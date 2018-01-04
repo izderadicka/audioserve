@@ -10,25 +10,32 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate clap;
+#[macro_use]
+extern crate quick_error;
 
 use hyper::server::{Http as HttpServer, NewService, Request, Response, Service};
 use hyper::{Method, StatusCode};
 use hyper::header::{Range};
-use std::io;
+use std::io::{self, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use subs::{send_file, short_response_boxed, ResponseFuture, NOT_FOUND_MESSAGE, get_folder};
+use config::{parse_args, Config};
+
 mod subs;
 mod types;
+mod config;
 
 
 const OVERLOADED_MESSAGE: &str = "Overloaded, try later";
-const MAX_SENDING_THREADS: usize = 10;
 
 type Counter = Arc<AtomicUsize>;
 
 struct Factory {
     sending_threads: Counter,
+    max_threads: usize
 }
 
 impl NewService for Factory {
@@ -40,11 +47,13 @@ impl NewService for Factory {
     fn new_service(&self) -> Result<Self::Instance, io::Error> {
         Ok(FileSendService {
             sending_threads: self.sending_threads.clone(),
+            max_threads: self.max_threads
         })
     }
 }
 struct FileSendService {
     sending_threads: Counter,
+    max_threads: usize
 }
 
 
@@ -55,7 +64,7 @@ impl Service for FileSendService {
     type Future = ResponseFuture;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-        if self.sending_threads.load(Ordering::SeqCst) > MAX_SENDING_THREADS {
+        if self.sending_threads.load(Ordering::SeqCst) > self.max_threads {
                     warn!("Server is busy, refusing request");
                     return short_response_boxed(
                         StatusCode::ServiceUnavailable,
@@ -94,12 +103,13 @@ impl Service for FileSendService {
     }
 }
 
-fn start_server() -> Result<(), hyper::Error> {
-    let addr = "127.0.0.1:3000".parse().unwrap();
+fn start_server(config: Config) -> Result<(), hyper::Error> {
+    
     let factory = Factory {
         sending_threads: Arc::new(AtomicUsize::new(0)),
+        max_threads: config.max_sending_threads
     };
-    let mut server = HttpServer::new().bind(&addr, factory)?;
+    let mut server = HttpServer::new().bind(&config.local_addr, factory)?;
     server.no_proto();
     info!("Server listening on {}", server.local_addr().unwrap());
     server.run()?;
@@ -108,6 +118,15 @@ fn start_server() -> Result<(), hyper::Error> {
     Ok(())
 }
 fn main() {
+    let config=match parse_args() {
+        Err(e) => {
+            writeln!(&mut io::stderr(), "Arguments error: {:?}",e).unwrap();
+            std::process::exit(1)
+        }
+        Ok(c) => c
+    };
+    debug!("Started with following config {:?}", config);
     pretty_env_logger::init().unwrap();
-    start_server().unwrap();
+
+    start_server(config).unwrap();
 }
