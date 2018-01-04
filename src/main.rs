@@ -23,6 +23,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use subs::{send_file, short_response_boxed, ResponseFuture, NOT_FOUND_MESSAGE, get_folder};
 use config::{parse_args, Config};
+use std::path::PathBuf;
 
 mod subs;
 mod types;
@@ -35,7 +36,8 @@ type Counter = Arc<AtomicUsize>;
 
 struct Factory {
     sending_threads: Counter,
-    max_threads: usize
+    max_threads: usize,
+    base_dir: PathBuf
 }
 
 impl NewService for Factory {
@@ -47,13 +49,15 @@ impl NewService for Factory {
     fn new_service(&self) -> Result<Self::Instance, io::Error> {
         Ok(FileSendService {
             sending_threads: self.sending_threads.clone(),
-            max_threads: self.max_threads
+            max_threads: self.max_threads,
+            base_dir: self.base_dir.clone()
         })
     }
 }
 struct FileSendService {
     sending_threads: Counter,
-    max_threads: usize
+    max_threads: usize,
+    base_dir: PathBuf
 }
 
 
@@ -94,8 +98,8 @@ impl Service for FileSendService {
                 send_file("test_data/julie.opus".into(), bytes_range, self.sending_threads.clone())
             },
             (&Method::Get, "/folder") => {
-                let base_path = "./".into();
-                get_folder(base_path, "test_data".into(),  self.sending_threads.clone()) 
+                
+                get_folder(self.base_dir.clone(), "".into(),  self.sending_threads.clone()) 
             }
 
             (_, _) => short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE),
@@ -107,7 +111,8 @@ fn start_server(config: Config) -> Result<(), hyper::Error> {
     
     let factory = Factory {
         sending_threads: Arc::new(AtomicUsize::new(0)),
-        max_threads: config.max_sending_threads
+        max_threads: config.max_sending_threads,
+        base_dir: config.base_dir
     };
     let mut server = HttpServer::new().bind(&config.local_addr, factory)?;
     server.no_proto();
@@ -120,7 +125,7 @@ fn start_server(config: Config) -> Result<(), hyper::Error> {
 fn main() {
     let config=match parse_args() {
         Err(e) => {
-            writeln!(&mut io::stderr(), "Arguments error: {:?}",e).unwrap();
+            writeln!(&mut io::stderr(), "Arguments error: {}",e).unwrap();
             std::process::exit(1)
         }
         Ok(c) => c

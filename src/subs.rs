@@ -177,7 +177,7 @@ pub fn get_folder(
                 ).expect(THREAD_SEND_ERROR);
             },
             Err(_) => {
-                short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE);
+                tx.send(short_response(StatusCode::NotFound, NOT_FOUND_MESSAGE)).expect(THREAD_SEND_ERROR);
             }
 
         }
@@ -233,8 +233,8 @@ fn list_dir<P:AsRef<Path>, P2:AsRef<Path>+Display>(base_dir:P, dir_path: P2) -> 
                     Err(e) => warn!("Cannot list items in directory {}, error {}", &dir_path, e)
                 }
             }
-            files.sort_unstable();
-            subfolders.sort_unstable();
+            files.sort_unstable_by_key(|e| e.name.to_uppercase());
+            subfolders.sort_unstable_by_key(|e| e.name.to_uppercase());;
             Ok(AudioFolder{
                 files,
                 subfolders,

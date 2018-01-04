@@ -2,6 +2,7 @@ use clap::{App, Arg};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::env;
+use std::io;
 
 quick_error! { 
 #[derive(Debug)]
@@ -76,9 +77,19 @@ pub fn parse_args() -> Result<Config, Error>{
         }
     }
 
-    let base_dir = args.value_of("base_dir").unwrap().into();
+    let base_dir: PathBuf = args.value_of("base_dir").unwrap().into();
+    if ! base_dir.is_dir() {
+        return Err(Error::InvalidBaseDirectory(io::Error::from(io::ErrorKind::NotFound)))
+    }
     let local_addr = args.value_of("local_addr").unwrap().parse()?;
     let max_sending_threads = args.value_of("max-threads").unwrap().parse()?;
+    if max_sending_threads < 10 {
+        return Err("Too low - should be above 10".into())
+    }
+    if max_sending_threads > 10000 {
+        return Err("Too much - should be below 10000".into())
+    }
+
 
     Ok(Config{
         base_dir,
