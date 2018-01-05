@@ -1,12 +1,13 @@
 use hyper::server::{NewService, Request, Response, Service};
 use hyper::{Method, StatusCode};
-use hyper::header::{Range};
+use hyper::header::{Range,AccessControlAllowOrigin};
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use self::subs::{send_file, short_response_boxed, ResponseFuture, NOT_FOUND_MESSAGE, get_folder};
 use std::path::{PathBuf, Path};
 use percent_encoding::percent_decode;
+use futures::Future;
 
 mod subs;
 mod types;
@@ -46,6 +47,11 @@ pub struct FileSendService {
 fn get_subfolder(path: &str, prefix: &str) -> PathBuf {
     Path::new(&path).strip_prefix(prefix).unwrap().to_path_buf()
 }
+
+fn add_cors_headers(resp: Response) -> Response {
+    resp.with_header(AccessControlAllowOrigin::Any)
+}
+
 impl Service for FileSendService {
     type Request = Request;
     type Response = Response;
@@ -61,7 +67,7 @@ impl Service for FileSendService {
                     );
         };
 
-        match req.method() {
+        let response = match req.method() {
             &Method::Get => {
                 let path = percent_decode(req.path().as_bytes()).decode_utf8_lossy().into_owned();
                 
@@ -98,6 +104,8 @@ impl Service for FileSendService {
             },
 
             _ => short_response_boxed(StatusCode::MethodNotAllowed, "Method not supported"),
-        }
+        };
+
+        Box::new(response.map(|r| add_cors_headers((r))))
     }
 }

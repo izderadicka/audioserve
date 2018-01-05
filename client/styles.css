@@ -1,0 +1,23 @@
+html {
+    height: 100%;
+    position: relative;
+}
+
+body {
+    height: 100%;
+}
+
+#main {
+    overflow-y: scroll;
+    height: calc(100% - 50px);
+}
+
+#player {
+    height: 50px;
+    padding-top: 5px;
+    overflow: hidden;
+}
+
+#player audio {
+    width: 100%;
+}
