@@ -1,5 +1,5 @@
 [package]
-name = "server"
+name = "audioserve"
 version = "0.1.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 
