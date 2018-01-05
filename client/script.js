@@ -1,5 +1,5 @@
 $(function() {
-    const baseUrl ="http://localhost:3000";
+    const baseUrl =`${window.location.protocol}//${window.location.hostname}:3000`;
     let currentFolder = "";
     function loadFolder(path) {
         $.ajax(baseUrl+"/folder/"+ path)
