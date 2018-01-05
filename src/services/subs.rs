@@ -12,8 +12,7 @@ use std::thread;
 use std::sync::atomic::{Ordering};
 use super::{Counter};
 use super::types::*;
-use std::path::Path;
-use std::fmt::Display;
+use std::path::{Path, PathBuf};
 use mime_guess::guess_mime_type;
 use mime;
 use serde_json;
@@ -62,12 +61,15 @@ where F: FnOnce()->()+Send+'static
 
 }
 
-pub fn send_file(file_path: String, 
+pub fn send_file(
+base_path: PathBuf,    
+file_path: PathBuf, 
 range: Option<hyper::header::ByteRangeSpec>, 
 counter: Counter) -> ResponseFuture {
     let (tx, rx) = oneshot::channel();
     guarded_spawn(counter,move || {
-        match File::open(&file_path) {
+        let full_path=base_path.join(&file_path);
+        match File::open(&full_path) {
             Ok(mut file) => {
                 let (mut body_tx, body_rx) = mpsc::channel(1);
                 let file_sz = file.metadata().map(|m| m.len()).expect("File stat error");
@@ -162,8 +164,8 @@ fn box_rx(rx: ::futures::sync::oneshot::Receiver<Response>) -> ResponseFuture {
 }
 
 pub fn get_folder(
-    base_path: ::std::path::PathBuf,
-    folder_path: String, 
+    base_path: PathBuf,
+    folder_path: PathBuf, 
     counter: Counter) -> ResponseFuture {
     let (tx, rx) = oneshot::channel();
     guarded_spawn( counter, move || {
@@ -185,7 +187,7 @@ pub fn get_folder(
     box_rx(rx)
     }
 
-fn list_dir<P:AsRef<Path>, P2:AsRef<Path>+Display>(base_dir:P, dir_path: P2) -> Result<AudioFolder, io::Error>{
+fn list_dir<P:AsRef<Path>, P2:AsRef<Path>>(base_dir:P, dir_path: P2) -> Result<AudioFolder, io::Error>{
     fn os_to_string(s: ::std::ffi::OsString) -> String {
         match s.into_string() {
             Ok(s) => s,
@@ -230,7 +232,7 @@ fn list_dir<P:AsRef<Path>, P2:AsRef<Path>+Display>(base_dir:P, dir_path: P2) -> 
                             }
                         }
                     },
-                    Err(e) => warn!("Cannot list items in directory {}, error {}", &dir_path, e)
+                    Err(e) => warn!("Cannot list items in directory {:?}, error {}", dir_path.as_ref().as_os_str(), e)
                 }
             }
             files.sort_unstable_by_key(|e| e.name.to_uppercase());
@@ -244,7 +246,7 @@ fn list_dir<P:AsRef<Path>, P2:AsRef<Path>+Display>(base_dir:P, dir_path: P2) -> 
 
         }
         Err(e) => {
-            error!("Requesting wrong directory: {}", e);
+            error!("Requesting wrong directory {:?} : {}", (&full_path).as_os_str(), e);
             Err(e)
 
         }
