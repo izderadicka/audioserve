@@ -21,3 +21,7 @@ body {
 #player audio {
     width: 100%;
 }
+
+#subfolders-container, #files-container {
+    display: none;
+}

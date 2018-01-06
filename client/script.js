@@ -1,9 +1,13 @@
 $(function() {
     const baseUrl =`${window.location.protocol}//${window.location.hostname}:3000`;
-    let currentFolder = "";
     function loadFolder(path) {
         $.ajax(baseUrl+"/folder/"+ path)
-        .fail( err => console.log("Server error", err))
+        .fail( err => { 
+            console.log("Server error", err);
+            if (err.statusCode() == 404 && path.length) {
+                loadFolder("");
+            }
+        })
         .then(data => {
             //console.log(data);
             let subfolders = $('#subfolders');
@@ -17,6 +21,11 @@ $(function() {
                     .text(subfolder.name)
                 subfolders.append(item);
             }
+            if (data.subfolders.length) {
+                $("#subfolders-container").show();
+            } else {
+                $("#subfolders-container").hide();
+            }
             let files = $("#files");
             let fcount = $("#files-count");
             files.empty();
@@ -27,11 +36,24 @@ $(function() {
                     .text(file.name)
                 files.append(item);
             }
-            update_breadcrumb(path);
-            currentFolder = path;
-            clearPlayer();
-            
+            if (data.files.length) {
+                $("#files-container").show();
+            } else {
+                $("#files-container").hide();
+            }
 
+            update_breadcrumb(path);
+            window.localStorage.setItem("audioserve_folder", path);
+            let lastFile = window.localStorage.getItem("audioserve_file");
+            if (lastFile) {
+                let target=$(`#files a[href="${lastFile}"]`);
+                if (target.length) {
+                    let time = window.localStorage.getItem("audioserve_time");
+                    playFile(target, true, time);
+                }
+            } else {
+            clearPlayer();
+            }
         });
     }
 
@@ -52,17 +74,29 @@ $(function() {
 
     }
 
-    function playFile(target) {
+    function playFile(target, paused, startTime) {
+       
         $("#files a").removeClass("active");
         target.addClass("active");
         let path = target.attr("href");
+        window.localStorage.setItem("audioserve_file", path);
         let fullUrl = baseUrl+"/audio/"+path;
         let player = $("#player audio").get()[0];
         player.src= fullUrl;
-        player.play();
+        if (startTime) {
+            player.currentTime = startTime
+        }
+        if (! paused) {
+            let res=player.play();
+            if (res.catch) {
+                res.catch(e => console.log("Play failed", e))
+            }
+        }
     }
 
     function clearPlayer() {
+        window.localStorage.removeItem("audioserve_file");
+        window.localStorage.removeItem("audioserve_time");
         let player = $("#player audio").get()[0];
         player.pause()
         player.src = "";
@@ -88,17 +122,24 @@ $(function() {
     $("#player audio").on("ended", evt => {
         let nextTarget = $("#files a.active + a");
         if (nextTarget.length) {
+            try {
             nextTarget.get(0).scrollIntoView({block: "center", 
                 inline: "nearest",
                 behaviour: "smooth"
             });
+            }  catch(e) {
+                nextTarget.get(0).scrollIntoView();
+            }  
             playFile(nextTarget);
         } else {
             clearPlayer();
             console.log("Playback of folder finished");
         }
-    })
+    });
 
-    loadFolder(currentFolder);
-    
+    $("#player audio").on("timeupdate", evt => {
+        window.localStorage.setItem("audioserve_time", evt.target.currentTime);
+    });
+
+    loadFolder(window.localStorage.getItem("audioserve_folder")|| "");
 })
