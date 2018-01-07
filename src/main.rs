@@ -20,7 +20,7 @@ use hyper::server::{Http as HttpServer};
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicUsize};
 use std::sync::Arc;
-use services::{Factory};
+use services::{Factory,SharedSecretAuthenticator};
 use config::{parse_args, Config};
 
 mod services;
@@ -32,7 +32,11 @@ fn start_server(config: Config) -> Result<(), hyper::Error> {
     let factory = Factory {
         sending_threads: Arc::new(AtomicUsize::new(0)),
         max_threads: config.max_sending_threads,
-        base_dir: config.base_dir
+        base_dir: config.base_dir,
+        authenticator: Arc::new(Box::new(SharedSecretAuthenticator::new(
+            "hey".into(),
+            "how".into()
+        )))
     };
     let mut server = HttpServer::new().bind(&config.local_addr, factory)?;
     server.no_proto();

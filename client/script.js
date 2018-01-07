@@ -1,11 +1,19 @@
 $(function() {
     const baseUrl =`${window.location.protocol}//${window.location.hostname}:3000`;
     function loadFolder(path) {
-        $.ajax(baseUrl+"/folder/"+ path)
+        $.ajax({
+            url: baseUrl+"/folder/"+ path,
+            xhrFields: {
+                withCredentials: true
+             }
+            }
+            )
         .fail( err => { 
             console.log("Server error", err);
-            if (err.statusCode() == 404 && path.length) {
+            if (err.status == 404 && path.length) {
                 loadFolder("");
+            } else if (err.status == 401) {
+                $("#login-dialog").modal();
             }
         })
         .then(data => {
@@ -43,16 +51,19 @@ $(function() {
             }
 
             update_breadcrumb(path);
+            let prevFolder = window.localStorage.getItem("audioserve_folder");
             window.localStorage.setItem("audioserve_folder", path);
+            if (prevFolder !== path) {
+                clearPlayer();
+                }
             let lastFile = window.localStorage.getItem("audioserve_file");
             if (lastFile) {
                 let target=$(`#files a[href="${lastFile}"]`);
                 if (target.length) {
                     let time = window.localStorage.getItem("audioserve_time");
+                    showInView(target);
                     playFile(target, true, time);
                 }
-            } else {
-            clearPlayer();
             }
         });
     }
@@ -103,6 +114,17 @@ $(function() {
         $("#files a").removeClass("active");
     }
 
+    function showInView(nextTarget) {
+        try {
+            nextTarget.get(0).scrollIntoView({block: "center", 
+                inline: "nearest",
+                behaviour: "smooth"
+            });
+            }  catch(e) {
+                nextTarget.get(0).scrollIntoView();
+            } 
+    }
+
     $("#subfolders").on("click", "a.list-group-item-action", evt => {
         loadFolder($(evt.target).attr("href"));
         evt.preventDefault();
@@ -122,14 +144,7 @@ $(function() {
     $("#player audio").on("ended", evt => {
         let nextTarget = $("#files a.active + a");
         if (nextTarget.length) {
-            try {
-            nextTarget.get(0).scrollIntoView({block: "center", 
-                inline: "nearest",
-                behaviour: "smooth"
-            });
-            }  catch(e) {
-                nextTarget.get(0).scrollIntoView();
-            }  
+            showInView(nextTarget);
             playFile(nextTarget);
         } else {
             clearPlayer();
@@ -139,6 +154,24 @@ $(function() {
 
     $("#player audio").on("timeupdate", evt => {
         window.localStorage.setItem("audioserve_time", evt.target.currentTime);
+    });
+
+    $("#login-btn").on("click", evt => {
+        let secret = $("#secret-input").val();
+        $.ajax({
+            url:baseUrl+"/authenticate",
+            type: "POST",
+            data: {secret: secret},
+            xhrFields: {
+                withCredentials: true
+             }
+			
+        })
+        .done(data => {
+            loadFolder(window.localStorage.getItem("audioserve_folder")|| "");
+            $("#login-dialog").modal("hide");
+        })
+        .fail( err => console.log("Login failed", err))
     });
 
     loadFolder(window.localStorage.getItem("audioserve_folder")|| "");
