@@ -38,6 +38,12 @@ pub struct AudioFolder {
     pub description: Option<TypedFile> // description is file in folder - either txt, html, md
 }
 
+#[derive(Debug,Serialize)]
+pub struct SearchResult {
+    pub files: Vec<AudioFile>,
+    pub subfolders: Vec<AudioFolderShort>,
+}
+
 fn has_subtype(mime: &Mime, subtypes: &[&str]) -> bool {
     subtypes.iter().find(|&&s| s==mime.subtype()).is_some()
 }

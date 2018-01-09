@@ -1,17 +1,18 @@
 use hyper;
 use futures::future::{self, Future};
-use hyper::server::{Response};
+use hyper::server::Response;
 use hyper::{Chunk, StatusCode};
-use hyper::header::{ContentLength, ContentType, AcceptRanges, RangeUnit, 
-ContentRange, ContentRangeSpec};
+use hyper::header::{AcceptRanges, ContentLength, ContentRange, ContentRangeSpec, ContentType,
+                    RangeUnit};
 use futures::sync::{mpsc, oneshot};
 use futures::Sink;
 use std::io::{self, Read, Seek, SeekFrom};
-use std::fs::{self,File};
+use std::fs::{self, File};
 use std::thread;
-use std::sync::atomic::{Ordering};
-use super::{Counter};
+use std::sync::atomic::Ordering;
+use super::Counter;
 use super::types::*;
+use super::search::{Search, SearchTrait};
 use std::path::{Path, PathBuf};
 use mime_guess::guess_mime_type;
 use mime;
@@ -27,10 +28,9 @@ pub type ResponseFuture = Box<Future<Item = Response, Error = hyper::Error>>;
 
 pub fn short_response(status: StatusCode, msg: &'static str) -> Response {
     Response::new()
-    .with_status(status)
-    .with_header(ContentLength(msg.len() as u64))
-    .with_body(msg)
-
+        .with_status(status)
+        .with_header(ContentLength(msg.len() as u64))
+        .with_body(msg)
 }
 
 pub fn short_response_boxed(status: StatusCode, msg: &'static str) -> ResponseFuture {
@@ -47,10 +47,10 @@ impl Drop for GuardedCounter {
     }
 }
 
-fn guarded_spawn<F>(counter:Counter, f: F) -> thread::JoinHandle<()> 
-where F: FnOnce()->()+Send+'static
+fn guarded_spawn<F>(counter: Counter, f: F) -> thread::JoinHandle<()>
+where
+    F: FnOnce() -> () + Send + 'static,
 {
-    
     counter.fetch_add(1, Ordering::SeqCst);
     let gc = GuardedCounter(counter);
     thread::spawn(move || {
@@ -58,17 +58,17 @@ where F: FnOnce()->()+Send+'static
         drop(gc);
         //counter.fetch_sub(1, Ordering::SeqCst);
     })
-
 }
 
 pub fn send_file(
-base_path: PathBuf,    
-file_path: PathBuf, 
-range: Option<hyper::header::ByteRangeSpec>, 
-counter: Counter) -> ResponseFuture {
+    base_path: PathBuf,
+    file_path: PathBuf,
+    range: Option<hyper::header::ByteRangeSpec>,
+    counter: Counter,
+) -> ResponseFuture {
     let (tx, rx) = oneshot::channel();
-    guarded_spawn(counter,move || {
-        let full_path=base_path.join(&file_path);
+    guarded_spawn(counter, move || {
+        let full_path = base_path.join(&file_path);
         match File::open(&full_path) {
             Ok(mut file) => {
                 let (mut body_tx, body_rx) = mpsc::channel(1);
@@ -78,40 +78,37 @@ counter: Counter) -> ResponseFuture {
                     .with_body(body_rx)
                     .with_header(ContentType(mime));
                 let range = match range {
-                    Some(r) => 
-                        match r.to_satisfiable_range(file_sz) {
-                            Some((s,e)) => {
-                                assert!(e>=s);
-                                Some((s, e, e-s+1))
-                            },
-                            None => None
-                        },
-                    None => None
-                };
-               
-                    
-                let (start, content_len) = match range {
-                    Some((s,e,l)) => {
-                        
-                        res = res.with_header(ContentRange(ContentRangeSpec::Bytes{
-                                    range:Some((s,e)),
-                                    instance_length: Some(file_sz)
-                                    }))
-                                    .with_status(StatusCode::PartialContent);
-                            (s, l)
-                            },
-                        None => {
-                            res=res.with_header(AcceptRanges(vec![RangeUnit::Bytes]));
-                            (0,file_sz)
+                    Some(r) => match r.to_satisfiable_range(file_sz) {
+                        Some((s, e)) => {
+                            assert!(e >= s);
+                            Some((s, e, e - s + 1))
                         }
+                        None => None,
+                    },
+                    None => None,
                 };
-                   
-                
+
+
+                let (start, content_len) = match range {
+                    Some((s, e, l)) => {
+                        res = res.with_header(ContentRange(ContentRangeSpec::Bytes {
+                            range: Some((s, e)),
+                            instance_length: Some(file_sz),
+                        })).with_status(StatusCode::PartialContent);
+                        (s, l)
+                    }
+                    None => {
+                        res = res.with_header(AcceptRanges(vec![RangeUnit::Bytes]));
+                        (0, file_sz)
+                    }
+                };
+
+
                 res = res.with_header(ContentLength(content_len));
-                
+
                 tx.send(res).expect(THREAD_SEND_ERROR);
                 let mut buf = [0u8; BUF_SIZE];
-                if start>0 {
+                if start > 0 {
                     file.seek(SeekFrom::Start(start)).expect("Seek error");
                 }
                 let mut remains = content_len as usize;
@@ -139,11 +136,11 @@ counter: Counter) -> ResponseFuture {
                                 remains -= n
                             }
                         },
-                        
+
                         Err(e) => {
                             error!("Sending file error {}", e);
-                            break
-                        },
+                            break;
+                        }
                     }
                 }
             }
@@ -163,31 +160,24 @@ fn box_rx(rx: ::futures::sync::oneshot::Receiver<Response>) -> ResponseFuture {
     }))
 }
 
-pub fn get_folder(
-    base_path: PathBuf,
-    folder_path: PathBuf, 
-    counter: Counter) -> ResponseFuture {
+pub fn get_folder(base_path: PathBuf, folder_path: PathBuf, counter: Counter) -> ResponseFuture {
     let (tx, rx) = oneshot::channel();
-    guarded_spawn( counter, move || {
-        match list_dir(&base_path, &folder_path) {
-            Ok(folder) => {
-                let json = serde_json::to_string(&folder).expect("Serialization error");
-                tx.send(Response::new()
-                    .with_header(ContentType(mime::APPLICATION_JSON))
-                    .with_header(ContentLength(json.len() as u64))
-                    .with_body(json)
-                ).expect(THREAD_SEND_ERROR);
-            },
-            Err(_) => {
-                tx.send(short_response(StatusCode::NotFound, NOT_FOUND_MESSAGE)).expect(THREAD_SEND_ERROR);
-            }
-
+    guarded_spawn(counter, move || match list_dir(&base_path, &folder_path) {
+        Ok(folder) => {
+            tx.send(json_response(&folder)).expect(THREAD_SEND_ERROR);
+        }
+        Err(_) => {
+            tx.send(short_response(StatusCode::NotFound, NOT_FOUND_MESSAGE))
+                .expect(THREAD_SEND_ERROR);
         }
     });
     box_rx(rx)
-    }
+}
 
-fn list_dir<P:AsRef<Path>, P2:AsRef<Path>>(base_dir:P, dir_path: P2) -> Result<AudioFolder, io::Error>{
+fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
+    base_dir: P,
+    dir_path: P2,
+) -> Result<AudioFolder, io::Error> {
     fn os_to_string(s: ::std::ffi::OsString) -> String {
         match s.into_string() {
             Ok(s) => s,
@@ -208,49 +198,73 @@ fn list_dir<P:AsRef<Path>, P2:AsRef<Path>>(base_dir:P, dir_path: P2) -> Result<A
 
             for item in dir_iter {
                 match item {
-                    Ok(f) => {
-                        if let Ok(ft) = f.file_type() {
-                            let path = f.path().strip_prefix(&base_dir).unwrap().into();
-                            if ft.is_dir() {
-                                subfolders.push(AudioFolderShort{
-                                    path: path,
-                                    name: os_to_string(f.file_name())
+                    Ok(f) => if let Ok(ft) = f.file_type() {
+                        let path = f.path().strip_prefix(&base_dir).unwrap().into();
+                        if ft.is_dir() {
+                            subfolders.push(AudioFolderShort {
+                                path: path,
+                                name: os_to_string(f.file_name()),
+                            })
+                        } else if ft.is_file() {
+                            if is_audio(&path) {
+                                files.push(AudioFile {
+                                    path,
+                                    name: os_to_string(f.file_name()),
                                 })
-
-                            } else if ft.is_file() {
-                                
-                                if is_audio(&path) {
-                                    files.push(AudioFile{
-                                        path,
-                                        name: os_to_string(f.file_name())
-                                    })
-                                } else if cover.is_none() && is_cover(&path) {
-                                    cover = Some(TypedFile::new(path))
-                                } else if description.is_none() && is_description(&path) {
-                                    description = Some(TypedFile::new(path))
-                                }
+                            } else if cover.is_none() && is_cover(&path) {
+                                cover = Some(TypedFile::new(path))
+                            } else if description.is_none() && is_description(&path) {
+                                description = Some(TypedFile::new(path))
                             }
                         }
                     },
-                    Err(e) => warn!("Cannot list items in directory {:?}, error {}", dir_path.as_ref().as_os_str(), e)
+                    Err(e) => warn!(
+                        "Cannot list items in directory {:?}, error {}",
+                        dir_path.as_ref().as_os_str(),
+                        e
+                    ),
                 }
             }
             files.sort_unstable_by_key(|e| e.name.to_uppercase());
             subfolders.sort_unstable_by_key(|e| e.name.to_uppercase());;
-            Ok(AudioFolder{
+            Ok(AudioFolder {
                 files,
                 subfolders,
                 cover,
-                description
+                description,
             })
-
         }
         Err(e) => {
-            error!("Requesting wrong directory {:?} : {}", (&full_path).as_os_str(), e);
+            error!(
+                "Requesting wrong directory {:?} : {}",
+                (&full_path).as_os_str(),
+                e
+            );
             Err(e)
-
         }
     }
+}
+
+fn json_response<T: ::serde::Serialize>(data: &T) -> Response {
+    let json = serde_json::to_string(data).expect("Serialization error");
+    Response::new()
+        .with_header(ContentType(mime::APPLICATION_JSON))
+        .with_header(ContentLength(json.len() as u64))
+        .with_body(json)
+}
+
+pub fn search(
+    base_dir: PathBuf,
+    searcher: Search,
+    query: String,
+    counter: Counter,
+) -> ResponseFuture {
+    let (tx, rx) = oneshot::channel();
+    guarded_spawn(counter, move || {
+        let res = searcher.search(base_dir, query);
+        tx.send(json_response(&res)).expect(THREAD_SEND_ERROR);
+    });
+    box_rx(rx)
 }
 
 #[cfg(test)]
@@ -264,7 +278,9 @@ mod tests {
         let res = list_dir("./", "test_data/");
         assert!(res.is_ok());
         let folder = res.unwrap();
-        assert_eq!(folder.files.len(), 1);
+        assert_eq!(folder.files.len(), 3);
+        assert!(folder.cover.is_some());
+        assert!(folder.description.is_some());
     }
 
     #[test]
@@ -272,11 +288,9 @@ mod tests {
         let folder = list_dir("./", "test_data/").unwrap();
         let json = serde_json::to_string(&folder).unwrap();
         println!("JSON: {}", &json);
-
-
     }
-    use ::std::sync::Arc;
-    use ::std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     #[test]
     fn test_guarded_spawn() {
         let c = Arc::new(AtomicUsize::new(0));
@@ -284,11 +298,12 @@ mod tests {
         guarded_spawn(c.clone(), move || {
             println!("hey");
             assert_eq!(c2.load(Ordering::SeqCst), 1)
-        }).join().unwrap();
+        }).join()
+            .unwrap();
 
         assert_eq!(c.load(Ordering::SeqCst), 0);
 
-        let res=guarded_spawn(c.clone(), || {
+        let res = guarded_spawn(c.clone(), || {
             println!("Will panic");
             panic!("panic");
         }).join();
@@ -297,4 +312,3 @@ mod tests {
         assert_eq!(c.load(Ordering::SeqCst), 0)
     }
 }
-

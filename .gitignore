@@ -2,6 +2,5 @@
 /target/
 **/*.rs.bk
 .vscode
-test_data
 *.old
 Cargo.lock

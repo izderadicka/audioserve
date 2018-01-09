@@ -20,7 +20,9 @@ use hyper::server::{Http as HttpServer};
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicUsize};
 use std::sync::Arc;
-use services::{Factory,SharedSecretAuthenticator};
+use services::{Factory};
+use services::auth::SharedSecretAuthenticator;
+use services::search::Search;
 use config::{parse_args, Config};
 
 mod services;
@@ -36,7 +38,8 @@ fn start_server(config: Config) -> Result<(), hyper::Error> {
         authenticator: Arc::new(Box::new(SharedSecretAuthenticator::new(
             "hey".into(),
             "how".into()
-        )))
+        ))),
+        search:Search::FoldersSearch
     };
     let mut server = HttpServer::new().bind(&config.local_addr, factory)?;
     server.no_proto();
