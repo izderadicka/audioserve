@@ -19,9 +19,15 @@ impl TypedFile {
 #[derive(Debug,Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AudioFile {
     pub name: String,
-    pub path: PathBuf
+    pub path: PathBuf,
+    pub meta: Option<AudioMeta>
 }
 
+#[derive(Debug,Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AudioMeta {
+    pub duration: u32, // duration in seconds, if available
+    pub bitrate: u32 // bitrate in kB/s
+}
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AudioFolderShort {
@@ -48,10 +54,10 @@ fn has_subtype(mime: &Mime, subtypes: &[&str]) -> bool {
     subtypes.iter().find(|&&s| s==mime.subtype()).is_some()
 }
 
-
+const AUDIO: &'static [&'static str] = & ["ogg", "mpeg", "aac", "m4a", "m4b", "x-matroska"];
 pub fn is_audio<P: AsRef<Path>>(path:P) -> bool {
     let mime= guess_mime_type(path);
-    mime.type_() == "audio"
+    mime.type_() == "audio" && has_subtype((&mime), AUDIO)
 }
 
 const COVERS: &'static [&'static str] = & ["jpeg", "png"];

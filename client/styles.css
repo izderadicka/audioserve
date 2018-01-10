@@ -47,6 +47,11 @@ body {
   margin-right:0.5em;
 }
 
+.duration {
+  margin-left: 1em;
+  font-size: 70%
+}
+
 h1.top-header {
     min-height: 1.2em;
 }

@@ -44,6 +44,9 @@ $(function() {
                     .attr("href", file.path)
                     .text(file.name)
                 files.append(item);
+                if (file.meta) {
+                    item.append($(`<span class="duration">${formatDuration(file.meta.duration)}</span>`))
+                }
             }
             if (data.files.length) {
                 $("#files-container").show();
@@ -71,6 +74,23 @@ $(function() {
                 }
             }
         });
+    }
+
+    function formatDuration(dur) {
+        let hours = 0;
+        let mins = Math.floor(dur / 60);
+        let secs = dur - mins * 60;
+        secs = ("0"+secs).slice(-2);
+        if (mins >=60) {
+            hours = Math.floor(mins / 60);
+            mins = mins - hours * 60;
+            mins = ("0"+mins).slice(-2);
+        }
+        if (hours) {
+            return `(${hours}:${mins}:${secs})`
+        } else {
+            return `(${mins}:${secs})`;
+        }
     }
 
     function search(query, fromHistory) {

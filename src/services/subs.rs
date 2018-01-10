@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use mime_guess::guess_mime_type;
 use mime;
 use serde_json;
+use taglib;
 
 const BUF_SIZE: usize = 8 * 1024;
 pub const NOT_FOUND_MESSAGE: &str = "Not Found";
@@ -208,8 +209,10 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
                         } else if ft.is_file() {
                             if is_audio(&path) {
                                 files.push(AudioFile {
+                                    meta: get_audio_properties(&base_dir.as_ref().join(&path)),
                                     path,
                                     name: os_to_string(f.file_name()),
+                                    
                                 })
                             } else if cover.is_none() && is_cover(&path) {
                                 cover = Some(TypedFile::new(path))
@@ -243,6 +246,28 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
             Err(e)
         }
     }
+}
+
+fn get_audio_properties(filename: & Path) -> Option<AudioMeta> {
+    let filename = filename.as_os_str().to_str();
+    match filename {
+        Some(fname) => {
+            let audio_file = taglib::File::new(fname);
+            match audio_file {
+                Ok(f) => match f.audioproperties() {
+                    Ok(ap) => return Some(AudioMeta{
+                        duration: ap.length(),
+                        bitrate: ap.bitrate()
+                    }),
+                    Err(e) => warn!("File {} does not have audioproperties {:?}", fname, e)
+                },
+                Err(e) => warn!("Cannot get audiofile {} error {:?}", fname, e)
+            }
+        },
+        None => warn!("File name {:?} is not utf8", filename)
+    };
+    
+    None
 }
 
 fn json_response<T: ::serde::Serialize>(data: &T) -> Response {
@@ -311,4 +336,6 @@ mod tests {
 
         assert_eq!(c.load(Ordering::SeqCst), 0)
     }
+
+    
 }

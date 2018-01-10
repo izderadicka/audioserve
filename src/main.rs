@@ -16,6 +16,9 @@ extern crate clap;
 extern crate quick_error;
 extern crate url;
 extern crate percent_encoding;
+extern crate taglib;
+
+
 use hyper::server::{Http as HttpServer};
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicUsize};
