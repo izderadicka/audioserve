@@ -25,3 +25,47 @@ body {
 #subfolders-container, #files-container {
     display: none;
 }
+
+.search {
+    background-image: url("data:image/svg+xml;charset=utf8,%3C?xml version='1.0' encoding='UTF-8'?%3E%3Csvg width='16px' height='16px' viewBox='0 0 16 16' version='1.1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink'%3E%3C!-- Generator: Sketch 40.3 (33839) - http://www.bohemiancoding.com/sketch --%3E%3Ctitle%3Esearch%3C/title%3E%3Cdesc%3ECreated with Sketch.%3C/desc%3E%3Cdefs%3E%3C/defs%3E%3Cg id='Octicons' stroke='none' stroke-width='1' fill='none' fill-rule='evenodd'%3E%3Cg id='search' fill='%23000000'%3E%3Cpath d='M15.7,13.3 L11.89,9.47 C12.59,8.49 13,7.3 13,6 C13,2.69 10.31,0 7,0 C3.69,0 1,2.69 1,6 C1,9.31 3.69,12 7,12 C8.3,12 9.48,11.59 10.47,10.89 L14.3,14.7 C14.49,14.9 14.75,15 15,15 C15.25,15 15.52,14.91 15.7,14.7 C16.09,14.31 16.09,13.68 15.7,13.29 L15.7,13.3 Z M7,10.7 C4.41,10.7 2.3,8.59 2.3,6 C2.3,3.41 4.41,1.3 7,1.3 C9.59,1.3 11.7,3.41 11.7,6 C11.7,8.59 9.59,10.7 7,10.7 L7,10.7 Z' id='Shape'%3E%3C/path%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    background-size: contain;
+  }
+
+  #search-btn {
+    width: 1em;
+    height: 1em;
+    float: right;
+    margin-top: 5px;
+}
+
+#search-area {
+  padding-top: 0.2em;
+  font-size: 70%;
+  height:1em;
+  
+  float:right;
+  margin-right:0.5em;
+}
+
+h1.top-header {
+    min-height: 1.2em;
+}
+
+#search-btn, #search-area {
+    display: none;
+}
+
+@media (max-width: 1024px) {
+    h1.top-header {
+        font-size: 1.8rem;
+    }
+}
+
+@media (max-width: 360px) {
+    #search-area input {
+        width: 12em;
+    }
+}
+
+
+  
