@@ -17,15 +17,17 @@ extern crate quick_error;
 extern crate url;
 extern crate percent_encoding;
 extern crate taglib;
+extern crate num_cpus;
 
 
 use hyper::server::{Http as HttpServer};
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicUsize};
 use std::sync::Arc;
-use services::{Factory};
+use services::{Factory, TranscodingDetails};
 use services::auth::SharedSecretAuthenticator;
 use services::search::Search;
+use services::transcode::Transcoder;
 use config::{parse_args, Config};
 
 mod services;
@@ -39,10 +41,15 @@ fn start_server(config: Config) -> Result<(), hyper::Error> {
         max_threads: config.max_sending_threads,
         base_dir: config.base_dir,
         authenticator: Arc::new(Box::new(SharedSecretAuthenticator::new(
-            "hey".into(),
+            config.shared_secret,
             "how".into()
         ))),
-        search:Search::FoldersSearch
+        search:Search::FoldersSearch,
+        transcoding: TranscodingDetails {
+        transcoder: config.transcoding.map(|q| Transcoder::new(q)),
+        transcodings: Arc::new(AtomicUsize::new(0)),
+        max_transcodings: config.max_transcodings
+        }
     };
     let mut server = HttpServer::new().bind(&config.local_addr, factory)?;
     server.no_proto();

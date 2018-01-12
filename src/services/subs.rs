@@ -13,6 +13,7 @@ use std::sync::atomic::Ordering;
 use super::Counter;
 use super::types::*;
 use super::search::{Search, SearchTrait};
+use super::transcode::Transcoder;
 use std::path::{Path, PathBuf};
 use mime_guess::guess_mime_type;
 use mime;
@@ -61,20 +62,27 @@ where
     })
 }
 
-pub fn send_file(
-    base_path: PathBuf,
-    file_path: PathBuf,
-    range: Option<hyper::header::ByteRangeSpec>,
-    counter: Counter,
-) -> ResponseFuture {
-    let (tx, rx) = oneshot::channel();
-    guarded_spawn(counter, move || {
-        let full_path = base_path.join(&file_path);
-        match File::open(&full_path) {
+fn serve_file_transcoded(full_path: &Path, 
+    transcoder: Transcoder,
+    tx: ::futures::sync::oneshot::Sender<Response>) {
+    let (body_tx, body_rx) = mpsc::channel(1);
+    let resp = Response::new()
+        .with_header(ContentType(transcoder.transcoded_mime()))
+        .with_body(body_rx);
+    tx.send(resp).expect(THREAD_SEND_ERROR);
+
+    transcoder.transcode(full_path,body_tx);
+
+    }
+
+fn serve_file_from_fs(full_path: &Path, 
+    range: Option<::hyper::header::ByteRangeSpec>, 
+    tx: ::futures::sync::oneshot::Sender<Response>) {
+    match File::open(full_path) {
             Ok(mut file) => {
                 let (mut body_tx, body_rx) = mpsc::channel(1);
                 let file_sz = file.metadata().map(|m| m.len()).expect("File stat error");
-                let mime = guess_mime_type(&file_path);
+                let mime = guess_mime_type(&full_path);
                 let mut res = Response::new()
                     .with_body(body_rx)
                     .with_header(ContentType(mime));
@@ -150,7 +158,53 @@ pub fn send_file(
                 tx.send(short_response(StatusCode::NotFound, NOT_FOUND_MESSAGE))
                     .expect(THREAD_SEND_ERROR);
             }
-        };
+    }
+}
+
+pub fn send_file(
+    base_path: PathBuf,
+    file_path: PathBuf,
+    range: Option<hyper::header::ByteRangeSpec>,
+    counter: Counter,
+    transcoding: super::TranscodingDetails,
+    
+) -> ResponseFuture {
+    let (tx, rx) = oneshot::channel();
+    guarded_spawn(counter, move || {
+        let full_path = base_path.join(&file_path);
+        if full_path.exists() {
+
+            let audio_properties = get_audio_properties(&full_path);
+            debug!("Audio properties: {:?}", audio_properties);
+            debug!("Trancoder: {:?}", transcoding.transcoder);
+            let should_transcode =  transcoding.transcoder.is_some() && match audio_properties {
+                Some(ap) => {
+                    transcoding.transcoder.as_ref().unwrap().should_transcode(ap.bitrate)
+                }, 
+                None =>    false
+            };
+
+            if should_transcode {
+                let counter = transcoding.transcodings;
+                let transcoder = transcoding.transcoder.unwrap();
+                if counter.load(Ordering::SeqCst) > transcoding.max_transcodings {
+                    warn!("Max transcodings reached");
+                    tx.send(short_response(StatusCode::ServiceUnavailable, 
+                    "Max transcodings reached")).expect(THREAD_SEND_ERROR)
+                } else {
+                    debug!("Sendig file {:?} transcoded", &full_path);
+                    guarded_spawn(counter, move ||
+                    serve_file_transcoded(&full_path, transcoder, tx));
+                }
+
+            } else {
+            serve_file_from_fs(&full_path, range, tx);
+            }
+        } else {
+            error!("File {:?} does not exists", full_path);
+            tx.send(short_response(StatusCode::NotFound, NOT_FOUND_MESSAGE))
+                    .expect(THREAD_SEND_ERROR);
+        }
     });
     box_rx(rx)
 }
@@ -248,7 +302,7 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     }
 }
 
-fn get_audio_properties(filename: & Path) -> Option<AudioMeta> {
+pub fn get_audio_properties(filename: & Path) -> Option<AudioMeta> {
     let filename = filename.as_os_str().to_str();
     match filename {
         Some(fname) => {
@@ -336,6 +390,16 @@ mod tests {
 
         assert_eq!(c.load(Ordering::SeqCst), 0)
     }
+
+    #[test] 
+    fn test_meta() {
+        let res = get_audio_properties(Path::new("./test_data/01-file.mp3"));
+        assert!(res.is_some());
+        let meta = res.unwrap();
+        assert_eq!(meta.bitrate, 220);
+        assert_eq!(meta.duration, 2);
+
+    } 
 
     
 }

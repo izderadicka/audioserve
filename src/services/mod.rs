@@ -11,6 +11,7 @@ use percent_encoding::percent_decode;
 use futures::{Future, future};
 use self::auth::Authenticator;
 use self::search::Search;
+use self::transcode::Transcoder;
 use url::form_urlencoded;
 use std::collections::HashMap;
 
@@ -18,6 +19,7 @@ mod subs;
 mod types;
 pub mod search;
 pub mod auth;
+pub mod transcode;
 
 const OVERLOADED_MESSAGE: &str = "Overloaded, try later";
 
@@ -30,7 +32,9 @@ pub struct Factory {
     pub max_threads: usize,
     pub base_dir: PathBuf,
     pub authenticator: Arc<Box<Authenticator<Credentials=()>>>,
-    pub search: Search
+    pub search: Search,
+    pub transcoding: TranscodingDetails
+    
 }
 
 impl NewService for Factory {
@@ -41,20 +45,34 @@ impl NewService for Factory {
 
     fn new_service(&self) -> Result<Self::Instance, io::Error> {
         Ok(FileSendService {
+            authenticator: self.authenticator.clone(),
             sending_threads: self.sending_threads.clone(),
             max_threads: self.max_threads,
             base_dir: self.base_dir.clone(),
-            authenticator: self.authenticator.clone(),
-            search: self.search.clone()
+            search: self.search.clone(),
+            transcoding: self.transcoding.clone()
         })
     }
 }
+
+#[derive(Clone)]
+pub struct TranscodingDetails {
+    pub transcoder: Option<Transcoder>,
+    pub transcodings: Counter,
+    pub max_transcodings: usize
+
+}
+
 pub struct FileSendService {
+    pub authenticator: Arc<Box<Authenticator<Credentials=()>>>,
+    search: Search,
+
+    base_dir: PathBuf,
+
     sending_threads: Counter,
     max_threads: usize,
-    base_dir: PathBuf,
-    pub authenticator: Arc<Box<Authenticator<Credentials=()>>>,
-    search: Search
+    
+    transcoding: TranscodingDetails
 }
 
 // use only on checked prefixes
@@ -88,13 +106,15 @@ impl Service for FileSendService {
         let base_dir = self.base_dir.clone();
         let sending_threads =  self.sending_threads.clone();
         let searcher = self.search.clone();
+        let transcoding = self.transcoding.clone();
         let origin = req.headers().get::<Origin>().map(|o| {
             format!("{}",o)
             }
             );
         Box::new(self.authenticator.authenticate(req).and_then(move |result| {
             match result {
-                Ok((req,_creds)) => FileSendService::process_checked(req, base_dir,sending_threads, searcher),
+                Ok((req,_creds)) => 
+                    FileSendService::process_checked(req, base_dir,sending_threads, searcher, transcoding),
                 Err(resp) => Box::new(future::ok(resp))
             }.map(|r| add_cors_headers(r, origin))
         }))
@@ -103,7 +123,12 @@ impl Service for FileSendService {
 }
 
 impl FileSendService {
-    fn process_checked(req: Request, base_dir: PathBuf, sending_threads: Counter, searcher: Search) -> ResponseFuture {
+    fn process_checked(req: Request, 
+        base_dir: PathBuf, 
+        sending_threads: 
+        Counter, searcher: Search,
+        transcoding: TranscodingDetails
+        ) -> ResponseFuture {
 
         match req.method() {
             &Method::Get => {
@@ -131,7 +156,9 @@ impl FileSendService {
                 send_file(base_dir, 
                     get_subfolder(&path, "/audio/"), 
                     bytes_range, 
-                    sending_threads)
+                    sending_threads,
+                    transcoding,
+                    )
                 } else if path.starts_with("/folder/") {
                     get_folder(base_dir, 
                     get_subfolder(&path, "/folder/"),  
