@@ -18,6 +18,8 @@ extern crate url;
 extern crate percent_encoding;
 extern crate taglib;
 extern crate num_cpus;
+extern crate ring;
+extern crate data_encoding;
 
 
 use hyper::server::{Http as HttpServer};

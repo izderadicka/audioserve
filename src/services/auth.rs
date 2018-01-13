@@ -4,6 +4,8 @@ use futures::{Future,Stream, future};
 use url::form_urlencoded;
 use std::collections::HashMap;
 use super::subs::short_response;
+use ring::digest::{digest, SHA256};
+use data_encoding::{BASE64};
 
 pub trait Authenticator {
     type Credentials;
@@ -85,7 +87,21 @@ impl Authenticator for SharedSecretAuthenticator {
 
 impl SharedSecretAuthenticator {
     fn auth_token_ok(&self, token: &str) -> bool{
-        self.shared_secret == token
+        let parts = token.split("|")
+        .map(|s| BASE64.decode(s.as_bytes()))
+        .filter_map(|r| r.ok())
+        .collect::<Vec<_>>();
+        if parts.len() == 2 {
+            let mut hash2 = self.shared_secret.clone().into_bytes();
+            let hash = &parts[1];
+            hash2.extend(&parts[0]);
+            let hash2 = digest(&SHA256, &hash2);
+
+            return hash2.as_ref() == &hash[..]
+        } else {
+            error!("Incorrectly formed login token - {} parts", parts.len())
+        }
+        false
     }
     fn new_auth_token(&self) -> String {
         ::std::str::from_utf8(&self.my_secret).unwrap().into()

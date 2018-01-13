@@ -101,7 +101,7 @@ impl Transcoder {
         file: S,
         mut body_tx: futures::sync::mpsc::Sender<Result<hyper::Chunk, hyper::Error>>,
     ) {
-        let mut cmd = self.build_command(file);
+        let mut cmd = self.build_command(&file);
         match cmd.spawn() {
             Ok(mut child) => if child.stdout.is_some() {
                 let mut buf = [0u8; 1024*8];
@@ -124,7 +124,13 @@ impl Transcoder {
 
                         },
                         Err(e) => error!("Stdout read error {:?}", e),
-                    }
+                    };
+                }
+                match child.wait() {
+                    Ok(status) => if !status.success() {
+                        warn!("Transconding of file {:?} failed with code {:?}", file.as_ref(), status.code())
+                    },
+                    Err(e) => error!("Cannot get process status: {}", e)
                 }
             } else {
                 error!("Cannot get stdout")

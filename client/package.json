@@ -21,6 +21,7 @@
     "webpack-merge": "^4.1.1"
   },
   "dependencies": {
+    "base64js": "^1.0.1",
     "bootstrap": "^4.0.0-beta.3",
     "jquery": "^3.2.1",
     "popper.js": "^1.12.9"

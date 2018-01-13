@@ -20,6 +20,8 @@ quick-error = "1.2"
 url = "1.6"
 percent-encoding = "1.0"
 num_cpus = "1.8"
+ring = "0.12"
+data-encoding = "2.1"
 
 [dependencies.taglib]
 git = "https://github.com/ebassi/taglib-rust"

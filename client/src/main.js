@@ -2,14 +2,10 @@ import $ from "jquery";
 import "bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./styles.css";
+import base64js from "base64-js";
 
 $(function() {
     const baseUrl =`${window.location.protocol}//${window.location.hostname}:3000`;
-
-    // function Base64Decode(str, encoding = 'utf-8') {
-    //     var bytes = base64js.toByteArray(str)
-    //     return new (TextDecoder || TextDecoderLite)(encoding).decode(bytes)
-    // }
 
     function loadFolder(path, fromHistory) {
         $.ajax({
@@ -250,22 +246,37 @@ $(function() {
         window.localStorage.setItem("audioserve_time", evt.target.currentTime);
     });
 
+    function login(secret) {
+        let  secretBytes = new (TextEncoder || TextEncoderLite)("utf-8").encode(secret); 
+        let randomBytes = new Uint8Array(32);
+        window.crypto.getRandomValues(randomBytes);
+        let concatedBytes = new Uint8Array(secretBytes.length+randomBytes.length);
+        concatedBytes.set(secretBytes);
+        concatedBytes.set(randomBytes, secretBytes.length);
+        return window.crypto.subtle.digest('SHA-256', concatedBytes)
+         .then( s => {
+            let secret = base64js.fromByteArray(randomBytes)+"|"+base64js.fromByteArray(new Uint8Array(s));
+            return $.ajax({
+                url:baseUrl+"/authenticate",
+                type: "POST",
+                data: {secret: secret},
+                xhrFields: {
+                    withCredentials: true
+                }
+                
+            });
+        });
+    }
+
     $("#login-btn").on("click", evt => {
         let secret = $("#secret-input").val();
-        $.ajax({
-            url:baseUrl+"/authenticate",
-            type: "POST",
-            data: {secret: secret},
-            xhrFields: {
-                withCredentials: true
-             }
-			
-        })
-        .done(data => {
+        login(secret)
+        .then(data => {
             loadFolder(window.localStorage.getItem("audioserve_folder")|| "");
             $("#login-dialog").modal("hide");
         })
-        .fail( err => console.log("Login failed", err))
+        .catch( err => console.log("Login failed", err));
+        
     });
 
     $("#search-btn").on("click", evt => {
