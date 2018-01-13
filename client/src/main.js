@@ -1,5 +1,15 @@
+import $ from "jquery";
+import "bootstrap";
+import "bootstrap/dist/css/bootstrap.min.css";
+import "./styles.css";
+
 $(function() {
     const baseUrl =`${window.location.protocol}//${window.location.hostname}:3000`;
+
+    // function Base64Decode(str, encoding = 'utf-8') {
+    //     var bytes = base64js.toByteArray(str)
+    //     return new (TextDecoder || TextDecoderLite)(encoding).decode(bytes)
+    // }
 
     function loadFolder(path, fromHistory) {
         $.ajax({
@@ -54,7 +64,7 @@ $(function() {
                 $("#files-container").hide();
             }
 
-            update_breadcrumb(path);
+            updateBreadcrumb(path);
             let prevFolder = window.localStorage.getItem("audioserve_folder");
             window.localStorage.setItem("audioserve_folder", path);
             if (! fromHistory) {
@@ -133,7 +143,7 @@ $(function() {
             fcount.text("");
             files.empty();
             $("#files-container").hide();
-            update_breadcrumb_search(query);
+            updateBreadcrumbSearch(query);
             clearPlayer(); 
             if (! fromHistory) {
                 window.history.pushState({"audioserve_search": query}, `Audioserve - search ${query}`); 
@@ -141,8 +151,8 @@ $(function() {
         });
     }
 
-    function update_breadcrumb(path) {
-        bc = $("#breadcrumb");
+    function updateBreadcrumb(path) {
+        let bc = $("#breadcrumb");
         let segments = path.split("/");
         bc.empty();
         bc.append($('<li class="breadcrumb-item"><a href="">Home</a></li>'));
@@ -160,8 +170,8 @@ $(function() {
 
     }
 
-    function update_breadcrumb_search(query) {
-        bc = $("#breadcrumb");
+    function updateBreadcrumbSearch(query) {
+        let bc = $("#breadcrumb");
         bc.empty();
         bc.append($('<li class="breadcrumb-item"><a href="">Home</a></li>'));
         bc.append($('<li class="breadcrumb-item">Search</li>'));
