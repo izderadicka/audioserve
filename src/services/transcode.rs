@@ -113,22 +113,41 @@ impl Transcoder {
                             .close()
                             .map(|_| ())
                             .unwrap_or_else(|e| error!("Cannot close sink {:?}", e));
+                            debug!("finished sending transcoded data");
                             break;
                         } else {
                             let slice = buf[..n].to_vec();
                             let c: Chunk = slice.into();
+                            trace!("Sending {} bytes", n);
                             match body_tx.send(Ok(c)).wait() {
                                 Ok(t) => body_tx = t,
-                                Err(_) => break,
+                                Err(_) => { 
+                                    warn!("Cannot send data to response stream");
+                                    break
+                                    },
                             };
 
                         },
-                        Err(e) => error!("Stdout read error {:?}", e),
+                        Err(e) => {
+                            error!("Stdout read error {:?}", e);
+                            break
+                            },
                     };
                 }
+                // if preliminary_end {
+                    
+                //     debug!("Ending preliminary, need to kill transcoding process");
+                //     child.kill().unwrap_or_else(|e| error!{"Cannot kill process: {}", e});
+                // }
+
+                //must drop out to close subprocess stdout
+                drop(out);
+                debug!("waiting for transcode process to end");
                 match child.wait() {
                     Ok(status) => if !status.success() {
                         warn!("Transconding of file {:?} failed with code {:?}", file.as_ref(), status.code())
+                    } else {
+                        debug!("Finished transcoding process normally")
                     },
                     Err(e) => error!("Cannot get process status: {}", e)
                 }
