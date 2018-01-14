@@ -370,6 +370,7 @@ mod tests {
     }
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    
     #[test]
     fn test_guarded_spawn() {
         let c = Arc::new(AtomicUsize::new(0));

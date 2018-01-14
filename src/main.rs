@@ -44,7 +44,8 @@ fn start_server(config: Config) -> Result<(), hyper::Error> {
         base_dir: config.base_dir,
         authenticator: Arc::new(Box::new(SharedSecretAuthenticator::new(
             config.shared_secret,
-            "how".into()
+            "how".into(),
+            24
         ))),
         search:Search::FoldersSearch,
         transcoding: TranscodingDetails {
