@@ -38,11 +38,12 @@ impl Quality {
     }
 
     /// Bitrate from which it make sense to transcode - kbps
+    /// app. 1.5 * transcoding bitrate (bandwidth saving should outweight transoding costs)
     fn transcode_from(&self) -> u32 {
         match self {
-            &Quality::Low => 32,
-            &Quality::Medium => 48,
-            &Quality::High => 64,
+            &Quality::Low => 48,
+            &Quality::Medium => 64,
+            &Quality::High => 96,
         }
     }
 }
@@ -59,9 +60,15 @@ impl Transcoder {
         Transcoder { quality }
     }
 
-    fn build_command<S: AsRef<OsStr>>(&self, file: S) -> Command {
+    fn build_command<S: AsRef<OsStr>>(&self, file: S, seek:Option<f32>) -> Command {
         let mut cmd = Command::new("ffmpeg");
-        cmd.args(&["-nostdin", "-v", "error"])
+        cmd.args(&["-nostdin", "-v", "error"]);
+        if let Some(s) = seek {
+            cmd.args(&["-accurate_seek", "-ss"]);
+            let time_spec = format!("{:2}",s);
+            cmd.arg(time_spec);
+        }
+        cmd
             .arg("-i")
             .arg(file)
             .args(&[
@@ -83,13 +90,16 @@ impl Transcoder {
         cmd
     }
 
-    pub fn should_transcode(&self, bitrate: u32) -> bool {
+    pub fn should_transcode(&self, bitrate: u32, mime: &Mime) -> bool {
+        if super::types::must_transcode(mime) {
+            return true;
+        }
         debug!(
-            "Should transcode {} >= {}",
+            "Should transcode {} > {}",
             bitrate,
             self.quality.transcode_from()
         );
-        bitrate >= self.quality.transcode_from()
+        bitrate > self.quality.transcode_from()
     }
 
     pub fn transcoded_mime(&self) -> Mime {
@@ -99,9 +109,10 @@ impl Transcoder {
     pub fn transcode<S: AsRef<OsStr>>(
         &self,
         file: S,
+        seek: Option<f32>,
         mut body_tx: futures::sync::mpsc::Sender<Result<hyper::Chunk, hyper::Error>>,
     ) {
-        let mut cmd = self.build_command(&file);
+        let mut cmd = self.build_command(&file, seek);
         match cmd.spawn() {
             Ok(mut child) => if child.stdout.is_some() {
                 let mut buf = [0u8; 1024*8];
@@ -167,14 +178,14 @@ mod tests {
     use std::io::{Read, Write};
     use super::super::subs::get_audio_properties;
     use std::env::temp_dir;
-    use pretty_env_logger;
+    //use pretty_env_logger;
+    use std::path::Path;
 
-    #[test]
-    fn test_transcode() {
-        pretty_env_logger::init().unwrap();
+    fn dummy_transcode<P: AsRef<Path>>(output_file: P, seek:Option<f32>) {
+        //pretty_env_logger::init().unwrap();
         let t = Transcoder::new(Quality::Low);
-        let out_file = temp_dir().join("audioserve_transcoded.opus");
-        let mut cmd = t.build_command("./test_data/01-file.mp3");
+        let out_file = temp_dir().join(output_file);
+        let mut cmd = t.build_command("./test_data/01-file.mp3", seek);
         let mut child = cmd.spawn().expect("Cannot spawn subprocess");
 
         if child.stdout.is_some() {
@@ -197,8 +208,22 @@ mod tests {
         assert!(out_file.exists());
         //TODO: for some reasons sometimes cannot get meta - but file is OK
         if let Some(meta) = get_audio_properties(&out_file) {
-        assert_eq!(meta.duration, 2);
+            let dur = 2 - seek.map(|s| s.round() as u32).unwrap_or(0);
+        assert_eq!(meta.duration, dur);
         }
         remove_file(&out_file).expect("error deleting tmp file");
+
     }
+
+    #[test]
+    fn test_transcode() {
+        dummy_transcode("audioserve_transcoded.opus",None)
+    }
+
+    #[test]
+    fn test_transcode_seek() {
+        dummy_transcode("audioserve_transcoded2.opus",Some(0.8))
+    }
+
+    
 }

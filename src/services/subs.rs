@@ -63,6 +63,7 @@ where
 }
 
 fn serve_file_transcoded(full_path: &Path, 
+    seek: Option<f32>,
     transcoder: Transcoder,
     tx: ::futures::sync::oneshot::Sender<Response>) {
     let (body_tx, body_rx) = mpsc::channel(1);
@@ -71,7 +72,7 @@ fn serve_file_transcoded(full_path: &Path,
         .with_body(body_rx);
     tx.send(resp).expect(THREAD_SEND_ERROR);
 
-    transcoder.transcode(full_path,body_tx);
+    transcoder.transcode(full_path, seek,body_tx);
 
     }
 
@@ -165,6 +166,7 @@ pub fn send_file(
     base_path: PathBuf,
     file_path: PathBuf,
     range: Option<hyper::header::ByteRangeSpec>,
+    seek: Option<f32>,
     counter: Counter,
     transcoding: super::TranscodingDetails,
     
@@ -177,9 +179,11 @@ pub fn send_file(
             let audio_properties = get_audio_properties(&full_path);
             debug!("Audio properties: {:?}", audio_properties);
             debug!("Trancoder: {:?}", transcoding.transcoder);
-            let should_transcode =  transcoding.transcoder.is_some() && match audio_properties {
+            let should_transcode =  transcoding.transcoder.is_some() 
+            && match audio_properties {
                 Some(ap) => {
-                    transcoding.transcoder.as_ref().unwrap().should_transcode(ap.bitrate)
+                    let mime = ::mime_guess::guess_mime_type(&full_path);
+                    transcoding.transcoder.as_ref().unwrap().should_transcode(ap.bitrate, &mime)
                 }, 
                 None =>    false
             };
@@ -194,7 +198,7 @@ pub fn send_file(
                 } else {
                     debug!("Sendig file {:?} transcoded", &full_path);
                     guarded_spawn(counter, move ||
-                    serve_file_transcoded(&full_path, transcoder, tx));
+                    serve_file_transcoded(&full_path, seek, transcoder, tx));
                 }
 
             } else {
@@ -215,9 +219,12 @@ fn box_rx(rx: ::futures::sync::oneshot::Receiver<Response>) -> ResponseFuture {
     }))
 }
 
-pub fn get_folder(base_path: PathBuf, folder_path: PathBuf, counter: Counter) -> ResponseFuture {
+pub fn get_folder(base_path: PathBuf, 
+                  folder_path: PathBuf, 
+                  transcoder: Option<Transcoder>,
+                  counter: Counter) -> ResponseFuture {
     let (tx, rx) = oneshot::channel();
-    guarded_spawn(counter, move || match list_dir(&base_path, &folder_path) {
+    guarded_spawn(counter, move || match list_dir(&base_path, &folder_path, transcoder) {
         Ok(folder) => {
             tx.send(json_response(&folder)).expect(THREAD_SEND_ERROR);
         }
@@ -232,6 +239,7 @@ pub fn get_folder(base_path: PathBuf, folder_path: PathBuf, counter: Counter) ->
 fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     base_dir: P,
     dir_path: P2,
+    transcoder: Option<Transcoder>
 ) -> Result<AudioFolder, io::Error> {
     fn os_to_string(s: ::std::ffi::OsString) -> String {
         match s.into_string() {
@@ -262,10 +270,17 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
                             })
                         } else if ft.is_file() {
                             if is_audio(&path) {
+                                let mime = ::mime_guess::guess_mime_type(&path);
+                                let meta =  get_audio_properties(&base_dir.as_ref().join(&path));
+                                let bitrate = meta.as_ref().map(|m| m.bitrate.clone());
                                 files.push(AudioFile {
-                                    meta: get_audio_properties(&base_dir.as_ref().join(&path)),
+                                    trans:(&transcoder).as_ref().map(|t| bitrate.is_some() && 
+                                    t.should_transcode(bitrate.unwrap(), &mime)).unwrap_or(false),
+                                    meta,
                                     path,
                                     name: os_to_string(f.file_name()),
+                                    
+                                    mime: format!("{}", mime),
                                     
                                 })
                             } else if cover.is_none() && is_cover(&path) {
@@ -302,8 +317,8 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     }
 }
 
-pub fn get_audio_properties(filename: & Path) -> Option<AudioMeta> {
-    let filename = filename.as_os_str().to_str();
+pub fn get_audio_properties(audio_file_name: & Path) -> Option<AudioMeta> {
+    let filename = audio_file_name.as_os_str().to_str();
     match filename {
         Some(fname) => {
             let audio_file = taglib::File::new(fname);
@@ -311,7 +326,19 @@ pub fn get_audio_properties(filename: & Path) -> Option<AudioMeta> {
                 Ok(f) => match f.audioproperties() {
                     Ok(ap) => return Some(AudioMeta{
                         duration: ap.length(),
-                        bitrate: ap.bitrate()
+                        bitrate: { 
+                            let mut bitrate = ap.bitrate();
+                            let duration = ap.length();
+;                            if bitrate == 0 && duration != 0 {
+                                // estimate from duration and file size
+                                // Will not work well for small files
+                                if let Ok(size) = audio_file_name.metadata().map(|m| m.len()) {
+                                    bitrate = (size  * 8 / duration as u64 / 1024) as u32;
+                                    debug!("Estimating bitrate to {}", bitrate);
+                                };
+                            }
+                            bitrate
+                        }
                     }),
                     Err(e) => warn!("File {} does not have audioproperties {:?}", fname, e)
                 },
@@ -345,16 +372,18 @@ pub fn search(
     });
     box_rx(rx)
 }
-
+fn tcf() -> Option<Transcoder> {
+    Some(Transcoder::new(::services::transcode::Quality::Low))
+}
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json;
     #[test]
     fn test_list_dir() {
-        let res = list_dir("/non-existent", "folder");
+        let res = list_dir("/non-existent", "folder", tcf());
         assert!(res.is_err());
-        let res = list_dir("./", "test_data/");
+        let res = list_dir("./", "test_data/", tcf());
         assert!(res.is_ok());
         let folder = res.unwrap();
         assert_eq!(folder.files.len(), 3);
@@ -364,13 +393,13 @@ mod tests {
 
     #[test]
     fn test_json() {
-        let folder = list_dir("./", "test_data/").unwrap();
+        let folder = list_dir("./", "test_data/", tcf()).unwrap();
         let json = serde_json::to_string(&folder).unwrap();
         println!("JSON: {}", &json);
     }
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    
+
     #[test]
     fn test_guarded_spawn() {
         let c = Arc::new(AtomicUsize::new(0));

@@ -129,7 +129,9 @@ impl FileSendService {
         Counter, searcher: Search,
         transcoding: TranscodingDetails
         ) -> ResponseFuture {
-
+        
+        let params =  req.query().map(|query| form_urlencoded::parse(query.as_bytes())
+                            .collect::<HashMap<_, _>>());
         match req.method() {
             &Method::Get => {
                 let path = percent_decode(req.path().as_bytes()).decode_utf8_lossy().into_owned();
@@ -152,26 +154,24 @@ impl FileSendService {
                     "Other then bytes ranges are not supported"),
                     None => None
                 };
+                let seek: Option<f32> = params.and_then(|mut p| p.remove("seek")).and_then(|s| s.parse().ok());
 
                 send_file(base_dir, 
                     get_subfolder(&path, "/audio/"), 
                     bytes_range, 
+                    seek,
                     sending_threads,
                     transcoding,
                     )
                 } else if path.starts_with("/folder/") {
                     get_folder(base_dir, 
                     get_subfolder(&path, "/folder/"),  
+                    transcoding.transcoder,
                     sending_threads) 
                 } else if path == "/search" {
-                    if let Some(query) = req.query() {
-                        let mut params = form_urlencoded::parse(query.as_bytes())
-                            .collect::<HashMap<_, _>>();
-                        if let Some(search_string) = params.remove("q"){
-                            return search(base_dir, searcher, search_string.into_owned(), sending_threads);
-                        }
-                        
-                    };
+                    if let Some(search_string) = params.and_then(|mut p| p.remove("q")){
+                        return search(base_dir, searcher, search_string.into_owned(), sending_threads);
+                    }
                     short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE)
                 } else {
                     short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE)
