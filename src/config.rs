@@ -18,13 +18,17 @@ pub enum Error {
         from()
     }
 
-    InvalidBaseDirectory(err: ::std::io::Error) {
+    InvalidPath(err: io::Error) {
         from()
     }
     
     InvalidLimitValue(err: &'static str) {
         from()
     }
+
+    NonExistentBaseDirectory{ }
+
+    NonExistentClientDirectory{ }
 }
 }
 
@@ -35,7 +39,10 @@ pub struct Config{
     pub base_dir: PathBuf,
     pub shared_secret: String,
     pub transcoding: Option<Quality>,
-    pub max_transcodings: usize
+    pub max_transcodings: usize,
+    pub token_validity_hours: u64,
+    pub secret_file: PathBuf,
+    pub client_dir: PathBuf
 
 }
 type Parser<'a> = App<'a, 'a>;
@@ -90,6 +97,24 @@ fn create_parser<'a>() -> Parser<'a> {
             .takes_value(true)
             .help("Maximum number of concurrent transcodings (default is number of cores")
         )
+        .arg(Arg::with_name("token-validity-hours")
+            .long("token-validity-hours")
+            .takes_value(true)
+            .help("Validity of authentication token issued by this server (default is 1 year)")
+            .default_value("8760")
+        )
+        .arg(Arg::with_name("client-dir")
+            .short("c")
+            .long("client-dir")
+            .takes_value(true)
+            .help("Directory with client files - index.html and bundle.js (default is ./client/dist)")
+            .default_value("./client/dist")
+        )
+        .arg(Arg::with_name("secret-file")
+            .long("secret-file")
+            .takes_value(true)
+            .help("Path to file where server is kept - it's generated if it does not exists (default is $HOME/.audioserve.secret)")
+        )
 }
 
 pub fn parse_args() -> Result<Config, Error>{
@@ -105,7 +130,7 @@ pub fn parse_args() -> Result<Config, Error>{
 
     let base_dir: PathBuf = args.value_of("base_dir").unwrap().into();
     if ! base_dir.is_dir() {
-        return Err(Error::InvalidBaseDirectory(io::Error::from(io::ErrorKind::NotFound)))
+        return Err(Error::NonExistentBaseDirectory)
     }
     let local_addr = args.value_of("local_addr").unwrap().parse()?;
     let max_sending_threads = args.value_of("max-threads").unwrap().parse()?;
@@ -138,13 +163,34 @@ pub fn parse_args() -> Result<Config, Error>{
         return Err("Number of concurrent transcodings cannot be higher then number of threads".into())
     }
 
+    let token_validity_hours = args.value_of("token-validity-hours").unwrap().parse()?;
+    if token_validity_hours < 1 {
+        return Err("Token must be valid for at least an hour".into())
+    }
+    let client_dir: PathBuf = args.value_of("client-dir").unwrap().into();
+    if ! client_dir.exists() {
+        return Err(Error::NonExistentClientDirectory)
+    }
+
+    let secret_file = match args.value_of("secret-file") {
+        Some(s) => s.into(),
+        None => match ::std::env::home_dir() {
+            Some(home) => home.join(".audioserve.secret"),
+            None => "./.audioserve.secret".into()
+        }
+    };
+
+
     Ok(Config{
         base_dir,
         local_addr,
         max_sending_threads,
         shared_secret, 
         transcoding,
-        max_transcodings
+        max_transcodings,
+        token_validity_hours,
+        client_dir,
+        secret_file
 
     })
 

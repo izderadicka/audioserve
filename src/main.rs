@@ -23,7 +23,7 @@ extern crate data_encoding;
 
 
 use hyper::server::{Http as HttpServer};
-use std::io::{self, Write};
+use std::io::{self, Write, Read};
 use std::sync::atomic::{AtomicUsize};
 use std::sync::Arc;
 use services::{Factory, TranscodingDetails};
@@ -31,12 +31,41 @@ use services::auth::SharedSecretAuthenticator;
 use services::search::Search;
 use services::transcode::Transcoder;
 use config::{parse_args, Config};
+use ring::rand::{SecureRandom,SystemRandom};
+use std::path::Path;
+use std::fs::File;
+use std::process;
 
 mod services;
 mod config;
 
 
-fn start_server(config: Config) -> Result<(), hyper::Error> {
+fn gen_my_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error> {
+
+let file = file.as_ref();
+if file.exists() {
+    let mut v = vec![];
+    let size = file.metadata()?.len();
+    if size > 128 {
+        return Err(io::Error::new(io::ErrorKind::Other, "Secret too long"));
+    }
+
+    let mut f = File::open(file)?;
+    f.read_to_end(&mut v)?;
+    Ok(v)
+} else {
+    let mut random = [0u8; 32];
+    let rng = SystemRandom::new();
+    rng.fill(&mut random).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    let mut f = File::create(file)?;
+    f.write_all(&random)?;
+    Ok(random.iter().cloned().collect())
+
+}
+
+}
+
+fn start_server(config: Config, my_secret: Vec<u8>) -> Result<(), hyper::Error> {
     
     let factory = Factory {
         sending_threads: Arc::new(AtomicUsize::new(0)),
@@ -44,8 +73,8 @@ fn start_server(config: Config) -> Result<(), hyper::Error> {
         base_dir: config.base_dir,
         authenticator: Arc::new(Box::new(SharedSecretAuthenticator::new(
             config.shared_secret,
-            "how".into(),
-            24
+            my_secret,
+            config.token_validity_hours
         ))),
         search:Search::FoldersSearch,
         transcoding: TranscodingDetails {
@@ -66,12 +95,25 @@ fn main() {
     let config=match parse_args() {
         Err(e) => {
             writeln!(&mut io::stderr(), "Arguments error: {}",e).unwrap();
-            std::process::exit(1)
+            process::exit(1)
         }
         Ok(c) => c
     };
-    
     pretty_env_logger::init().unwrap();
     debug!("Started with following config {:?}", config);
-    start_server(config).unwrap();
+    let my_secret =  match gen_my_secret(&config.secret_file) {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Error creating/reading secret: {}", e);
+            process::exit(2)
+        }
+    };
+
+    match start_server(config, my_secret) {
+        Ok(_) => (),
+        Err(e) => {
+            error!("Error starting server: {}",e);
+            process::exit(3)
+        }
+    }
 }

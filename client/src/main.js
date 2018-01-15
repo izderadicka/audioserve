@@ -7,12 +7,24 @@ import base64js from "base64-js";
 $(function() {
     const baseUrl =`${window.location.protocol}//${window.location.hostname}:3000`;
 
+    let pendingCall = null;
+
+    function ajax(params) {
+        params.xhrFields = {
+            withCredentials: true
+         };
+        if (pendingCall) {
+            pendingCall.abort();
+        }
+        let res = $.ajax(params);
+        pendingCall = res;
+        res.always( () => {pendingCall=null});
+        return res
+    }
+
     function loadFolder(path, fromHistory) {
-        $.ajax({
+        ajax({
             url: baseUrl+"/folder/"+ path,
-            xhrFields: {
-                withCredentials: true
-             }
             }
             )
         .fail( err => { 
@@ -100,13 +112,10 @@ $(function() {
     }
 
     function search(query, fromHistory) {
-        $.ajax({
+        ajax({
             url: baseUrl+"/search",
             type: "GET",
-            data: {q: query},
-            xhrFields: {
-                withCredentials: true
-             }
+            data: {q: query}
             }
             )
         .fail( err => { 
@@ -256,13 +265,10 @@ $(function() {
         return window.crypto.subtle.digest('SHA-256', concatedBytes)
          .then( s => {
             let secret = base64js.fromByteArray(randomBytes)+"|"+base64js.fromByteArray(new Uint8Array(s));
-            return $.ajax({
+            return ajax({
                 url:baseUrl+"/authenticate",
                 type: "POST",
-                data: {secret: secret},
-                xhrFields: {
-                    withCredentials: true
-                }
+                data: {secret: secret}
                 
             });
         });

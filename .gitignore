@@ -5,3 +5,4 @@
 *.old
 Cargo.lock
 /client/node_modules
+/dist/bundle.js
