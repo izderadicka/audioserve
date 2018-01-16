@@ -3,6 +3,7 @@ import "bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./styles.css";
 import base64js from "base64-js";
+import {AudioPlayer} from "./player.js";
 
 $(function() {
     const baseUrl =`${window.location.protocol}//${window.location.hostname}:3000`;
@@ -184,6 +185,8 @@ $(function() {
         bc.append(item); 
     }
 
+    let player = new AudioPlayer();
+
     function playFile(target, paused, startTime) {
        
         $("#files a").removeClass("active");
@@ -191,10 +194,10 @@ $(function() {
         let path = target.attr("href");
         window.localStorage.setItem("audioserve_file", path);
         let fullUrl = baseUrl+"/audio/"+path;
-        let player = $("#player audio").get()[0];
+        player.setUrl(fullUrl);
         player.src= fullUrl;
         if (startTime) {
-            player.currentTime = startTime
+            player.jumpToTime(startTime)
         }
         if (! paused) {
             let res=player.play();
@@ -207,9 +210,9 @@ $(function() {
     function clearPlayer() {
         window.localStorage.removeItem("audioserve_file");
         window.localStorage.removeItem("audioserve_time");
-        let player = $("#player audio").get()[0];
-        player.pause()
-        player.src = "";
+        
+        player.pause();
+        player.setUrl("");
         $("#files a").removeClass("active");
     }
 

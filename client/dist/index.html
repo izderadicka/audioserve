@@ -2,69 +2,107 @@
 <html lang="en">
 
 <head>
-    <title>AudioServe Simple Client</title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>AudioServe Simple Client</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 </head>
 
 <body>
-    <div class="container" id="main">
-        <h1 class="top-header">
-            <span class="app-name">Audioserve Client</span>
-            <div id="search-btn" class="search"></div>
-            <div id="search-area">
-                <form id="search-form">
-                <input name="search" id="search-input" type="text" placeholder="Search">
-                </form>
-            </div>
-            
-        </h1>
-        <nav aria-label="breadcrumb">
-                <ol class="breadcrumb" id="breadcrumb">
-                  <li class="breadcrumb-item active" aria-current="page">Home</li>
-                </ol>
-        </nav>
-        <div id="subfolders-container">
-            <h3>Subfolders <span class="badge badge-primary" id="subfolders-count"></span></h3>
-            <ul class="list-group" id="subfolders">
-            </ul>
+  <div class="container" id="main">
+    <h1 class="top-header">
+      <span class="app-name">Audioserve Client</span>
+      <div id="search-btn" class="search"></div>
+      <div id="search-area">
+        <form id="search-form">
+          <input name="search" id="search-input" type="text" placeholder="Search">
+        </form>
+      </div>
 
-        </div>
-        <div id="files-container">
-                <h3>Files <span class="badge badge-primary" id="files-count"></span></h3>
-                <ul class="list-group" id="files">
-                </ul>
-    
-        </div>
-        
+    </h1>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb" id="breadcrumb">
+        <li class="breadcrumb-item active" aria-current="page">Home</li>
+      </ol>
+    </nav>
+    <div id="subfolders-container">
+      <h3>Subfolders
+        <span class="badge badge-primary" id="subfolders-count"></span>
+      </h3>
+      <ul class="list-group" id="subfolders">
+      </ul>
 
     </div>
-    <div id="player">
-            <audio controls="" preload="auto"></audio>
+    <div id="files-container">
+      <h3>Files
+        <span class="badge badge-primary" id="files-count"></span>
+      </h3>
+      <ul class="list-group" id="files">
+      </ul>
     </div>
+  </div>
+  <div id="player">
+    <div class="audio-player">
+      <div class="loading">
+        <div class="spinner"></div>
+      </div>
+      <div class="play-pause-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="24" viewBox="0 0 18 24">
+          <path fill="#566574" fill-rule="evenodd" d="M18 12L0 24V0" class="play-pause-icon" id="playPause" />
+        </svg>
+      </div>
 
-    <div class="modal" tabindex="-1" role="dialog" id="login-dialog">
-        <div class="modal-dialog" role="document">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title">Login to Audioserve</h5>
-              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-              </button>
-            </div>
-            <div class="modal-body">
-              <label>Provide shared secret:</label>
-              <input name="secret" type="password" id="secret-input">
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-primary" id="login-btn">Login</button>
-              <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      <div class="controls">
+        <span class="current-time">0:00</span>
+        <div class="slider" data-direction="horizontal">
+          <div class="progress">
+            <div class="pin" id="progress-pin" data-method="rewind"></div>
+          </div>
+        </div>
+        <span class="total-time">0:00</span>
+      </div>
+
+      <div class="volume">
+        <div class="volume-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+            <path fill="#566574" fill-rule="evenodd" d="M14.667 0v2.747c3.853 1.146 6.666 4.72 6.666 8.946 0 4.227-2.813 7.787-6.666 8.934v2.76C20 22.173 24 17.4 24 11.693 24 5.987 20 1.213 14.667 0zM18 11.693c0-2.36-1.333-4.386-3.333-5.373v10.707c2-.947 3.333-2.987 3.333-5.334zm-18-4v8h5.333L12 22.36V1.027L5.333 7.693H0z"
+              id="speaker" />
+          </svg>
+        </div>
+        <div class="volume-controls hidden">
+          <div class="slider" data-direction="vertical">
+            <div class="progress">
+              <div class="pin" id="volume-pin" data-method="changeVolume"></div>
             </div>
           </div>
         </div>
       </div>
-      
-    <script src="bundle.js"></script>
+
+      <audio preload="" />
+    </div>
+  </div>
+
+  <div class="modal" tabindex="-1" role="dialog" id="login-dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Login to Audioserve</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <label>Provide shared secret:</label>
+          <input name="secret" type="password" id="secret-input">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" id="login-btn">Login</button>
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="bundle.js"></script>
 </body>
 
 </html>

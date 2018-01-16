@@ -9,13 +9,12 @@ body {
 
 #main {
     overflow-y: scroll;
-    height: calc(100% - 50px);
+    height: calc(100% - 61px);
 }
 
 #player {
-    height: 50px;
+    height: 56px;
     padding-top: 5px;
-    overflow: hidden;
 }
 
 #player audio {

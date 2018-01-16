@@ -5,4 +5,5 @@
 *.old
 Cargo.lock
 /client/node_modules
-/dist/bundle.js
+npm-debug.log
+client/dist/bundle.js
