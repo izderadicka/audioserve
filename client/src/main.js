@@ -3,7 +3,7 @@ import "bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./styles.css";
 import base64js from "base64-js";
-import {AudioPlayer} from "./player.js";
+import {AudioPlayer, formatTime} from "./player.js";
 
 $(function() {
     const baseUrl =`${window.location.protocol}//${window.location.hostname}:3000`;
@@ -61,10 +61,12 @@ $(function() {
             for (let file of  data.files) {
                 let item = $('<a class="list-group-item list-group-item-action">')
                     .attr("href", file.path)
+                    .data("duration", file.meta.duration)
+                    .data("transcoded", file.trans)
                     .text(file.name)
                 files.append(item);
                 if (file.meta) {
-                    item.append($(`<span class="duration">${formatDuration(file.meta.duration)}</span>`))
+                    item.append($(`<span class="duration">${formatTime(file.meta.duration)}</span>`))
                 }
             }
             if (data.files.length) {
@@ -93,23 +95,6 @@ $(function() {
                 }
             }
         });
-    }
-
-    function formatDuration(dur) {
-        let hours = 0;
-        let mins = Math.floor(dur / 60);
-        let secs = dur - mins * 60;
-        secs = ("0"+secs).slice(-2);
-        if (mins >=60) {
-            hours = Math.floor(mins / 60);
-            mins = mins - hours * 60;
-            mins = ("0"+mins).slice(-2);
-        }
-        if (hours) {
-            return `(${hours}:${mins}:${secs})`
-        } else {
-            return `(${mins}:${secs})`;
-        }
     }
 
     function search(query, fromHistory) {
@@ -194,7 +179,10 @@ $(function() {
         let path = target.attr("href");
         window.localStorage.setItem("audioserve_file", path);
         let fullUrl = baseUrl+"/audio/"+path;
-        player.setUrl(fullUrl);
+        player.setUrl(fullUrl, {
+            duration: target.data("duration"),
+            transcoded: target.data("transcoded")
+        });
         player.src= fullUrl;
         if (startTime) {
             player.jumpToTime(startTime)
@@ -277,7 +265,8 @@ $(function() {
         });
     }
 
-    $("#login-btn").on("click", evt => {
+    $("#login-form").on("submit", evt => {
+        evt.preventDefault();
         let secret = $("#secret-input").val();
         login(secret)
         .then(data => {

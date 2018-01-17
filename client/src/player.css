@@ -122,6 +122,10 @@
     display: block;
   }
 
+  .audio-player .loading {
+    display: none;
+  }
+
   .audio-player .controls .current-time {
     display: block;
     width: 5em;

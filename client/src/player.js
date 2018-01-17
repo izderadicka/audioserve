@@ -1,9 +1,21 @@
 import "./player.css";
 
-export function formatTime(time) {
-    let min = Math.floor(time / 60);
-    let sec = Math.floor(time % 60);
-    return min + ':' + ((sec < 10) ? ('0' + sec) : sec);
+export function formatTime(dur) {
+    if (! isFinite(dur)) return "?";
+    let hours = 0;
+    let mins = Math.floor(dur / 60);
+    let secs = Math.round(dur % 60);
+    secs = ("0"+secs).slice(-2);
+    if (mins >=60) {
+        hours = Math.floor(mins / 60);
+        mins = mins - hours * 60;
+        mins = ("0"+mins).slice(-2);
+    }
+    if (hours) {
+        return `${hours}:${mins}:${secs}`
+    } else {
+        return `${mins}:${secs}`;
+    }
 }
 
 const VOLUME_FULL = 'M14.667 0v2.747c3.853 1.146 6.666 4.72 6.666 8.946 0 4.227-2.813 7.787-6.666 8.934v2.76C20 22.173 24 17.4 24 11.693 24 5.987 20 1.213 14.667 0zM18 11.693c0-2.36-1.333-4.386-3.333-5.373v10.707c2-.947 3.333-2.987 3.333-5.334zm-18-4v8h5.333L12 22.36V1.027L5.333 7.693H0z';
@@ -17,6 +29,9 @@ export class AudioPlayer {
     // Most of code copied from https://codepen.io/gregh/pen/NdVvbm
 
     constructor() {
+
+        this.unsized = false;
+        this.knownDuration =null;
 
         let audioPlayer = document.querySelector('.audio-player');
         this._rootElem = audioPlayer;
@@ -172,7 +187,7 @@ export class AudioPlayer {
         this._player.addEventListener('loadedmetadata', this._updateTotal.bind(this));
         this._player.addEventListener('canplay', () => {
             //console.log("Can play");
-            this._makePlay();
+            this._showPlay();
         });
         this._player.addEventListener('ended', () => {
             this._playPause.attributes.d.value = PLAY;
@@ -182,12 +197,12 @@ export class AudioPlayer {
         });
         let state = this._player.readyState;
         if (state > 1) this._updateTotal();
-        if (state > 2) this._makePlay();
+        if (state > 2) this._showPlay();
 
     }
 
     _updateTotal() {
-        this._totalTime.textContent = formatTime(this._player.duration);
+        this._totalTime.textContent = formatTime(this.getTotalTime());
     }
 
     _updateProgress() {
@@ -200,6 +215,7 @@ export class AudioPlayer {
             let current = this._player.currentTime;
             let percent = (current / this.getTotalTime()) * 100;
             if (percent > 100) percent = 100;
+            if (isNaN(percent)) percent = 0;
             this._progress.style.width = percent + '%';
             this._currentTime.textContent = formatTime(current);
         }
@@ -251,7 +267,11 @@ export class AudioPlayer {
     }
 
     getTotalTime() {
-        return this._player.duration;
+        if (this.unsized && this.knownDuration) {
+            return this.knownDuration
+        } else {
+            return this._player.duration;
+        }
     }
 
     _onMoveSlider(event, jump = false) {
@@ -272,13 +292,20 @@ export class AudioPlayer {
     }
 
 
-    _makePlay() {
+    _showPlay() {
         this._playpauseBtn.style.display = 'block';
         this._loading.style.display = 'none';
     }
 
+    _hidePlay() {
+        this._playpauseBtn.style.display = 'none';
+        this._loading.style.display = 'show';
+    }
+
     jumpToTime(time) {
-        if (Math.abs(time - this._player.currentTime) > 1) {
+        console.log(`Jumping to time ${time}, duration: ${this._player.duration}`);
+        if (this._player.buffered.length) console.log(`${this._player.buffered.length} buffered: ${formatTime(this._player.buffered.start(0))} - ${formatTime(this._player.buffered.end(0))}`);
+        if (Math.abs(time - this._player.currentTime) > 1 && isFinite(time)) {
             this._player.currentTime = time;
         }
     }
@@ -291,17 +318,40 @@ export class AudioPlayer {
         }
     }
 
-    setUrl(url) {
-        this._player.src = url;
+    setUrl(url, options) {
+        if (options && "duration" in options) {
+            this.knownDuration = options.duration;
+        } else {
+            this.knownDuration = null;
+        }
+        if (options && options.transcoded) this.unsized = true
+        else if (options && options.unsized) this.unsized = true
+        else this.unsized = false;
+        if (!url) {
+            this._player.src = "";
+            this._updateTotal();
+            this._updateProgress();
+            this._hidePlay();
+            this._loading.style.display = 'none';
+        } else {
+            this._player.src = url;
+            this._hidePlay();
+        }
     }
 
     play() { 
         this._playPause.attributes.d.value = PAUSE;
-        return this._player.play();
+        return this._player.play()
+        .catch((e) => {
+            this.pause();
+            console.log("Play error",e);
+        }
+        );
     }
 
     pause() {
         this._playPause.attributes.d.value = PLAY;
         this._player.pause();
+        
     }
 }
