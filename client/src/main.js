@@ -243,7 +243,7 @@ $(function() {
         evt.preventDefault();
     });
 
-    $("#player audio").on("ended", evt => {
+    $("#player .audio-player").on("ended", evt => {
         let nextTarget = $("#files a.active + a");
         if (nextTarget.length) {
             showInView(nextTarget);
@@ -254,8 +254,8 @@ $(function() {
         }
     });
 
-    $("#player audio").on("timeupdate", evt => {
-        window.localStorage.setItem("audioserve_time", evt.target.currentTime);
+    $("#player .audio-player").on("timeupdate", evt => {
+        window.localStorage.setItem("audioserve_time", evt.detail.currentTime);
     });
 
     function login(secret) {

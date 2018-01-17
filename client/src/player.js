@@ -19,6 +19,7 @@ export class AudioPlayer {
     constructor() {
 
         let audioPlayer = document.querySelector('.audio-player');
+        this._rootElem = audioPlayer;
 
         this._playPause = audioPlayer.querySelector('#playPause');
         this._playpauseBtn = audioPlayer.querySelector('.play-pause-btn');
@@ -44,7 +45,6 @@ export class AudioPlayer {
             this._currentlyDragged = event.target;
             let handler = this._onMoveSlider.bind(this);
             window.addEventListener('mousemove', handler, false);
-
             window.addEventListener('mouseup', (evt) => {
                 window.setTimeout(() => this._currentlyDragged = false, 200);
                 this._onMoveSlider(evt, true);
@@ -52,6 +52,59 @@ export class AudioPlayer {
                 evt.stopImmediatePropagation();
             }, { once: true });
         });
+
+        let touchToEvent = (touch, type) => {
+            return {
+                target: touch.target,
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                type: type
+            }
+        }
+
+
+        window.addEventListener("touchcancel", () => {
+            console.log("touch canceled");
+        })
+
+        pinTime.addEventListener("touchstart", (event) => {
+            if (event.changedTouches.length == 1 && event.targetTouches.length ==1) {
+                let touch = event.changedTouches[0];
+                this._currentlyDragged = touch.target;
+                let touchId = touch.identifier;
+                let clientX, clientY;
+
+                let myTouch = (event) => {
+                    for (let i = 0; i< event.changedTouches.length; i++) {
+                        let t = event.changedTouches.item(i);
+                        if (t.identifier === touch.identifier) return t;
+                    }
+                }
+                
+                let handler = (event) => {
+                    let t = myTouch(event);
+                    if (t) {
+                    let evt = touchToEvent(t, "mousemove");
+                    clientX=evt.clientX;
+                    clientY=evt.clientY;
+                    this._onMoveSlider(evt);
+                    }
+                }
+                window.addEventListener("touchmove", handler);
+                window.addEventListener("touchend", (event) => {
+                    let t = myTouch(event);
+                    if (t) {
+                    window.setTimeout( () => { this._currentlyDragged = false}, 200);
+                    window.removeEventListener("touchmove", handler);
+                    let evt = touchToEvent(event, "mouseup");
+                    evt.clientX = clientX;
+                    evt.clientY = clientY;
+                    this._onMoveSlider(evt, true);
+                    }
+
+                }, {once:true});
+            }
+        }, {passive:true});
 
         pinVolume.addEventListener('mousedown', (event) => {
 
@@ -64,6 +117,38 @@ export class AudioPlayer {
                 window.removeEventListener('mousemove', handler, false);
             }, { once: true });
         });
+
+        pinVolume.addEventListener("touchstart", (event) => {
+            if (event.changedTouches.length == 1 && event.targetTouches.length ==1) {
+                let touch = event.changedTouches[0];
+                this._currentlyDragged = touch.target;
+                let touchId = touch.identifier;
+
+                let myTouch = (event) => {
+                    for (let i = 0; i< event.changedTouches.length; i++) {
+                        let t = event.changedTouches.item(i);
+                        if (t.identifier === touch.identifier) return t;
+                    }
+                }
+                
+                let handler = (event) => {
+                    let t = myTouch(event);
+                    if (t) {
+                    let evt = touchToEvent(t, "mousemove");
+                    this._onChangeVolume(evt);
+                    }
+                }
+                window.addEventListener("touchmove", handler);
+                window.addEventListener("touchend", (event) => {
+                    let t = myTouch(event);
+                    if (t) {
+                    this._currentlyDragged = false;
+                    window.removeEventListener("touchmove", handler);
+                    }
+
+                }, {once:true});
+            }
+        }, {passive:true});
 
         sliderTime.addEventListener('click', (evt) => {
             if (!this._currentlyDragged) this._onMoveSlider(evt, true);
@@ -91,6 +176,8 @@ export class AudioPlayer {
         });
         this._player.addEventListener('ended', () => {
             this._playPause.attributes.d.value = PLAY;
+            let event = new Event("ended");
+            this._rootElem.dispatchEvent(event);
             console.log("Track ended");
         });
         let state = this._player.readyState;
@@ -104,6 +191,11 @@ export class AudioPlayer {
     }
 
     _updateProgress() {
+        let event = new CustomEvent('timeupdate', {detail:{
+            currentTime: this._player.currentTime,
+            totalTime: this._player.duration
+        }});
+        this._rootElem.dispatchEvent(event);
         if (!this._currentlyDragged) {
             let current = this._player.currentTime;
             let percent = (current / this.getTotalTime()) * 100;

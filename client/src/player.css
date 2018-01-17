@@ -121,6 +121,12 @@
   .audio-player svg, .audio-player img {
     display: block;
   }
+
+  .audio-player .controls .current-time {
+    display: block;
+    width: 5em;
+    text-align: right;
+  }
   
   @keyframes spin {
     from {
