@@ -24,6 +24,8 @@ const VOLUME_LOW = 'M0 7.667v8h5.333L12 22.333V1L5.333 7.667';
 const PLAY = "M18 12L0 24V0";
 const PAUSE = "M0 0h6v24H0zM12 0h6v24h-6z";
 
+const NO_RELOAD_JUMP=300; 
+
 
 export class AudioPlayer {
     // Most of code copied from https://codepen.io/gregh/pen/NdVvbm
@@ -32,6 +34,7 @@ export class AudioPlayer {
 
         this.unsized = false;
         this.knownDuration =null;
+        this._timeOffset = 0; // offset of current steam in case time seeking was used
 
         let audioPlayer = document.querySelector('.audio-player');
         this._rootElem = audioPlayer;
@@ -199,6 +202,16 @@ export class AudioPlayer {
         if (state > 1) this._updateTotal();
         if (state > 2) this._showPlay();
 
+        let show_buffered = () => {
+            let ranges =""
+            for (let i=0; i< this._player.buffered.length; i++) {
+                ranges += `${i}: ${this._player.buffered.start(i)} - ${this._player.buffered.end(i)}`;
+            }
+            console.log("Buffered: "+ranges);
+        }
+
+        window.setInterval(show_buffered, 5000);
+
     }
 
     _updateTotal() {
@@ -207,12 +220,12 @@ export class AudioPlayer {
 
     _updateProgress() {
         let event = new CustomEvent('timeupdate', {detail:{
-            currentTime: this._player.currentTime,
-            totalTime: this._player.duration
+            currentTime: this._player.currentTime + this._timeOffset,
+            totalTime: this.getTotalTime()
         }});
         this._rootElem.dispatchEvent(event);
         if (!this._currentlyDragged) {
-            let current = this._player.currentTime;
+            let current = this._player.currentTime + this._timeOffset;
             let percent = (current / this.getTotalTime()) * 100;
             if (percent > 100) percent = 100;
             if (isNaN(percent)) percent = 0;
@@ -302,11 +315,43 @@ export class AudioPlayer {
         this._loading.style.display = 'show';
     }
 
+    _jumpWithSeek(time) {
+        let queryIndex = this._player.src.indexOf("?seek=");
+        let baseUrl = queryIndex>0? this._player.src.substr(0,queryIndex): this._player.src;
+        let wasPlaying = ! this._player.paused; 
+        let url = baseUrl+`?seek=${time}`;
+        this._timeOffset = time;
+        this._player.src = url;
+        this._player.currentTime= 0;
+        if (wasPlaying) {
+            this._player.play();
+        } else {
+            this._updateProgress();
+        }
+    }
+
     jumpToTime(time) {
+        time = parseFloat(time);
         console.log(`Jumping to time ${time}, duration: ${this._player.duration}`);
-        if (this._player.buffered.length) console.log(`${this._player.buffered.length} buffered: ${formatTime(this._player.buffered.start(0))} - ${formatTime(this._player.buffered.end(0))}`);
-        if (Math.abs(time - this._player.currentTime) > 1 && isFinite(time)) {
+        
+        let currentTime =  this._player.currentTime + this._timeOffset
+        let diff = time - currentTime;
+        if (Math.abs(diff) > 1 && isFinite(time)) {
+            if (this.unsized) {
+                
+                if (diff > NO_RELOAD_JUMP) {
+                    // jump with seek
+                    this._jumpWithSeek(time)
+                } else if (diff < 0 && (time - this._timeOffset < 0 || -diff > NO_RELOAD_JUMP)) {
+                    // jump back can work in FF, but Chrome does not seem to cache whole file so 
+                    // jumping back only limited
+                    this._jumpWithSeek(time)
+                } else {
+                    this._player.currentTime = time - this._timeOffset; 
+                }
+            } else {
             this._player.currentTime = time;
+            }
         }
     }
 
@@ -319,6 +364,7 @@ export class AudioPlayer {
     }
 
     setUrl(url, options) {
+        this._timeOffset = 0;
         if (options && "duration" in options) {
             this.knownDuration = options.duration;
         } else {
