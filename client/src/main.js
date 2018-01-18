@@ -6,8 +6,13 @@ import base64js from "base64-js";
 import {AudioPlayer, formatTime} from "./player.js";
 
 $(function() {
-    const baseUrl =`${window.location.protocol}//${window.location.hostname}:3000`;
-
+    let baseUrl;
+    if (AUDIOSERVE_DEVELOPMENT) {
+        baseUrl = `${window.location.protocol}//${window.location.hostname}:3000`;
+    } else {
+        baseUrl = `${window.location.protocol}//${window.location.host}`;
+    }
+     
     let pendingCall = null;
 
     function ajax(params) {

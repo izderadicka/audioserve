@@ -5,7 +5,8 @@ Origin};
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use self::subs::{send_file, short_response_boxed, search,ResponseFuture, NOT_FOUND_MESSAGE, get_folder};
+use self::subs::{send_file, send_file_simple, short_response_boxed, search,ResponseFuture, 
+    NOT_FOUND_MESSAGE, get_folder};
 use std::path::{PathBuf, Path};
 use percent_encoding::percent_decode;
 use futures::{Future, future};
@@ -31,6 +32,7 @@ pub struct Factory {
     pub sending_threads: Counter,
     pub max_threads: usize,
     pub base_dir: PathBuf,
+    pub client_dir: PathBuf,
     pub authenticator: Arc<Box<Authenticator<Credentials=()>>>,
     pub search: Search,
     pub transcoding: TranscodingDetails
@@ -50,7 +52,8 @@ impl NewService for Factory {
             max_threads: self.max_threads,
             base_dir: self.base_dir.clone(),
             search: self.search.clone(),
-            transcoding: self.transcoding.clone()
+            transcoding: self.transcoding.clone(),
+            client_dir: self.client_dir.clone()
         })
     }
 }
@@ -68,7 +71,7 @@ pub struct FileSendService {
     search: Search,
 
     base_dir: PathBuf,
-
+    client_dir: PathBuf,
     sending_threads: Counter,
     max_threads: usize,
     
@@ -103,6 +106,14 @@ impl Service for FileSendService {
                         OVERLOADED_MESSAGE,
                     );
         };
+        //static files 
+        if req.path() == "/" {
+            return send_file_simple(self.client_dir.clone(), "index.html".into(), self.sending_threads.clone());
+        };
+        if req.path() =="/bundle.js" {
+            return send_file_simple(self.client_dir.clone(), "bundle.js".into(), self.sending_threads.clone());
+        }
+        // from here everything must be authenticated
         let base_dir = self.base_dir.clone();
         let sending_threads =  self.sending_threads.clone();
         let searcher = self.search.clone();

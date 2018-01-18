@@ -162,6 +162,25 @@ fn serve_file_from_fs(full_path: &Path,
     }
 }
 
+pub fn send_file_simple(
+    base_path: PathBuf,
+    file_path: PathBuf,
+    counter: Counter,
+) -> ResponseFuture {
+    let (tx, rx) = oneshot::channel();
+    guarded_spawn(counter, move || {
+        let full_path = base_path.join(&file_path);
+        if full_path.exists() {
+            serve_file_from_fs(&full_path, None, tx);
+        } else {
+             error!("File {:?} does not exists", full_path);
+            tx.send(short_response(StatusCode::NotFound, NOT_FOUND_MESSAGE))
+                    .expect(THREAD_SEND_ERROR);
+        }
+        });
+    box_rx(rx)
+}
+
 pub fn send_file(
     base_path: PathBuf,
     file_path: PathBuf,

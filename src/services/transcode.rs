@@ -94,7 +94,7 @@ impl Transcoder {
         if super::types::must_transcode(mime) {
             return true;
         }
-        debug!(
+        trace!(
             "Should transcode {} > {}",
             bitrate,
             self.quality.transcode_from()

@@ -71,6 +71,7 @@ fn start_server(config: Config, my_secret: Vec<u8>) -> Result<(), hyper::Error> 
         sending_threads: Arc::new(AtomicUsize::new(0)),
         max_threads: config.max_sending_threads,
         base_dir: config.base_dir,
+        client_dir: config.client_dir,
         authenticator: Arc::new(Box::new(SharedSecretAuthenticator::new(
             config.shared_secret,
             my_secret,
