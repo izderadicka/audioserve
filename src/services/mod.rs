@@ -35,7 +35,8 @@ pub struct Factory {
     pub client_dir: PathBuf,
     pub authenticator: Arc<Box<Authenticator<Credentials=()>>>,
     pub search: Search,
-    pub transcoding: TranscodingDetails
+    pub transcoding: TranscodingDetails,
+    pub cors: bool
     
 }
 
@@ -53,7 +54,8 @@ impl NewService for Factory {
             base_dir: self.base_dir.clone(),
             search: self.search.clone(),
             transcoding: self.transcoding.clone(),
-            client_dir: self.client_dir.clone()
+            client_dir: self.client_dir.clone(),
+            cors: self.cors.clone()
         })
     }
 }
@@ -69,13 +71,12 @@ pub struct TranscodingDetails {
 pub struct FileSendService {
     pub authenticator: Arc<Box<Authenticator<Credentials=()>>>,
     search: Search,
-
     base_dir: PathBuf,
     client_dir: PathBuf,
     sending_threads: Counter,
     max_threads: usize,
-    
-    transcoding: TranscodingDetails
+    transcoding: TranscodingDetails,
+    cors: bool
 }
 
 // use only on checked prefixes
@@ -83,7 +84,10 @@ fn get_subfolder(path: &str, prefix: &str) -> PathBuf {
     Path::new(&path).strip_prefix(prefix).unwrap().to_path_buf()
 }
 
-fn add_cors_headers(resp: Response, origin: Option<String>) -> Response {
+fn add_cors_headers(resp: Response, origin: Option<String>, enabled: bool) -> Response {
+    if ! enabled {
+        return resp
+    }
     match origin {
         Some(o) =>
             resp.with_header(AccessControlAllowOrigin::Value(o))
@@ -118,6 +122,7 @@ impl Service for FileSendService {
         let sending_threads =  self.sending_threads.clone();
         let searcher = self.search.clone();
         let transcoding = self.transcoding.clone();
+        let cors = self.cors;
         let origin = req.headers().get::<Origin>().map(|o| {
             format!("{}",o)
             }
@@ -127,7 +132,7 @@ impl Service for FileSendService {
                 Ok((req,_creds)) => 
                     FileSendService::process_checked(req, base_dir,sending_threads, searcher, transcoding),
                 Err(resp) => Box::new(future::ok(resp))
-            }.map(|r| add_cors_headers(r, origin))
+            }.map(move |r| add_cors_headers(r, origin, cors))
         }))
         
     }

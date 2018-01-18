@@ -81,8 +81,9 @@ fn start_server(config: Config, my_secret: Vec<u8>) -> Result<(), hyper::Error> 
         transcoding: TranscodingDetails {
         transcoder: config.transcoding.map(|q| Transcoder::new(q)),
         transcodings: Arc::new(AtomicUsize::new(0)),
-        max_transcodings: config.max_transcodings
-        }
+        max_transcodings: config.max_transcodings,
+        },
+        cors: config.cors
     };
     let mut server = HttpServer::new().bind(&config.local_addr, factory)?;
     server.no_proto();

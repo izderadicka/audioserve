@@ -42,7 +42,8 @@ pub struct Config{
     pub max_transcodings: usize,
     pub token_validity_hours: u64,
     pub secret_file: PathBuf,
-    pub client_dir: PathBuf
+    pub client_dir: PathBuf,
+    pub cors: bool
 
 }
 type Parser<'a> = App<'a, 'a>;
@@ -115,6 +116,10 @@ fn create_parser<'a>() -> Parser<'a> {
             .takes_value(true)
             .help("Path to file where server is kept - it's generated if it does not exists (default is $HOME/.audioserve.secret)")
         )
+        .arg(Arg::with_name("cors")
+            .long("cors")
+            .help("Enable CORS - enables any origin of requests")
+        )
 }
 
 pub fn parse_args() -> Result<Config, Error>{
@@ -180,6 +185,8 @@ pub fn parse_args() -> Result<Config, Error>{
         }
     };
 
+    let cors = args.is_present("cors");
+
 
     Ok(Config{
         base_dir,
@@ -190,7 +197,8 @@ pub fn parse_args() -> Result<Config, Error>{
         max_transcodings,
         token_validity_hours,
         client_dir,
-        secret_file
+        secret_file,
+        cors
 
     })
 
