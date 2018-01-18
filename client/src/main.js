@@ -3,6 +3,7 @@ import "bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./styles.css";
 import base64js from "base64-js";
+import {sha256} from "js-sha256";
 import {AudioPlayer, formatTime} from "./player.js";
 
 $(function() {
@@ -43,6 +44,27 @@ $(function() {
         })
         .then(data => {
             //console.log(data);
+            $("#info-container").hide();
+            
+
+            if (data.cover) {
+                $("#info-cover").show().attr('src', baseUrl+"/cover/"+data.cover.path);
+                $("#info-container").show();
+            } else {
+                $("#info-cover").hide();
+            }
+
+            // new Promise((resolve, reject) => {
+            //     let coverLoader, descLoader;
+            //     if (data.cover) {
+            //         coverLoader = $.ajax({
+
+            //         })
+            //     }
+
+            // })
+            // .catch((e) => console.log("Cannot load folder info",e));
+
             let subfolders = $('#subfolders');
             let count = $('#subfolders-count');
             subfolders.empty();
@@ -79,6 +101,8 @@ $(function() {
             } else {
                 $("#files-container").hide();
             }
+
+            $(".collapse").collapse('show');
 
             updateBreadcrumb(path);
             let prevFolder = window.localStorage.getItem("audioserve_folder");
@@ -258,8 +282,15 @@ $(function() {
         let concatedBytes = new Uint8Array(secretBytes.length+randomBytes.length);
         concatedBytes.set(secretBytes);
         concatedBytes.set(randomBytes, secretBytes.length);
-        return window.crypto.subtle.digest('SHA-256', concatedBytes)
+        let digestPromise;
+        if (! window.crypto.subtle) {
+            digestPromise = Promise.resolve(sha256.arrayBuffer(concatedBytes));
+        } else {
+            digestPromise =  window.crypto.subtle.digest('SHA-256', concatedBytes);
+        }
+        return digestPromise
          .then( s => {
+             console.log('hash',s);
             let secret = base64js.fromByteArray(randomBytes)+"|"+base64js.fromByteArray(new Uint8Array(s));
             return ajax({
                 url:baseUrl+"/authenticate",

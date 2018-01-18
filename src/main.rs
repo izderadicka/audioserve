@@ -86,7 +86,7 @@ fn start_server(config: Config, my_secret: Vec<u8>) -> Result<(), hyper::Error> 
         cors: config.cors
     };
     let mut server = HttpServer::new().bind(&config.local_addr, factory)?;
-    server.no_proto();
+    //server.no_proto();
     info!("Server listening on {}", server.local_addr().unwrap());
     server.run()?;
 

@@ -80,7 +80,7 @@ pub struct FileSendService {
 }
 
 // use only on checked prefixes
-fn get_subfolder(path: &str, prefix: &str) -> PathBuf {
+fn get_subpath(path: &str, prefix: &str) -> PathBuf {
     Path::new(&path).strip_prefix(prefix).unwrap().to_path_buf()
 }
 
@@ -123,6 +123,7 @@ impl Service for FileSendService {
         let searcher = self.search.clone();
         let transcoding = self.transcoding.clone();
         let cors = self.cors;
+        let client_dir = self.client_dir.clone();
         let origin = req.headers().get::<Origin>().map(|o| {
             format!("{}",o)
             }
@@ -130,7 +131,7 @@ impl Service for FileSendService {
         Box::new(self.authenticator.authenticate(req).and_then(move |result| {
             match result {
                 Ok((req,_creds)) => 
-                    FileSendService::process_checked(req, base_dir,sending_threads, searcher, transcoding),
+                    FileSendService::process_checked(req, base_dir, client_dir, sending_threads, searcher, transcoding),
                 Err(resp) => Box::new(future::ok(resp))
             }.map(move |r| add_cors_headers(r, origin, cors))
         }))
@@ -141,6 +142,7 @@ impl Service for FileSendService {
 impl FileSendService {
     fn process_checked(req: Request, 
         base_dir: PathBuf, 
+        client_dir: PathBuf,
         sending_threads: 
         Counter, searcher: Search,
         transcoding: TranscodingDetails
@@ -173,7 +175,7 @@ impl FileSendService {
                 let seek: Option<f32> = params.and_then(|mut p| p.remove("seek")).and_then(|s| s.parse().ok());
 
                 send_file(base_dir, 
-                    get_subfolder(&path, "/audio/"), 
+                    get_subpath(&path, "/audio/"), 
                     bytes_range, 
                     seek,
                     sending_threads,
@@ -181,7 +183,7 @@ impl FileSendService {
                     )
                 } else if path.starts_with("/folder/") {
                     get_folder(base_dir, 
-                    get_subfolder(&path, "/folder/"),  
+                    get_subpath(&path, "/folder/"),  
                     transcoding.transcoder,
                     sending_threads) 
                 } else if path == "/search" {
@@ -189,6 +191,13 @@ impl FileSendService {
                         return search(base_dir, searcher, search_string.into_owned(), sending_threads);
                     }
                     short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE)
+                } else if path.starts_with("/cover/") {
+                    send_file_simple(base_dir, 
+                    get_subpath(&path, "/cover"), sending_threads)
+
+                } else if path.starts_with("/desc/") {
+                    send_file_simple(base_dir, 
+                    get_subpath(&path, "/desc"), sending_threads)
                 } else {
                     short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE)
                 }

@@ -8,7 +8,7 @@
 </head>
 
 <body>
-  <div class="container" id="main">
+  <div class="container-fluid" id="main">
     <h1 class="top-header">
       <span class="app-name">Audioserve Client</span>
       <div id="search-btn" class="search"></div>
@@ -24,22 +24,41 @@
         <li class="breadcrumb-item active" aria-current="page">Home</li>
       </ol>
     </nav>
-    <div id="subfolders-container">
-      <h3>Subfolders
+
+    <div id="info-container" class="content-section">
+        <h3 class="expanded" data-toggle="collapse" data-target="#info-box" aria-expanded="true">
+          Info
+        </h3>
+        <div id="info-box" class="collapse show">
+          <p><img id="info-cover"><span id="info-desc">
+          </span></p>
+        </div>
+      </div>
+
+
+    <div id="subfolders-container" class="content-section">
+      <h3 class="expanded" data-toggle="collapse" data-target="#subfolders-box" aria-expanded="true">
+        Subfolders
         <span class="badge badge-primary" id="subfolders-count"></span>
       </h3>
-      <ul class="list-group" id="subfolders">
-      </ul>
-
+      <div id="subfolders-box" class="collapse show">
+        <ul class="list-group collapse" id="subfolders">
+        </ul>
+      </div>
     </div>
-    <div id="files-container">
-      <h3>Files
+
+    <div id="files-container"  class="content-section">
+      <h3 class="expanded" data-toggle="collapse" data-target="#files-box" aria-expanded="true">
+        Files
         <span class="badge badge-primary" id="files-count"></span>
       </h3>
-      <ul class="list-group" id="files">
+      <div id="files-box" class="collapse show">
+        <ul class="list-group" id="files">
+      </div>
       </ul>
     </div>
   </div>
+
   <div id="player">
     <div class="audio-player">
       <div class="loading">
@@ -85,20 +104,20 @@
     <div class="modal-dialog" role="document">
       <div class="modal-content">
         <form id="login-form">
-        <div class="modal-header">
-          <h5 class="modal-title">Login to Audioserve</h5>
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
-        </div>
-        <div class="modal-body">
-          <label>Provide shared secret:</label>
-          <input name="secret" type="password" id="secret-input">
-        </div>
-        <div class="modal-footer">
-          <input type="submit" class="btn btn-primary" id="login-btn" value="Login">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-        </div>
+          <div class="modal-header">
+            <h5 class="modal-title">Login to Audioserve</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <label>Provide shared secret:</label>
+            <input name="secret" type="password" id="secret-input">
+          </div>
+          <div class="modal-footer">
+            <input type="submit" class="btn btn-primary" id="login-btn" value="Login">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          </div>
         </form>
       </div>
     </div>

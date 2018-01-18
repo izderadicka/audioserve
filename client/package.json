@@ -24,6 +24,7 @@
     "base64js": "^1.0.1",
     "bootstrap": "^4.0.0-beta.3",
     "jquery": "^3.2.1",
+    "js-sha256": "^0.9.0",
     "popper.js": "^1.12.9"
   }
 }

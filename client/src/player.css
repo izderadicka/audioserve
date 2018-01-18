@@ -88,9 +88,10 @@
     fill: #0275d8;
   }
   .audio-player .volume .volume-controls {
+    z-index: 99;
     width: 30px;
     height: 135px;
-    background-color: rgba(0, 0, 0, 0.62);
+    background-color: rgba(0, 0, 0, 0.8);
     border-radius: 7px;
     position: absolute;
     left: -3px;
@@ -128,7 +129,7 @@
 
   .audio-player .controls .current-time {
     display: block;
-    width: 5em;
+    width: 3.5em;
     text-align: right;
   }
   
