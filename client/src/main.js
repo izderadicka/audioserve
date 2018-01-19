@@ -5,13 +5,14 @@ import "./styles.css";
 import base64js from "base64-js";
 import {sha256} from "js-sha256";
 import {AudioPlayer, formatTime} from "./player.js";
+import showdown from "showdown";
 
 $(function() {
     let baseUrl;
     if (AUDIOSERVE_DEVELOPMENT) {
         baseUrl = `${window.location.protocol}//${window.location.hostname}:3000`;
     } else {
-        baseUrl = `${window.location.protocol}//${window.location.host}`;
+        baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname.length>1?window.location.pathname:""}`;
     }
      
     let pendingCall = null;
@@ -53,6 +54,29 @@ $(function() {
             } else {
                 $("#info-cover").hide();
             }
+
+            if (data.description) {
+                $("#info-desc").empty();
+                $.ajax({
+                    url: baseUrl+"/desc/"+data.description.path,
+                    xhrFields: {
+                        withCredentials: true
+                     }
+                })
+                .then((text, status, response) => {
+                    let mime = response.getResponseHeader("Content-Type");
+                    if (mime == "text/html") {
+                        $("#info-desc").html(text);
+                    } else if (mime == "text/x-markdown") {
+                        let converter = new showdown.Converter();
+                        $("#info-desc").html(converter.makeHtml(text));
+                    } else {
+                    $("#info-desc").text(text);
+                    }
+                    $("#info-container").show();
+                })
+                .catch((e) => console.log("Cannot load description", e));
+            } 
 
             // new Promise((resolve, reject) => {
             //     let coverLoader, descLoader;
@@ -290,7 +314,6 @@ $(function() {
         }
         return digestPromise
          .then( s => {
-             console.log('hash',s);
             let secret = base64js.fromByteArray(randomBytes)+"|"+base64js.fromByteArray(new Uint8Array(s));
             return ajax({
                 url:baseUrl+"/authenticate",
@@ -313,24 +336,33 @@ $(function() {
         
     });
 
+    // TODO: Change this later, it's clumsy
     $("#search-btn").on("click", evt => {
         $("#search-area").toggle();
         $(".app-name").toggle();
+        searchExpanded = ! searchExpanded;
 
         if ($("#search-area").is(':visible')) {
             $("#search-area input").focus();
         }
     })
 
+    let searchExpanded = false;
     function showSearch() {
         if ($(window).width() > 600) {
-            $("#search-area").show();
-            $(".app-name").show();
-            $("#search-btn").hide();
+                $("#search-area").show();
+                $(".app-name").show();
+                $("#search-btn").hide();
         } else {
-            $("#search-area").hide();
-            $(".app-name").show();
-            $("#search-btn").show();
+            if (searchExpanded) {
+                $("#search-area").show();
+                $(".app-name").hide();
+                $("#search-btn").show();
+            } else {
+                $("#search-area").hide();
+                $(".app-name").show();
+                $("#search-btn").show();
+            }
         }
     }
 
@@ -358,4 +390,5 @@ $(function() {
 
     showSearch();
     loadFolder(window.localStorage.getItem("audioserve_folder")|| "");
+    $("#splash").hide();
 })

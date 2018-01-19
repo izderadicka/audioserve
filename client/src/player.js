@@ -202,15 +202,15 @@ export class AudioPlayer {
         if (state > 1) this._updateTotal();
         if (state > 2) this._showPlay();
 
-        let show_buffered = () => {
-            let ranges =""
-            for (let i=0; i< this._player.buffered.length; i++) {
-                ranges += `${i}: ${this._player.buffered.start(i)} - ${this._player.buffered.end(i)}`;
-            }
-            console.log("Buffered: "+ranges);
-        }
+        // let show_buffered = () => {
+        //     let ranges =""
+        //     for (let i=0; i< this._player.buffered.length; i++) {
+        //         ranges += `${i}: ${this._player.buffered.start(i)} - ${this._player.buffered.end(i)}`;
+        //     }
+        //     console.log("Buffered: "+ranges);
+        // }
 
-        window.setInterval(show_buffered, 5000);
+        // window.setInterval(show_buffered, 5000);
 
     }
 
