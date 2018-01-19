@@ -114,10 +114,14 @@ $(function() {
                     .attr("href", file.path)
                     .data("duration", file.meta.duration)
                     .data("transcoded", file.trans)
-                    .text(file.name)
+                    .text(file.name);
+                
                 files.append(item);
                 if (file.meta) {
-                    item.append($(`<span class="duration">${formatTime(file.meta.duration)}</span>`))
+                    item.append($(`<span class="duration">(${formatTime(file.meta.duration)})</span>`))
+                }
+                if (file.trans) {
+                    item.append($("<span>").addClass("transcoded"));
                 }
             }
             if (data.files.length) {
