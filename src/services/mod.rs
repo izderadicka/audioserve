@@ -1,8 +1,7 @@
-use hyper::server::{NewService, Request, Response, Service};
+use hyper::server::{Request, Response, Service};
 use hyper::{Method, StatusCode};
 use hyper::header::{Range,AccessControlAllowOrigin, AccessControlAllowCredentials, 
 Origin};
-use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use self::subs::{send_file, send_file_simple, short_response_boxed, search,ResponseFuture, 
@@ -27,39 +26,6 @@ const OVERLOADED_MESSAGE: &str = "Overloaded, try later";
 type Counter = Arc<AtomicUsize>;
 
 
-
-pub struct Factory {
-    pub sending_threads: Counter,
-    pub max_threads: usize,
-    pub base_dir: PathBuf,
-    pub client_dir: PathBuf,
-    pub authenticator: Arc<Box<Authenticator<Credentials=()>>>,
-    pub search: Search,
-    pub transcoding: TranscodingDetails,
-    pub cors: bool
-    
-}
-
-impl NewService for Factory {
-    type Request = Request;
-    type Response = Response;
-    type Error = ::hyper::Error;
-    type Instance = FileSendService;
-
-    fn new_service(&self) -> Result<Self::Instance, io::Error> {
-        Ok(FileSendService {
-            authenticator: self.authenticator.clone(),
-            sending_threads: self.sending_threads.clone(),
-            max_threads: self.max_threads,
-            base_dir: self.base_dir.clone(),
-            search: self.search.clone(),
-            transcoding: self.transcoding.clone(),
-            client_dir: self.client_dir.clone(),
-            cors: self.cors.clone()
-        })
-    }
-}
-
 #[derive(Clone)]
 pub struct TranscodingDetails {
     pub transcoder: Option<Transcoder>,
@@ -68,15 +34,16 @@ pub struct TranscodingDetails {
 
 }
 
+#[derive(Clone)]
 pub struct FileSendService {
-    pub authenticator: Arc<Box<Authenticator<Credentials=()>>>,
-    search: Search,
-    base_dir: PathBuf,
-    client_dir: PathBuf,
-    sending_threads: Counter,
-    max_threads: usize,
-    transcoding: TranscodingDetails,
-    cors: bool
+   pub authenticator: Arc<Box<Authenticator<Credentials=()>>>,
+   pub  search: Search,
+   pub  base_dir: PathBuf,
+   pub  client_dir: PathBuf,
+   pub  sending_threads: Counter,
+   pub  max_threads: usize,
+   pub  transcoding: TranscodingDetails,
+   pub  cors: bool
 }
 
 // use only on checked prefixes
@@ -123,7 +90,6 @@ impl Service for FileSendService {
         let searcher = self.search.clone();
         let transcoding = self.transcoding.clone();
         let cors = self.cors;
-        let client_dir = self.client_dir.clone();
         let origin = req.headers().get::<Origin>().map(|o| {
             format!("{}",o)
             }
@@ -131,7 +97,7 @@ impl Service for FileSendService {
         Box::new(self.authenticator.authenticate(req).and_then(move |result| {
             match result {
                 Ok((req,_creds)) => 
-                    FileSendService::process_checked(req, base_dir, client_dir, sending_threads, searcher, transcoding),
+                    FileSendService::process_checked(req, base_dir, sending_threads, searcher, transcoding),
                 Err(resp) => Box::new(future::ok(resp))
             }.map(move |r| add_cors_headers(r, origin, cors))
         }))
@@ -142,7 +108,6 @@ impl Service for FileSendService {
 impl FileSendService {
     fn process_checked(req: Request, 
         base_dir: PathBuf, 
-        client_dir: PathBuf,
         sending_threads: 
         Counter, searcher: Search,
         transcoding: TranscodingDetails

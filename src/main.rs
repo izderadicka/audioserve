@@ -26,7 +26,7 @@ use hyper::server::{Http as HttpServer};
 use std::io::{self, Write, Read};
 use std::sync::atomic::{AtomicUsize};
 use std::sync::Arc;
-use services::{Factory, TranscodingDetails};
+use services::{TranscodingDetails, FileSendService};
 use services::auth::SharedSecretAuthenticator;
 use services::search::Search;
 use services::transcode::Transcoder;
@@ -67,7 +67,8 @@ if file.exists() {
 
 fn start_server(config: Config, my_secret: Vec<u8>) -> Result<(), hyper::Error> {
     
-    let factory = Factory {
+
+    let svc = FileSendService {
         sending_threads: Arc::new(AtomicUsize::new(0)),
         max_threads: config.max_sending_threads,
         base_dir: config.base_dir,
@@ -85,7 +86,26 @@ fn start_server(config: Config, my_secret: Vec<u8>) -> Result<(), hyper::Error> 
         },
         cors: config.cors
     };
-    let mut server = HttpServer::new().bind(&config.local_addr, factory)?;
+
+    // let factory = Factory {
+    //     sending_threads: Arc::new(AtomicUsize::new(0)),
+    //     max_threads: config.max_sending_threads,
+    //     base_dir: config.base_dir,
+    //     client_dir: config.client_dir,
+    //     authenticator: Arc::new(Box::new(SharedSecretAuthenticator::new(
+    //         config.shared_secret,
+    //         my_secret,
+    //         config.token_validity_hours
+    //     ))),
+    //     search:Search::FoldersSearch,
+    //     transcoding: TranscodingDetails {
+    //     transcoder: config.transcoding.map(|q| Transcoder::new(q)),
+    //     transcodings: Arc::new(AtomicUsize::new(0)),
+    //     max_transcodings: config.max_transcodings,
+    //     },
+    //     cors: config.cors
+    // };
+    let server = HttpServer::new().bind(&config.local_addr, move || Ok(svc.clone()))?;
     //server.no_proto();
     info!("Server listening on {}", server.local_addr().unwrap());
     server.run()?;

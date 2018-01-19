@@ -391,13 +391,16 @@ pub fn search(
     });
     box_rx(rx)
 }
-fn tcf() -> Option<Transcoder> {
-    Some(Transcoder::new(::services::transcode::Quality::Low))
-}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json;
+
+    fn tcf() -> Option<Transcoder> {
+        Some(Transcoder::new(::services::transcode::Quality::Low))
+    }
+    
     #[test]
     fn test_list_dir() {
         let res = list_dir("/non-existent", "folder", tcf());
