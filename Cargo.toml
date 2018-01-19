@@ -23,6 +23,12 @@ num_cpus = "1.8"
 ring = "0.12"
 data-encoding = "2.1"
 
+# forr ssl
+tokio-tls = {version="0.1", features=["tokio-proto"]}
+native-tls = "0.1"
+tokio-proto = "0.1"
+tokio-service = "0.1"
+
 [dependencies.taglib]
 git = "https://github.com/ebassi/taglib-rust"
 

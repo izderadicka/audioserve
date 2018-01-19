@@ -10,7 +10,7 @@ use ring::rand::{SystemRandom, SecureRandom};
 use data_encoding::{BASE64};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub trait Authenticator {
+pub trait Authenticator: Send+Sync {
     type Credentials;
     fn authenticate(&self, req: Request) -> Box<Future<Item=Result<(Request,Self::Credentials), Response>, Error=hyper::Error>>;
 }

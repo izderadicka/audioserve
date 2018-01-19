@@ -29,6 +29,8 @@ pub enum Error {
     NonExistentBaseDirectory{ }
 
     NonExistentClientDirectory{ }
+
+    NonExistentSSLKeyFile { }
 }
 }
 
@@ -43,7 +45,9 @@ pub struct Config{
     pub token_validity_hours: u64,
     pub secret_file: PathBuf,
     pub client_dir: PathBuf,
-    pub cors: bool
+    pub cors: bool,
+    pub ssl_key_file: Option<PathBuf>,
+    pub ssl_key_password: Option<String>
 
 }
 type Parser<'a> = App<'a, 'a>;
@@ -120,6 +124,17 @@ fn create_parser<'a>() -> Parser<'a> {
             .long("cors")
             .help("Enable CORS - enables any origin of requests")
         )
+        .arg(Arg::with_name("ssl-key")
+            .long("ssl-key")
+            .takes_value(true)
+            .help("TLS/SSL private key and certificate in form of PKCS#12 key file, if provide https is used")
+        )
+        .arg(Arg::with_name("ssl-key-password")
+            .long("ssl-key-password")
+            .takes_value(true)
+            .requires("ssl-key")
+            .help("Password for TLS/SSL private key")
+        )
 }
 
 pub fn parse_args() -> Result<Config, Error>{
@@ -187,6 +202,19 @@ pub fn parse_args() -> Result<Config, Error>{
 
     let cors = args.is_present("cors");
 
+    let ssl_key_file = match args.value_of("ssl-key") {
+        Some(f) => {
+            let p: PathBuf = f.into();
+            if ! p.exists() {
+                return Err(Error::NonExistentSSLKeyFile)
+            }
+            Some(p)
+        },
+        None => None
+    };
+
+    let ssl_key_password = args.value_of("ssl-key-password").map(|s| s.into());
+
 
     Ok(Config{
         base_dir,
@@ -198,7 +226,9 @@ pub fn parse_args() -> Result<Config, Error>{
         token_validity_hours,
         client_dir,
         secret_file,
-        cors
+        cors,
+        ssl_key_file,
+        ssl_key_password
 
     })
 
