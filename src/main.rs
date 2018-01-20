@@ -56,7 +56,7 @@ where P:AsRef<Path>
             let mut bytes = vec![];
             let mut f = File::open(fname)?;
             f.read_to_end(&mut bytes)?;
-            let key = Pkcs12::from_der(&bytes, pass.unwrap()).map_err(|e| 
+            let key = Pkcs12::from_der(&bytes, pass.unwrap_or(&String::new())).map_err(|e| 
             io::Error::new(io::ErrorKind::Other, e))?;
             Ok(Some(key))
         },
