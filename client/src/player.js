@@ -1,4 +1,5 @@
 import "./player.css";
+import {debug, ifDebug} from "./debug.js";
 
 export function formatTime(dur) {
     if (! isFinite(dur)) return "?";
@@ -12,7 +13,7 @@ export function formatTime(dur) {
         mins = ("0"+mins).slice(-2);
     }
     if (hours) {
-        return `${hours}:${mins}:${secs}`
+        return `${hours}:${mins}:${secs}`;
     } else {
         return `${mins}:${secs}`;
     }
@@ -23,7 +24,6 @@ const VOLUME_MED = 'M0 7.667v8h5.333L12 22.333V1L5.333 7.667M17.333 11.373C17.33
 const VOLUME_LOW = 'M0 7.667v8h5.333L12 22.333V1L5.333 7.667';
 const PLAY = "M18 12L0 24V0";
 const PAUSE = "M0 0h6v24H0zM12 0h6v24h-6z";
-
 const NO_RELOAD_JUMP=300; 
 
 
@@ -77,13 +77,13 @@ export class AudioPlayer {
                 clientX: touch.clientX,
                 clientY: touch.clientY,
                 type: type
-            }
-        }
+            };
+        };
 
 
         window.addEventListener("touchcancel", () => {
-            console.log("touch canceled");
-        })
+            debug("touch canceled");
+        });
 
         pinTime.addEventListener("touchstart", (event) => {
             if (event.changedTouches.length == 1 && event.targetTouches.length ==1) {
@@ -97,7 +97,7 @@ export class AudioPlayer {
                         let t = event.changedTouches.item(i);
                         if (t.identifier === touch.identifier) return t;
                     }
-                }
+                };
                 
                 let handler = (event) => {
                     let t = myTouch(event);
@@ -107,12 +107,12 @@ export class AudioPlayer {
                     clientY=evt.clientY;
                     this._onMoveSlider(evt);
                     }
-                }
+                };
                 window.addEventListener("touchmove", handler);
                 window.addEventListener("touchend", (event) => {
                     let t = myTouch(event);
                     if (t) {
-                    window.setTimeout( () => { this._currentlyDragged = false}, 200);
+                    window.setTimeout( () => { this._currentlyDragged = false; }, 200);
                     window.removeEventListener("touchmove", handler);
                     let evt = touchToEvent(event, "mouseup");
                     evt.clientX = clientX;
@@ -147,7 +147,7 @@ export class AudioPlayer {
                         let t = event.changedTouches.item(i);
                         if (t.identifier === touch.identifier) return t;
                     }
-                }
+                };
                 
                 let handler = (event) => {
                     let t = myTouch(event);
@@ -155,7 +155,7 @@ export class AudioPlayer {
                     let evt = touchToEvent(t, "mousemove");
                     this._onChangeVolume(evt);
                     }
-                }
+                };
                 window.addEventListener("touchmove", handler);
                 window.addEventListener("touchend", (event) => {
                     let t = myTouch(event);
@@ -185,19 +185,30 @@ export class AudioPlayer {
     }
 
     initPlayer() {
+        ifDebug(() => {
+            this._player.addEventListener('abort', (evt)=> console.log("Player aborted"));
+            this._player.addEventListener('error', (evt)=> console.log("Player errror"));
+            this._player.addEventListener('emptied', (evt)=> console.log("Player emptied"));
+            this._player.addEventListener('stalled', (evt)=> console.log("Player stalled"));
+            this._player.addEventListener('suspend', (evt)=> console.log("Player suspend"));
+        });
+
         this._player.addEventListener('timeupdate', this._updateProgress.bind(this));
         this._player.addEventListener('volumechange', this._updateVolume.bind(this));
-        this._player.addEventListener('loadedmetadata', this._updateTotal.bind(this));
+        this._player.addEventListener('durationchange', this._updateTotal.bind(this));
+        //this._player.addEventListener('loadedmetadata', this._updateTotal.bind(this));
         this._player.addEventListener('canplay', () => {
-            //console.log("Can play");
             this._showPlay();
         });
         this._player.addEventListener('ended', () => {
-            this._playPause.attributes.d.value = PLAY;
+            this._displayPlay();
             let event = new Event("ended");
             this._rootElem.dispatchEvent(event);
-            console.log("Track ended");
+            debug("Track ended");
         });
+        this._player.addEventListener('pause', (evt) => this._displayPlay());
+        this._player.addEventListener('playing', (evt) => this._displayPause());
+
         let state = this._player.readyState;
         if (state > 1) this._updateTotal();
         if (state > 2) this._showPlay();
@@ -209,7 +220,6 @@ export class AudioPlayer {
         //     }
         //     console.log("Buffered: "+ranges);
         // }
-
         // window.setInterval(show_buffered, 5000);
 
     }
@@ -251,7 +261,7 @@ export class AudioPlayer {
         if (event.type == 'click' && event.target.classList.contains('pin')) {
             rangeBox = event.target.parentElement.parentElement;
         }
-        if (event.type == 'mousemove' || event.type == 'mouseup') {
+        if (el && (event.type == 'mousemove' || event.type == 'mouseup')) {
             rangeBox = el.parentElement.parentElement;
         }
         return rangeBox;
@@ -281,7 +291,7 @@ export class AudioPlayer {
 
     getTotalTime() {
         if (this.unsized && this.knownDuration) {
-            return this.knownDuration
+            return this.knownDuration;
         } else {
             return this._player.duration;
         }
@@ -307,6 +317,7 @@ export class AudioPlayer {
 
     _showPlay() {
         this._playpauseBtn.style.display = 'block';
+        this._displayPlay();
         this._loading.style.display = 'none';
     }
 
@@ -316,6 +327,7 @@ export class AudioPlayer {
     }
 
     _jumpWithSeek(time) {
+        debug("Reloading media by server seek");
         let queryIndex = this._player.src.indexOf("?seek=");
         let baseUrl = queryIndex>0? this._player.src.substr(0,queryIndex): this._player.src;
         let wasPlaying = ! this._player.paused; 
@@ -332,20 +344,20 @@ export class AudioPlayer {
 
     jumpToTime(time) {
         time = parseFloat(time);
-        console.log(`Jumping to time ${time}, duration: ${this._player.duration}`);
+        debug(`Jumping to time ${time}, duration: ${this._player.duration}`);
         
-        let currentTime =  this._player.currentTime + this._timeOffset
+        let currentTime =  this._player.currentTime + this._timeOffset;
         let diff = time - currentTime;
         if (Math.abs(diff) > 1 && isFinite(time)) {
             if (this.unsized) {
                 
                 if (diff > NO_RELOAD_JUMP) {
                     // jump with seek
-                    this._jumpWithSeek(time)
+                    this._jumpWithSeek(time);
                 } else if (diff < 0 && (time - this._timeOffset < 0 || -diff > NO_RELOAD_JUMP)) {
                     // jump back can work in FF, but Chrome does not seem to cache whole file so 
                     // jumping back only limited
-                    this._jumpWithSeek(time)
+                    this._jumpWithSeek(time);
                 } else {
                     this._player.currentTime = time - this._timeOffset; 
                 }
@@ -370,8 +382,8 @@ export class AudioPlayer {
         } else {
             this.knownDuration = null;
         }
-        if (options && options.transcoded) this.unsized = true
-        else if (options && options.unsized) this.unsized = true
+        if (options && options.transcoded) this.unsized = true;
+        else if (options && options.unsized) this.unsized = true;
         else this.unsized = false;
         if (!url) {
             this._player.src = "";
@@ -385,8 +397,15 @@ export class AudioPlayer {
         }
     }
 
-    play() { 
+    _displayPause() {
         this._playPause.attributes.d.value = PAUSE;
+    }
+
+    _displayPlay() {
+        this._playPause.attributes.d.value = PLAY;
+    }
+
+    play() { 
         return this._player.play()
         .catch((e) => {
             this.pause();
@@ -396,7 +415,6 @@ export class AudioPlayer {
     }
 
     pause() {
-        this._playPause.attributes.d.value = PLAY;
         this._player.pause();
         
     }

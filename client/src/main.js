@@ -6,6 +6,7 @@ import base64js from "base64-js";
 import {sha256} from "js-sha256";
 import {AudioPlayer, formatTime} from "./player.js";
 import showdown from "showdown";
+import {debug} from "./debug.js";
 
 $(function() {
     let baseUrl;
@@ -26,8 +27,8 @@ $(function() {
         }
         let res = $.ajax(params);
         pendingCall = res;
-        res.always( () => {pendingCall=null});
-        return res
+        res.always( () => {pendingCall=null;});
+        return res;
     }
 
     function loadFolder(path, fromHistory) {
@@ -44,7 +45,6 @@ $(function() {
             }
         })
         .then(data => {
-            //console.log(data);
             $("#info-container").hide();
             
 
@@ -78,26 +78,14 @@ $(function() {
                 .catch((e) => console.log("Cannot load description", e));
             } 
 
-            // new Promise((resolve, reject) => {
-            //     let coverLoader, descLoader;
-            //     if (data.cover) {
-            //         coverLoader = $.ajax({
-
-            //         })
-            //     }
-
-            // })
-            // .catch((e) => console.log("Cannot load folder info",e));
-
             let subfolders = $('#subfolders');
             let count = $('#subfolders-count');
             subfolders.empty();
             count.text(data.subfolders.length);
             for (let subfolder of  data.subfolders) {
-                //console.log(subfolder);
                 let item = $('<a class="list-group-item list-group-item-action">')
                     .attr("href", subfolder.path)
-                    .text(subfolder.name)
+                    .text(subfolder.name);
                 subfolders.append(item);
             }
             if (data.subfolders.length) {
@@ -118,7 +106,7 @@ $(function() {
                 
                 files.append(item);
                 if (file.meta) {
-                    item.append($(`<span class="duration">(${formatTime(file.meta.duration)})</span>`))
+                    item.append($(`<span class="duration">(${formatTime(file.meta.duration)})</span>`));
                 }
                 if (file.trans) {
                     item.append($("<span>").addClass("transcoded"));
@@ -168,16 +156,15 @@ $(function() {
             }
         })
         .then(data => {
-            //console.log(data);
+            $("#info-container").hide();
             let subfolders = $('#subfolders');
             let count = $('#subfolders-count');
             subfolders.empty();
             count.text(data.subfolders.length);
             for (let subfolder of  data.subfolders) {
-                //console.log(subfolder);
                 let item = $('<a class="list-group-item list-group-item-action">')
                     .attr("href", subfolder.path)
-                    .text(subfolder.name)
+                    .text(subfolder.name);
                 subfolders.append(item);
             }
             if (data.subfolders.length) {
@@ -242,12 +229,12 @@ $(function() {
         });
         player.src= fullUrl;
         if (startTime) {
-            player.jumpToTime(startTime)
+            player.jumpToTime(startTime);
         }
         if (! paused) {
             let res=player.play();
             if (res.catch) {
-                res.catch(e => console.log("Play failed", e))
+                res.catch(e => console.log("Play failed", e));
             }
         }
     }
@@ -295,7 +282,7 @@ $(function() {
             playFile(nextTarget);
         } else {
             clearPlayer();
-            console.log("Playback of folder finished");
+            debug("Playback of folder finished");
         }
     });
 
@@ -304,7 +291,7 @@ $(function() {
     });
 
     function login(secret) {
-        let  secretBytes = new (TextEncoder || TextEncoderLite)("utf-8").encode(secret); 
+        let  secretBytes = new (TextEncoder)("utf-8").encode(secret); 
         let randomBytes = new Uint8Array(32);
         window.crypto.getRandomValues(randomBytes);
         let concatedBytes = new Uint8Array(secretBytes.length+randomBytes.length);
@@ -349,7 +336,7 @@ $(function() {
         if ($("#search-area").is(':visible')) {
             $("#search-area input").focus();
         }
-    })
+    });
 
     let searchExpanded = false;
     function showSearch() {
@@ -376,17 +363,17 @@ $(function() {
         let query = $("#search-input").val();
         evt.preventDefault();
         if (query.length) {
-            search(query)
+            search(query);
         }
-    })
+    });
 
     window.onpopstate = evt => {
         if (evt.state) {
         if ("audioserve_folder" in evt.state) {
-            console.log("Going back to folder ", evt.state.audioserve_folder);
+            debug("Going back to folder ", evt.state.audioserve_folder);
             loadFolder(evt.state.audioserve_folder, true);
         } else if ("audioserve_search" in evt.state) {
-            console.log("Going back to search ", evt.state.audioserve_search);
+           debug("Going back to search ", evt.state.audioserve_search);
             search(evt.state.audioserve_search, true);
         }
     }
@@ -395,4 +382,4 @@ $(function() {
     showSearch();
     loadFolder(window.localStorage.getItem("audioserve_folder")|| "");
     $("#splash").hide();
-})
+});

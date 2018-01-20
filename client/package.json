@@ -7,13 +7,15 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack --config webpack.prod.js",
     "watch": "webpack --progress --watch --config webpack.dev.js",
-    "start": "webpack-dev-server --open --config webpack.dev.js"
+    "start": "webpack-dev-server --open --config webpack.dev.js",
+    "lint": "jshint src/*.js"
   },
   "keywords": [],
   "author": "Ivan<ivan@zderadicka.eu>",
   "license": "MIT",
   "devDependencies": {
     "css-loader": "^0.28.8",
+    "jshint": "^2.9.5",
     "style-loader": "^0.19.1",
     "uglifyjs-webpack-plugin": "^1.1.6",
     "webpack": "^3.10.0",

@@ -119,11 +119,9 @@ fn start_server(config: Config, my_secret: Vec<u8>, private_key: Option<Pkcs12>)
             let tls_cx = TlsAcceptor::builder(pk)?.build()?;
             let proto = proto::Server::new(HttpServer::new(), tls_cx);
 
-        // Finally use `tokio-proto`'s `TcpServer` helper struct to quickly
-        // take our protocol above to running our hello-world Service on a
-        // local TCP port.
-        let srv = TcpServer::new(proto, config.local_addr);
-        println!("TLS Listening on {}", "addr");
+        let addr = config.local_addr;
+        let srv = TcpServer::new(proto, addr);
+        println!("TLS Listening on {}", addr);
         srv.serve( move || Ok(svc.clone()));
         }
     }
