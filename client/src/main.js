@@ -55,8 +55,8 @@ $(function() {
                 $("#info-cover").hide();
             }
 
+            $("#info-desc").empty();
             if (data.description) {
-                $("#info-desc").empty();
                 $.ajax({
                     url: baseUrl+"/desc/"+data.description.path,
                     xhrFields: {
