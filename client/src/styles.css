@@ -21,7 +21,7 @@ body {
     width: 100%;
 }
 
-#subfolders-container, #files-container {
+#subfolders-container, #files-container, #info-container {
     display: none;
 }
 

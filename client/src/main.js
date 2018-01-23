@@ -46,6 +46,8 @@ $(function() {
                 loadFolder("");
             } else if (err.status == 401) {
                 $("#login-dialog").modal();
+            } else {
+                alert("Cannot contact server");
             }
         })
         .then(data => {
@@ -159,6 +161,8 @@ $(function() {
             console.log("Search error", err);
             if (err.status == 401) {
                 $("#login-dialog").modal();
+            } else {
+                alert("Server error");
             }
         })
         .then(data => {

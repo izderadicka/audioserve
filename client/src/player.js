@@ -25,7 +25,7 @@ const VOLUME_LOW = 'M0 7.667v8h5.333L12 22.333V1L5.333 7.667';
 const PLAY = "M18 12L0 24V0";
 const PAUSE = "M0 0h6v24H0zM12 0h6v24h-6z";
 const NO_RELOAD_JUMP=300; 
-
+const MEDIA_ERRORS = ["MEDIA_ERR_ABORTED", "MEDIA_ERR_NETWORK", "MEDIA_ERR_DECODE", "MEDIA_ERR_SRC_NOT_SUPPORTED"];
 
 export class AudioPlayer {
     // Most of code copied from https://codepen.io/gregh/pen/NdVvbm
@@ -187,10 +187,22 @@ export class AudioPlayer {
     initPlayer() {
         ifDebug(() => {
             this._player.addEventListener('abort', (evt)=> console.log("Player aborted"));
-            this._player.addEventListener('error', (evt)=> console.log("Player errror"));
             this._player.addEventListener('emptied', (evt)=> console.log("Player emptied"));
             this._player.addEventListener('stalled', (evt)=> console.log("Player stalled"));
             this._player.addEventListener('suspend', (evt)=> console.log("Player suspend"));
+        });
+
+        this._player.addEventListener('error', (evt)=> {
+            let codeName = (code) => {
+                if (code > 0 && code <= MEDIA_ERRORS.length) 
+                    return MEDIA_ERRORS[code-1];
+                else
+                    return `UNKNOWN_${code}`;
+            };
+            let e = this._player.error;
+            let msg = `Player errror: ${codeName(e.code)} : ${e.message}`;
+            console.log(msg);
+            alert("Player error - check connection");
         });
 
         this._player.addEventListener('timeupdate', this._updateProgress.bind(this));
@@ -386,7 +398,8 @@ export class AudioPlayer {
         else if (options && options.unsized) this.unsized = true;
         else this.unsized = false;
         if (!url) {
-            this._player.src = "";
+            this._player.removeAttribute("src");
+            this._player.load();
             this._updateTotal();
             this._updateProgress();
             this._hidePlay();
