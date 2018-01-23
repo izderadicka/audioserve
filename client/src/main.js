@@ -31,7 +31,11 @@ $(function() {
         return res;
     }
 
-    function loadFolder(path, fromHistory) {
+    function scrollMain(to) {
+        $("#main").scrollTop(to || 0);
+    }
+
+    function loadFolder(path, fromHistory, scrollTo) {
         ajax({
             url: baseUrl+"/folder/"+ path,
             }
@@ -127,6 +131,8 @@ $(function() {
                 window.history.pushState({"audioserve_folder": path}, `Audioserve - folder ${path}`);
             }
 
+            scrollMain(scrollTo);
+
             if (prevFolder !== path) {
                 clearPlayer();
                 }
@@ -142,7 +148,7 @@ $(function() {
         });
     }
 
-    function search(query, fromHistory) {
+    function search(query, fromHistory, scrollTo) {
         ajax({
             url: baseUrl+"/search",
             type: "GET",
@@ -179,6 +185,7 @@ $(function() {
             files.empty();
             $("#files-container").hide();
             updateBreadcrumbSearch(query);
+            scrollMain(scrollTo);
             clearPlayer(); 
             if (! fromHistory) {
                 window.history.pushState({"audioserve_search": query}, `Audioserve - search ${query}`); 
@@ -367,14 +374,25 @@ $(function() {
         }
     });
 
+    $("#main").on("scroll", (evt) => {
+        //console.log(`Scroll ${$("#main").scrollTop()}`, evt.detail);
+        if (window.history.state) {
+            let s = window.history.state;
+            s.audioserve_scroll = $("#main").scrollTop();
+            window.history.replaceState(s, "");
+            
+        }
+    });
+
     window.onpopstate = evt => {
         if (evt.state) {
+        debug(`History state: ${JSON.stringify(evt.state)}`);
         if ("audioserve_folder" in evt.state) {
             debug("Going back to folder ", evt.state.audioserve_folder);
-            loadFolder(evt.state.audioserve_folder, true);
+            loadFolder(evt.state.audioserve_folder, true, evt.state.audioserve_scroll);
         } else if ("audioserve_search" in evt.state) {
            debug("Going back to search ", evt.state.audioserve_search);
-            search(evt.state.audioserve_search, true);
+            search(evt.state.audioserve_search, true, evt.state.audioserve_scroll);
         }
     }
     };
