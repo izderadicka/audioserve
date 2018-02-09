@@ -53,7 +53,7 @@ $(function() {
         return res;
     }
 
-    function load_collections() {
+    function loadCollections() {
         return ajax({url: baseUrl + "/collections"})
         .catch(e => {
             console.log("Cannot load collections", e);
@@ -107,6 +107,7 @@ $(function() {
             }
         })
         .then(data => {
+            $("#search-form input").val("");
             if (data.cover) {
                 $("#info-cover").show().attr('src', collectionUrl+"/cover/"+data.cover.path);
                 $("#info-container").show();
@@ -458,7 +459,7 @@ $(function() {
         loadFolder("");
     });
 
-    load_collections().then(numCollections => {
+    loadCollections().then(numCollections => {
     loadFolder(window.localStorage.getItem("audioserve_folder")|| "");
     $("#splash").hide().addClass("transparent");
     });
