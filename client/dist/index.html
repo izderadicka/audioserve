@@ -11,20 +11,30 @@
 <body>
   <div class="container-fluid" id="main">
     <h1 class="top-header">
-      <span class="app-name">Audioserve Client</span>
-      <div id="search-btn" class="search"></div>
+      <span class="app-name">AS</span>
+      <span class="transcoded"></span>
       <div id="search-area">
-        <form id="search-form">
-          <input name="search" id="search-input" type="text" placeholder="Search">
-        </form>
+          <form id="search-form">
+            <input name="search" id="search-input" type="text" placeholder="Search">
+          </form>
+        </div>
+      <div id="collections">
+          <label for="current_collection">Collection: </label>
+          <select name=current_collection>
+    
+          </select>
       </div>
 
     </h1>
-    <nav aria-label="breadcrumb">
+
+    
+
+    <nav class="main-breadcrumb" aria-label="breadcrumb">
       <ol class="breadcrumb" id="breadcrumb">
         <li class="breadcrumb-item active" aria-current="page">Home</li>
       </ol>
     </nav>
+   
 
     <div id="info-container" class="content-section">
         <h3 class="expanded" data-toggle="collapse" data-target="#info-box" aria-expanded="true">

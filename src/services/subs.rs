@@ -19,6 +19,7 @@ use mime_guess::guess_mime_type;
 use mime;
 use serde_json;
 use taglib;
+use config::get_config;
 
 const BUF_SIZE: usize = 8 * 1024;
 pub const NOT_FOUND_MESSAGE: &str = "Not Found";
@@ -163,7 +164,7 @@ fn serve_file_from_fs(full_path: &Path,
 }
 
 pub fn send_file_simple(
-    base_path: PathBuf,
+    base_path: &'static Path,
     file_path: PathBuf,
     counter: Counter,
 ) -> ResponseFuture {
@@ -182,7 +183,7 @@ pub fn send_file_simple(
 }
 
 pub fn send_file(
-    base_path: PathBuf,
+    base_path: &'static Path,
     file_path: PathBuf,
     range: Option<hyper::header::ByteRangeSpec>,
     seek: Option<f32>,
@@ -238,7 +239,7 @@ fn box_rx(rx: ::futures::sync::oneshot::Receiver<Response>) -> ResponseFuture {
     }))
 }
 
-pub fn get_folder(base_path: PathBuf, 
+pub fn get_folder(base_path: &'static Path, 
                   folder_path: PathBuf, 
                   transcoder: Option<Transcoder>,
                   counter: Counter) -> ResponseFuture {
@@ -378,8 +379,18 @@ fn json_response<T: ::serde::Serialize>(data: &T) -> Response {
         .with_body(json)
 }
 
+const UKNOWN_NAME: &str = "unknown";
+
+pub fn collections_list() -> ResponseFuture {
+    let collections = Collections {
+        count: get_config().base_dirs.len() as u32,
+        names: get_config().base_dirs.iter().map(|p| p.file_name().and_then(|n| n.to_str()).unwrap_or(UKNOWN_NAME)).collect()
+    };
+    Box::new(future::ok(json_response(&collections)))
+}
+
 pub fn search(
-    base_dir: PathBuf,
+    base_dir: &'static Path,
     searcher: Search,
     query: String,
     counter: Counter,

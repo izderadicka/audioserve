@@ -6,6 +6,15 @@ use std::io;
 use super::services::transcode::Quality;
 use num_cpus;
 
+static mut CONFIG: Option<Config> = None;
+
+// CONFIG is assured to be inited only once from main thread
+pub fn get_config() -> &'static Config {
+    unsafe {
+        CONFIG.as_ref().expect("Config is not initialized")
+    }
+}
+
 quick_error! { 
 #[derive(Debug)]
 pub enum Error {
@@ -34,11 +43,11 @@ pub enum Error {
 }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config{
     pub local_addr: SocketAddr,
     pub max_sending_threads: usize,
-    pub base_dir: PathBuf,
+    pub base_dirs: Vec<PathBuf>,
     pub shared_secret: String,
     pub transcoding: Option<Quality>,
     pub max_transcodings: usize,
@@ -78,6 +87,9 @@ fn create_parser<'a>() -> Parser<'a> {
         .arg(Arg::with_name("base_dir")
             .value_name("BASE_DIR")
             .required(true)
+            .multiple(true)
+            .min_values(1)
+            .max_values(100)
             .takes_value(true)
             .help("Root directory for audio books")
 
@@ -137,7 +149,7 @@ fn create_parser<'a>() -> Parser<'a> {
         )
 }
 
-pub fn parse_args() -> Result<Config, Error>{
+pub fn parse_args() -> Result<(), Error>{
     let p = create_parser();
     let args = p.get_matches();
 
@@ -148,10 +160,18 @@ pub fn parse_args() -> Result<Config, Error>{
         }
     }
 
-    let base_dir: PathBuf = args.value_of("base_dir").unwrap().into();
-    if ! base_dir.is_dir() {
+    let base_dirs_items = args.values_of("base_dir").unwrap();
+    let mut base_dirs = vec![];
+    for dir in base_dirs_items {
+        let base_dir: PathBuf = dir.into();
+        if ! base_dir.is_dir() {
         return Err(Error::NonExistentBaseDirectory)
+        }
+        base_dirs.push(base_dir);
+
     }
+
+    
     let local_addr = args.value_of("local_addr").unwrap().parse()?;
     let max_sending_threads = args.value_of("max-threads").unwrap().parse()?;
     if max_sending_threads < 10 {
@@ -215,9 +235,8 @@ pub fn parse_args() -> Result<Config, Error>{
 
     let ssl_key_password = args.value_of("ssl-key-password").map(|s| s.into());
 
-
-    Ok(Config{
-        base_dir,
+    let config = Config{
+        base_dirs,
         local_addr,
         max_sending_threads,
         shared_secret, 
@@ -230,6 +249,11 @@ pub fn parse_args() -> Result<Config, Error>{
         ssl_key_file,
         ssl_key_password
 
-    })
+    };
+    unsafe {
+        CONFIG = Some(config);
+    }
+
+    Ok(())
 
 }

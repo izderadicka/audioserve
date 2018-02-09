@@ -15,8 +15,28 @@ $(function() {
     } else {
         baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname.length>1?window.location.pathname:""}`;
     }
-     
+
+
+    let collectionUrl = baseUrl; 
+    let collections = [];
     let pendingCall = null;
+    let pendingSpinner = null;
+
+    function showSpinner() {
+        pendingSpinner = window.setTimeout(() => 
+        $("#splash").show(), 1000);
+    }
+
+    function hideSpinner() {
+        if (pendingSpinner) {
+            window.clearTimeout(pendingSpinner);
+            pendingSpinner = null;
+        }
+        $("#splash").hide();
+    }
+
+    $(document).ajaxStart(showSpinner);
+    $(document).ajaxStop(hideSpinner);
 
     function ajax(params) {
         params.xhrFields = {
@@ -27,8 +47,43 @@ $(function() {
         }
         let res = $.ajax(params);
         pendingCall = res;
-        res.always( () => {pendingCall=null;});
+        res.always( () => {
+            pendingCall=null;
+        });
         return res;
+    }
+
+    function load_collections() {
+        return ajax({url: baseUrl + "/collections"})
+        .catch(e => {
+            console.log("Cannot load collections", e);
+            alert("Server error when loading collections");
+        })
+        .then(data => {
+            console.log("Collections", data);
+            collections = data.names;
+            console.assert(data.names.length>0);
+            console.assert(collections.length == data.count, "Invalid collections response - count does not fit");
+            let cselect = $("#collections select").empty();
+            for(let i=0; i< data.names.length; i++) {
+                $("<option>").attr("value", i).text(data.names[i]).appendTo(cselect);
+            }
+            if (data.names.length > 1) {
+                $("#collections").show();
+                let storedIndex = parseInt( window.localStorage.getItem("audioserve_collection") || 0);
+                let collIndex = storedIndex< data.names.length? storedIndex: 0;
+                cselect.val(collIndex);
+                setCollection(collIndex);
+                window.localStorage.setItem("audioserve_collection", collIndex);
+                
+            } else {
+                $("#collections").hide();
+                setCollection(0);
+                window.localStorage.removeItem("audioserve_collection");
+
+            }
+            return collections.length;
+        });
     }
 
     function scrollMain(to) {
@@ -36,8 +91,9 @@ $(function() {
     }
 
     function loadFolder(path, fromHistory, scrollTo) {
+        $("#info-container").hide();
         ajax({
-            url: baseUrl+"/folder/"+ path,
+            url: collectionUrl+"/folder/"+ path,
             }
             )
         .fail( err => { 
@@ -51,11 +107,8 @@ $(function() {
             }
         })
         .then(data => {
-            $("#info-container").hide();
-            
-
             if (data.cover) {
-                $("#info-cover").show().attr('src', baseUrl+"/cover/"+data.cover.path);
+                $("#info-cover").show().attr('src', collectionUrl+"/cover/"+data.cover.path);
                 $("#info-container").show();
             } else {
                 $("#info-cover").hide();
@@ -64,7 +117,7 @@ $(function() {
             $("#info-desc").empty();
             if (data.description) {
                 $.ajax({
-                    url: baseUrl+"/desc/"+data.description.path,
+                    url: collectionUrl+"/desc/"+data.description.path,
                     xhrFields: {
                         withCredentials: true
                      }
@@ -112,6 +165,7 @@ $(function() {
                 
                 files.append(item);
                 if (file.meta) {
+                    item.append(" ");
                     item.append($(`<span class="duration">(${formatTime(file.meta.duration)})</span>`));
                 }
                 if (file.trans) {
@@ -130,7 +184,11 @@ $(function() {
             let prevFolder = window.localStorage.getItem("audioserve_folder");
             window.localStorage.setItem("audioserve_folder", path);
             if (! fromHistory) {
-                window.history.pushState({"audioserve_folder": path}, `Audioserve - folder ${path}`);
+                window.history.pushState({
+                    "audioserve_folder": path,
+                    "audioserve_collection": currentCollection()
+                }, 
+                `Audioserve - folder ${path}`);
             }
 
             scrollMain(scrollTo);
@@ -152,7 +210,7 @@ $(function() {
 
     function search(query, fromHistory, scrollTo) {
         ajax({
-            url: baseUrl+"/search",
+            url: collectionUrl+"/search",
             type: "GET",
             data: {q: query}
             }
@@ -192,7 +250,10 @@ $(function() {
             scrollMain(scrollTo);
             clearPlayer(); 
             if (! fromHistory) {
-                window.history.pushState({"audioserve_search": query}, `Audioserve - search ${query}`); 
+                window.history.pushState({
+                    "audioserve_search": query,
+                    "audioserve_collection": currentCollection()
+                }, `Audioserve - search ${query}`); 
             } 
         });
     }
@@ -233,7 +294,7 @@ $(function() {
         target.addClass("active");
         let path = target.attr("href");
         window.localStorage.setItem("audioserve_file", path);
-        let fullUrl = baseUrl+"/audio/"+path;
+        let fullUrl = collectionUrl+"/audio/"+path;
         player.setUrl(fullUrl, {
             duration: target.data("duration"),
             transcoded: target.data("transcoded")
@@ -338,40 +399,23 @@ $(function() {
         
     });
 
-    // TODO: Change this later, it's clumsy
-    $("#search-btn").on("click", evt => {
-        $("#search-area").toggle();
-        $(".app-name").toggle();
-        searchExpanded = ! searchExpanded;
 
-        if ($("#search-area").is(':visible')) {
-            $("#search-area input").focus();
-        }
-    });
-
-    let searchExpanded = false;
-    function showSearch() {
-        if ($(window).width() > 600) {
-                $("#search-area").show();
-                $(".app-name").show();
-                $("#search-btn").hide();
+    function setCollection(collIndex) {
+        collIndex = parseInt(collIndex);
+        if (collIndex > 0) {
+            collectionUrl = baseUrl + "/" + collIndex;
         } else {
-            if (searchExpanded) {
-                $("#search-area").show();
-                $(".app-name").hide();
-                $("#search-btn").show();
-            } else {
-                $("#search-area").hide();
-                $(".app-name").show();
-                $("#search-btn").show();
-            }
+            collectionUrl = baseUrl;
         }
+        
     }
 
-    $(window).on("resize", showSearch);
+    function currentCollection() {
+        return $("#collections select").val();
+    }
 
     $("#search-form").on("submit", evt => {
-        let query = $("#search-input").val();
+        let query = $("#search-input").blur().val();
         evt.preventDefault();
         if (query.length) {
             search(query);
@@ -391,6 +435,12 @@ $(function() {
     window.onpopstate = evt => {
         if (evt.state) {
         debug(`History state: ${JSON.stringify(evt.state)}`);
+        if ("audioserve_collection" in evt.state) {
+            let collIndex = parseInt(evt.state.audioserve_collection);
+            setCollection(collIndex);
+            $("#collections select").val(collIndex);
+            window.localStorage.setItem("audioserve_collection", collIndex);
+        }
         if ("audioserve_folder" in evt.state) {
             debug("Going back to folder ", evt.state.audioserve_folder);
             loadFolder(evt.state.audioserve_folder, true, evt.state.audioserve_scroll);
@@ -401,7 +451,15 @@ $(function() {
     }
     };
 
-    showSearch();
+    $("#collections select").on("change", (evt) => {
+        let collIndex = $("#collections select").val();
+        setCollection(collIndex);
+        window.localStorage.setItem("audioserve_collection", collIndex);
+        loadFolder("");
+    });
+
+    load_collections().then(numCollections => {
     loadFolder(window.localStorage.getItem("audioserve_folder")|| "");
-    $("#splash").hide();
+    $("#splash").hide().addClass("transparent");
+    });
 });

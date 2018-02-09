@@ -20,6 +20,9 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate taglib;
 extern crate url;
+extern crate regex;
+#[macro_use]
+extern crate lazy_static;
 // for TLS
 extern crate native_tls;
 extern crate tokio_proto;
@@ -35,7 +38,7 @@ use services::{FileSendService, TranscodingDetails};
 use services::auth::SharedSecretAuthenticator;
 use services::search::Search;
 use services::transcode::Transcoder;
-use config::{parse_args, Config};
+use config::{parse_args, get_config};
 use ring::rand::{SecureRandom, SystemRandom};
 use std::path::Path;
 use std::fs::File;
@@ -47,6 +50,7 @@ use tokio_tls::proto;
 
 mod services;
 mod config;
+
 
 fn load_private_key<P>(file: Option<P>, pass: Option<&String>) -> Result<Option<Pkcs12>, io::Error> 
 where P:AsRef<Path>
@@ -88,29 +92,25 @@ fn gen_my_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error> {
     }
 }
 
-fn start_server(config: Config, my_secret: Vec<u8>, private_key: Option<Pkcs12>) -> Result<(), Box<std::error::Error>> {
+fn start_server(my_secret: Vec<u8>, private_key: Option<Pkcs12>) -> Result<(), Box<std::error::Error>> {
     let svc = FileSendService {
         sending_threads: Arc::new(AtomicUsize::new(0)),
-        max_threads: config.max_sending_threads,
-        base_dir: config.base_dir,
-        client_dir: config.client_dir,
         authenticator: Arc::new(Box::new(SharedSecretAuthenticator::new(
-            config.shared_secret,
+            get_config().shared_secret.clone(),
             my_secret,
-            config.token_validity_hours,
+            get_config().token_validity_hours,
         ))),
         search: Search::FoldersSearch,
         transcoding: TranscodingDetails {
-            transcoder: config.transcoding.map(|q| Transcoder::new(q)),
+            transcoder: get_config().transcoding.clone().map(|q| Transcoder::new(q)),
             transcodings: Arc::new(AtomicUsize::new(0)),
-            max_transcodings: config.max_transcodings,
+            max_transcodings: get_config().max_transcodings,
         },
-        cors: config.cors,
     };
 
     match private_key {
         None => {
-            let server = HttpServer::new().bind(&config.local_addr, move || Ok(svc.clone()))?;
+            let server = HttpServer::new().bind(&get_config().local_addr, move || Ok(svc.clone()))?;
             //server.no_proto();
             info!("Server listening on {}", server.local_addr().unwrap());
             server.run()?;
@@ -119,18 +119,17 @@ fn start_server(config: Config, my_secret: Vec<u8>, private_key: Option<Pkcs12>)
             let tls_cx = TlsAcceptor::builder(pk)?.build()?;
             let proto = proto::Server::new(HttpServer::new(), tls_cx);
 
-        let addr = config.local_addr;
+        let addr = get_config().local_addr;
         let srv = TcpServer::new(proto, addr);
         println!("TLS Listening on {}", addr);
         srv.serve( move || Ok(svc.clone()));
         }
     }
-
-
     Ok(())
 }
+
 fn main() {
-    let config = match parse_args() {
+    match parse_args() {
         Err(e) => {
             writeln!(&mut io::stderr(), "Arguments error: {}", e).unwrap();
             process::exit(1)
@@ -138,8 +137,8 @@ fn main() {
         Ok(c) => c,
     };
     pretty_env_logger::init().unwrap();
-    debug!("Started with following config {:?}", config);
-    let my_secret = match gen_my_secret(&config.secret_file) {
+    debug!("Started with following config {:?}", get_config());
+    let my_secret = match gen_my_secret(&get_config().secret_file) {
         Ok(s) => s,
         Err(e) => {
             error!("Error creating/reading secret: {}", e);
@@ -148,7 +147,7 @@ fn main() {
     };
 
 
-    let private_key = match load_private_key(config.ssl_key_file.as_ref(), config.ssl_key_password.as_ref()) {
+    let private_key = match load_private_key(get_config().ssl_key_file.as_ref(), get_config().ssl_key_password.as_ref()) {
         Ok(s) => s,
         Err(e) => {
             error!("Error loading SSL/TLS private key: {}", e);
@@ -156,7 +155,7 @@ fn main() {
         }
     };
 
-    match start_server(config, my_secret, private_key) {
+    match start_server(my_secret, private_key) {
         Ok(_) => (),
         Err(e) => {
             error!("Error starting server: {}", e);

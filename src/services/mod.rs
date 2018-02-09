@@ -5,7 +5,7 @@ Origin};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use self::subs::{send_file, send_file_simple, short_response_boxed, search,ResponseFuture, 
-    NOT_FOUND_MESSAGE, get_folder};
+    NOT_FOUND_MESSAGE, get_folder, collections_list};
 use std::path::{PathBuf, Path};
 use percent_encoding::percent_decode;
 use futures::{Future, future};
@@ -14,6 +14,8 @@ use self::search::Search;
 use self::transcode::Transcoder;
 use url::form_urlencoded;
 use std::collections::HashMap;
+use config::get_config;
+use regex::Regex;
 
 mod subs;
 mod types;
@@ -22,6 +24,9 @@ pub mod auth;
 pub mod transcode;
 
 const OVERLOADED_MESSAGE: &str = "Overloaded, try later";
+lazy_static! {
+    static ref COLLECTION_NUMBER_RE: Regex = Regex::new(r"^/(\d+)/.+").unwrap();
+}
 
 type Counter = Arc<AtomicUsize>;
 
@@ -38,12 +43,8 @@ pub struct TranscodingDetails {
 pub struct FileSendService {
    pub authenticator: Arc<Box<Authenticator<Credentials=()>>>,
    pub  search: Search,
-   pub  base_dir: PathBuf,
-   pub  client_dir: PathBuf,
    pub  sending_threads: Counter,
-   pub  max_threads: usize,
    pub  transcoding: TranscodingDetails,
-   pub  cors: bool
 }
 
 // use only on checked prefixes
@@ -70,7 +71,7 @@ impl Service for FileSendService {
     type Future = ResponseFuture;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-        if self.sending_threads.load(Ordering::SeqCst) > self.max_threads {
+        if self.sending_threads.load(Ordering::SeqCst) > get_config().max_transcodings {
                     warn!("Server is busy, refusing request");
                     return short_response_boxed(
                         StatusCode::ServiceUnavailable,
@@ -79,17 +80,16 @@ impl Service for FileSendService {
         };
         //static files 
         if req.path() == "/" {
-            return send_file_simple(self.client_dir.clone(), "index.html".into(), self.sending_threads.clone());
+            return send_file_simple(&get_config().client_dir, "index.html".into(), self.sending_threads.clone());
         };
         if req.path() =="/bundle.js" {
-            return send_file_simple(self.client_dir.clone(), "bundle.js".into(), self.sending_threads.clone());
+            return send_file_simple(&get_config().client_dir, "bundle.js".into(), self.sending_threads.clone());
         }
         // from here everything must be authenticated
-        let base_dir = self.base_dir.clone();
         let sending_threads =  self.sending_threads.clone();
         let searcher = self.search.clone();
         let transcoding = self.transcoding.clone();
-        let cors = self.cors;
+        let cors = get_config().cors;
         let origin = req.headers().get::<Origin>().map(|o| {
             format!("{}",o)
             }
@@ -97,7 +97,7 @@ impl Service for FileSendService {
         Box::new(self.authenticator.authenticate(req).and_then(move |result| {
             match result {
                 Ok((req,_creds)) => 
-                    FileSendService::process_checked(req, base_dir, sending_threads, searcher, transcoding),
+                    FileSendService::process_checked(req, sending_threads, searcher, transcoding),
                 Err(resp) => Box::new(future::ok(resp))
             }.map(move |r| add_cors_headers(r, origin, cors))
         }))
@@ -107,7 +107,6 @@ impl Service for FileSendService {
 
 impl FileSendService {
     fn process_checked(req: Request, 
-        base_dir: PathBuf, 
         sending_threads: 
         Counter, searcher: Search,
         transcoding: TranscodingDetails
@@ -117,8 +116,34 @@ impl FileSendService {
                             .collect::<HashMap<_, _>>());
         match req.method() {
             &Method::Get => {
-                let path = percent_decode(req.path().as_bytes()).decode_utf8_lossy().into_owned();
                 
+                let mut path = percent_decode(req.path().as_bytes()).decode_utf8_lossy().into_owned();
+
+                if path.starts_with("/collections") {
+                    collections_list() 
+                } else {
+                // TODO -  select correct base dir
+                let mut colllection_index = 0;
+                let mut new_path: Option<String> = None;
+
+                {
+                let matches = COLLECTION_NUMBER_RE.captures(&path);
+                    if matches.is_some() {
+                        let cnum = matches.unwrap().get(1).unwrap();
+                        // match gives us char position is it's safe to slice
+                        new_path = Some((&path[cnum.end()..]).to_string());
+                        // and cnum is guarateed to contain digits only
+                        let cnum: usize = cnum.as_str().parse().unwrap();
+                        if cnum >= get_config().base_dirs.len() {
+                            return short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE)
+                        }
+                        colllection_index = cnum;
+                    }
+                }
+                if new_path.is_some() {
+                    path = new_path.unwrap();
+                }
+                let base_dir = &get_config().base_dirs[colllection_index];
                 if path.starts_with("/audio/") {
                 debug!("Received request with following headers {}", req.headers());
 
@@ -165,6 +190,7 @@ impl FileSendService {
                     get_subpath(&path, "/desc"), sending_threads)
                 } else {
                     short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE)
+                }
                 }
             },
 

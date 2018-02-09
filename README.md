@@ -1,7 +1,7 @@
 Audioserve
 ==========
 
-Simple personal server to serve audio files files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalistic design.
+Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalistic design.
 
 Server is in Rust,  client is Javascript intended for modern browser (latest Firefox or Chrome). 
 

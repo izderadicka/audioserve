@@ -37,6 +37,12 @@ pub struct AudioFolderShort {
     pub path: PathBuf
 }
 
+#[derive(Debug,Serialize)]
+pub struct Collections {
+    pub count: u32,
+    pub names: Vec<&'static str>
+}
+
 
 #[derive(Debug,Serialize)]
 pub struct AudioFolder {

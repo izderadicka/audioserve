@@ -25,11 +25,6 @@ body {
     display: none;
 }
 
-.search {
-    background-image: url("data:image/svg+xml;charset=utf8,%3C?xml version='1.0' encoding='UTF-8'?%3E%3Csvg width='16px' height='16px' viewBox='0 0 16 16' version='1.1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink'%3E%3C!-- Generator: Sketch 40.3 (33839) - http://www.bohemiancoding.com/sketch --%3E%3Ctitle%3Esearch%3C/title%3E%3Cdesc%3ECreated with Sketch.%3C/desc%3E%3Cdefs%3E%3C/defs%3E%3Cg id='Octicons' stroke='none' stroke-width='1' fill='none' fill-rule='evenodd'%3E%3Cg id='search' fill='%23000000'%3E%3Cpath d='M15.7,13.3 L11.89,9.47 C12.59,8.49 13,7.3 13,6 C13,2.69 10.31,0 7,0 C3.69,0 1,2.69 1,6 C1,9.31 3.69,12 7,12 C8.3,12 9.48,11.59 10.47,10.89 L14.3,14.7 C14.49,14.9 14.75,15 15,15 C15.25,15 15.52,14.91 15.7,14.7 C16.09,14.31 16.09,13.68 15.7,13.29 L15.7,13.3 Z M7,10.7 C4.41,10.7 2.3,8.59 2.3,6 C2.3,3.41 4.41,1.3 7,1.3 C9.59,1.3 11.7,3.41 11.7,6 C11.7,8.59 9.59,10.7 7,10.7 L7,10.7 Z' id='Shape'%3E%3C/path%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-    background-size: contain;
-  }
-
 .expanded {
     background-image: url("data:image/svg+xml;charset=utf8,%3C?xml version='1.0' encoding='UTF-8'?%3E%3Csvg width='12px' height='16px' viewBox='0 0 12 16' version='1.1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink'%3E%3C!-- Generator: Sketch 40.3 (33839) - http://www.bohemiancoding.com/sketch --%3E%3Ctitle%3Etriangle-down%3C/title%3E%3Cdesc%3ECreated with Sketch.%3C/desc%3E%3Cdefs%3E%3C/defs%3E%3Cg id='Octicons' stroke='none' stroke-width='1' fill='none' fill-rule='evenodd'%3E%3Cg id='triangle-down' fill='%23000000'%3E%3Cpolygon id='Shape' points='0 5 6 11 12 5'%3E%3C/polygon%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
     background-size: contain;
@@ -63,20 +58,13 @@ body {
   
   
 
-  #search-btn {
-    width: 1em;
-    height: 1em;
-    float: right;
-    margin-top: 5px;
-}
-
 #search-area {
-  padding-top: 0.2em;
-  font-size: 70%;
-  height:1em;
-  
+  padding-top: 0.4em;
+  padding-left: 0.1em;
+  font-size: 0.5em;
+  height:0.5em;
   float:right;
-  margin-right:0.5em;
+  margin:0 0.5em;
 }
 
 .duration {
@@ -88,8 +76,8 @@ h1.top-header {
     min-height: 1.2em;
 }
 
-#search-btn, #search-area {
-    display: none;
+nav.main-breadcrumb {
+    clear: both;
 }
 
 span.transcoded {
@@ -102,11 +90,54 @@ span.transcoded {
     background-image: url("data:image/svg+xml;charset=utf8,%3C?xml version='1.0' encoding='UTF-8' standalone='no'?%3E%3Csvg xmlns:dc='http://purl.org/dc/elements/1.1/' xmlns:cc='http://creativecommons.org/ns%23' xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns%23' xmlns:svg='http://www.w3.org/2000/svg' xmlns='http://www.w3.org/2000/svg' xmlns:sodipodi='http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd' xmlns:inkscape='http://www.inkscape.org/namespaces/inkscape' width='14px' height='16px' viewBox='0 0 14 16' version='1.1' id='svg2' inkscape:version='0.91 r13725' sodipodi:docname='pulse.svg'%3E%3Cmetadata id='metadata15'%3E%3Crdf:RDF%3E%3Ccc:Work rdf:about=''%3E%3Cdc:format%3Eimage/svg+xml%3C/dc:format%3E%3Cdc:type rdf:resource='http://purl.org/dc/dcmitype/StillImage' /%3E%3C/cc:Work%3E%3C/rdf:RDF%3E%3C/metadata%3E%3Csodipodi:namedview pagecolor='%23ffffff' bordercolor='%23666666' borderopacity='1' objecttolerance='10' gridtolerance='10' guidetolerance='10' inkscape:pageopacity='0' inkscape:pageshadow='2' inkscape:window-width='1865' inkscape:window-height='1056' id='namedview13' showgrid='false' inkscape:zoom='14.75' inkscape:cx='7' inkscape:cy='8' inkscape:window-x='55' inkscape:window-y='24' inkscape:window-maximized='1' inkscape:current-layer='svg2' /%3E%3C!-- Generator: Sketch 40.3 (33839) - http://www.bohemiancoding.com/sketch --%3E%3Ctitle id='title4'%3Epulse%3C/title%3E%3Cdesc id='desc6'%3ECreated with Sketch.%3C/desc%3E%3Cdefs id='defs8' /%3E%3Cg id='Octicons' stroke='none' stroke-width='1' fill='none' fill-rule='evenodd' style='fill:%23b3b3b3'%3E%3Cg id='pulse' fill='%23000000' style='fill:%23b3b3b3'%3E%3Cpolygon id='Shape' points='11.5 8 8.8 5.4 6.6 8.5 5.5 1.6 2.38 8 0 8 0 10 3.6 10 4.5 8.2 5.4 13.6 9 8.5 10.6 10 14 10 14 8' style='fill:%23b3b3b3' /%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
       
   }
+
+.top-header .transcoded {
+    margin-left: -0.2em;
+    width: 1.2em;
+    height: 1.2em;
+    vertical-align: bottom;
+}
+
+.app-name {
+    font-weight: bold;
+}
+
   
+.list-group-item {
+    overflow: hidden
+}
+
+#splash.transparent {
+    background-color: rgba(0, 0, 0, 0);
+  }
+  
+
+#collections {
+    display:none;
+    font-size: 0.5em;
+    width: 60%;
+    float: right;
+    vertical-align: middle;
+    margin-top: 0.4em;
+    text-align: right;
+}
+
+#collections label {
+    font-weight: bold;
+    font-size: 120%;
+}
 
 @media (max-width: 1024px) {
     h1.top-header {
         font-size: 1.8rem;
+    }
+}
+
+@media (max-width: 770px) {
+    #collections {
+        float: none;
+        text-align: left;
+        width: 100%;
     }
 }
 
