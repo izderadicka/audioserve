@@ -333,7 +333,8 @@ $(function() {
     }
 
     $("#subfolders").on("click", "a.list-group-item-action", evt => {
-        loadFolder($(evt.target).attr("href"));
+        let target = $(evt.target).closest("a");
+        loadFolder(target.attr("href"));
         evt.preventDefault();
     });
 
@@ -343,7 +344,8 @@ $(function() {
     });
 
     $("#files").on("click", "a.list-group-item-action", evt => {
-        let target = $(evt.target);
+        let target = $(evt.target).closest("a");
+        console.log("Click to play:", target);
         playFile(target);
         evt.preventDefault();
     });
