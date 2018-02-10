@@ -55,10 +55,6 @@ $(function() {
 
     function loadCollections() {
         return ajax({url: baseUrl + "/collections"})
-        .catch(e => {
-            console.log("Cannot load collections", e);
-            alert("Server error when loading collections");
-        })
         .then(data => {
             console.log("Collections", data);
             collections = data.names;
@@ -83,6 +79,16 @@ $(function() {
 
             }
             return collections.length;
+        })
+        .catch(err => {
+            if (err.status == 401) {
+                $("#login-dialog").modal();
+                throw new Error("Unauthorised");
+            } else {
+                console.log("Cannot load collections", err);
+                alert("Server error when loading collections");
+                throw new Error("Server Error");
+            }
         });
     }
 
@@ -395,8 +401,10 @@ $(function() {
         let secret = $("#secret-input").val();
         login(secret)
         .then(data => {
+            loadCollections().then(()=>{
             loadFolder(window.localStorage.getItem("audioserve_folder")|| "");
             $("#login-dialog").modal("hide");
+        });
         })
         .catch( err => console.log("Login failed", err));
         
