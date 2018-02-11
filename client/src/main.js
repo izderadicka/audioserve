@@ -56,7 +56,7 @@ $(function() {
     function loadCollections() {
         return ajax({url: baseUrl + "/collections"})
         .then(data => {
-            console.log("Collections", data);
+            debug("Collections", data);
             collections = data.names;
             console.assert(data.names.length>0);
             console.assert(collections.length == data.count, "Invalid collections response - count does not fit");
@@ -351,7 +351,7 @@ $(function() {
 
     $("#files").on("click", "a.list-group-item-action", evt => {
         let target = $(evt.target).closest("a");
-        console.log("Click to play:", target);
+        debug("Click to play:", target);
         playFile(target);
         evt.preventDefault();
     });
