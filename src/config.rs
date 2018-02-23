@@ -48,7 +48,7 @@ pub struct Config{
     pub local_addr: SocketAddr,
     pub max_sending_threads: usize,
     pub base_dirs: Vec<PathBuf>,
-    pub shared_secret: String,
+    pub shared_secret: Option<String>,
     pub transcoding: Option<Quality>,
     pub max_transcodings: usize,
     pub token_validity_hours: u64,
@@ -94,11 +94,15 @@ fn create_parser<'a>() -> Parser<'a> {
             .help("Root directory for audio books")
 
         )
+        .arg(Arg::with_name("no-authentication")
+            .long("no-authentication")
+            .help("no authentication required - mainly for testing purposes")
+        )
         .arg(Arg::with_name("shared-secret")
             .short("s")
             .long("shared-secret")
             .takes_value(true)
-            .required(true)
+            .required_unless("no-authentication")
             .help("Shared secret for client authentication")
         )
         .arg(Arg::with_name("transcode")
@@ -180,7 +184,11 @@ pub fn parse_args() -> Result<(), Error>{
     if max_sending_threads > 10000 {
         return Err("Too much threads - should be below 10000".into())
     }
-    let shared_secret = args.value_of("shared-secret").unwrap().into();
+    
+    let shared_secret = if args.is_present("no-authentication") {
+        None } else {
+        Some(args.value_of("shared-secret").unwrap().into())
+        };
 
     let transcoding = args.value_of("transcode").map(|t| match t {
         "low" => Quality::Low,

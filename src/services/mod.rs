@@ -41,7 +41,7 @@ pub struct TranscodingDetails {
 
 #[derive(Clone)]
 pub struct FileSendService {
-   pub authenticator: Arc<Box<Authenticator<Credentials=()>>>,
+   pub authenticator: Option<Arc<Box<Authenticator<Credentials=()>>>>,
    pub  search: Search,
    pub  sending_threads: Counter,
    pub  transcoding: TranscodingDetails,
@@ -94,14 +94,22 @@ impl Service for FileSendService {
             format!("{}",o)
             }
             );
-        Box::new(self.authenticator.authenticate(req).and_then(move |result| {
+
+        let resp = match self.authenticator {
+
+        Some(ref auth) =>
+        Box::new(auth.authenticate(req).and_then(move |result| {
             match result {
                 Ok((req,_creds)) => 
                     FileSendService::process_checked(req, sending_threads, searcher, transcoding),
                 Err(resp) => Box::new(future::ok(resp))
-            }.map(move |r| add_cors_headers(r, origin, cors))
-        }))
-        
+            }
+        }
+        )),
+        None => FileSendService::process_checked(req, sending_threads, searcher, transcoding)
+
+        };
+        Box::new(resp.map(move |r| add_cors_headers(r, origin, cors)))
     }
 }
 
