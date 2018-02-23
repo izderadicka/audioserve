@@ -95,14 +95,14 @@ fn gen_my_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error> {
 fn start_server(my_secret: Vec<u8>, private_key: Option<Pkcs12>) -> Result<(), Box<std::error::Error>> {
     let svc = FileSendService {
         sending_threads: Arc::new(AtomicUsize::new(0)),
-        authenticator: match get_config().shared_secret {
-            Some(ref secret) => Some(Arc::new(Box::new(SharedSecretAuthenticator::new(
+        authenticator:  get_config().shared_secret.as_ref().map( |secret| -> 
+            Arc<Box<services::auth::Authenticator<Credentials=()>>> {
+            Arc::new(Box::new(SharedSecretAuthenticator::new(
             secret.clone(),
             my_secret,
             get_config().token_validity_hours,
-            )))),
-            None => None
-        },
+            )))
+        }),
         search: Search::FoldersSearch,
         transcoding: TranscodingDetails {
             transcoder: get_config().transcoding.clone().map(|q| Transcoder::new(q)),
