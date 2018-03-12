@@ -65,12 +65,12 @@ fn has_subtype(mime: &Mime, subtypes: &[&str]) -> bool {
 const AUDIO: &'static [&'static str] = & ["ogg", "mpeg", "aac", "m4a", "m4b", "x-matroska", "flac", "webm"];
 pub fn is_audio<P: AsRef<Path>>(path:P) -> bool {
     let mime= guess_mime_type(path);
-    mime.type_() == "audio" && has_subtype((&mime), AUDIO)
+    mime.type_() == "audio" && has_subtype(&mime, AUDIO)
 }
 
 const AUDIO_T: &'static [&'static str] = & ["aac", "m4a", "m4b", "x-matroska"];
 pub fn must_transcode(mime: &Mime) -> bool {
-    has_subtype((&mime), AUDIO_T)
+    has_subtype(&mime, AUDIO_T)
 }
 
 const COVERS: &'static [&'static str] = & ["jpeg", "png"];
