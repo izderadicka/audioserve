@@ -23,6 +23,9 @@ pub mod search;
 pub mod auth;
 pub mod transcode;
 
+const APP_STATIC_FILES_CACHE_AGE: u32 = 30*24*3600;
+const FOLDER_INFO_FILES_CACHE_AGE: u32 = 24*3600;
+
 const OVERLOADED_MESSAGE: &str = "Overloaded, try later";
 lazy_static! {
     static ref COLLECTION_NUMBER_RE: Regex = Regex::new(r"^/(\d+)/.+").unwrap();
@@ -38,6 +41,7 @@ pub struct TranscodingDetails {
     pub max_transcodings: usize
 
 }
+
 
 #[derive(Clone)]
 pub struct FileSendService {
@@ -80,10 +84,16 @@ impl Service for FileSendService {
         };
         //static files 
         if req.path() == "/" {
-            return send_file_simple(&get_config().client_dir, "index.html".into(), self.sending_threads.clone());
+            return send_file_simple(&get_config().client_dir, 
+            "index.html".into(), 
+            Some(APP_STATIC_FILES_CACHE_AGE),
+            self.sending_threads.clone());
         };
         if req.path() =="/bundle.js" {
-            return send_file_simple(&get_config().client_dir, "bundle.js".into(), self.sending_threads.clone());
+            return send_file_simple(&get_config().client_dir, 
+            "bundle.js".into(), 
+            Some(APP_STATIC_FILES_CACHE_AGE),
+            self.sending_threads.clone());
         }
         // from here everything must be authenticated
         let sending_threads =  self.sending_threads.clone();
@@ -191,11 +201,15 @@ impl FileSendService {
                     short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE)
                 } else if path.starts_with("/cover/") {
                     send_file_simple(base_dir, 
-                    get_subpath(&path, "/cover"), sending_threads)
+                    get_subpath(&path, "/cover"), 
+                    Some(FOLDER_INFO_FILES_CACHE_AGE),
+                    sending_threads)
 
                 } else if path.starts_with("/desc/") {
                     send_file_simple(base_dir, 
-                    get_subpath(&path, "/desc"), sending_threads)
+                    get_subpath(&path, "/desc"), 
+                    Some(FOLDER_INFO_FILES_CACHE_AGE),
+                    sending_threads)
                 } else {
                     short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE)
                 }
