@@ -46,12 +46,11 @@ impl Authenticator for SharedSecretAuthenticator {
         }
         // this is part where client can authenticate itself and get token
         if req.method() == &Method::Post && req.path()=="/authenticate" {
+            debug!("Authentication request");
             let auth = self.clone();
             return Box::new(req.body().concat2().map(move |b| {
-                    
                 let params = form_urlencoded::parse(b.as_ref()).into_owned()
                 .collect::<HashMap<String, String>>();
-                    
                 if let Some(secret) = params.get("secret") {
                         debug!("Authenticating user");
                         if auth.auth_token_ok(secret) {
