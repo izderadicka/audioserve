@@ -3,7 +3,7 @@ Audioserve
 
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalistic design.
 
-Server is in Rust,  client is Javascript intended for modern browser (latest Firefox or Chrome). 
+Server is in Rust,  default client is in Javascript intended for modern browsers (latest Firefox or Chrome) and is integrated with the server. There is also Android client under development. 
 
 For some background and video demo check this article [Audioserve Audiobooks Server - Stupidly Simple or Simply Stupid?](http://zderadicka.eu/audioserve-audiobooks-server-stupidly-simple-or-simply-stupid)
 
@@ -31,9 +31,9 @@ Security
 
 Audioserve is not writing anything to your media library, so read only access is OK.  The only one file where it needs to write is a file were it keeps its secret key for authentication (by default in `~/.audioserve.secret`, but it can be specified by command line argument).
 
-Authentication is done by shared secret phrase (supplied to server on command line), which client must know.  Secret phrase is never sent in plain (it's sent as salted hash). If correct shared secret hash is provided sever generates a token, usinng its secret key.  Token then can be used in cookie or HTTP Authorization header (Bearer method). 
+Authentication is done by shared secret phrase (supplied to server on command line), which client must know.  Secret phrase is never sent in plain (it's sent as salted hash). If correct shared secret hash is provided sever generates a token, using its secret key.  Token then can be used in cookie or HTTP Authorization header (Bearer method). 
 Token validity period is one year by default, but can be set as command line argument.
-As token can be used to replay session https is recomended (TLS support is build in).
+As the token can be used to steal the session https is recomended (TLS support is build in).
 
 ### TLS/SSL
 
@@ -61,6 +61,11 @@ Command line
 ------------
 Check with `audioserve -h`. Only two required arguments are shared secrect and root of media library.
 `audioserve`  is server executable and it also needs web client files , which are `index.html` and `bundle.js`, which are defaultly in `./client/dist`, but their location can by specified by argument `-c` 
+
+Android client
+--------------
+Android client is under development code is [available on github](https://github.com/izderadicka/audioserve-android)
+Client is in very early stage.
 
 
 Installation
