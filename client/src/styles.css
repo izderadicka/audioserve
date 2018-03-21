@@ -127,6 +127,10 @@ span.transcoded {
     font-size: 120%;
 }
 
+#player .controls .current-time, #player .controls .total-time {
+    cursor: pointer;
+}
+
 @media (max-width: 1024px) {
     h1.top-header {
         font-size: 1.8rem;

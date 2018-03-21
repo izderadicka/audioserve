@@ -469,6 +469,13 @@ $(function() {
         loadFolder("");
     });
 
+    $("#player .controls .current-time, #player .controls .total-time").on('click', evt => {
+        let activeFile = $("#files a.active");
+        if (activeFile.length>0) {
+            showInView(activeFile);
+        }
+    });
+
     loadCollections().then(numCollections => {
     loadFolder(window.localStorage.getItem("audioserve_folder")|| "");
     $("#splash").hide().addClass("transparent");
