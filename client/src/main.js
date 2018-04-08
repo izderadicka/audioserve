@@ -21,6 +21,8 @@ $(function() {
     let collections = [];
     let pendingCall = null;
     let pendingSpinner = null;
+    let transcodingLimit = 64;
+    let transcoding = "m";
 
     function showSpinner() {
         pendingSpinner = window.setTimeout(() => 
@@ -96,6 +98,17 @@ $(function() {
         $("#main").scrollTop(to || 0);
     }
 
+    function calcTranscoding(file) {
+        let bitrate = parseInt( file.meta.bitrate)
+        if (bitrate> transcodingLimit) {
+            file.trans=true;
+            file.path=file.path+`?trans=${transcoding}`;
+        } else {
+            file.trans = false;
+            file.path=file.path+`?trans=0`;
+        }
+    }
+
     function loadFolder(path, fromHistory, scrollTo) {
         $("#info-container").hide();
         ajax({
@@ -164,6 +177,7 @@ $(function() {
             files.empty();
             fcount.text(data.files.length);
             for (let file of  data.files) {
+                calcTranscoding(file);
                 let item = $('<a class="list-group-item list-group-item-action">')
                     .attr("href", file.path)
                     .data("duration", file.meta.duration)

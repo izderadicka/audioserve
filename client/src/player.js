@@ -5,7 +5,7 @@ export function formatTime(dur) {
     if (! isFinite(dur)) return "?";
     let hours = 0;
     let mins = Math.floor(dur / 60);
-    let secs = Math.round(dur % 60);
+    let secs = Math.floor(dur % 60);
     secs = ("0"+secs).slice(-2);
     if (mins >=60) {
         hours = Math.floor(mins / 60);
@@ -340,10 +340,10 @@ export class AudioPlayer {
 
     _jumpWithSeek(time) {
         debug("Reloading media by server seek");
-        let queryIndex = this._player.src.indexOf("?seek=");
+        let queryIndex = this._player.src.indexOf("&seek=");
         let baseUrl = queryIndex>0? this._player.src.substr(0,queryIndex): this._player.src;
         let wasPlaying = ! this._player.paused; 
-        let url = baseUrl+`?seek=${time}`;
+        let url = baseUrl+`&seek=${time}`;
         this._timeOffset = time;
         this._player.src = url;
         this._player.currentTime= 0;
