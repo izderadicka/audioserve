@@ -67,7 +67,7 @@ body {
   margin:0 0.5em;
 }
 
-.duration {
+.duration, .bitrate {
   margin-left: 1em;
   font-size: 70%
 }

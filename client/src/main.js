@@ -185,9 +185,13 @@ $(function() {
                     .text(file.name);
                 
                 files.append(item);
-                if (file.meta) {
+                if (file.meta && file.meta.duration) {
                     item.append(" ");
                     item.append($(`<span class="duration">(${formatTime(file.meta.duration)})</span>`));
+                }
+                if (file.meta && file.meta.bitrate) {
+                    item.append(" ");
+                    item.append($(`<span class="bitrate">${file.meta.bitrate} kbps</span>`));
                 }
                 if (file.trans) {
                     item.append($("<span>").addClass("transcoded"));
