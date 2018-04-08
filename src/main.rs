@@ -18,6 +18,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+extern crate serde_yaml;
 extern crate taglib;
 extern crate url;
 extern crate regex;
@@ -37,7 +38,6 @@ use std::sync::Arc;
 use services::{FileSendService, TranscodingDetails};
 use services::auth::SharedSecretAuthenticator;
 use services::search::Search;
-use services::transcode::Transcoder;
 use config::{parse_args, get_config};
 use ring::rand::{SecureRandom, SystemRandom};
 use std::path::Path;
@@ -105,7 +105,6 @@ fn start_server(my_secret: Vec<u8>, private_key: Option<Pkcs12>) -> Result<(), B
         }),
         search: Search::FoldersSearch,
         transcoding: TranscodingDetails {
-            transcoder: get_config().transcoding.clone().map(|q| Transcoder::new(q)),
             transcodings: Arc::new(AtomicUsize::new(0)),
             max_transcodings: get_config().max_transcodings,
         },

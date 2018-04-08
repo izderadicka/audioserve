@@ -13,7 +13,7 @@ use std::sync::atomic::Ordering;
 use super::Counter;
 use super::types::*;
 use super::search::{Search, SearchTrait};
-use super::transcode::Transcoder;
+use super::transcode::{Transcoder, QualityLevel};
 use std::path::{Path, PathBuf};
 use mime_guess::guess_mime_type;
 use mime;
@@ -195,6 +195,7 @@ pub fn send_file(
     seek: Option<f32>,
     counter: Counter,
     transcoding: super::TranscodingDetails,
+    transcoding_quality: Option<QualityLevel>
 ) -> ResponseFuture {
     let (tx, rx) = oneshot::channel();
     guarded_spawn(counter, move || {
@@ -202,22 +203,23 @@ pub fn send_file(
         if full_path.exists() {
             let audio_properties = get_audio_properties(&full_path);
             debug!("Audio properties: {:?}", audio_properties);
-            debug!("Trancoder: {:?}", transcoding.transcoder);
-            let should_transcode = transcoding.transcoder.is_some() && match audio_properties {
-                Some(ap) => {
-                    let mime = ::mime_guess::guess_mime_type(&full_path);
-                    transcoding
-                        .transcoder
-                        .as_ref()
-                        .unwrap()
-                        .should_transcode(ap.bitrate, &mime)
-                }
-                None => false,
-            };
+            
+            
+            // transcoding.transcoder.is_some() && match audio_properties {
+            //     Some(ap) => {
+            //         let mime = ::mime_guess::guess_mime_type(&full_path);
+            //         transcoding
+            //             .transcoder
+            //             .as_ref()
+            //             .unwrap()
+            //             .should_transcode(ap.bitrate, &mime)
+            //     }
+            //     None => false,
+            // };
 
-            if should_transcode {
+            if transcoding_quality.is_some() {
                 let counter = transcoding.transcodings;
-                let transcoder = transcoding.transcoder.unwrap();
+                let transcoder = Transcoder::new(get_config().transcoding.get(transcoding_quality.unwrap()));
                 if counter.load(Ordering::SeqCst) > transcoding.max_transcodings {
                     warn!("Max transcodings reached");
                     tx.send(short_response(
@@ -249,12 +251,11 @@ fn box_rx(rx: ::futures::sync::oneshot::Receiver<Response>) -> ResponseFuture {
 pub fn get_folder(
     base_path: &'static Path,
     folder_path: PathBuf,
-    transcoder: Option<Transcoder>,
     counter: Counter,
 ) -> ResponseFuture {
     let (tx, rx) = oneshot::channel();
     guarded_spawn(counter, move || {
-        match list_dir(&base_path, &folder_path, transcoder) {
+        match list_dir(&base_path, &folder_path) {
             Ok(folder) => {
                 tx.send(json_response(&folder)).expect(THREAD_SEND_ERROR);
             }
@@ -270,7 +271,6 @@ pub fn get_folder(
 fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     base_dir: P,
     dir_path: P2,
-    transcoder: Option<Transcoder>,
 ) -> Result<AudioFolder, io::Error> {
     fn os_to_string(s: ::std::ffi::OsString) -> String {
         match s.into_string() {
@@ -303,15 +303,7 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
                             if is_audio(&path) {
                                 let mime = ::mime_guess::guess_mime_type(&path);
                                 let meta = get_audio_properties(&base_dir.as_ref().join(&path));
-                                let bitrate = meta.as_ref().map(|m| m.bitrate.clone());
                                 files.push(AudioFile {
-                                    trans: (&transcoder)
-                                        .as_ref()
-                                        .map(|t| {
-                                            bitrate.is_some()
-                                                && t.should_transcode(bitrate.unwrap(), &mime)
-                                        })
-                                        .unwrap_or(false),
                                     meta,
                                     path,
                                     name: os_to_string(f.file_name()),
@@ -433,15 +425,11 @@ mod tests {
     use super::*;
     use serde_json;
 
-    fn tcf() -> Option<Transcoder> {
-        Some(Transcoder::new(::services::transcode::Quality::Low))
-    }
-
     #[test]
     fn test_list_dir() {
-        let res = list_dir("/non-existent", "folder", tcf());
+        let res = list_dir("/non-existent", "folder");
         assert!(res.is_err());
-        let res = list_dir("./", "test_data/", tcf());
+        let res = list_dir("./", "test_data/");
         assert!(res.is_ok());
         let folder = res.unwrap();
         assert_eq!(folder.files.len(), 3);
@@ -451,7 +439,7 @@ mod tests {
 
     #[test]
     fn test_json() {
-        let folder = list_dir("./", "test_data/", tcf()).unwrap();
+        let folder = list_dir("./", "test_data/").unwrap();
         let json = serde_json::to_string(&folder).unwrap();
         println!("JSON: {}", &json);
     }

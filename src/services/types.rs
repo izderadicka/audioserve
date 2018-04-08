@@ -21,7 +21,6 @@ pub struct AudioFile {
     pub name: String,
     pub path: PathBuf,
     pub meta: Option<AudioMeta>,
-    pub trans: bool,
     pub mime: String
 }
 

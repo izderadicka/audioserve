@@ -11,11 +11,11 @@ use percent_encoding::percent_decode;
 use futures::{Future, future};
 use self::auth::Authenticator;
 use self::search::Search;
-use self::transcode::Transcoder;
 use url::form_urlencoded;
 use std::collections::HashMap;
 use config::get_config;
 use regex::Regex;
+use self::transcode::QualityLevel;
 
 mod subs;
 mod types;
@@ -36,7 +36,6 @@ type Counter = Arc<AtomicUsize>;
 
 #[derive(Clone)]
 pub struct TranscodingDetails {
-    pub transcoder: Option<Transcoder>,
     pub transcodings: Counter,
     pub max_transcodings: usize
 
@@ -130,7 +129,7 @@ impl FileSendService {
         transcoding: TranscodingDetails
         ) -> ResponseFuture {
         
-        let params =  req.query().map(|query| form_urlencoded::parse(query.as_bytes())
+        let mut params =  req.query().map(|query| form_urlencoded::parse(query.as_bytes())
                             .collect::<HashMap<_, _>>());
         match req.method() {
             &Method::Get => {
@@ -180,7 +179,9 @@ impl FileSendService {
                     "Other then bytes ranges are not supported"),
                     None => None
                 };
-                let seek: Option<f32> = params.and_then(|mut p| p.remove("seek")).and_then(|s| s.parse().ok());
+                let seek: Option<f32> = params.as_mut().and_then(|p| p.remove("seek")).and_then(|s| s.parse().ok());
+                let transcoding_quality: Option<QualityLevel> = params.and_then(|mut p| p.remove("trans"))
+                    .and_then(|t| QualityLevel::from_letter(&t));
 
                 send_file(base_dir, 
                     get_subpath(&path, "/audio/"), 
@@ -188,11 +189,11 @@ impl FileSendService {
                     seek,
                     sending_threads,
                     transcoding,
+                    transcoding_quality
                     )
                 } else if path.starts_with("/folder/") {
                     get_folder(base_dir, 
                     get_subpath(&path, "/folder/"),  
-                    transcoding.transcoder,
                     sending_threads) 
                 } else if path == "/search" {
                     if let Some(search_string) = params.and_then(|mut p| p.remove("q")){

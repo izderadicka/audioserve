@@ -2,9 +2,12 @@ use clap::{App, Arg};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::env;
-use std::io;
-use super::services::transcode::Quality;
+use std::io::{self, Read};
+use super::services::transcode::{Quality, QualityLevel};
 use num_cpus;
+use serde_yaml;
+use std::collections::BTreeMap;
+use std::fs::File;
 
 static mut CONFIG: Option<Config> = None;
 
@@ -44,12 +47,29 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone)]
+pub struct TranscodingConfig {
+    low: Option<Quality>,
+    medium: Option<Quality>,
+    high: Option<Quality>
+}
+
+impl TranscodingConfig {
+    pub fn get(&self, quality: QualityLevel) -> Quality {
+        match quality {
+            l @ QualityLevel::Low => self.low.as_ref().map_or(Quality::default_level(l), |c| c.clone()),
+            l @ QualityLevel::Medium => self.medium.as_ref().map_or(Quality::default_level(l), |c| c.clone()), 
+            l @ QualityLevel::High => self.high.as_ref().map_or(Quality::default_level(l), |c| c.clone()),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Config{
     pub local_addr: SocketAddr,
     pub max_sending_threads: usize,
     pub base_dirs: Vec<PathBuf>,
     pub shared_secret: Option<String>,
-    pub transcoding: Option<Quality>,
+    pub transcoding: TranscodingConfig,
     pub max_transcodings: usize,
     pub token_validity_hours: u64,
     pub secret_file: PathBuf,
@@ -105,13 +125,13 @@ fn create_parser<'a>() -> Parser<'a> {
             .required_unless("no-authentication")
             .help("Shared secret for client authentication")
         )
-        .arg(Arg::with_name("transcode")
-            .short("t")
-            .long("transcode")
-            .takes_value(true)
-            .possible_values(&["low", "medium", "high"])
-            .help("Use transcoding to safe bandwidth (or serve incompatible audio files)")
-        )
+        // .arg(Arg::with_name("transcode")
+        //     .short("t")
+        //     .long("transcode")
+        //     .takes_value(true)
+        //     .possible_values(&["low", "medium", "high"])
+        //     .help("Use transcoding to safe bandwidth (or serve incompatible audio files)")
+        // )
         .arg(Arg::with_name("max-transcodings")
             .short("x")
             .long("max-transcodings")
@@ -190,12 +210,14 @@ pub fn parse_args() -> Result<(), Error>{
         Some(args.value_of("shared-secret").unwrap().into())
         };
 
-    let transcoding = args.value_of("transcode").map(|t| match t {
-        "low" => Quality::Low,
-        "medium" => Quality::Medium,
-        "high" => Quality::High,
-        _ => unreachable!("Wrong transcoding")
-    });
+    // let transcoding = args.value_of("transcode").map(|t| match t {
+    //     "low" => Quality::default_level(QualityLevel::Low),
+    //     "medium" => Quality::default_level(QualityLevel::Medium),
+    //     "high" => Quality::default_level(QualityLevel::High),
+    //     _ => unreachable!("Wrong transcoding")
+    // });
+
+    let transcoding = TranscodingConfig{low:None, medium:None, high:None};
 
     let max_transcodings = match args.value_of("max-transcodings") {
         Some(s) => {
@@ -263,5 +285,39 @@ pub fn parse_args() -> Result<(), Error>{
     }
 
     Ok(())
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+
+    #[test]
+    fn test_yaml_serialize() {
+        let mut qualities = BTreeMap::new();
+        qualities.insert("low", Quality::default_level(QualityLevel::Low));
+        qualities.insert("medium", Quality::default_level(QualityLevel::Medium));
+        qualities.insert("high", Quality::default_level(QualityLevel::High));
+        let s = serde_yaml::to_string(&qualities).unwrap();
+        assert!(s.len() > 20);
+        println!("{}",s);
+
+        let des: BTreeMap<String, Quality> = serde_yaml::from_str(&s).unwrap();
+        assert_eq!(des.get("medium"), qualities.get("medium"));
+
+    }
+    #[test]
+    fn test_yaml_deserialize() {
+        let f = File::open("./test_data/transcodings.yaml").unwrap();
+        let des: BTreeMap<String, Quality> = serde_yaml::from_reader(f).unwrap();
+        assert_eq!(3, des.len());
+        assert!(des.get("high").is_some());
+        
+        
+    }
+
+
+    
 
 }
