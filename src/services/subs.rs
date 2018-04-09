@@ -398,6 +398,11 @@ pub fn collections_list() -> ResponseFuture {
     Box::new(future::ok(json_response(&collections)))
 }
 
+pub fn transcodings_list() -> ResponseFuture {
+    let transcodings = Transcondigs::new();
+    Box::new(future::ok(json_response(&transcodings)))
+}
+
 pub fn search(
     base_dir: &'static Path,
     searcher: Search,

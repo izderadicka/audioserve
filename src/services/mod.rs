@@ -5,7 +5,7 @@ Origin};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use self::subs::{send_file, send_file_simple, short_response_boxed, search,ResponseFuture, 
-    NOT_FOUND_MESSAGE, get_folder, collections_list};
+    NOT_FOUND_MESSAGE, get_folder, collections_list, transcodings_list};
 use std::path::{PathBuf, Path};
 use percent_encoding::percent_decode;
 use futures::{Future, future};
@@ -138,6 +138,8 @@ impl FileSendService {
 
                 if path.starts_with("/collections") {
                     collections_list() 
+                } else if path.starts_with("/transcodings") {
+                    transcodings_list()
                 } else {
                 // TODO -  select correct base dir
                 let mut colllection_index = 0;

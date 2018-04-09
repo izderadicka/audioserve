@@ -1,6 +1,8 @@
 use std::path::{PathBuf, Path};
 use mime::Mime;
 use mime_guess::{guess_mime_type};
+use services::transcode::{QualityLevel,Quality};
+use config::get_config;
 
 #[derive(Debug,Serialize)]
 pub struct TypedFile {
@@ -40,6 +42,24 @@ pub struct AudioFolderShort {
 pub struct Collections {
     pub count: u32,
     pub names: Vec<&'static str>
+}
+
+#[derive(Debug, Serialize)]
+pub struct Transcondigs {
+    pub low: Quality,
+    pub medium: Quality,
+    pub high: Quality
+}
+
+impl Transcondigs {
+    pub fn new() -> Self {
+        let cfg = get_config();
+        Transcondigs {
+            low: cfg.transcoding.get(QualityLevel::Low),
+            medium: cfg.transcoding.get(QualityLevel::Medium),
+            high: cfg.transcoding.get(QualityLevel::High)
+        }
+    }
 }
 
 
