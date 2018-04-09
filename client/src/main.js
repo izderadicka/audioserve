@@ -92,7 +92,7 @@ $(function () {
                         transcodingLimits.m = t.medium.bitrate * c;
                         $("#bitrate-trans-high").text( t.high.bitrate + "kbps");
                         transcodingLimits.h = t.high.bitrate * c;
-                    })
+                    });
             })
             .catch(err => {
                 if (err.status == 401) {
