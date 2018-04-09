@@ -115,7 +115,7 @@ span.transcoded {
 #collections {
     display:none;
     font-size: 0.5em;
-    width: 60%;
+    width: 50%;
     float: right;
     vertical-align: middle;
     margin-top: 0.4em;
@@ -130,10 +130,36 @@ span.transcoded {
 #player .controls .current-time, #player .controls .total-time {
     cursor: pointer;
 }
+.menu-top-right {
+    display: block;
+    float: right;
+    width: 0.5em;
+    height: 1em;
+    margin-left: 0.5em;
+    padding-top: 0.1em;
+}
+
+.menu-top-right .nav-link {
+    padding: 0;
+    margin: 0;
+}
+
+.menu-top-right .dropdown-item, .menu-top-right .dropdown-header {
+    font-size: 150%;
+}
+
+.menu-top-right .dropdown-menu a, .menu-top-right .dropdown-menu a input, .menu-top-right .dropdown-menu a label {
+    cursor: pointer;
+}
+.menu-button:before {
+    content: '\2807';
+    font-size: 1em;
+    
+    }
 
 @media (max-width: 1024px) {
     h1.top-header {
-        font-size: 1.8rem;
+        font-size: 1.6rem;
     }
 }
 

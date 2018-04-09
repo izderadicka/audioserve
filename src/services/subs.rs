@@ -27,6 +27,8 @@ const THREAD_SEND_ERROR: &str = "Cannot communicate with other thread";
 
 pub type ResponseFuture = Box<Future<Item = Response, Error = hyper::Error>>;
 
+header! { (XTranscode, "X-Transcode") => [String]}
+
 pub fn short_response(status: StatusCode, msg: &'static str) -> Response {
     Response::new()
         .with_status(status)
@@ -70,6 +72,7 @@ fn serve_file_transcoded(
     let (body_tx, body_rx) = mpsc::channel(1);
     let resp = Response::new()
         .with_header(ContentType(transcoder.transcoded_mime()))
+        .with_header(XTranscode(transcoder.transcoding_params()))
         .with_body(body_rx);
     tx.send(resp).expect(THREAD_SEND_ERROR);
 
@@ -201,23 +204,11 @@ pub fn send_file(
     guarded_spawn(counter, move || {
         let full_path = base_path.join(&file_path);
         if full_path.exists() {
-            let audio_properties = get_audio_properties(&full_path);
-            debug!("Audio properties: {:?}", audio_properties);
             
             
-            // transcoding.transcoder.is_some() && match audio_properties {
-            //     Some(ap) => {
-            //         let mime = ::mime_guess::guess_mime_type(&full_path);
-            //         transcoding
-            //             .transcoder
-            //             .as_ref()
-            //             .unwrap()
-            //             .should_transcode(ap.bitrate, &mime)
-            //     }
-            //     None => false,
-            // };
 
             if transcoding_quality.is_some() {
+                debug!("Sending file transcoded in quality {:?}", transcoding_quality);
                 let counter = transcoding.transcodings;
                 let transcoder = Transcoder::new(get_config().transcoding.get(transcoding_quality.unwrap()));
                 if counter.load(Ordering::SeqCst) > transcoding.max_transcodings {
@@ -233,6 +224,7 @@ pub fn send_file(
                     });
                 }
             } else {
+                debug!("Sending file directly from fs");
                 serve_file_from_fs(&full_path, range, None, tx);
             }
         } else {

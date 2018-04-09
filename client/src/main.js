@@ -21,7 +21,7 @@ $(function() {
     let collections = [];
     let pendingCall = null;
     let pendingSpinner = null;
-    let transcodingLimit = 64;
+    let transcodingLimit = 58;
     let transcoding = "m";
 
     function showSpinner() {
@@ -99,8 +99,8 @@ $(function() {
     }
 
     function calcTranscoding(file) {
-        let bitrate = parseInt( file.meta.bitrate)
-        if (bitrate> transcodingLimit) {
+        let bitrate = parseInt( file.meta.bitrate);
+        if (transcodingLimit>=0  && bitrate> transcodingLimit) {
             file.trans=true;
             file.path=file.path+`?trans=${transcoding}`;
         } else {
@@ -493,6 +493,53 @@ $(function() {
             showInView(activeFile);
         }
     });
+
+    $("#logout-link").on('click', (evt) => {
+        document.cookie = 'audioserve_token=; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        document.location.reload();
+    });
+
+    let transSelect = $('input[name="transcoding"]');
+
+    function setTranscoding(val) {
+        switch (val) {
+            case "0":
+                transcodingLimit = -1;
+                transcoding = val;
+                break;
+            case "l": 
+                transcodingLimit = 38;
+                transcoding = val;
+                break;
+            case "m":
+                transcodingLimit = 58;
+                transcoding = val;
+                break;
+            case "h":
+                transcodingLimit = 76;
+                transcoding = val;
+                break;
+            default:
+                transcodingLimit = -1;
+                transcoding = "0";
+        }
+
+        window.localStorage.setItem("audioserver_transcoding", transcoding);
+
+    }
+
+    transSelect.on("change", (evt) => {
+        let val = transSelect.filter(":checked").val();
+        setTranscoding(val);
+        document.location.reload();
+        
+    });
+
+    if (window.localStorage.getItem("audioserver_transcoding")) {
+        setTranscoding(window.localStorage.getItem("audioserver_transcoding"));
+    }
+
+    transSelect.filter(`[value="${transcoding}"]`).prop('checked', true);
 
     loadCollections().then(numCollections => {
     loadFolder(window.localStorage.getItem("audioserve_folder")|| "");

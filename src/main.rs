@@ -3,6 +3,7 @@ extern crate clap;
 extern crate data_encoding;
 extern crate futures;
 extern crate futures_cpupool;
+#[macro_use]
 extern crate hyper;
 #[macro_use]
 extern crate log;

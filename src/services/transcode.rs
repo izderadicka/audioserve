@@ -35,7 +35,7 @@ pub struct Quality {
     
 }
 
-
+#[derive(Clone, Debug, PartialEq)]
 pub enum QualityLevel {
     Low,
     Medium,
@@ -136,6 +136,11 @@ impl Transcoder {
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
         cmd
+    }
+
+    pub fn transcoding_params(&self) -> String {
+        format!("codec=opus; bitrate={}; compression_level={}; cutoff={}", self.quality.bitrate, 
+        self.quality.compression_level, self.quality.cutoff.to_hz())
     }
 
     //TODO - keeping it for a while if we need to check clients
