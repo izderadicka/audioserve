@@ -26,6 +26,8 @@ In folders you can have additional metadata files - first available image (jpeg 
 
 Search is done for folder names only (not individual files, neither audio metadata tags).
 
+You can have several libraries/ collections - just use several root directories as audioserve start parametes. In client you can switch between collections in the client. Typical usage will be to have separate collections for different languages.
+
 Security
 --------
 
@@ -48,14 +50,29 @@ Audioserve supports TLS/SSL - to enable it you need to provide your private serv
 Transcoding
 -----------
 
-Audioserve offers possibility to transcode audio files to opus format (opus codec, ogg container) to save bandwidth and volume of transfered data. For transcoding to work `ffmpeg` program must be install and available on system's PATH.
-Transconding is provided is three options ( argument `-t`, if not provided no transcoding is done):
+Audioserve offers possibility to transcode audio files to opus format (opus codec, ogg container) to save bandwidth and volume of transfered data. For transcoding to work `ffmpeg` program must be installed and available on system's PATH.
+Transconding is provided in three variants and client can choose between then (using query parameter trans with value l,m or h):
 
-* low - 32 kbps opus with 12kHz cutoff
-* medium - 48 kbps opus with 12kHz cutoff
-* high - 64 kbps opus with 20kHz cutoff
+* low - (default 32 kbps opus with 12kHz cutoff)
+* medium - (default 48 kbps opus with 12kHz cutoff)
+* high - (default 64 kbps opus with 20kHz cutoff)
 
-As already noted audioserve is intended primarily for audiobooks and believe me opus codec is excellent there even in low bitrates.
+As already noted audioserve is intended primarily for audiobooks and believe me opus codec is excellent there even in low bitrates. However if you want to change parameters of these three trancodings you can easily do so by providing yaml confing file to paramete `--transcoding-config`. Here is sample file:
+```yaml
+low:
+  bitrate: 16
+  compression_level: 3
+  cutoff: WideBand
+medium:
+  bitrate: 24
+  compression_level: 6
+  cutoff: SuperWideBand
+high:
+  bitrate: 32
+  compression_level: 9
+  cutoff: SuperWideBand
+```
+Where bitrate is desired bitrate in kbps, compression_level is determining audio quality and speed of transcoding with values 1-10 ( 1 - worst quality, but fastest, 10 - best quality, but slowest ) and cutoff is determining audio freq. bandwith (NarrowBand => 4kHz, MediumBand => 6kHz, WideBand => 8kHz, SuperWideBand => 12kHz, FullBand => 20kHz).
 
 Command line
 ------------

@@ -92,6 +92,11 @@ $(function () {
                         transcodingLimits.m = t.medium.bitrate * c;
                         $("#bitrate-trans-high").text( t.high.bitrate + "kbps");
                         transcodingLimits.h = t.high.bitrate * c;
+
+                        if (window.localStorage.getItem("audioserver_transcoding")) {
+                            setTranscoding(window.localStorage.getItem("audioserver_transcoding"));
+                        }
+                        transSelect.filter(`[value="${transcoding}"]`).prop('checked', true);
                     });
             })
             .catch(err => {
@@ -532,12 +537,6 @@ $(function () {
         document.location.reload();
 
     });
-
-    if (window.localStorage.getItem("audioserver_transcoding")) {
-        setTranscoding(window.localStorage.getItem("audioserver_transcoding"));
-    }
-
-    transSelect.filter(`[value="${transcoding}"]`).prop('checked', true);
 
     loadCollections().then(() => {
         loadFolder(window.localStorage.getItem("audioserve_folder") || "");

@@ -2,7 +2,7 @@ use clap::{App, Arg};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::env;
-use std::io::{self, Read};
+use std::io;
 use super::services::transcode::{Quality, QualityLevel};
 use num_cpus;
 use serde_yaml;
@@ -35,6 +35,10 @@ pub enum Error {
     }
     
     InvalidLimitValue(err: &'static str) {
+        from()
+    }
+
+    InvalidYamlFile(err: serde_yaml::Error) {
         from()
     }
 
@@ -125,13 +129,11 @@ fn create_parser<'a>() -> Parser<'a> {
             .required_unless("no-authentication")
             .help("Shared secret for client authentication")
         )
-        // .arg(Arg::with_name("transcode")
-        //     .short("t")
-        //     .long("transcode")
-        //     .takes_value(true)
-        //     .possible_values(&["low", "medium", "high"])
-        //     .help("Use transcoding to safe bandwidth (or serve incompatible audio files)")
-        // )
+        .arg(Arg::with_name("transcoding-config")
+            .long("transcoding-config")
+            .takes_value(true)
+            .help("Custom transcoding config in yaml file [defaul: built-in settings of 32, 48, 64 kbps")
+        )
         .arg(Arg::with_name("max-transcodings")
             .short("x")
             .long("max-transcodings")
@@ -217,7 +219,20 @@ pub fn parse_args() -> Result<(), Error>{
     //     _ => unreachable!("Wrong transcoding")
     // });
 
-    let transcoding = TranscodingConfig{low:None, medium:None, high:None};
+    
+let transcoding = match  args.value_of("transcoding-config") {
+    None =>  TranscodingConfig{low:None, medium:None, high:None},
+    Some(f) => {
+        let config_file = File::open(f)?;
+        let mut qs: BTreeMap<String, Quality> = serde_yaml::from_reader(config_file)?; 
+        TranscodingConfig{
+            low:qs.remove("low"), 
+            medium:qs.remove("medium"), 
+            high:qs.remove("high")}
+    }
+};
+    
+   
 
     let max_transcodings = match args.value_of("max-transcodings") {
         Some(s) => {

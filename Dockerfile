@@ -49,7 +49,7 @@ RUN mkdir ssl &&\
 
 EXPOSE 3000
 
-CMD ./audioserve -s mypass -t low --ssl-key ./ssl/audioserve.p12 --ssl-key-password mypass /audiobooks
+CMD ./audioserve -s mypass --ssl-key ./ssl/audioserve.p12 --ssl-key-password mypass /audiobooks
 
     
 
