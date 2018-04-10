@@ -73,16 +73,17 @@ high:
   cutoff: SuperWideBand
 ```
 Where bitrate is desired bitrate in kbps, compression_level is determining audio quality and speed of transcoding with values 1-10 ( 1 - worst quality, but fastest, 10 - best quality, but slowest ) and cutoff is determining audio freq. bandwith (NarrowBand => 4kHz, MediumBand => 6kHz, WideBand => 8kHz, SuperWideBand => 12kHz, FullBand => 20kHz).
+You can overide one two or all three defaults, depending on what sections you have in this config file.
 
 Command line
 ------------
-Check with `audioserve -h`. Only two required arguments are shared secrect and root of media library.
+Check with `audioserve -h`. Only two required arguments are shared secrect and root of media library (as noted above you can have severals libraries).
 `audioserve`  is server executable and it also needs web client files , which are `index.html` and `bundle.js`, which are defaultly in `./client/dist`, but their location can by specified by argument `-c` 
 
 Android client
 --------------
-Android client is under development code is [available on github](https://github.com/izderadicka/audioserve-android)
-Client is in very early stage.
+Android client is under development, code is [available on github](https://github.com/izderadicka/audioserve-android)
+Client is in an early stage, but is becomming usable (I'm using it now to listen to my audiobooks).
 
 
 Installation
