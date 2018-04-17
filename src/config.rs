@@ -1,27 +1,25 @@
-use clap::{App, Arg};
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::env;
-use std::io;
 use super::services::transcode::{Quality, QualityLevel};
+use clap::{App, Arg};
 use num_cpus;
 use serde_yaml;
 use std::collections::BTreeMap;
+use std::env;
 use std::fs::File;
+use std::io;
+use std::net::SocketAddr;
+use std::path::PathBuf;
 
 static mut CONFIG: Option<Config> = None;
 
 // CONFIG is assured to be inited only once from main thread
 pub fn get_config() -> &'static Config {
-    unsafe {
-        CONFIG.as_ref().expect("Config is not initialized")
-    }
+    unsafe { CONFIG.as_ref().expect("Config is not initialized") }
 }
 
-quick_error! { 
+quick_error! {
 #[derive(Debug)]
 pub enum Error {
-    
+
     InvalidNumber(err: ::std::num::ParseIntError) {
         from()
     }
@@ -33,7 +31,7 @@ pub enum Error {
     InvalidPath(err: io::Error) {
         from()
     }
-    
+
     InvalidLimitValue(err: &'static str) {
         from()
     }
@@ -54,21 +52,27 @@ pub enum Error {
 pub struct TranscodingConfig {
     low: Option<Quality>,
     medium: Option<Quality>,
-    high: Option<Quality>
+    high: Option<Quality>,
 }
 
 impl TranscodingConfig {
     pub fn get(&self, quality: QualityLevel) -> Quality {
         match quality {
-            l @ QualityLevel::Low => self.low.as_ref().map_or(Quality::default_level(l), |c| c.clone()),
-            l @ QualityLevel::Medium => self.medium.as_ref().map_or(Quality::default_level(l), |c| c.clone()), 
-            l @ QualityLevel::High => self.high.as_ref().map_or(Quality::default_level(l), |c| c.clone()),
+            l @ QualityLevel::Low => self.low
+                .as_ref()
+                .map_or(Quality::default_level(l), |c| c.clone()),
+            l @ QualityLevel::Medium => self.medium
+                .as_ref()
+                .map_or(Quality::default_level(l), |c| c.clone()),
+            l @ QualityLevel::High => self.high
+                .as_ref()
+                .map_or(Quality::default_level(l), |c| c.clone()),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct Config{
+pub struct Config {
     pub local_addr: SocketAddr,
     pub max_sending_threads: usize,
     pub base_dirs: Vec<PathBuf>,
@@ -80,8 +84,7 @@ pub struct Config{
     pub client_dir: PathBuf,
     pub cors: bool,
     pub ssl_key_file: Option<PathBuf>,
-    pub ssl_key_password: Option<String>
-
+    pub ssl_key_password: Option<String>,
 }
 type Parser<'a> = App<'a, 'a>;
 
@@ -175,7 +178,7 @@ fn create_parser<'a>() -> Parser<'a> {
         )
 }
 
-pub fn parse_args() -> Result<(), Error>{
+pub fn parse_args() -> Result<(), Error> {
     let p = create_parser();
     let args = p.get_matches();
 
@@ -190,79 +193,71 @@ pub fn parse_args() -> Result<(), Error>{
     let mut base_dirs = vec![];
     for dir in base_dirs_items {
         let base_dir: PathBuf = dir.into();
-        if ! base_dir.is_dir() {
-        return Err(Error::NonExistentBaseDirectory)
+        if !base_dir.is_dir() {
+            return Err(Error::NonExistentBaseDirectory);
         }
         base_dirs.push(base_dir);
-
     }
 
-    
     let local_addr = args.value_of("local_addr").unwrap().parse()?;
     let max_sending_threads = args.value_of("max-threads").unwrap().parse()?;
     if max_sending_threads < 10 {
-        return Err("Too few threads - should be above 10".into())
+        return Err("Too few threads - should be above 10".into());
     }
     if max_sending_threads > 10000 {
-        return Err("Too much threads - should be below 10000".into())
+        return Err("Too much threads - should be below 10000".into());
     }
-    
+
     let shared_secret = if args.is_present("no-authentication") {
-        None } else {
+        None
+    } else {
         Some(args.value_of("shared-secret").unwrap().into())
-        };
+    };
 
-    // let transcoding = args.value_of("transcode").map(|t| match t {
-    //     "low" => Quality::default_level(QualityLevel::Low),
-    //     "medium" => Quality::default_level(QualityLevel::Medium),
-    //     "high" => Quality::default_level(QualityLevel::High),
-    //     _ => unreachable!("Wrong transcoding")
-    // });
-
-    
-let transcoding = match  args.value_of("transcoding-config") {
-    None =>  TranscodingConfig{low:None, medium:None, high:None},
-    Some(f) => {
-        let config_file = File::open(f)?;
-        let mut qs: BTreeMap<String, Quality> = serde_yaml::from_reader(config_file)?; 
-        TranscodingConfig{
-            low:qs.remove("low"), 
-            medium:qs.remove("medium"), 
-            high:qs.remove("high")}
-    }
-};
-    
-   
-
-    let max_transcodings = match args.value_of("max-transcodings") {
-        Some(s) => {
-            s.parse()?
+    let transcoding = match args.value_of("transcoding-config") {
+        None => TranscodingConfig {
+            low: None,
+            medium: None,
+            high: None,
         },
-        None => {
-            num_cpus::get()
+        Some(f) => {
+            let config_file = File::open(f)?;
+            let mut qs: BTreeMap<String, Quality> = serde_yaml::from_reader(config_file)?;
+            TranscodingConfig {
+                low: qs.remove("low"),
+                medium: qs.remove("medium"),
+                high: qs.remove("high"),
+            }
         }
     };
+
+    let max_transcodings = match args.value_of("max-transcodings") {
+        Some(s) => s.parse()?,
+        None => num_cpus::get(),
+    };
     if max_transcodings < 1 {
-        return Err("At least one concurrent trancoding must be available".into())
+        return Err("At least one concurrent trancoding must be available".into());
     } else if max_transcodings > max_sending_threads {
-        return Err("Number of concurrent transcodings cannot be higher then number of threads".into())
+        return Err(
+            "Number of concurrent transcodings cannot be higher then number of threads".into(),
+        );
     }
 
     let token_validity_hours = args.value_of("token-validity-hours").unwrap().parse()?;
     if token_validity_hours < 1 {
-        return Err("Token must be valid for at least an hour".into())
+        return Err("Token must be valid for at least an hour".into());
     }
     let client_dir: PathBuf = args.value_of("client-dir").unwrap().into();
-    if ! client_dir.exists() {
-        return Err(Error::NonExistentClientDirectory)
+    if !client_dir.exists() {
+        return Err(Error::NonExistentClientDirectory);
     }
 
     let secret_file = match args.value_of("secret-file") {
         Some(s) => s.into(),
         None => match ::std::env::home_dir() {
             Some(home) => home.join(".audioserve.secret"),
-            None => "./.audioserve.secret".into()
-        }
+            None => "./.audioserve.secret".into(),
+        },
     };
 
     let cors = args.is_present("cors");
@@ -270,21 +265,21 @@ let transcoding = match  args.value_of("transcoding-config") {
     let ssl_key_file = match args.value_of("ssl-key") {
         Some(f) => {
             let p: PathBuf = f.into();
-            if ! p.exists() {
-                return Err(Error::NonExistentSSLKeyFile)
+            if !p.exists() {
+                return Err(Error::NonExistentSSLKeyFile);
             }
             Some(p)
-        },
-        None => None
+        }
+        None => None,
     };
 
     let ssl_key_password = args.value_of("ssl-key-password").map(|s| s.into());
 
-    let config = Config{
+    let config = Config {
         base_dirs,
         local_addr,
         max_sending_threads,
-        shared_secret, 
+        shared_secret,
         transcoding,
         max_transcodings,
         token_validity_hours,
@@ -292,21 +287,18 @@ let transcoding = match  args.value_of("transcoding-config") {
         secret_file,
         cors,
         ssl_key_file,
-        ssl_key_password
-
+        ssl_key_password,
     };
     unsafe {
         CONFIG = Some(config);
     }
 
     Ok(())
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     #[test]
     fn test_yaml_serialize() {
@@ -316,11 +308,10 @@ mod tests {
         qualities.insert("high", Quality::default_level(QualityLevel::High));
         let s = serde_yaml::to_string(&qualities).unwrap();
         assert!(s.len() > 20);
-        println!("{}",s);
+        println!("{}", s);
 
         let des: BTreeMap<String, Quality> = serde_yaml::from_str(&s).unwrap();
         assert_eq!(des.get("medium"), qualities.get("medium"));
-
     }
     #[test]
     fn test_yaml_deserialize() {
@@ -328,11 +319,6 @@ mod tests {
         let des: BTreeMap<String, Quality> = serde_yaml::from_reader(f).unwrap();
         assert_eq!(3, des.len());
         assert!(des.get("high").is_some());
-        
-        
     }
-
-
-    
 
 }

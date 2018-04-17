@@ -57,7 +57,7 @@ Transconding is provided in three variants and client can choose between then (u
 * medium - (default 48 kbps opus with 12kHz cutoff)
 * high - (default 64 kbps opus with 20kHz cutoff)
 
-As already noted audioserve is intended primarily for audiobooks and believe me opus codec is excellent there even in low bitrates. However if you want to change parameters of these three trancodings you can easily do so by providing yaml confing file to paramete `--transcoding-config`. Here is sample file:
+As already noted audioserve is intended primarily for audiobooks and believe me opus codec is excellent there even in low bitrates. However if you want to change parameters of these three trancodings you can easily do so by providing yaml confing file to parameter `--transcoding-config`. Here is sample file:
 ```yaml
 low:
   bitrate: 16

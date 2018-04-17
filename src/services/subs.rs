@@ -211,14 +211,16 @@ pub fn send_file(
                 debug!("Sending file transcoded in quality {:?}", transcoding_quality);
                 let counter = transcoding.transcodings;
                 let transcoder = Transcoder::new(get_config().transcoding.get(transcoding_quality.unwrap()));
-                if counter.load(Ordering::SeqCst) > transcoding.max_transcodings {
-                    warn!("Max transcodings reached");
+                let running_transcodings = counter.load(Ordering::SeqCst);
+                if running_transcodings >= transcoding.max_transcodings {
+                    warn!("Max transcodings reached {}", transcoding.max_transcodings);
                     tx.send(short_response(
                         StatusCode::ServiceUnavailable,
                         "Max transcodings reached",
                     )).expect(THREAD_SEND_ERROR)
                 } else {
-                    debug!("Sendig file {:?} transcoded", &full_path);
+                    debug!("Sendig file {:?} transcoded - remaining slots {}", &full_path, 
+                    transcoding.max_transcodings - running_transcodings-1);
                     guarded_spawn(counter, move || {
                         serve_file_transcoded(&full_path, seek, transcoder, tx)
                     });
