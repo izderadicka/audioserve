@@ -219,8 +219,8 @@ pub fn send_file(
                         "Max transcodings reached",
                     )).expect(THREAD_SEND_ERROR)
                 } else {
-                    debug!("Sendig file {:?} transcoded - remaining slots {}", &full_path, 
-                    transcoding.max_transcodings - running_transcodings-1);
+                    debug!("Sendig file {:?} transcoded - remaining slots {}/{}", &full_path, 
+                    transcoding.max_transcodings - running_transcodings-1, transcoding.max_transcodings);
                     guarded_spawn(counter, move || {
                         serve_file_transcoded(&full_path, seek, transcoder, tx)
                     });

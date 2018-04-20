@@ -141,7 +141,7 @@ fn create_parser<'a>() -> Parser<'a> {
             .short("x")
             .long("max-transcodings")
             .takes_value(true)
-            .help("Maximum number of concurrent transcodings [default: number of cores]")
+            .help("Maximum number of concurrent transcodings [default: 2 * number of cores]")
         )
         .arg(Arg::with_name("token-validity-hours")
             .long("token-validity-hours")
@@ -233,7 +233,7 @@ pub fn parse_args() -> Result<(), Error> {
 
     let max_transcodings = match args.value_of("max-transcodings") {
         Some(s) => s.parse()?,
-        None => num_cpus::get(),
+        None => 2 * num_cpus::get(),
     };
     if max_transcodings < 1 {
         return Err("At least one concurrent trancoding must be available".into());
