@@ -8,6 +8,7 @@ before_install:
   - sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev
   - curl https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-64bit-static.tar.xz | tar  xJv --strip-components=1 --wildcards "*/ffmpeg"
   - sudo cp ffmpeg /usr/local/bin
+cache: cargo
 matrix:
   fast_finish: true
   allow_failures:
@@ -16,6 +17,9 @@ matrix:
     - language: node_js
       node_js:
       - "7"
+      cache:
+        directories:
+        - "client/node_modules"
       script:
       - cd client
       - npm install
