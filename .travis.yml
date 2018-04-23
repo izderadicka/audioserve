@@ -5,7 +5,7 @@ rust:
   - nightly
 before_install: 
   - sudo apt-get -qq update
-  - sudo apt-get install -y libtag-dev
+  - sudo apt-get install -y libtag1-dev
 matrix:
   fast_finish: true
   allow_failures:
