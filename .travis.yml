@@ -5,4 +5,4 @@ rust:
   - nightly
 matrix:
   allow_failures:
-- rust: nightly
+  - rust: nightly
