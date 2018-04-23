@@ -12,5 +12,10 @@ matrix:
   fast_finish: true
   allow_failures:
   - rust: nightly
+  include:
+    - language: node_js
+      script:
+      - cd client
+      - npm run build
 
 
