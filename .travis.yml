@@ -3,6 +3,12 @@ rust:
   - stable
   - beta
   - nightly
+before_install: 
+  - sudo apt-get -qq update
+  - sudo apt-get install -y libtag-dev
 matrix:
+  fast_finish: true
   allow_failures:
   - rust: nightly
+
+
