@@ -16,6 +16,7 @@ matrix:
     - language: node_js
       script:
       - cd client
+      - npm install
       - npm run build
 
 
