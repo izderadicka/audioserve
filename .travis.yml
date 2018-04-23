@@ -5,7 +5,7 @@ rust:
   - nightly
 before_install: 
   - sudo apt-get -qq update
-  - sudo apt-get install -y libtag1-dev libtagc0-dev
+  - sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev ffmpeg
 matrix:
   fast_finish: true
   allow_failures:

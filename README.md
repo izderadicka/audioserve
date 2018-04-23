@@ -3,7 +3,7 @@ Audioserve
 
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalistic design.
 
-Server is in Rust,  default client is in Javascript intended for modern browsers (latest Firefox or Chrome) and is integrated with the server. There is also Android client under development. 
+Server is in Rust,  default client is in Javascript intended for modern browsers (latest Firefox or Chrome) and is integrated with the server. There is also Android client. 
 
 For some background and video demo check this article [Audioserve Audiobooks Server - Stupidly Simple or Simply Stupid?](http://zderadicka.eu/audioserve-audiobooks-server-stupidly-simple-or-simply-stupid)
 
@@ -82,12 +82,16 @@ Check with `audioserve -h`. Only two required arguments are shared secrect and r
 
 Android client
 --------------
-Android client is under development, code is [available on github](https://github.com/izderadicka/audioserve-android)
-Client is in an early stage, but is becomming usable (I'm using it now to listen to my audiobooks).
+Android client code is [available on github](https://github.com/izderadicka/audioserve-android)
+Client is in early beta stage (I'm using it now to listen to my audiobooks).
 
 
-Installation
+Installation (Linux)
 ------------
+
+Install required dependencies:
+    # Ubuntu - for other distros look for equivalent packages
+    sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev ffmpeg
 
 Clone repo with: 
 
@@ -104,6 +108,9 @@ But easiest way how to test audioserve is to run it as docker container with pro
     docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  audioserve  
 
 Then open https://localhost:3000 and accept insecure connection, shared secret to enter in client is mypass
+
+Other platforms - theoretically audioserve can work on Windows and MacOS (probably with few changes), 
+but I never tried to build it there. Any help in this area is welcomed.
 
 
 License
