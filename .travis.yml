@@ -15,8 +15,7 @@ matrix:
   include:
     - language: node_js
       node_js:
-      - "iojs"
-      - "6"
+      - "7"
       script:
       - cd client
       - npm install
