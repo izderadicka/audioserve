@@ -91,6 +91,7 @@ Installation (Linux)
 ------------
 
 Install required dependencies:
+
     # Ubuntu - for other distros look for equivalent packages
     sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev ffmpeg
 

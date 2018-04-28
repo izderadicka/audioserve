@@ -1,7 +1,8 @@
 FROM ubuntu:16.04
 MAINTAINER Ivan <ivan@zderadicka.eu>
 
-RUN apt-get update &&\
+RUN apt -o Acquire::https::No-Cache=True -o Acquire::http::No-Cache=True update &&\
+    apt-get update &&\
     apt-get install -y pkg-config openssl libssl-dev libtag1-dev libtagc0-dev curl ffmpeg &&\
     curl -sL https://deb.nodesource.com/setup_8.x | bash - &&\
     apt-get install -y nodejs &&\
