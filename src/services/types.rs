@@ -45,16 +45,18 @@ pub struct Collections {
 }
 
 #[derive(Debug, Serialize)]
-pub struct Transcondigs {
+pub struct Transcodings {
+    pub max_transcodings: usize,
     pub low: Quality,
     pub medium: Quality,
     pub high: Quality
 }
 
-impl Transcondigs {
+impl Transcodings {
     pub fn new() -> Self {
         let cfg = get_config();
-        Transcondigs {
+        Transcodings {
+            max_transcodings: cfg.max_transcodings,
             low: cfg.transcoding.get(QualityLevel::Low),
             medium: cfg.transcoding.get(QualityLevel::Medium),
             high: cfg.transcoding.get(QualityLevel::High)

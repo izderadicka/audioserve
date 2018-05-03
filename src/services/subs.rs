@@ -401,7 +401,7 @@ pub fn collections_list() -> ResponseFuture {
 }
 
 pub fn transcodings_list() -> ResponseFuture {
-    let transcodings = Transcondigs::new();
+    let transcodings = Transcodings::new();
     Box::new(future::ok(json_response(&transcodings)))
 }
 
