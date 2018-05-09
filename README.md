@@ -4,7 +4,7 @@ Audioserve
 
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalistic design.
 
-Server is in Rust,  default client is in Javascript intended for modern browsers (latest Firefox or Chrome) and is integrated with the server. There is also Android client. 
+Server is in Rust,  default client is in Javascript intended for modern browsers (latest Firefox or Chrome) and is integrated with the server. There is also [Android client](https://github.com/izderadicka/audioserve-android) and API for custom clients. 
 
 For some background and video demo check this article [Audioserve Audiobooks Server - Stupidly Simple or Simply Stupid?](http://zderadicka.eu/audioserve-audiobooks-server-stupidly-simple-or-simply-stupid)
 
@@ -85,6 +85,11 @@ Android client
 --------------
 Android client code is [available on github](https://github.com/izderadicka/audioserve-android)
 Client is in early beta stage (I'm using it now to listen to my audiobooks).
+
+API
+---
+audioserve server provides very simple API (see [api.md](./docs/api.md) for documentation), so it's easy to write 
+your own clients.
 
 
 Installation (Linux)
