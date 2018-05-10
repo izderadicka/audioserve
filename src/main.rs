@@ -139,7 +139,7 @@ fn main() {
         }
         Ok(c) => c,
     };
-    pretty_env_logger::init().unwrap();
+    pretty_env_logger::init();
     debug!("Started with following config {:?}", get_config());
     let my_secret = match gen_my_secret(&get_config().secret_file) {
         Ok(s) => s,
