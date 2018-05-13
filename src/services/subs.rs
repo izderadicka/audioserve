@@ -20,6 +20,7 @@ use mime;
 use serde_json;
 use taglib;
 use config::get_config;
+use simple_thread_pool::Pool;
 
 const BUF_SIZE: usize = 8 * 1024;
 pub const NOT_FOUND_MESSAGE: &str = "Not Found";
@@ -171,14 +172,26 @@ fn serve_file_from_fs(
     }
 }
 
+macro_rules! spawn_in_pool {
+    ($pool:ident, $f:expr) => {
+        if let Err(_) = $pool.spawn($f) {
+        return short_response_boxed(
+                        StatusCode::ServiceUnavailable,
+                        super::OVERLOADED_MESSAGE,
+                    );
+        }
+       
+    }
+}
+
 pub fn send_file_simple(
     base_path: &'static Path,
     file_path: PathBuf,
     cache: Option<u32>,
-    counter: Counter,
+    mut pool: Pool,
 ) -> ResponseFuture {
     let (tx, rx) = oneshot::channel();
-    guarded_spawn(counter, move || {
+    spawn_in_pool!(pool,  move || {
         let full_path = base_path.join(&file_path);
         if full_path.exists() {
             serve_file_from_fs(&full_path, None, cache, tx);
@@ -189,6 +202,7 @@ pub fn send_file_simple(
         }
     });
     box_rx(rx)
+    
 }
 
 pub fn send_file(
@@ -196,12 +210,12 @@ pub fn send_file(
     file_path: PathBuf,
     range: Option<hyper::header::ByteRangeSpec>,
     seek: Option<f32>,
-    counter: Counter,
+    mut pool: Pool,
     transcoding: super::TranscodingDetails,
     transcoding_quality: Option<QualityLevel>
 ) -> ResponseFuture {
     let (tx, rx) = oneshot::channel();
-    guarded_spawn(counter, move || {
+    spawn_in_pool!(pool, move || {
         let full_path = base_path.join(&file_path);
         if full_path.exists() {
             
@@ -245,10 +259,10 @@ fn box_rx(rx: ::futures::sync::oneshot::Receiver<Response>) -> ResponseFuture {
 pub fn get_folder(
     base_path: &'static Path,
     folder_path: PathBuf,
-    counter: Counter,
+    mut pool: Pool,
 ) -> ResponseFuture {
     let (tx, rx) = oneshot::channel();
-    guarded_spawn(counter, move || {
+    spawn_in_pool!(pool, move || {
         match list_dir(&base_path, &folder_path) {
             Ok(folder) => {
                 tx.send(json_response(&folder)).expect(THREAD_SEND_ERROR);
@@ -409,10 +423,10 @@ pub fn search(
     base_dir: &'static Path,
     searcher: Search,
     query: String,
-    counter: Counter,
+    mut pool: Pool,
 ) -> ResponseFuture {
     let (tx, rx) = oneshot::channel();
-    guarded_spawn(counter, move || {
+    spawn_in_pool!(pool, move || {
         let res = searcher.search(base_dir, query);
         tx.send(json_response(&res)).expect(THREAD_SEND_ERROR);
     });

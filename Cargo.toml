@@ -34,3 +34,6 @@ tokio-service = "0.1"
 [dependencies.taglib]
 git = "https://github.com/ebassi/taglib-rust"
 
+[dependencies.simple-thread-pool]
+git = "https://github.com/izderadicka/simple-thread-pool.git"
+

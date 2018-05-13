@@ -30,6 +30,7 @@ extern crate native_tls;
 extern crate tokio_proto;
 extern crate tokio_service;
 extern crate tokio_tls;
+extern crate simple_thread_pool;
 
 
 use hyper::server::Http as HttpServer;
@@ -95,7 +96,9 @@ fn gen_my_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error> {
 
 fn start_server(my_secret: Vec<u8>, private_key: Option<Pkcs12>) -> Result<(), Box<std::error::Error>> {
     let svc = FileSendService {
-        sending_threads: Arc::new(AtomicUsize::new(0)),
+        pool: simple_thread_pool::Builder::new()
+                .set_max_queue(100)
+                .build(),
         authenticator:  get_config().shared_secret.as_ref().map( |secret| -> 
             Arc<Box<services::auth::Authenticator<Credentials=()>>> {
             Arc::new(Box::new(SharedSecretAuthenticator::new(
@@ -122,10 +125,10 @@ fn start_server(my_secret: Vec<u8>, private_key: Option<Pkcs12>) -> Result<(), B
             let tls_cx = TlsAcceptor::builder(pk)?.build()?;
             let proto = proto::Server::new(HttpServer::new(), tls_cx);
 
-        let addr = get_config().local_addr;
-        let srv = TcpServer::new(proto, addr);
-        println!("TLS Listening on {}", addr);
-        srv.serve( move || Ok(svc.clone()));
+            let addr = get_config().local_addr;
+            let srv = TcpServer::new(proto, addr);
+            println!("TLS Listening on {}", addr);
+            srv.serve( move || Ok(svc.clone()));
         }
     }
     Ok(())
