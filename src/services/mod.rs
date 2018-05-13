@@ -74,7 +74,7 @@ impl Service for FileSendService {
     type Future = ResponseFuture;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-        if self.sending_threads.load(Ordering::SeqCst) > get_config().max_transcodings {
+        if self.sending_threads.load(Ordering::SeqCst) > get_config().max_sending_threads {
                     warn!("Server is busy, refusing request");
                     return short_response_boxed(
                         StatusCode::ServiceUnavailable,
