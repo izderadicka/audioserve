@@ -95,22 +95,25 @@ fn gen_my_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error> {
 }
 
 fn start_server(my_secret: Vec<u8>, private_key: Option<Pkcs12>) -> Result<(), Box<std::error::Error>> {
+    let cfg = get_config();
     let svc = FileSendService {
         pool: simple_thread_pool::Builder::new()
-                .set_max_queue(100)
+                .set_max_queue(cfg.pool_size.queue_size)
+                .set_min_threads(cfg.pool_size.min_threads)
+                .set_max_threads(cfg.pool_size.max_threads)
                 .build(),
         authenticator:  get_config().shared_secret.as_ref().map( |secret| -> 
             Arc<Box<services::auth::Authenticator<Credentials=()>>> {
             Arc::new(Box::new(SharedSecretAuthenticator::new(
             secret.clone(),
             my_secret,
-            get_config().token_validity_hours,
+            cfg.token_validity_hours,
             )))
         }),
         search: Search::FoldersSearch,
         transcoding: TranscodingDetails {
             transcodings: Arc::new(AtomicUsize::new(0)),
-            max_transcodings: get_config().max_transcodings,
+            max_transcodings: cfg.max_transcodings,
         },
     };
 
@@ -125,7 +128,7 @@ fn start_server(my_secret: Vec<u8>, private_key: Option<Pkcs12>) -> Result<(), B
             let tls_cx = TlsAcceptor::builder(pk)?.build()?;
             let proto = proto::Server::new(HttpServer::new(), tls_cx);
 
-            let addr = get_config().local_addr;
+            let addr = cfg.local_addr;
             let srv = TcpServer::new(proto, addr);
             println!("TLS Listening on {}", addr);
             srv.serve( move || Ok(svc.clone()));

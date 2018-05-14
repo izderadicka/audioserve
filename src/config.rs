@@ -71,10 +71,18 @@ impl TranscodingConfig {
     }
 }
 
+
+#[derive(Clone, Debug)]
+pub struct ThreadPoolSize {
+    pub min_threads: usize,
+    pub max_threads: usize,
+    pub queue_size: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub local_addr: SocketAddr,
-    pub max_sending_threads: usize,
+    pub pool_size: ThreadPoolSize,
     pub base_dirs: Vec<PathBuf>,
     pub shared_secret: Option<String>,
     pub transcoding: TranscodingConfig,
@@ -104,12 +112,10 @@ fn create_parser<'a>() -> Parser<'a> {
             .takes_value(true)
             .default_value("0.0.0.0:3000")
         )
-        .arg(Arg::with_name("max-threads")
-            .short("m")
-            .long("max-threads")
-            .takes_value(true)
-            .help("Maximum number of threads for requests processing")
-            .default_value("100")
+        .arg(Arg::with_name("large-thread-pool")
+            .long("large-thread-pool")
+            .help("Use larger thread pool (usually will not be needed)")
+            
         )
         .arg(Arg::with_name("base_dir")
             .value_name("BASE_DIR")
@@ -200,13 +206,20 @@ pub fn parse_args() -> Result<(), Error> {
     }
 
     let local_addr = args.value_of("local_addr").unwrap().parse()?;
-    let max_sending_threads = args.value_of("max-threads").unwrap().parse()?;
-    if max_sending_threads < 10 {
-        return Err("Too few threads - should be above 10".into());
-    }
-    if max_sending_threads > 10000 {
-        return Err("Too much threads - should be below 10000".into());
-    }
+
+    let pool_size = if args.is_present("large-thread-pool") {
+        ThreadPoolSize {
+            min_threads: 4,
+            max_threads: 8,
+            queue_size: 100
+        }
+    } else {
+        ThreadPoolSize {
+            min_threads: 8,
+            max_threads: 32,
+            queue_size: 1000
+        }
+    };
 
     let shared_secret = if args.is_present("no-authentication") {
         None
@@ -237,9 +250,9 @@ pub fn parse_args() -> Result<(), Error> {
     };
     if max_transcodings < 1 {
         return Err("At least one concurrent trancoding must be available".into());
-    } else if max_transcodings > max_sending_threads {
+    } else if max_transcodings > 100 {
         return Err(
-            "Number of concurrent transcodings cannot be higher then number of threads".into(),
+            "As transcodings are resource intesive, having more then 100 is not wise".into(),
         );
     }
 
@@ -278,7 +291,7 @@ pub fn parse_args() -> Result<(), Error> {
     let config = Config {
         base_dirs,
         local_addr,
-        max_sending_threads,
+        pool_size,
         shared_secret,
         transcoding,
         max_transcodings,
