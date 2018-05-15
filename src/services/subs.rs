@@ -173,13 +173,15 @@ fn serve_file_from_fs(
 }
 
 macro_rules! spawn_in_pool {
-    ($pool:ident, $f:expr) => {
+    ($pool:ident, $tx: ident, $rx: ident, $f:expr) => {
+        let ($tx, $rx) = oneshot::channel();
         if let Err(_) = $pool.spawn($f) {
         return short_response_boxed(
                         StatusCode::ServiceUnavailable,
                         super::OVERLOADED_MESSAGE,
                     );
         }
+        return box_rx($rx);
        
     }
 }
@@ -190,8 +192,7 @@ pub fn send_file_simple(
     cache: Option<u32>,
     mut pool: Pool,
 ) -> ResponseFuture {
-    let (tx, rx) = oneshot::channel();
-    spawn_in_pool!(pool,  move || {
+    spawn_in_pool!(pool, tx, rx, move || {
         let full_path = base_path.join(&file_path);
         if full_path.exists() {
             serve_file_from_fs(&full_path, None, cache, tx);
@@ -201,8 +202,6 @@ pub fn send_file_simple(
                 .expect(THREAD_SEND_ERROR);
         }
     });
-    box_rx(rx)
-    
 }
 
 pub fn send_file(
@@ -214,8 +213,7 @@ pub fn send_file(
     transcoding: super::TranscodingDetails,
     transcoding_quality: Option<QualityLevel>
 ) -> ResponseFuture {
-    let (tx, rx) = oneshot::channel();
-    spawn_in_pool!(pool, move || {
+    spawn_in_pool!(pool, tx, rx, move || {
         let full_path = base_path.join(&file_path);
         if full_path.exists() {
             
@@ -249,7 +247,6 @@ pub fn send_file(
                 .expect(THREAD_SEND_ERROR);
         }
     });
-    box_rx(rx)
 }
 
 fn box_rx(rx: ::futures::sync::oneshot::Receiver<Response>) -> ResponseFuture {
@@ -261,8 +258,7 @@ pub fn get_folder(
     folder_path: PathBuf,
     mut pool: Pool,
 ) -> ResponseFuture {
-    let (tx, rx) = oneshot::channel();
-    spawn_in_pool!(pool, move || {
+    spawn_in_pool!(pool, tx, rx, move || {
         match list_dir(&base_path, &folder_path) {
             Ok(folder) => {
                 tx.send(json_response(&folder)).expect(THREAD_SEND_ERROR);
@@ -273,7 +269,6 @@ pub fn get_folder(
             }
         }
     });
-    box_rx(rx)
 }
 
 fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
@@ -425,12 +420,12 @@ pub fn search(
     query: String,
     mut pool: Pool,
 ) -> ResponseFuture {
-    let (tx, rx) = oneshot::channel();
-    spawn_in_pool!(pool, move || {
+    
+    spawn_in_pool!(pool, tx, rx, move || {
         let res = searcher.search(base_dir, query);
         tx.send(json_response(&res)).expect(THREAD_SEND_ERROR);
     });
-    box_rx(rx)
+    
 }
 
 #[cfg(test)]
