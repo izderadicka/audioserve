@@ -2,7 +2,7 @@ use hyper::server::{Request, Response, Service};
 use hyper::{Method, StatusCode};
 use hyper::header::{Range,AccessControlAllowOrigin, AccessControlAllowCredentials, 
 Origin};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize};
 use std::sync::Arc;
 use self::subs::{send_file, send_file_simple, short_response_boxed, search,ResponseFuture, 
     NOT_FOUND_MESSAGE, get_folder, collections_list, transcodings_list};
@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use config::get_config;
 use regex::Regex;
 use self::transcode::QualityLevel;
+use simple_thread_pool::Pool;
 
 mod subs;
 mod types;
@@ -46,7 +47,7 @@ pub struct TranscodingDetails {
 pub struct FileSendService {
    pub authenticator: Option<Arc<Box<Authenticator<Credentials=()>>>>,
    pub  search: Search,
-   pub  sending_threads: Counter,
+   pub  pool: Pool,
    pub  transcoding: TranscodingDetails,
 }
 
@@ -74,7 +75,7 @@ impl Service for FileSendService {
     type Future = ResponseFuture;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-        if self.sending_threads.load(Ordering::SeqCst) > get_config().max_sending_threads {
+        if self.pool.queue_size() > get_config().pool_size.queue_size {
                     warn!("Server is busy, refusing request");
                     return short_response_boxed(
                         StatusCode::ServiceUnavailable,
@@ -86,16 +87,16 @@ impl Service for FileSendService {
             return send_file_simple(&get_config().client_dir, 
             "index.html".into(), 
             Some(APP_STATIC_FILES_CACHE_AGE),
-            self.sending_threads.clone());
+            self.pool.clone());
         };
         if req.path() =="/bundle.js" {
             return send_file_simple(&get_config().client_dir, 
             "bundle.js".into(), 
             Some(APP_STATIC_FILES_CACHE_AGE),
-            self.sending_threads.clone());
+            self.pool.clone());
         }
         // from here everything must be authenticated
-        let sending_threads =  self.sending_threads.clone();
+        let pool =  self.pool.clone();
         let searcher = self.search.clone();
         let transcoding = self.transcoding.clone();
         let cors = get_config().cors;
@@ -110,12 +111,12 @@ impl Service for FileSendService {
         Box::new(auth.authenticate(req).and_then(move |result| {
             match result {
                 Ok((req,_creds)) => 
-                    FileSendService::process_checked(req, sending_threads, searcher, transcoding),
+                    FileSendService::process_checked(req, pool, searcher, transcoding),
                 Err(resp) => Box::new(future::ok(resp))
             }
         }
         )),
-        None => FileSendService::process_checked(req, sending_threads, searcher, transcoding)
+        None => FileSendService::process_checked(req, pool, searcher, transcoding)
 
         };
         Box::new(resp.map(move |r| add_cors_headers(r, origin, cors)))
@@ -124,8 +125,8 @@ impl Service for FileSendService {
 
 impl FileSendService {
     fn process_checked(req: Request, 
-        sending_threads: 
-        Counter, searcher: Search,
+        pool: Pool, 
+        searcher: Search,
         transcoding: TranscodingDetails
         ) -> ResponseFuture {
         
@@ -189,30 +190,30 @@ impl FileSendService {
                     get_subpath(&path, "/audio/"), 
                     bytes_range, 
                     seek,
-                    sending_threads,
+                    pool,
                     transcoding,
                     transcoding_quality
                     )
                 } else if path.starts_with("/folder/") {
                     get_folder(base_dir, 
                     get_subpath(&path, "/folder/"),  
-                    sending_threads) 
+                    pool) 
                 } else if path == "/search" {
                     if let Some(search_string) = params.and_then(|mut p| p.remove("q")){
-                        return search(base_dir, searcher, search_string.into_owned(), sending_threads);
+                        return search(base_dir, searcher, search_string.into_owned(), pool);
                     }
                     short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE)
                 } else if path.starts_with("/cover/") {
                     send_file_simple(base_dir, 
                     get_subpath(&path, "/cover"), 
                     Some(FOLDER_INFO_FILES_CACHE_AGE),
-                    sending_threads)
+                    pool)
 
                 } else if path.starts_with("/desc/") {
                     send_file_simple(base_dir, 
                     get_subpath(&path, "/desc"), 
                     Some(FOLDER_INFO_FILES_CACHE_AGE),
-                    sending_threads)
+                    pool)
                 } else {
                     short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE)
                 }

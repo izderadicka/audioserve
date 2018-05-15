@@ -30,6 +30,7 @@ extern crate native_tls;
 extern crate tokio_proto;
 extern crate tokio_service;
 extern crate tokio_tls;
+extern crate simple_thread_pool;
 
 
 use hyper::server::Http as HttpServer;
@@ -94,20 +95,25 @@ fn gen_my_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error> {
 }
 
 fn start_server(my_secret: Vec<u8>, private_key: Option<Pkcs12>) -> Result<(), Box<std::error::Error>> {
+    let cfg = get_config();
     let svc = FileSendService {
-        sending_threads: Arc::new(AtomicUsize::new(0)),
+        pool: simple_thread_pool::Builder::new()
+                .set_max_queue(cfg.pool_size.queue_size)
+                .set_min_threads(cfg.pool_size.min_threads)
+                .set_max_threads(cfg.pool_size.max_threads)
+                .build(),
         authenticator:  get_config().shared_secret.as_ref().map( |secret| -> 
             Arc<Box<services::auth::Authenticator<Credentials=()>>> {
             Arc::new(Box::new(SharedSecretAuthenticator::new(
             secret.clone(),
             my_secret,
-            get_config().token_validity_hours,
+            cfg.token_validity_hours,
             )))
         }),
         search: Search::FoldersSearch,
         transcoding: TranscodingDetails {
             transcodings: Arc::new(AtomicUsize::new(0)),
-            max_transcodings: get_config().max_transcodings,
+            max_transcodings: cfg.max_transcodings,
         },
     };
 
@@ -122,10 +128,10 @@ fn start_server(my_secret: Vec<u8>, private_key: Option<Pkcs12>) -> Result<(), B
             let tls_cx = TlsAcceptor::builder(pk)?.build()?;
             let proto = proto::Server::new(HttpServer::new(), tls_cx);
 
-        let addr = get_config().local_addr;
-        let srv = TcpServer::new(proto, addr);
-        println!("TLS Listening on {}", addr);
-        srv.serve( move || Ok(svc.clone()));
+            let addr = cfg.local_addr;
+            let srv = TcpServer::new(proto, addr);
+            println!("TLS Listening on {}", addr);
+            srv.serve( move || Ok(svc.clone()));
         }
     }
     Ok(())
@@ -139,7 +145,7 @@ fn main() {
         }
         Ok(c) => c,
     };
-    pretty_env_logger::init().unwrap();
+    pretty_env_logger::init();
     debug!("Started with following config {:?}", get_config());
     let my_secret = match gen_my_secret(&get_config().secret_file) {
         Ok(s) => s,

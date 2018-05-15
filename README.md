@@ -48,6 +48,16 @@ Audioserve supports TLS/SSL - to enable it you need to provide your private serv
     rm key.pem certificate.pem
 
 
+Performance
+-----------
+
+Audioserve is inteded to serve personal audio collections of moderate sizes. For sake of simplicity it does not provide any large scale perfomance optimalizations.  It's fine to serve couple of users from collection of couple of thousands audiobooks, if they are reasonably organized. That's it, if you're looking for solution for thousands or millions of users, look elsewere. To compensate for this audioserve is very lightweight and by itself takes minimum of system resources.
+
+Browsing of collections is limited by speed of the file system. As directory listing needs to read audio files metadata (duration and bitrate), folders with too many files (> 200) will be slow. Search is done by walking through collection, it can be slow - especially the first search (subsequent searches are much, much faster, as directory structure from previous search is cached by OS for some time).
+
+But true limiting factor is transcoding - as it's quite CPU intensive. Normally you should run only a handful of transcodings in parallel, not much then 2x - 4x more then there is the number of cores in the machine. 
+
+
 Transcoding
 -----------
 
