@@ -35,7 +35,8 @@ Security
 Audioserve is not writing anything to your media library, so read only access is OK.  The only one file where it needs to write is a file were it keeps its secret key for authentication (by default in `~/.audioserve.secret`, but it can be specified by command line argument).
 
 Authentication is done by shared secret phrase (supplied to server on command line), which client must know.  Secret phrase is never sent in plain (it's sent as salted hash). If correct shared secret hash is provided sever generates a token, using its secret key.  Token then can be used in cookie or HTTP Authorization header (Bearer method). 
-Token validity period is one year by default, but can be set as command line argument.
+Token validity period is one year by default, but can be set as command line argument, but system 
+generaly expects token validity to be at least 10 days.
 As the token can be used to steal the session https is recomended (TLS support is build in).
 
 ### TLS/SSL

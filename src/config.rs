@@ -149,11 +149,11 @@ fn create_parser<'a>() -> Parser<'a> {
             .takes_value(true)
             .help("Maximum number of concurrent transcodings [default: 2 * number of cores]")
         )
-        .arg(Arg::with_name("token-validity-hours")
-            .long("token-validity-hours")
+        .arg(Arg::with_name("token-validity-days")
+            .long("token-validity-days")
             .takes_value(true)
-            .help("Validity of authentication token issued by this server in hours")
-            .default_value("8760")
+            .help("Validity of authentication token issued by this server in days[default 365, min 10]")
+            .default_value("365")
         )
         .arg(Arg::with_name("client-dir")
             .short("c")
@@ -256,9 +256,9 @@ pub fn parse_args() -> Result<(), Error> {
         );
     }
 
-    let token_validity_hours = args.value_of("token-validity-hours").unwrap().parse()?;
-    if token_validity_hours < 1 {
-        return Err("Token must be valid for at least an hour".into());
+    let token_validity_days: u64 = args.value_of("token-validity-days").unwrap().parse()?;
+    if token_validity_days < 10 {
+        return Err("Token must be valid for at least 10 days".into());
     }
     let client_dir: PathBuf = args.value_of("client-dir").unwrap().into();
     if !client_dir.exists() {
@@ -295,7 +295,7 @@ pub fn parse_args() -> Result<(), Error> {
         shared_secret,
         transcoding,
         max_transcodings,
-        token_validity_hours,
+        token_validity_hours: token_validity_days*24,
         client_dir,
         secret_file,
         cors,
