@@ -4,10 +4,9 @@ rust:
   - beta
   - nightly
 before_install: 
+  - sudo add-apt-repository -y ppa:mc3man/trusty-media
   - sudo apt-get -qq update
-  - sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev
-  - curl https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-64bit-static.tar.xz | tar  xJv --strip-components=1 --wildcards "*/ffmpeg"
-  - sudo cp ffmpeg /usr/local/bin
+  - sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev ffmpeg
 cache: cargo
 matrix:
   fast_finish: true
