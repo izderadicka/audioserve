@@ -2,7 +2,6 @@
 extern crate clap;
 extern crate data_encoding;
 extern crate futures;
-extern crate futures_cpupool;
 #[macro_use]
 extern crate hyper;
 #[macro_use]
@@ -25,12 +24,15 @@ extern crate url;
 extern crate regex;
 #[macro_use]
 extern crate lazy_static;
-// for TLS
-extern crate native_tls;
-extern crate tokio_proto;
-extern crate tokio_service;
-extern crate tokio_tls;
 extern crate simple_thread_pool;
+// for TLS
+#[cfg(feature="tls")]
+extern crate native_tls;
+#[cfg(feature="tls")]
+extern crate tokio_proto;
+#[cfg(feature="tls")]
+extern crate tokio_tls;
+
 
 
 use hyper::server::Http as HttpServer;
@@ -46,28 +48,28 @@ use std::path::Path;
 use std::fs::File;
 use std::process;
 
+#[cfg(feature="tls")]
 use native_tls::{Pkcs12, TlsAcceptor};
+#[cfg(feature="tls")]
 use self::tokio_proto::TcpServer;
+#[cfg(feature="tls")]
 use tokio_tls::proto;
 
 mod services;
 mod config;
 
-
-fn load_private_key<P>(file: Option<P>, pass: Option<&String>) -> Result<Option<Pkcs12>, io::Error> 
+#[cfg(feature="tls")]
+fn load_private_key<P>(file: P, pass: Option<&String>) -> Result<Pkcs12, io::Error> 
 where P:AsRef<Path>
 {
-    match file {
-        Some(fname) => {
-            let mut bytes = vec![];
-            let mut f = File::open(fname)?;
-            f.read_to_end(&mut bytes)?;
-            let key = Pkcs12::from_der(&bytes, pass.unwrap_or(&String::new())).map_err(|e| 
-            io::Error::new(io::ErrorKind::Other, e))?;
-            Ok(Some(key))
-        },
-        None => Ok(None)
-    }
+    
+    let mut bytes = vec![];
+    let mut f = File::open(file)?;
+    f.read_to_end(&mut bytes)?;
+    let key = Pkcs12::from_der(&bytes, pass.unwrap_or(&String::new())).map_err(|e| 
+    io::Error::new(io::ErrorKind::Other, e))?;
+    Ok(key)
+
     
 }
 
@@ -94,7 +96,7 @@ fn gen_my_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error> {
     }
 }
 
-fn start_server(my_secret: Vec<u8>, private_key: Option<Pkcs12>) -> Result<(), Box<std::error::Error>> {
+fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
     let cfg = get_config();
     let svc = FileSendService {
         pool: simple_thread_pool::Builder::new()
@@ -117,21 +119,35 @@ fn start_server(my_secret: Vec<u8>, private_key: Option<Pkcs12>) -> Result<(), B
         },
     };
 
-    match private_key {
+    match get_config().ssl_key_file.as_ref() {
         None => {
             let server = HttpServer::new().bind(&get_config().local_addr, move || Ok(svc.clone()))?;
             //server.no_proto();
             info!("Server listening on {}", server.local_addr().unwrap());
             server.run()?;
         },
-        Some(pk) => {
-            let tls_cx = TlsAcceptor::builder(pk)?.build()?;
+        Some(file) => {
+
+            #[cfg(feature="tls")] {
+            let private_key = match load_private_key(file, get_config().ssl_key_password.as_ref()) {
+                Ok(s) => s,
+                Err(e) => {
+                    error!("Error loading SSL/TLS private key: {}", e);
+                    return Err(Box::new(e))
+                }
+            };
+            let tls_cx = TlsAcceptor::builder(private_key)?.build()?;
             let proto = proto::Server::new(HttpServer::new(), tls_cx);
 
             let addr = cfg.local_addr;
             let srv = TcpServer::new(proto, addr);
             println!("TLS Listening on {}", addr);
             srv.serve( move || Ok(svc.clone()));
+            }
+
+            #[cfg(not(feature="tls"))] {
+                panic!("TLS is not compiled - build with default features {:?}", file)
+            }
         }
     }
     Ok(())
@@ -155,16 +171,7 @@ fn main() {
         }
     };
 
-
-    let private_key = match load_private_key(get_config().ssl_key_file.as_ref(), get_config().ssl_key_password.as_ref()) {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Error loading SSL/TLS private key: {}", e);
-            process::exit(3)
-        }
-    };
-
-    match start_server(my_secret, private_key) {
+    match start_server(my_secret) {
         Ok(_) => (),
         Err(e) => {
             error!("Error starting server: {}", e);

@@ -48,6 +48,8 @@ Audioserve supports TLS/SSL - to enable it you need to provide your private serv
     openssl pkcs12 -inkey key.pem -in certificate.pem -export  -passout pass:mypass -out audioserve.p12
     rm key.pem certificate.pem
 
+You can also run behind reverse proxy like nginx or ha-proxy and perminate SSL there (in that case you can compile audioserve without TLS support see below)
+
 
 Performance
 -----------
@@ -99,8 +101,8 @@ Client is in early beta stage (I'm using it now to listen to my audiobooks).
 
 API
 ---
-audioserve server provides very simple API (see [api.md](./docs/api.md) for documentation), so it's easy to write 
-your own clients.
+audioserve server provides very simple API (see [api.md](./docs/api.md) for documentation), 
+so it's easy to write your own clients.
 
 
 Installation (Linux)
@@ -129,6 +131,9 @@ Then open https://localhost:3000 and accept insecure connection, shared secret t
 
 Other platforms - theoretically audioserve can work on Windows and MacOS (probably with few changes), 
 but I never tried to build it there. Any help in this area is welcomed.
+
+### Compiling without default features
+TLS support is default features, but you can compile without it - just add `--no-default-features` option to cargo.
 
 
 License

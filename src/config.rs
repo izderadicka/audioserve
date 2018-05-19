@@ -97,7 +97,7 @@ pub struct Config {
 type Parser<'a> = App<'a, 'a>;
 
 fn create_parser<'a>() -> Parser<'a> {
-    App::new(crate_name!())
+    let mut parser = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
         .arg(Arg::with_name("debug")
@@ -170,18 +170,23 @@ fn create_parser<'a>() -> Parser<'a> {
         .arg(Arg::with_name("cors")
             .long("cors")
             .help("Enable CORS - enables any origin of requests")
-        )
-        .arg(Arg::with_name("ssl-key")
+        );
+
+        if cfg!(feature="tls") {
+            parser = parser.arg(Arg::with_name("ssl-key")
             .long("ssl-key")
             .takes_value(true)
             .help("TLS/SSL private key and certificate in form of PKCS#12 key file, if provided, https is used")
-        )
-        .arg(Arg::with_name("ssl-key-password")
-            .long("ssl-key-password")
-            .takes_value(true)
-            .requires("ssl-key")
-            .help("Password for TLS/SSL private key")
-        )
+            )
+            .arg(Arg::with_name("ssl-key-password")
+                .long("ssl-key-password")
+                .takes_value(true)
+                .requires("ssl-key")
+                .help("Password for TLS/SSL private key")
+            );
+        }
+
+        parser
 }
 
 pub fn parse_args() -> Result<(), Error> {
@@ -275,18 +280,27 @@ pub fn parse_args() -> Result<(), Error> {
 
     let cors = args.is_present("cors");
 
-    let ssl_key_file = match args.value_of("ssl-key") {
-        Some(f) => {
-            let p: PathBuf = f.into();
-            if !p.exists() {
-                return Err(Error::NonExistentSSLKeyFile);
-            }
-            Some(p)
-        }
-        None => None,
-    };
+    let ssl_key_file;
+    let ssl_key_password;
 
-    let ssl_key_password = args.value_of("ssl-key-password").map(|s| s.into());
+    if cfg!(feature="tls") {
+
+        ssl_key_file = match args.value_of("ssl-key") {
+            Some(f) => {
+                let p: PathBuf = f.into();
+                if !p.exists() {
+                    return Err(Error::NonExistentSSLKeyFile);
+                }
+                Some(p)
+            }
+            None => None,
+        };
+
+        ssl_key_password = args.value_of("ssl-key-password").map(|s| s.into());
+    } else {
+        ssl_key_file = None;
+        ssl_key_password = None;
+    }
 
     let config = Config {
         base_dirs,
