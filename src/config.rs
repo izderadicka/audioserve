@@ -214,16 +214,17 @@ pub fn parse_args() -> Result<(), Error> {
 
     let pool_size = if args.is_present("large-thread-pool") {
         ThreadPoolSize {
-            min_threads: 4,
-            max_threads: 8,
-            queue_size: 100
-        }
-    } else {
-        ThreadPoolSize {
             min_threads: 8,
             max_threads: 32,
             queue_size: 1000
         }
+        
+    } else {
+        ThreadPoolSize {
+            min_threads: 4,
+            max_threads: 8,
+            queue_size: 100
+        } 
     };
 
     let shared_secret = if args.is_present("no-authentication") {
