@@ -1,26 +1,28 @@
-use hyper;
+use super::search::{Search, SearchTrait};
+use super::transcode::{QualityLevel, Transcoder};
+use super::types::*;
+use super::Counter;
+use config::get_config;
 use futures::future::{self, Future};
-use hyper::server::Response;
-use hyper::{Chunk, StatusCode};
-use hyper::header::{AcceptRanges, ContentLength, ContentRange, ContentRangeSpec, ContentType,
-                    RangeUnit, CacheControl, CacheDirective, LastModified};
 use futures::sync::{mpsc, oneshot};
 use futures::Sink;
-use std::io::{self, Read, Seek, SeekFrom};
-use std::fs::{self, File};
-use std::thread;
-use std::sync::atomic::Ordering;
-use super::Counter;
-use super::types::*;
-use super::search::{Search, SearchTrait};
-use super::transcode::{Transcoder, QualityLevel};
-use std::path::{Path, PathBuf};
-use mime_guess::guess_mime_type;
+use hyper;
+use hyper::header::{
+    AcceptRanges, CacheControl, CacheDirective, ContentLength, ContentRange, ContentRangeSpec,
+    ContentType, LastModified, RangeUnit,
+};
+use hyper::server::Response;
+use hyper::{Chunk, StatusCode};
 use mime;
+use mime_guess::guess_mime_type;
 use serde_json;
-use taglib;
-use config::get_config;
 use simple_thread_pool::Pool;
+use std::fs::{self, read_link, DirEntry, File};
+use std::io::{self, Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::Ordering;
+use std::thread;
+use taglib;
 
 const BUF_SIZE: usize = 8 * 1024;
 pub const NOT_FOUND_MESSAGE: &str = "Not Found";
@@ -106,10 +108,11 @@ fn serve_file_from_fs(
 
             let (start, content_len) = match range {
                 Some((s, e, l)) => {
-                    res = res.with_header(ContentRange(ContentRangeSpec::Bytes {
-                        range: Some((s, e)),
-                        instance_length: Some(file_sz),
-                    })).with_status(StatusCode::PartialContent);
+                    res =
+                        res.with_header(ContentRange(ContentRangeSpec::Bytes {
+                            range: Some((s, e)),
+                            instance_length: Some(file_sz),
+                        })).with_status(StatusCode::PartialContent);
                     (s, l)
                 }
                 None => {
@@ -120,7 +123,10 @@ fn serve_file_from_fs(
 
             res = res.with_header(ContentLength(content_len));
             if let Some(age) = caching {
-                res = res.with_header(CacheControl(vec![CacheDirective::Public, CacheDirective::MaxAge(age)]));
+                res = res.with_header(CacheControl(vec![
+                    CacheDirective::Public,
+                    CacheDirective::MaxAge(age),
+                ]));
                 if let Some(last_modified) = last_modified {
                     res = res.with_header(LastModified(last_modified.into()))
                 }
@@ -173,17 +179,16 @@ fn serve_file_from_fs(
 }
 
 macro_rules! spawn_in_pool {
-    ($pool:ident, $tx: ident, $rx: ident, $f:expr) => {
+    ($pool:ident, $tx:ident, $rx:ident, $f:expr) => {
         let ($tx, $rx) = oneshot::channel();
         if let Err(_) = $pool.spawn($f) {
-        return short_response_boxed(
-                        StatusCode::ServiceUnavailable,
-                        super::OVERLOADED_MESSAGE,
-                    );
+            return short_response_boxed(
+                StatusCode::ServiceUnavailable,
+                super::OVERLOADED_MESSAGE,
+            );
         }
         return box_rx($rx);
-       
-    }
+    };
 }
 
 pub fn send_file_simple(
@@ -211,18 +216,19 @@ pub fn send_file(
     seek: Option<f32>,
     mut pool: Pool,
     transcoding: super::TranscodingDetails,
-    transcoding_quality: Option<QualityLevel>
+    transcoding_quality: Option<QualityLevel>,
 ) -> ResponseFuture {
     spawn_in_pool!(pool, tx, rx, move || {
         let full_path = base_path.join(&file_path);
         if full_path.exists() {
-            
-            
-
             if transcoding_quality.is_some() {
-                debug!("Sending file transcoded in quality {:?}", transcoding_quality);
+                debug!(
+                    "Sending file transcoded in quality {:?}",
+                    transcoding_quality
+                );
                 let counter = transcoding.transcodings;
-                let transcoder = Transcoder::new(get_config().transcoding.get(transcoding_quality.unwrap()));
+                let transcoder =
+                    Transcoder::new(get_config().transcoding.get(transcoding_quality.unwrap()));
                 let running_transcodings = counter.load(Ordering::SeqCst);
                 if running_transcodings >= transcoding.max_transcodings {
                     warn!("Max transcodings reached {}", transcoding.max_transcodings);
@@ -231,8 +237,12 @@ pub fn send_file(
                         "Max transcodings reached",
                     )).expect(THREAD_SEND_ERROR)
                 } else {
-                    debug!("Sendig file {:?} transcoded - remaining slots {}/{}", &full_path, 
-                    transcoding.max_transcodings - running_transcodings-1, transcoding.max_transcodings);
+                    debug!(
+                        "Sendig file {:?} transcoded - remaining slots {}/{}",
+                        &full_path,
+                        transcoding.max_transcodings - running_transcodings - 1,
+                        transcoding.max_transcodings
+                    );
                     guarded_spawn(counter, move || {
                         serve_file_transcoded(&full_path, seek, transcoder, tx)
                     });
@@ -271,6 +281,25 @@ pub fn get_folder(
     });
 }
 
+fn get_real_file_type<P: AsRef<Path>>(
+    dir_entry: &DirEntry,
+    full_path: P,
+) -> Result<::std::fs::FileType, io::Error> {
+    let ft = dir_entry.file_type()?;
+
+    if ft.is_symlink() {
+        let p = read_link(dir_entry.path())?;
+        let ap = if p.is_relative() {
+            full_path.as_ref().join(p)
+        } else {
+            p
+        };
+        return Ok(ap.metadata()?.file_type());
+    } else {
+        Ok(ft)
+    }
+}
+
 fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     base_dir: P,
     dir_path: P2,
@@ -295,29 +324,34 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
 
             for item in dir_iter {
                 match item {
-                    Ok(f) => if let Ok(ft) = f.file_type() {
-                        let path = f.path().strip_prefix(&base_dir).unwrap().into();
-                        if ft.is_dir() {
-                            subfolders.push(AudioFolderShort {
-                                path: path,
-                                name: os_to_string(f.file_name()),
-                            })
-                        } else if ft.is_file() {
-                            if is_audio(&path) {
-                                let mime = ::mime_guess::guess_mime_type(&path);
-                                let meta = get_audio_properties(&base_dir.as_ref().join(&path));
-                                files.push(AudioFile {
-                                    meta,
-                                    path,
+                    Ok(f) => match get_real_file_type(&f, &full_path) {
+                        Ok(ft) => {
+                            let path = f.path().strip_prefix(&base_dir).unwrap().into();
+                            if ft.is_dir() {
+                                subfolders.push(AudioFolderShort {
+                                    path: path,
                                     name: os_to_string(f.file_name()),
-
-                                    mime: format!("{}", mime),
                                 })
-                            } else if cover.is_none() && is_cover(&path) {
-                                cover = Some(TypedFile::new(path))
-                            } else if description.is_none() && is_description(&path) {
-                                description = Some(TypedFile::new(path))
+                            } else if ft.is_file() {
+                                if is_audio(&path) {
+                                    let mime = ::mime_guess::guess_mime_type(&path);
+                                    let meta = get_audio_properties(&base_dir.as_ref().join(&path));
+                                    files.push(AudioFile {
+                                        meta,
+                                        path,
+                                        name: os_to_string(f.file_name()),
+
+                                        mime: format!("{}", mime),
+                                    })
+                                } else if cover.is_none() && is_cover(&path) {
+                                    cover = Some(TypedFile::new(path))
+                                } else if description.is_none() && is_description(&path) {
+                                    description = Some(TypedFile::new(path))
+                                }
                             }
+                        }
+                        Err(e) => {
+                            warn!("Cannot get dir entry type for {:?}, error: {}", f.path(), e)
                         }
                     },
                     Err(e) => warn!(
@@ -370,7 +404,7 @@ pub fn get_audio_properties(audio_file_name: &Path) -> Option<AudioMeta> {
                                 }
                                 bitrate
                             },
-                        })
+                        });
                     }
                     Err(e) => warn!("File {} does not have audioproperties {:?}", fname, e),
                 },
@@ -420,12 +454,10 @@ pub fn search(
     query: String,
     mut pool: Pool,
 ) -> ResponseFuture {
-    
     spawn_in_pool!(pool, tx, rx, move || {
         let res = searcher.search(base_dir, query);
         tx.send(json_response(&res)).expect(THREAD_SEND_ERROR);
     });
-    
 }
 
 #[cfg(test)]
@@ -451,8 +483,8 @@ mod tests {
         let json = serde_json::to_string(&folder).unwrap();
         println!("JSON: {}", &json);
     }
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
 
     #[test]
     fn test_guarded_spawn() {
