@@ -17,12 +17,13 @@ use mime;
 use mime_guess::guess_mime_type;
 use serde_json;
 use simple_thread_pool::Pool;
-use std::fs::{self, read_link, DirEntry, File};
+use std::fs::{self, File};
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::thread;
 use taglib;
+use super::get_real_file_type;
 
 const BUF_SIZE: usize = 8 * 1024;
 pub const NOT_FOUND_MESSAGE: &str = "Not Found";
@@ -281,25 +282,6 @@ pub fn get_folder(
     });
 }
 
-fn get_real_file_type<P: AsRef<Path>>(
-    dir_entry: &DirEntry,
-    full_path: P,
-) -> Result<::std::fs::FileType, io::Error> {
-    let ft = dir_entry.file_type()?;
-
-    if ft.is_symlink() {
-        let p = read_link(dir_entry.path())?;
-        let ap = if p.is_relative() {
-            full_path.as_ref().join(p)
-        } else {
-            p
-        };
-        return Ok(ap.metadata()?.file_type());
-    } else {
-        Ok(ft)
-    }
-}
-
 fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     base_dir: P,
     dir_path: P2,
@@ -321,10 +303,11 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
             let mut subfolders = vec![];
             let mut cover = None;
             let mut description = None;
+            let allow_symlinks = get_config().allow_symlinks;
 
             for item in dir_iter {
                 match item {
-                    Ok(f) => match get_real_file_type(&f, &full_path) {
+                    Ok(f) => match get_real_file_type(&f, &full_path, allow_symlinks) {
                         Ok(ft) => {
                             let path = f.path().strip_prefix(&base_dir).unwrap().into();
                             if ft.is_dir() {

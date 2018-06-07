@@ -93,6 +93,7 @@ pub struct Config {
     pub cors: bool,
     pub ssl_key_file: Option<PathBuf>,
     pub ssl_key_password: Option<String>,
+    pub allow_symlinks: bool
 }
 type Parser<'a> = App<'a, 'a>;
 
@@ -170,6 +171,10 @@ fn create_parser<'a>() -> Parser<'a> {
         .arg(Arg::with_name("cors")
             .long("cors")
             .help("Enable CORS - enables any origin of requests")
+        )
+        .arg(Arg::with_name("allow-symlinks")
+            .long("allow-symlinks")
+            .help("Will follow symbolic/sof links in collections directories")
         );
 
         if cfg!(feature="tls") {
@@ -280,6 +285,7 @@ pub fn parse_args() -> Result<(), Error> {
     };
 
     let cors = args.is_present("cors");
+    let allow_symlinks = args.is_present("allow-symlinks");
 
     let ssl_key_file;
     let ssl_key_password;
@@ -316,6 +322,7 @@ pub fn parse_args() -> Result<(), Error> {
         cors,
         ssl_key_file,
         ssl_key_password,
+        allow_symlinks
     };
     unsafe {
         CONFIG = Some(config);
