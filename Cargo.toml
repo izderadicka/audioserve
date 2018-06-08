@@ -36,6 +36,7 @@ git = "https://github.com/ebassi/taglib-rust"
 git = "https://github.com/izderadicka/simple-thread-pool.git"
 
 [features]
-default = ["tls"]
+default = ["tls", "symlinks"]
 tls=["tokio-tls", "native-tls", "tokio-proto"]
+symlinks=[]
 

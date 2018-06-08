@@ -172,10 +172,6 @@ fn create_parser<'a>() -> Parser<'a> {
         .arg(Arg::with_name("cors")
             .long("cors")
             .help("Enable CORS - enables any origin of requests")
-        )
-        .arg(Arg::with_name("allow-symlinks")
-            .long("allow-symlinks")
-            .help("Will follow symbolic/sof links in collections directories")
         );
 
     if cfg!(feature = "tls") {
@@ -190,6 +186,14 @@ fn create_parser<'a>() -> Parser<'a> {
                 .requires("ssl-key")
                 .help("Password for TLS/SSL private key")
             );
+    }
+
+    if cfg!(feature="symlinks") {
+
+        parser=parser.arg(Arg::with_name("allow-symlinks")
+            .long("allow-symlinks")
+            .help("Will follow symbolic/sof links in collections directories")
+        );
     }
 
     parser
@@ -291,7 +295,11 @@ pub fn parse_args() -> Result<(), Error> {
     };
 
     let cors = args.is_present("cors");
-    let allow_symlinks = args.is_present("allow-symlinks");
+    let allow_symlinks = if cfg!(feature = "symlinks") {
+        args.is_present("allow-symlinks")
+    } else {
+        false
+    };
 
     let ssl_key_file;
     let ssl_key_password = if cfg!(feature = "tls") {

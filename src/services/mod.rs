@@ -14,7 +14,9 @@ use percent_encoding::percent_decode;
 use regex::Regex;
 use simple_thread_pool::Pool;
 use std::collections::HashMap;
-use std::fs::{read_link, DirEntry};
+use std::fs::DirEntry;
+#[cfg(feature="symlinks")]
+use std::fs::read_link;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicUsize;
@@ -241,6 +243,7 @@ impl FileSendService {
     }
 }
 
+#[cfg(feature = "symlinks")]
 fn get_real_file_type<P: AsRef<Path>>(
     dir_entry: &DirEntry,
     full_path: P,
@@ -259,4 +262,13 @@ fn get_real_file_type<P: AsRef<Path>>(
     } else {
         Ok(ft)
     }
+}
+
+#[cfg(not(feature = "symlinks"))]
+fn get_real_file_type<P: AsRef<Path>>(
+    dir_entry: &DirEntry,
+    _full_path: P,
+    _allow_symlinks: bool,
+) -> Result<::std::fs::FileType, io::Error> {
+    dir_entry.file_type()
 }
