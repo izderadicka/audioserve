@@ -58,19 +58,21 @@ pub struct TranscodingConfig {
 impl TranscodingConfig {
     pub fn get(&self, quality: QualityLevel) -> Quality {
         match quality {
-            l @ QualityLevel::Low => self.low
+            l @ QualityLevel::Low => self
+                .low
                 .as_ref()
                 .map_or(Quality::default_level(l), |c| c.clone()),
-            l @ QualityLevel::Medium => self.medium
+            l @ QualityLevel::Medium => self
+                .medium
                 .as_ref()
                 .map_or(Quality::default_level(l), |c| c.clone()),
-            l @ QualityLevel::High => self.high
+            l @ QualityLevel::High => self
+                .high
                 .as_ref()
                 .map_or(Quality::default_level(l), |c| c.clone()),
         }
     }
 }
-
 
 #[derive(Clone, Debug)]
 pub struct ThreadPoolSize {
@@ -93,7 +95,7 @@ pub struct Config {
     pub cors: bool,
     pub ssl_key_file: Option<PathBuf>,
     pub ssl_key_password: Option<String>,
-    pub allow_symlinks: bool
+    pub allow_symlinks: bool,
 }
 type Parser<'a> = App<'a, 'a>;
 
@@ -115,8 +117,7 @@ fn create_parser<'a>() -> Parser<'a> {
         )
         .arg(Arg::with_name("large-thread-pool")
             .long("large-thread-pool")
-            .help("Use larger thread pool (usually will not be needed)")
-            
+            .help("Use larger thread pool (usually will not be needed)")            
         )
         .arg(Arg::with_name("base_dir")
             .value_name("BASE_DIR")
@@ -177,8 +178,8 @@ fn create_parser<'a>() -> Parser<'a> {
             .help("Will follow symbolic/sof links in collections directories")
         );
 
-        if cfg!(feature="tls") {
-            parser = parser.arg(Arg::with_name("ssl-key")
+    if cfg!(feature = "tls") {
+        parser = parser.arg(Arg::with_name("ssl-key")
             .long("ssl-key")
             .takes_value(true)
             .help("TLS/SSL private key and certificate in form of PKCS#12 key file, if provided, https is used")
@@ -189,12 +190,18 @@ fn create_parser<'a>() -> Parser<'a> {
                 .requires("ssl-key")
                 .help("Password for TLS/SSL private key")
             );
-        }
+    }
 
-        parser
+    parser
 }
 
 pub fn parse_args() -> Result<(), Error> {
+    unsafe {
+        if CONFIG.is_some() {
+            panic!("Config is already initialied")
+        }
+    }
+
     let p = create_parser();
     let args = p.get_matches();
 
@@ -221,15 +228,14 @@ pub fn parse_args() -> Result<(), Error> {
         ThreadPoolSize {
             min_threads: 8,
             max_threads: 32,
-            queue_size: 1000
+            queue_size: 1000,
         }
-        
     } else {
         ThreadPoolSize {
             min_threads: 4,
             max_threads: 8,
-            queue_size: 100
-        } 
+            queue_size: 100,
+        }
     };
 
     let shared_secret = if args.is_present("no-authentication") {
@@ -288,10 +294,7 @@ pub fn parse_args() -> Result<(), Error> {
     let allow_symlinks = args.is_present("allow-symlinks");
 
     let ssl_key_file;
-    let ssl_key_password;
-
-    if cfg!(feature="tls") {
-
+    let ssl_key_password = if cfg!(feature = "tls") {
         ssl_key_file = match args.value_of("ssl-key") {
             Some(f) => {
                 let p: PathBuf = f.into();
@@ -303,11 +306,11 @@ pub fn parse_args() -> Result<(), Error> {
             None => None,
         };
 
-        ssl_key_password = args.value_of("ssl-key-password").map(|s| s.into());
+        args.value_of("ssl-key-password").map(|s| s.into())
     } else {
         ssl_key_file = None;
-        ssl_key_password = None;
-    }
+        None
+    };
 
     let config = Config {
         base_dirs,
@@ -316,13 +319,13 @@ pub fn parse_args() -> Result<(), Error> {
         shared_secret,
         transcoding,
         max_transcodings,
-        token_validity_hours: token_validity_days*24,
+        token_validity_hours: token_validity_days * 24,
         client_dir,
         secret_file,
         cors,
         ssl_key_file,
         ssl_key_password,
-        allow_symlinks
+        allow_symlinks,
     };
     unsafe {
         CONFIG = Some(config);

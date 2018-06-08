@@ -1,8 +1,8 @@
 use super::get_real_file_type;
 use super::types::{AudioFolderShort, SearchResult};
+use config::get_config;
 use std::fs;
 use std::path::Path;
-use config::get_config;
 
 pub trait SearchTrait {
     fn search<P: AsRef<Path>, S: AsRef<str>>(&self, base_dir: P, query: S) -> SearchResult;
@@ -19,8 +19,8 @@ pub enum Search {
 //As we cannot use Trait object due to generic types, we can alternatively use enum and dispatch search fn here
 impl SearchTrait for Search {
     fn search<P: AsRef<Path>, S: AsRef<str>>(&self, base_dir: P, query: S) -> SearchResult {
-        match self {
-            &Search::FoldersSearch => FoldersSearch.search(base_dir, query),
+        match *self {
+            Search::FoldersSearch => FoldersSearch.search(base_dir, query),
         }
     }
 }
@@ -29,16 +29,21 @@ impl SearchTrait for FoldersSearch {
     fn search<P: AsRef<Path>, S: AsRef<str>>(&self, base_dir: P, query: S) -> SearchResult {
         let tokens: Vec<String> = query
             .as_ref()
-            .split(" ")
-            .filter(|s| s.len() > 0)
+            .split(' ')
+            .filter(|s| !s.is_empty())
             .map(|s| s.to_lowercase())
             .collect();
         let mut res = SearchResult {
             subfolders: vec![],
             files: vec![],
         };
-        FoldersSearch::search_recursive(base_dir.as_ref(), base_dir.as_ref(), &mut res, &tokens, 
-            get_config().allow_symlinks);
+        FoldersSearch::search_recursive(
+            base_dir.as_ref(),
+            base_dir.as_ref(),
+            &mut res,
+            &tokens,
+            get_config().allow_symlinks,
+        );
         res
     }
 }
@@ -48,8 +53,8 @@ impl FoldersSearch {
         base_path: &Path,
         path: &Path,
         results: &mut SearchResult,
-        tokens: &Vec<String>,
-        allow_symlinks: bool
+        tokens: &[String],
+        allow_symlinks: bool,
     ) {
         if let Ok(dir_iter) = fs::read_dir(path) {
             for item in dir_iter {
@@ -66,7 +71,13 @@ impl FoldersSearch {
                                         path: p.strip_prefix(base_path).unwrap().into(),
                                     })
                                 } else {
-                                    FoldersSearch::search_recursive(base_path, &p, results, tokens, allow_symlinks)
+                                    FoldersSearch::search_recursive(
+                                        base_path,
+                                        &p,
+                                        results,
+                                        tokens,
+                                        allow_symlinks,
+                                    )
                                 }
                             }
                         }

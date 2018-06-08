@@ -1,3 +1,4 @@
+use super::get_real_file_type;
 use super::search::{Search, SearchTrait};
 use super::transcode::{QualityLevel, Transcoder};
 use super::types::*;
@@ -23,7 +24,6 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::thread;
 use taglib;
-use super::get_real_file_type;
 
 const BUF_SIZE: usize = 8 * 1024;
 pub const NOT_FOUND_MESSAGE: &str = "Not Found";
@@ -70,7 +70,7 @@ where
 fn serve_file_transcoded(
     full_path: &Path,
     seek: Option<f32>,
-    transcoder: Transcoder,
+    transcoder: &Transcoder,
     tx: ::futures::sync::oneshot::Sender<Response>,
 ) {
     let (body_tx, body_rx) = mpsc::channel(1);
@@ -182,7 +182,7 @@ fn serve_file_from_fs(
 macro_rules! spawn_in_pool {
     ($pool:ident, $tx:ident, $rx:ident, $f:expr) => {
         let ($tx, $rx) = oneshot::channel();
-        if let Err(_) = $pool.spawn($f) {
+        if $pool.spawn($f).is_err() {
             return short_response_boxed(
                 StatusCode::ServiceUnavailable,
                 super::OVERLOADED_MESSAGE,
@@ -245,7 +245,7 @@ pub fn send_file(
                         transcoding.max_transcodings
                     );
                     guarded_spawn(counter, move || {
-                        serve_file_transcoded(&full_path, seek, transcoder, tx)
+                        serve_file_transcoded(&full_path, seek, &transcoder, tx)
                     });
                 }
             } else {
@@ -312,7 +312,7 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
                             let path = f.path().strip_prefix(&base_dir).unwrap().into();
                             if ft.is_dir() {
                                 subfolders.push(AudioFolderShort {
-                                    path: path,
+                                    path,
                                     name: os_to_string(f.file_name()),
                                 })
                             } else if ft.is_file() {
@@ -381,7 +381,7 @@ pub fn get_audio_properties(audio_file_name: &Path) -> Option<AudioMeta> {
                                     // estimate from duration and file size
                                     // Will not work well for small files
                                     if let Ok(size) = audio_file_name.metadata().map(|m| m.len()) {
-                                        bitrate = (size * 8 / duration as u64 / 1024) as u32;
+                                        bitrate = (size * 8 / u64::from(duration) / 1024) as u32;
                                         debug!("Estimating bitrate to {}", bitrate);
                                     };
                                 }
