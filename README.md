@@ -29,6 +29,8 @@ Search is done for folder names only (not individual files, neither audio metada
 
 You can have several libraries/ collections - just use several root directories as audioserve start parametes. In client you can switch between collections in the client. Typical usage will be to have separate collections for different languages.
 
+By default symbolic(soft) links are not followed in the collections directory (because if incorretly used it can have quite negative impact on search and browse), but they can be enabled by `--allow-soflinks` program argument.
+
 Security
 --------
 
@@ -133,7 +135,7 @@ Other platforms - theoretically audioserve can work on Windows and MacOS (probab
 but I never tried to build it there. Any help in this area is welcomed.
 
 ### Compiling without default features
-TLS support is default features, but you can compile without it - just add `--no-default-features` option to cargo.
+TLS support and symbolic links  are default features, but you can compile without it - just add `--no-default-features` option to cargo. And then evetually choose only features you need.
 
 
 License
