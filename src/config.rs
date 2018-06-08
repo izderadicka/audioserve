@@ -56,6 +56,13 @@ pub struct TranscodingConfig {
 }
 
 impl TranscodingConfig {
+    fn default() -> Self {
+        TranscodingConfig {
+            low: None,
+            medium: None,
+            high: None,
+        }
+    }
     pub fn get(&self, quality: QualityLevel) -> Quality {
         match quality {
             l @ QualityLevel::Low => self
@@ -79,6 +86,16 @@ pub struct ThreadPoolSize {
     pub min_threads: usize,
     pub max_threads: usize,
     pub queue_size: usize,
+}
+
+impl ThreadPoolSize {
+    fn default() -> Self {
+        ThreadPoolSize {
+            min_threads: 4,
+            max_threads: 8,
+            queue_size: 100,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -188,11 +205,11 @@ fn create_parser<'a>() -> Parser<'a> {
             );
     }
 
-    if cfg!(feature="symlinks") {
-
-        parser=parser.arg(Arg::with_name("allow-symlinks")
-            .long("allow-symlinks")
-            .help("Will follow symbolic/sof links in collections directories")
+    if cfg!(feature = "symlinks") {
+        parser = parser.arg(
+            Arg::with_name("allow-symlinks")
+                .long("allow-symlinks")
+                .help("Will follow symbolic/sof links in collections directories"),
         );
     }
 
@@ -235,11 +252,7 @@ pub fn parse_args() -> Result<(), Error> {
             queue_size: 1000,
         }
     } else {
-        ThreadPoolSize {
-            min_threads: 4,
-            max_threads: 8,
-            queue_size: 100,
-        }
+        ThreadPoolSize::default()
     };
 
     let shared_secret = if args.is_present("no-authentication") {
@@ -249,11 +262,7 @@ pub fn parse_args() -> Result<(), Error> {
     };
 
     let transcoding = match args.value_of("transcoding-config") {
-        None => TranscodingConfig {
-            low: None,
-            medium: None,
-            high: None,
-        },
+        None => TranscodingConfig::default(),
         Some(f) => {
             let config_file = File::open(f)?;
             let mut qs: BTreeMap<String, Quality> = serde_yaml::from_reader(config_file)?;
@@ -340,6 +349,35 @@ pub fn parse_args() -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+//this default config is used only for testing
+#[allow(dead_code)]
+pub fn init_default_config() {
+    unsafe {
+        if CONFIG.is_some() {
+            return
+        }
+    }
+
+    let config = Config {
+        base_dirs: vec![],
+        local_addr: "127.0.0.1:3000".parse().unwrap(),
+        pool_size: ThreadPoolSize::default(),
+        shared_secret: None,
+        transcoding: TranscodingConfig::default(),
+        max_transcodings: 10,
+        token_validity_hours: 365 * 24,
+        client_dir: "./client/dist".into(),
+        secret_file: "./secret".into(),
+        cors: false,
+        ssl_key_file: None,
+        ssl_key_password: None,
+        allow_symlinks: false,
+    };
+    unsafe {
+        CONFIG = Some(config);
+    }
 }
 
 #[cfg(test)]

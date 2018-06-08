@@ -14,9 +14,9 @@ use percent_encoding::percent_decode;
 use regex::Regex;
 use simple_thread_pool::Pool;
 use std::collections::HashMap;
-use std::fs::DirEntry;
-#[cfg(feature="symlinks")]
+#[cfg(feature = "symlinks")]
 use std::fs::read_link;
+use std::fs::DirEntry;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicUsize;

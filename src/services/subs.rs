@@ -447,9 +447,11 @@ pub fn search(
 mod tests {
     use super::*;
     use serde_json;
+    use config::init_default_config;
 
     #[test]
     fn test_list_dir() {
+        init_default_config();
         let res = list_dir("/non-existent", "folder");
         assert!(res.is_err());
         let res = list_dir("./", "test_data/");
@@ -462,6 +464,7 @@ mod tests {
 
     #[test]
     fn test_json() {
+        init_default_config();
         let folder = list_dir("./", "test_data/").unwrap();
         let json = serde_json::to_string(&folder).unwrap();
         println!("JSON: {}", &json);

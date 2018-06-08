@@ -91,9 +91,11 @@ impl FoldersSearch {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use config::init_default_config;
 
     #[test]
     fn test_search_folders() {
+        init_default_config();
         let search = FoldersSearch;
         let res = search.search("./test_data", "usak kulisak");
         assert_eq!(res.subfolders.len(), 1);
