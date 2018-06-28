@@ -7,9 +7,11 @@ use self::subs::{
 use self::transcode::QualityLevel;
 use config::get_config;
 use futures::{future, Future};
-use hyper::header::{AccessControlAllowCredentials, AccessControlAllowOrigin, Origin, Range};
-use hyper::server::{Request, Response, Service};
+use hyper::header::{ HeaderValue, ACCESS_CONTROL_ALLOW_CREDENTIALS, 
+ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN, RANGE};
+use hyper::{Request, Response};
 use hyper::{Method, StatusCode};
+use hyper::service::Service;
 use percent_encoding::percent_decode;
 use regex::Regex;
 use simple_thread_pool::Pool;
@@ -58,28 +60,28 @@ fn get_subpath(path: &str, prefix: &str) -> PathBuf {
     Path::new(&path).strip_prefix(prefix).unwrap().to_path_buf()
 }
 
-fn add_cors_headers(resp: Response, origin: Option<String>, enabled: bool) -> Response {
-    if !enabled {
+fn add_cors_headers<T>(resp: Response<T>, origin: Option<String>, enabled: bool) -> Response<T> {
+    if enabled {
         return resp;
     }
     match origin {
-        Some(o) => resp
-            .with_header(AccessControlAllowOrigin::Value(o))
-            .with_header(AccessControlAllowCredentials),
+        Some(o) => {
+            if let Ok(origin_value) = HeaderValue::from_str(&o) {
+                let headers = resp.headers_mut();
+                headers.append(ACCESS_CONTROL_ALLOW_ORIGIN, origin_value);
+                headers.append(ACCESS_CONTROL_ALLOW_CREDENTIALS, HeaderValue::from_static("true"));
+            }
+            resp
+        }
         None => resp,
     }
 }
 
 impl Service for FileSendService {
-    type Request = Request;
-    type Response = Response;
-    type Error = ::hyper::Error;
-    type Future = ResponseFuture;
-
-    fn call(&self, req: Self::Request) -> Self::Future {
+    fn call(&self, req: Request<Self::ReqBody>) -> Self::Future {
         if self.pool.queue_size() > get_config().pool_size.queue_size {
             warn!("Server is busy, refusing request");
-            return short_response_boxed(StatusCode::ServiceUnavailable, OVERLOADED_MESSAGE);
+            return short_response_boxed(StatusCode::SERVICE_UNAVAILABLE, OVERLOADED_MESSAGE);
         };
         //static files
         if req.path() == "/" {
@@ -103,7 +105,7 @@ impl Service for FileSendService {
         let searcher = self.search.clone();
         let transcoding = self.transcoding.clone();
         let cors = get_config().cors;
-        let origin = req.headers().get::<Origin>().map(|o| format!("{}", o));
+        let origin = req.headers().get(ORIGIN).map(|o| format!("{}", o));
 
         let resp = match self.authenticator {
             Some(ref auth) => {
@@ -121,18 +123,18 @@ impl Service for FileSendService {
 }
 
 impl FileSendService {
-    fn process_checked(
-        req: &Request,
+    fn process_checked<T>(
+        req: &Request<T>,
         pool: Pool,
         searcher: Search,
         transcoding: TranscodingDetails,
     ) -> ResponseFuture {
         let mut params = req
-            .query()
+            .uri().query()
             .map(|query| form_urlencoded::parse(query.as_bytes()).collect::<HashMap<_, _>>());
         match *req.method() {
-            Method::Get => {
-                let mut path = percent_decode(req.path().as_bytes())
+            Method::GET => {
+                let mut path = percent_decode(req.uri().path().as_bytes())
                     .decode_utf8_lossy()
                     .into_owned();
 
@@ -155,7 +157,7 @@ impl FileSendService {
                             let cnum: usize = cnum.as_str().parse().unwrap();
                             if cnum >= get_config().base_dirs.len() {
                                 return short_response_boxed(
-                                    StatusCode::NotFound,
+                                    StatusCode::NOT_FOUND,
                                     NOT_FOUND_MESSAGE,
                                 );
                             }
@@ -167,19 +169,19 @@ impl FileSendService {
                     }
                     let base_dir = &get_config().base_dirs[colllection_index];
                     if path.starts_with("/audio/") {
-                        debug!("Received request with following headers {}", req.headers());
+                        debug!("Received request with following headers {:?}", req.headers());
 
-                        let range = req.headers().get::<Range>();
+                        let range = req.headers().get(RANGE);
                         let bytes_range = match range {
-                            Some(&Range::Bytes(ref bytes_ranges)) => {
+                            Some(bytes_ranges) => {
                                 if bytes_ranges.is_empty() {
                                     return short_response_boxed(
-                                        StatusCode::BadRequest,
+                                        StatusCode::BAD_REQUEST,
                                         "One range is required",
                                     );
                                 } else if bytes_ranges.len() > 1 {
                                     return short_response_boxed(
-                                        StatusCode::NotImplemented,
+                                        StatusCode::NOT_IMPLEMENTED,
                                         "Do not support muptiple ranges",
                                     );
                                 } else {
@@ -188,7 +190,7 @@ impl FileSendService {
                             }
                             Some(_) => {
                                 return short_response_boxed(
-                                    StatusCode::NotImplemented,
+                                    StatusCode::NOT_IMPLEMENTED,
                                     "Other then bytes ranges are not supported",
                                 )
                             }
@@ -217,7 +219,7 @@ impl FileSendService {
                         if let Some(search_string) = params.and_then(|mut p| p.remove("q")) {
                             return search(base_dir, searcher, search_string.into_owned(), pool);
                         }
-                        short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE)
+                        short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
                     } else if path.starts_with("/cover/") {
                         send_file_simple(
                             base_dir,
@@ -233,12 +235,12 @@ impl FileSendService {
                             pool,
                         )
                     } else {
-                        short_response_boxed(StatusCode::NotFound, NOT_FOUND_MESSAGE)
+                        short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
                     }
                 }
             }
 
-            _ => short_response_boxed(StatusCode::MethodNotAllowed, "Method not supported"),
+            _ => short_response_boxed(StatusCode::METHOD_NOT_ALLOWED, "Method not supported"),
         }
     }
 }

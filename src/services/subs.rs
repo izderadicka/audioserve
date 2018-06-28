@@ -9,10 +9,10 @@ use futures::sync::{mpsc, oneshot};
 use futures::Sink;
 use hyper;
 use hyper::header::{
-    AcceptRanges, CacheControl, CacheDirective, ContentLength, ContentRange, ContentRangeSpec,
-    ContentType, LastModified, RangeUnit,
+    ACCEPT_RANGES, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_RANGE, 
+    CONTENT_TYPE, LAST_MODIFIED,
 };
-use hyper::server::Response;
+use hyper::Response;
 use hyper::{Chunk, StatusCode};
 use mime;
 use mime_guess::guess_mime_type;
@@ -31,13 +31,13 @@ const THREAD_SEND_ERROR: &str = "Cannot communicate with other thread";
 
 pub type ResponseFuture = Box<Future<Item = Response, Error = hyper::Error>>;
 
-header! { (XTranscode, "X-Transcode") => [String]}
+
 
 pub fn short_response(status: StatusCode, msg: &'static str) -> Response {
-    Response::new()
-        .with_status(status)
-        .with_header(ContentLength(msg.len() as u64))
-        .with_body(msg)
+    Response::builder()
+        .status(status)
+        .header(CONTENT_LENGTH, format!("{}", msg.len()).as_bytes())
+        .body(msg)
 }
 
 pub fn short_response_boxed(status: StatusCode, msg: &'static str) -> ResponseFuture {

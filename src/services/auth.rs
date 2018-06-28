@@ -1,7 +1,7 @@
 use super::subs::short_response;
 use data_encoding::BASE64;
 use futures::{future, Future, Stream};
-use hyper::header::{Authorization, Bearer, ContentLength, ContentType, Cookie, SetCookie};
+use hyper::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, SET_COOKIE};
 use hyper::{self, Method, Request, Response, StatusCode};
 use ring::digest::{digest, SHA256};
 use ring::hmac;
@@ -10,12 +10,12 @@ use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use url::form_urlencoded;
 
-pub trait Authenticator: Send + Sync {
+pub trait Authenticator<RQ,RS>: Send + Sync {
     type Credentials;
     fn authenticate(
         &self,
-        req: Request,
-    ) -> Box<Future<Item = Result<(Request, Self::Credentials), Response>, Error = hyper::Error>>;
+        req: Request<RQ>,
+    ) -> Box<Future<Item = Result<(Request<RQ>, Self::Credentials), Response<RS>>, Error = hyper::Error>>;
 }
 
 #[derive(Clone)]
@@ -38,16 +38,16 @@ impl SharedSecretAuthenticator {
 const COOKIE_NAME: &str = "audioserve_token";
 const ACCESS_DENIED: &str = "Access denied";
 
-type AuthResult = Result<(Request, ()), Response>;
-type AuthFuture = Box<Future<Item = AuthResult, Error = hyper::Error>>;
-impl Authenticator for SharedSecretAuthenticator {
+type AuthResult<RQ,RS> = Result<(Request<RQ>, ()), Response<RS>>;
+type AuthFuture<RQ,RS> = Box<Future<Item = AuthResult<RQ,RS>, Error = hyper::Error>>;
+impl <RQ,RS>Authenticator<RQ,RS> for SharedSecretAuthenticator {
     type Credentials = ();
-    fn authenticate(&self, req: Request) -> AuthFuture {
-        fn deny() -> AuthResult {
-            Err(short_response(StatusCode::Unauthorized, ACCESS_DENIED))
+    fn authenticate(&self, req: Request<RQ>) -> AuthFuture<RQ,RS> {
+        fn deny() -> AuthResult<_,_> {
+            Err(short_response(StatusCode::UNAUTHORIZED, ACCESS_DENIED))
         }
         // this is part where client can authenticate itself and get token
-        if req.method() == &Method::Post && req.path() == "/authenticate" {
+        if req.method() == &Method::POST && req.uri().path() == "/authenticate" {
             debug!("Authentication request");
             let auth = self.clone();
             return Box::new(req.body().concat2().map(move |b| {
@@ -59,15 +59,15 @@ impl Authenticator for SharedSecretAuthenticator {
                     if auth.auth_token_ok(secret) {
                         debug!("Authentication success");
                         let token = auth.new_auth_token();
-                        Err(Response::new()
-                            .with_header(ContentType::plaintext())
-                            .with_header(ContentLength(token.len() as u64))
-                            .with_header(SetCookie(vec![format!(
+                        Err(Response::builder()
+                            .header(CONTENT_TYPE, "text/plain")
+                            .header(CONTENT_LENGTH, token.len())
+                            .with_header(SET_COOKIE(format!(
                                 "{}={}; Max-Age={}",
                                 COOKIE_NAME,
                                 token,
                                 10 * 365 * 24 * 3600
-                            )]))
+                            )))
                             .with_body(token))
                     } else {
                         deny()
@@ -81,12 +81,12 @@ impl Authenticator for SharedSecretAuthenticator {
         {
             let mut token = req
                 .headers()
-                .get::<Authorization<Bearer>>()
+                .get(AUTHORIZATION)
                 .map(|h| h.0.token.as_str());
             if token.is_none() {
                 token = req
                     .headers()
-                    .get::<Cookie>()
+                    .get(COOKIE_NAME)
                     .and_then(|h| h.get(COOKIE_NAME));
             }
 

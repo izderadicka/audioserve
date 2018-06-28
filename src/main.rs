@@ -34,7 +34,7 @@ extern crate tokio_proto;
 extern crate tokio_tls;
 
 use config::{get_config, parse_args};
-use hyper::server::Http as HttpServer;
+use hyper::Server as HttpServer;
 use ring::rand::{SecureRandom, SystemRandom};
 use services::auth::SharedSecretAuthenticator;
 use services::search::Search;
@@ -118,10 +118,10 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
 
     match get_config().ssl_key_file.as_ref() {
         None => {
-            let server = HttpServer::new().bind(&get_config().local_addr, move || Ok(svc.clone()))?;
+            let server = HttpServer::bind(&get_config().local_addr).serve(move || Ok(svc.clone()))?;
             //server.no_proto();
             info!("Server listening on {}", server.local_addr().unwrap());
-            server.run()?;
+            hyper::rt::run(server);
         }
         Some(file) => {
             #[cfg(feature = "tls")]
