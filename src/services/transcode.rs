@@ -161,7 +161,7 @@ impl Transcoder {
         &self,
         file: S,
         seek: Option<f32>,
-        mut body_tx: futures::sync::mpsc::Sender<Result<hyper::Chunk, hyper::Error>>,
+        mut body_tx: futures::sync::mpsc::Sender<hyper::Chunk>
     ) {
         let mut cmd = self.build_command(&file, seek);
         match cmd.spawn() {
@@ -181,7 +181,7 @@ impl Transcoder {
                             let slice = buf[..n].to_vec();
                             let c: Chunk = slice.into();
                             trace!("Sending {} bytes", n);
-                            match body_tx.send(Ok(c)).wait() {
+                            match body_tx.send(c).wait() {
                                 Ok(t) => body_tx = t,
                                 Err(_) => {
                                     warn!("Cannot send data to response stream");

@@ -2,20 +2,25 @@ use super::subs::short_response;
 use data_encoding::BASE64;
 use futures::{future, Future, Stream};
 use hyper::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, SET_COOKIE};
-use hyper::{self, Method, Request, Response, StatusCode};
+use hyperx::header::{Header, Authorization, Bearer, Cookie};
+use hyper::{Method, Request, Response, StatusCode, Body};
 use ring::digest::{digest, SHA256};
 use ring::hmac;
 use ring::rand::{SecureRandom, SystemRandom};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use url::form_urlencoded;
+use error::Error;
 
-pub trait Authenticator<RQ,RS>: Send + Sync {
+type AuthResult = Result<(Request<Body>, ()), Response<Body>>;
+type AuthFuture = Box<Future<Item = AuthResult, Error = Error>+Send>;
+
+pub trait Authenticator: Send + Sync {
     type Credentials;
     fn authenticate(
         &self,
-        req: Request<RQ>,
-    ) -> Box<Future<Item = Result<(Request<RQ>, Self::Credentials), Response<RS>>, Error = hyper::Error>>;
+        req: Request<Body>,
+    ) -> AuthFuture;
 }
 
 #[derive(Clone)]
@@ -38,19 +43,19 @@ impl SharedSecretAuthenticator {
 const COOKIE_NAME: &str = "audioserve_token";
 const ACCESS_DENIED: &str = "Access denied";
 
-type AuthResult<RQ,RS> = Result<(Request<RQ>, ()), Response<RS>>;
-type AuthFuture<RQ,RS> = Box<Future<Item = AuthResult<RQ,RS>, Error = hyper::Error>>;
-impl <RQ,RS>Authenticator<RQ,RS> for SharedSecretAuthenticator {
+impl Authenticator for SharedSecretAuthenticator {
     type Credentials = ();
-    fn authenticate(&self, req: Request<RQ>) -> AuthFuture<RQ,RS> {
-        fn deny() -> AuthResult<_,_> {
+    fn authenticate(&self, req: Request<Body>) -> AuthFuture {
+        fn deny() -> AuthResult {
             Err(short_response(StatusCode::UNAUTHORIZED, ACCESS_DENIED))
         }
         // this is part where client can authenticate itself and get token
         if req.method() == &Method::POST && req.uri().path() == "/authenticate" {
             debug!("Authentication request");
             let auth = self.clone();
-            return Box::new(req.body().concat2().map(move |b| {
+            return Box::new(req.into_body().concat2()
+            .map_err(|e| Error::new_with_cause(e))
+            .map(move |b| {
                 let params = form_urlencoded::parse(b.as_ref())
                     .into_owned()
                     .collect::<HashMap<String, String>>();
@@ -62,13 +67,14 @@ impl <RQ,RS>Authenticator<RQ,RS> for SharedSecretAuthenticator {
                         Err(Response::builder()
                             .header(CONTENT_TYPE, "text/plain")
                             .header(CONTENT_LENGTH, token.len())
-                            .with_header(SET_COOKIE(format!(
+                            .header(SET_COOKIE, format!(
                                 "{}={}; Max-Age={}",
                                 COOKIE_NAME,
                                 token,
                                 10 * 365 * 24 * 3600
-                            )))
-                            .with_body(token))
+                            ).as_str())
+                            .body(token.into())
+                            .unwrap())
                     } else {
                         deny()
                     }
@@ -76,21 +82,27 @@ impl <RQ,RS>Authenticator<RQ,RS> for SharedSecretAuthenticator {
                     deny()
                 }
             }));
-        };
-        // And in this part we check token
-        {
+        } else {
+            // And in this part we check token
             let mut token = req
                 .headers()
                 .get(AUTHORIZATION)
-                .map(|h| h.0.token.as_str());
+                .and_then(|h| {
+                    Authorization::<Bearer>::parse_header(&h.as_bytes().into()).ok()
+                })
+                .map(|a| a.0.token.to_owned());
             if token.is_none() {
                 token = req
                     .headers()
-                    .get(COOKIE_NAME)
-                    .and_then(|h| h.get(COOKIE_NAME));
+                    .get(COOKIE)
+                    .and_then(|h| {
+                        Cookie::parse_header(&h.as_bytes().into()).ok()
+                    }).
+                    and_then(|c| c.get(COOKIE_NAME)
+                        .map(|v| v.to_owned()));
             }
 
-            if token.is_none() || !self.token_ok(token.unwrap()) {
+            if token.is_none() || !self.token_ok(&token.unwrap()) {
                 return Box::new(future::ok(deny()));
             }
         }

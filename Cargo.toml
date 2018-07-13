@@ -6,7 +6,8 @@ authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 [dependencies]
 pretty_env_logger = "0.2"
 log = "0.4"
-hyper = "=0.12"
+hyper = "0.12"
+hyperx= "0.13"
 futures = "0.1"
 mime = "0.3"
 mime_guess = "2.0.0-alpha.4"

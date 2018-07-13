@@ -9,9 +9,9 @@ use config::get_config;
 use futures::{future, Future};
 use hyper::header::{ HeaderValue, ACCESS_CONTROL_ALLOW_CREDENTIALS, 
 ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN, RANGE};
-use hyper::{Request, Response};
-use hyper::{Method, StatusCode};
+use hyper::{Body, Request, Response, Method, StatusCode};
 use hyper::service::Service;
+use hyperx::header::{Header,Range};
 use percent_encoding::percent_decode;
 use regex::Regex;
 use simple_thread_pool::Pool;
@@ -60,13 +60,13 @@ fn get_subpath(path: &str, prefix: &str) -> PathBuf {
     Path::new(&path).strip_prefix(prefix).unwrap().to_path_buf()
 }
 
-fn add_cors_headers<T>(resp: Response<T>, origin: Option<String>, enabled: bool) -> Response<T> {
+fn add_cors_headers<T: AsRef<str>>(mut resp: Response<Body>, origin: Option<T>, enabled: bool) -> Response<Body> {
     if enabled {
         return resp;
     }
     match origin {
         Some(o) => {
-            if let Ok(origin_value) = HeaderValue::from_str(&o) {
+            if let Ok(origin_value) = HeaderValue::from_str(o.as_ref()) {
                 let headers = resp.headers_mut();
                 headers.append(ACCESS_CONTROL_ALLOW_ORIGIN, origin_value);
                 headers.append(ACCESS_CONTROL_ALLOW_CREDENTIALS, HeaderValue::from_static("true"));
@@ -78,13 +78,17 @@ fn add_cors_headers<T>(resp: Response<T>, origin: Option<String>, enabled: bool)
 }
 
 impl Service for FileSendService {
-    fn call(&self, req: Request<Self::ReqBody>) -> Self::Future {
+    type ReqBody = Body;
+    type ResBody = Body;
+    type Error =  ::error::Error;
+    type Future = Box<Future<Item = Response<Self::ResBody>, Error = Self::Error>+Send>;
+    fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
         if self.pool.queue_size() > get_config().pool_size.queue_size {
             warn!("Server is busy, refusing request");
             return short_response_boxed(StatusCode::SERVICE_UNAVAILABLE, OVERLOADED_MESSAGE);
         };
         //static files
-        if req.path() == "/" {
+        if req.uri().path() == "/" {
             return send_file_simple(
                 &get_config().client_dir,
                 "index.html".into(),
@@ -92,7 +96,7 @@ impl Service for FileSendService {
                 self.pool.clone(),
             );
         };
-        if req.path() == "/bundle.js" {
+        if req.uri().path() == "/bundle.js" {
             return send_file_simple(
                 &get_config().client_dir,
                 "bundle.js".into(),
@@ -105,7 +109,9 @@ impl Service for FileSendService {
         let searcher = self.search.clone();
         let transcoding = self.transcoding.clone();
         let cors = get_config().cors;
-        let origin = req.headers().get(ORIGIN).map(|o| format!("{}", o));
+        let origin = req.headers().get(ORIGIN)
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.to_owned());
 
         let resp = match self.authenticator {
             Some(ref auth) => {
@@ -171,9 +177,10 @@ impl FileSendService {
                     if path.starts_with("/audio/") {
                         debug!("Received request with following headers {:?}", req.headers());
 
-                        let range = req.headers().get(RANGE);
+                        let range = req.headers().get(RANGE)
+                            .and_then(|h| Range::parse_header(&h.as_ref().into()).ok());
                         let bytes_range = match range {
-                            Some(bytes_ranges) => {
+                            Some(Range::Bytes(bytes_ranges)) => {
                                 if bytes_ranges.is_empty() {
                                     return short_response_boxed(
                                         StatusCode::BAD_REQUEST,

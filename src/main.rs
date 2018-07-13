@@ -2,7 +2,7 @@
 extern crate clap;
 extern crate data_encoding;
 extern crate futures;
-#[macro_use]
+extern crate hyperx;
 extern crate hyper;
 #[macro_use]
 extern crate log;
@@ -34,7 +34,8 @@ extern crate tokio_proto;
 extern crate tokio_tls;
 
 use config::{get_config, parse_args};
-use hyper::Server as HttpServer;
+use hyper::{Server as HttpServer};
+use hyper::rt::Future;
 use ring::rand::{SecureRandom, SystemRandom};
 use services::auth::SharedSecretAuthenticator;
 use services::search::Search;
@@ -47,14 +48,11 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
 #[cfg(feature = "tls")]
-use self::tokio_proto::TcpServer;
-#[cfg(feature = "tls")]
 use native_tls::{Pkcs12, TlsAcceptor};
-#[cfg(feature = "tls")]
-use tokio_tls::proto;
 
 mod config;
 mod services;
+mod error;
 
 #[cfg(feature = "tls")]
 fn load_private_key<P>(file: P, pass: Option<&String>) -> Result<Pkcs12, io::Error>
@@ -118,30 +116,35 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
 
     match get_config().ssl_key_file.as_ref() {
         None => {
-            let server = HttpServer::bind(&get_config().local_addr).serve(move || Ok(svc.clone()))?;
-            //server.no_proto();
-            info!("Server listening on {}", server.local_addr().unwrap());
-            hyper::rt::run(server);
+            let server = HttpServer::bind(&get_config().local_addr)
+            .serve(move || {
+                let s: Result<_, error::Error> = Ok(svc.clone());
+                s
+                });
+            
+            info!("Server listening on {}", &get_config().local_addr);
+            hyper::rt::run(server.map_err(|e| error!("Server error {}", e)));
         }
         Some(file) => {
             #[cfg(feature = "tls")]
-            {
-                let private_key =
-                    match load_private_key(file, get_config().ssl_key_password.as_ref()) {
-                        Ok(s) => s,
-                        Err(e) => {
-                            error!("Error loading SSL/TLS private key: {}", e);
-                            return Err(Box::new(e));
-                        }
-                    };
-                let tls_cx = TlsAcceptor::builder(private_key)?.build()?;
-                let proto = proto::Server::new(HttpServer::new(), tls_cx);
+            panic!("No tls now");
+            // {
+            //     let private_key =
+            //         match load_private_key(file, get_config().ssl_key_password.as_ref()) {
+            //             Ok(s) => s,
+            //             Err(e) => {
+            //                 error!("Error loading SSL/TLS private key: {}", e);
+            //                 return Err(Box::new(e));
+            //             }
+            //         };
+            //     let tls_cx = TlsAcceptor::builder(private_key)?.build()?;
+            //     let proto = proto::Server::new(HttpServer::new(), tls_cx);
 
-                let addr = cfg.local_addr;
-                let srv = TcpServer::new(proto, addr);
-                println!("TLS Listening on {}", addr);
-                srv.serve(move || Ok(svc.clone()));
-            }
+            //     let addr = cfg.local_addr;
+            //     let srv = TcpServer::new(proto, addr);
+            //     println!("TLS Listening on {}", addr);
+            //     srv.serve(move || Ok(svc.clone()));
+            // }
 
             #[cfg(not(feature = "tls"))]
             {

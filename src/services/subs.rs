@@ -6,14 +6,13 @@ use super::Counter;
 use config::get_config;
 use futures::future::{self, Future};
 use futures::sync::{mpsc, oneshot};
-use futures::Sink;
-use hyper;
+use futures::{Sink, Stream};
 use hyper::header::{
     ACCEPT_RANGES, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_RANGE, 
-    CONTENT_TYPE, LAST_MODIFIED,
+    CONTENT_TYPE, LAST_MODIFIED, HeaderValue
 };
-use hyper::Response;
-use hyper::{Chunk, StatusCode};
+use hyperx::header::{ContentRangeSpec, ContentRange, CacheControl, CacheDirective, LastModified};
+use hyper::{Response as HyperResponse, Chunk, StatusCode, Body};
 use mime;
 use mime_guess::guess_mime_type;
 use serde_json;
@@ -24,20 +23,24 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::thread;
 use taglib;
+use ::error::Error;
 
 const BUF_SIZE: usize = 8 * 1024;
 pub const NOT_FOUND_MESSAGE: &str = "Not Found";
 const THREAD_SEND_ERROR: &str = "Cannot communicate with other thread";
 
-pub type ResponseFuture = Box<Future<Item = Response, Error = hyper::Error>>;
+type Response = HyperResponse<Body>;
+
+pub type ResponseFuture = Box<Future<Item = Response, Error = Error>+Send>;
 
 
 
 pub fn short_response(status: StatusCode, msg: &'static str) -> Response {
-    Response::builder()
+    HyperResponse::builder()
         .status(status)
-        .header(CONTENT_LENGTH, format!("{}", msg.len()).as_bytes())
-        .body(msg)
+        .header(CONTENT_LENGTH, msg.len())
+        .body(msg.into())
+        .unwrap()
 }
 
 pub fn short_response_boxed(status: StatusCode, msg: &'static str) -> ResponseFuture {
@@ -74,10 +77,11 @@ fn serve_file_transcoded(
     tx: ::futures::sync::oneshot::Sender<Response>,
 ) {
     let (body_tx, body_rx) = mpsc::channel(1);
-    let resp = Response::new()
-        .with_header(ContentType(transcoder.transcoded_mime()))
-        .with_header(XTranscode(transcoder.transcoding_params()))
-        .with_body(body_rx);
+    let resp = HyperResponse::builder()
+        .header(CONTENT_TYPE, transcoder.transcoded_mime().as_ref())
+        .header("X-Transcode", transcoder.transcoding_params().as_bytes())
+        .body(Body::wrap_stream(body_rx.map_err(|_e| Error::new())))
+        .unwrap();
     tx.send(resp).expect(THREAD_SEND_ERROR);
 
     transcoder.transcode(full_path, seek, body_tx);
@@ -85,7 +89,7 @@ fn serve_file_transcoded(
 
 fn serve_file_from_fs(
     full_path: &Path,
-    range: Option<::hyper::header::ByteRangeSpec>,
+    range: Option<::hyperx::header::ByteRangeSpec>,
     caching: Option<u32>,
     tx: ::futures::sync::oneshot::Sender<Response>,
 ) {
@@ -96,9 +100,10 @@ fn serve_file_from_fs(
             let file_sz = meta.len();
             let last_modified = meta.modified().ok();
             let mime = guess_mime_type(&full_path);
-            let mut res = Response::new()
-                .with_body(body_rx)
-                .with_header(ContentType(mime));
+            let mut res = HyperResponse::builder()
+                .header(CONTENT_TYPE, mime.as_ref())
+                .body(Body::wrap_stream(body_rx.map_err(|_e| Error::new())))
+                .unwrap();
 
             let range = range
                 .and_then(|r| r.to_satisfiable_range(file_sz))
@@ -109,27 +114,36 @@ fn serve_file_from_fs(
 
             let (start, content_len) = match range {
                 Some((s, e, l)) => {
-                    res =
-                        res.with_header(ContentRange(ContentRangeSpec::Bytes {
+                    let range = ContentRange(ContentRangeSpec::Bytes {
                             range: Some((s, e)),
                             instance_length: Some(file_sz),
-                        })).with_status(StatusCode::PartialContent);
+                        });
+                    res.headers_mut().insert(CONTENT_RANGE, 
+                    HeaderValue::from_str(&format!("{}",range)).unwrap());
+                    *res.status_mut() = StatusCode::PARTIAL_CONTENT;
                     (s, l)
                 }
                 None => {
-                    res = res.with_header(AcceptRanges(vec![RangeUnit::Bytes]));
+                    res.headers_mut().insert(ACCEPT_RANGES, 
+                        HeaderValue::from_str("bytes").unwrap());
                     (0, file_sz)
                 }
             };
 
-            res = res.with_header(ContentLength(content_len));
+            res.headers_mut().insert(CONTENT_LENGTH, 
+                HeaderValue::from_str(&format!("{}",content_len)).unwrap());
             if let Some(age) = caching {
-                res = res.with_header(CacheControl(vec![
+                let cache = CacheControl(vec![
                     CacheDirective::Public,
                     CacheDirective::MaxAge(age),
-                ]));
+                ]);
+                res.headers_mut().insert(CACHE_CONTROL, 
+                    HeaderValue::from_str(&format!("{}",cache)).unwrap());
                 if let Some(last_modified) = last_modified {
-                    res = res.with_header(LastModified(last_modified.into()))
+                    let lm = LastModified(last_modified.into());
+                    res.headers_mut().insert(LAST_MODIFIED,
+                        HeaderValue::from_str(&format!("{}",lm)).unwrap()
+                    );
                 }
             }
 
@@ -150,7 +164,7 @@ fn serve_file_from_fs(
                         trace!("Received {}, remains {}, sending {}", n, remains, to_send);
                         let slice = buf[..to_send].to_vec();
                         let c: Chunk = slice.into();
-                        match body_tx.send(Ok(c)).wait() {
+                        match body_tx.send(c).wait() {
                             Ok(t) => body_tx = t,
                             Err(_) => break,
                         };
@@ -173,7 +187,7 @@ fn serve_file_from_fs(
         }
         Err(e) => {
             error!("File opening error {}", e);
-            tx.send(short_response(StatusCode::NotFound, NOT_FOUND_MESSAGE))
+            tx.send(short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE))
                 .expect(THREAD_SEND_ERROR);
         }
     }
@@ -184,7 +198,7 @@ macro_rules! spawn_in_pool {
         let ($tx, $rx) = oneshot::channel();
         if $pool.spawn($f).is_err() {
             return short_response_boxed(
-                StatusCode::ServiceUnavailable,
+                StatusCode::SERVICE_UNAVAILABLE,
                 super::OVERLOADED_MESSAGE,
             );
         }
@@ -204,7 +218,7 @@ pub fn send_file_simple(
             serve_file_from_fs(&full_path, None, cache, tx);
         } else {
             error!("File {:?} does not exists", full_path);
-            tx.send(short_response(StatusCode::NotFound, NOT_FOUND_MESSAGE))
+            tx.send(short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE))
                 .expect(THREAD_SEND_ERROR);
         }
     });
@@ -213,7 +227,7 @@ pub fn send_file_simple(
 pub fn send_file(
     base_path: &'static Path,
     file_path: PathBuf,
-    range: Option<hyper::header::ByteRangeSpec>,
+    range: Option<::hyperx::header::ByteRangeSpec>,
     seek: Option<f32>,
     mut pool: Pool,
     transcoding: super::TranscodingDetails,
@@ -234,7 +248,7 @@ pub fn send_file(
                 if running_transcodings >= transcoding.max_transcodings {
                     warn!("Max transcodings reached {}", transcoding.max_transcodings);
                     tx.send(short_response(
-                        StatusCode::ServiceUnavailable,
+                        StatusCode::SERVICE_UNAVAILABLE,
                         "Max transcodings reached",
                     )).expect(THREAD_SEND_ERROR)
                 } else {
@@ -254,14 +268,14 @@ pub fn send_file(
             }
         } else {
             error!("File {:?} does not exists", full_path);
-            tx.send(short_response(StatusCode::NotFound, NOT_FOUND_MESSAGE))
+            tx.send(short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE))
                 .expect(THREAD_SEND_ERROR);
         }
     });
 }
 
 fn box_rx(rx: ::futures::sync::oneshot::Receiver<Response>) -> ResponseFuture {
-    Box::new(rx.map_err(|e| hyper::Error::from(io::Error::new(io::ErrorKind::Other, e))))
+    Box::new(rx.map_err(|e| Error::new_with_cause(e)))
 }
 
 pub fn get_folder(
@@ -275,7 +289,7 @@ pub fn get_folder(
                 tx.send(json_response(&folder)).expect(THREAD_SEND_ERROR);
             }
             Err(_) => {
-                tx.send(short_response(StatusCode::NotFound, NOT_FOUND_MESSAGE))
+                tx.send(short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE))
                     .expect(THREAD_SEND_ERROR);
             }
         }
@@ -402,10 +416,11 @@ pub fn get_audio_properties(audio_file_name: &Path) -> Option<AudioMeta> {
 
 fn json_response<T: ::serde::Serialize>(data: &T) -> Response {
     let json = serde_json::to_string(data).expect("Serialization error");
-    Response::new()
-        .with_header(ContentType(mime::APPLICATION_JSON))
-        .with_header(ContentLength(json.len() as u64))
-        .with_body(json)
+    HyperResponse::builder()
+        .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(CONTENT_LENGTH, json.len())
+        .body(json.into())
+        .unwrap()
 }
 
 const UKNOWN_NAME: &str = "unknown";
