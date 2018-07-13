@@ -1,26 +1,23 @@
 use super::subs::short_response;
 use data_encoding::BASE64;
+use error::Error;
 use futures::{future, Future, Stream};
 use hyper::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, SET_COOKIE};
-use hyperx::header::{Header, Authorization, Bearer, Cookie};
-use hyper::{Method, Request, Response, StatusCode, Body};
+use hyper::{Body, Method, Request, Response, StatusCode};
+use hyperx::header::{Authorization, Bearer, Cookie, Header};
 use ring::digest::{digest, SHA256};
 use ring::hmac;
 use ring::rand::{SecureRandom, SystemRandom};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use url::form_urlencoded;
-use error::Error;
 
 type AuthResult = Result<(Request<Body>, ()), Response<Body>>;
-type AuthFuture = Box<Future<Item = AuthResult, Error = Error>+Send>;
+type AuthFuture = Box<Future<Item = AuthResult, Error = Error> + Send>;
 
 pub trait Authenticator: Send + Sync {
     type Credentials;
-    fn authenticate(
-        &self,
-        req: Request<Body>,
-    ) -> AuthFuture;
+    fn authenticate(&self, req: Request<Body>) -> AuthFuture;
 }
 
 #[derive(Clone)]
@@ -53,53 +50,54 @@ impl Authenticator for SharedSecretAuthenticator {
         if req.method() == &Method::POST && req.uri().path() == "/authenticate" {
             debug!("Authentication request");
             let auth = self.clone();
-            return Box::new(req.into_body().concat2()
-            .map_err(|e| Error::new_with_cause(e))
-            .map(move |b| {
-                let params = form_urlencoded::parse(b.as_ref())
-                    .into_owned()
-                    .collect::<HashMap<String, String>>();
-                if let Some(secret) = params.get("secret") {
-                    debug!("Authenticating user");
-                    if auth.auth_token_ok(secret) {
-                        debug!("Authentication success");
-                        let token = auth.new_auth_token();
-                        Err(Response::builder()
-                            .header(CONTENT_TYPE, "text/plain")
-                            .header(CONTENT_LENGTH, token.len())
-                            .header(SET_COOKIE, format!(
-                                "{}={}; Max-Age={}",
-                                COOKIE_NAME,
-                                token,
-                                10 * 365 * 24 * 3600
-                            ).as_str())
-                            .body(token.into())
-                            .unwrap())
-                    } else {
-                        deny()
-                    }
-                } else {
-                    deny()
-                }
-            }));
+            return Box::new(
+                req.into_body()
+                    .concat2()
+                    .map_err(Error::new_with_cause)
+                    .map(move |b| {
+                        let params = form_urlencoded::parse(b.as_ref())
+                            .into_owned()
+                            .collect::<HashMap<String, String>>();
+                        if let Some(secret) = params.get("secret") {
+                            debug!("Authenticating user");
+                            if auth.auth_token_ok(secret) {
+                                debug!("Authentication success");
+                                let token = auth.new_auth_token();
+                                Err(Response::builder()
+                                    .header(CONTENT_TYPE, "text/plain")
+                                    .header(CONTENT_LENGTH, token.len())
+                                    .header(
+                                        SET_COOKIE,
+                                        format!(
+                                            "{}={}; Max-Age={}",
+                                            COOKIE_NAME,
+                                            token,
+                                            10 * 365 * 24 * 3600
+                                        ).as_str(),
+                                    )
+                                    .body(token.into())
+                                    .unwrap())
+                            } else {
+                                deny()
+                            }
+                        } else {
+                            deny()
+                        }
+                    }),
+            );
         } else {
             // And in this part we check token
             let mut token = req
                 .headers()
                 .get(AUTHORIZATION)
-                .and_then(|h| {
-                    Authorization::<Bearer>::parse_header(&h.as_bytes().into()).ok()
-                })
+                .and_then(|h| Authorization::<Bearer>::parse_header(&h.as_bytes().into()).ok())
                 .map(|a| a.0.token.to_owned());
             if token.is_none() {
                 token = req
                     .headers()
                     .get(COOKIE)
-                    .and_then(|h| {
-                        Cookie::parse_header(&h.as_bytes().into()).ok()
-                    }).
-                    and_then(|c| c.get(COOKIE_NAME)
-                        .map(|v| v.to_owned()));
+                    .and_then(|h| Cookie::parse_header(&h.as_bytes().into()).ok())
+                    .and_then(|c| c.get(COOKIE_NAME).map(|v| v.to_owned()));
             }
 
             if token.is_none() || !self.token_ok(&token.unwrap()) {
@@ -152,7 +150,7 @@ struct Token {
     signature: [u8; 32],
 }
 
-fn prepare_data(r: &[u8; 32], v: &[u8; 8]) -> [u8; 40] {
+fn prepare_data(r: &[u8; 32], v: [u8; 8]) -> [u8; 40] {
     let mut to_sign = [0u8; 40];
     to_sign[0..32].copy_from_slice(&r[..]);
     to_sign[32..40].copy_from_slice(&v[..]);
@@ -174,7 +172,7 @@ impl Token {
             .expect("Cannot generate random number");
         let validity: u64 = now() + token_validity_hours * 3600;
         let validity: [u8; 8] = unsafe { ::std::mem::transmute(validity.to_be()) };
-        let to_sign = prepare_data(&random, &validity);
+        let to_sign = prepare_data(&random, validity);
         let key = hmac::SigningKey::new(&SHA256, secret);
         let sig = hmac::sign(&key, &to_sign);
         let slice = sig.as_ref();
@@ -191,7 +189,7 @@ impl Token {
 
     fn is_valid(&self, secret: &[u8]) -> bool {
         let key = hmac::VerificationKey::new(&SHA256, secret);
-        let data = prepare_data(&self.random, &self.validity);
+        let data = prepare_data(&self.random, self.validity);
         if hmac::verify(&key, &data, &self.signature).is_err() {
             return false;
         };

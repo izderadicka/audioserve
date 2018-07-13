@@ -356,7 +356,7 @@ pub fn parse_args() -> Result<(), Error> {
 pub fn init_default_config() {
     unsafe {
         if CONFIG.is_some() {
-            return
+            return;
         }
     }
 

@@ -2,8 +2,8 @@
 extern crate clap;
 extern crate data_encoding;
 extern crate futures;
-extern crate hyperx;
 extern crate hyper;
+extern crate hyperx;
 #[macro_use]
 extern crate log;
 extern crate mime;
@@ -29,13 +29,11 @@ extern crate simple_thread_pool;
 #[cfg(feature = "tls")]
 extern crate native_tls;
 #[cfg(feature = "tls")]
-extern crate tokio_proto;
-#[cfg(feature = "tls")]
 extern crate tokio_tls;
 
 use config::{get_config, parse_args};
-use hyper::{Server as HttpServer};
 use hyper::rt::Future;
+use hyper::Server as HttpServer;
 use ring::rand::{SecureRandom, SystemRandom};
 use services::auth::SharedSecretAuthenticator;
 use services::search::Search;
@@ -51,8 +49,8 @@ use std::sync::Arc;
 use native_tls::{Pkcs12, TlsAcceptor};
 
 mod config;
-mod services;
 mod error;
+mod services;
 
 #[cfg(feature = "tls")]
 fn load_private_key<P>(file: P, pass: Option<&String>) -> Result<Pkcs12, io::Error>
@@ -116,12 +114,11 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
 
     match get_config().ssl_key_file.as_ref() {
         None => {
-            let server = HttpServer::bind(&get_config().local_addr)
-            .serve(move || {
+            let server = HttpServer::bind(&get_config().local_addr).serve(move || {
                 let s: Result<_, error::Error> = Ok(svc.clone());
                 s
-                });
-            
+            });
+
             info!("Server listening on {}", &get_config().local_addr);
             hyper::rt::run(server.map_err(|e| error!("Server error {}", e)));
         }

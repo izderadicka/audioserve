@@ -161,7 +161,7 @@ impl Transcoder {
         &self,
         file: S,
         seek: Option<f32>,
-        mut body_tx: futures::sync::mpsc::Sender<hyper::Chunk>
+        mut body_tx: futures::sync::mpsc::Sender<hyper::Chunk>,
     ) {
         let mut cmd = self.build_command(&file, seek);
         match cmd.spawn() {

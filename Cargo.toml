@@ -28,7 +28,7 @@ regex = "1.0"
 # for ssl
 tokio-tls = {version="0.1", features=["tokio-proto"], optional=true}
 native-tls = {version="0.1", optional=true}
-tokio-proto = {version="0.1", optional=true}
+
 
 [dependencies.taglib]
 git = "https://github.com/ebassi/taglib-rust"
@@ -38,6 +38,6 @@ git = "https://github.com/izderadicka/simple-thread-pool.git"
 
 [features]
 default = ["tls", "symlinks"]
-tls=["tokio-tls", "native-tls", "tokio-proto"]
+tls=["tokio-tls", "native-tls"]
 symlinks=[]
 

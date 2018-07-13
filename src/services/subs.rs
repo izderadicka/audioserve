@@ -4,15 +4,16 @@ use super::transcode::{QualityLevel, Transcoder};
 use super::types::*;
 use super::Counter;
 use config::get_config;
+use error::Error;
 use futures::future::{self, Future};
 use futures::sync::{mpsc, oneshot};
 use futures::{Sink, Stream};
 use hyper::header::{
-    ACCEPT_RANGES, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_RANGE, 
-    CONTENT_TYPE, LAST_MODIFIED, HeaderValue
+    HeaderValue, ACCEPT_RANGES, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE,
+    LAST_MODIFIED,
 };
-use hyperx::header::{ContentRangeSpec, ContentRange, CacheControl, CacheDirective, LastModified};
-use hyper::{Response as HyperResponse, Chunk, StatusCode, Body};
+use hyper::{Body, Chunk, Response as HyperResponse, StatusCode};
+use hyperx::header::{CacheControl, CacheDirective, ContentRange, ContentRangeSpec, LastModified};
 use mime;
 use mime_guess::guess_mime_type;
 use serde_json;
@@ -23,7 +24,6 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::thread;
 use taglib;
-use ::error::Error;
 
 const BUF_SIZE: usize = 8 * 1024;
 pub const NOT_FOUND_MESSAGE: &str = "Not Found";
@@ -31,9 +31,7 @@ const THREAD_SEND_ERROR: &str = "Cannot communicate with other thread";
 
 type Response = HyperResponse<Body>;
 
-pub type ResponseFuture = Box<Future<Item = Response, Error = Error>+Send>;
-
-
+pub type ResponseFuture = Box<Future<Item = Response, Error = Error> + Send>;
 
 pub fn short_response(status: StatusCode, msg: &'static str) -> Response {
     HyperResponse::builder()
@@ -115,34 +113,38 @@ fn serve_file_from_fs(
             let (start, content_len) = match range {
                 Some((s, e, l)) => {
                     let range = ContentRange(ContentRangeSpec::Bytes {
-                            range: Some((s, e)),
-                            instance_length: Some(file_sz),
-                        });
-                    res.headers_mut().insert(CONTENT_RANGE, 
-                    HeaderValue::from_str(&format!("{}",range)).unwrap());
+                        range: Some((s, e)),
+                        instance_length: Some(file_sz),
+                    });
+                    res.headers_mut().insert(
+                        CONTENT_RANGE,
+                        HeaderValue::from_str(&format!("{}", range)).unwrap(),
+                    );
                     *res.status_mut() = StatusCode::PARTIAL_CONTENT;
                     (s, l)
                 }
                 None => {
-                    res.headers_mut().insert(ACCEPT_RANGES, 
-                        HeaderValue::from_str("bytes").unwrap());
+                    res.headers_mut()
+                        .insert(ACCEPT_RANGES, HeaderValue::from_str("bytes").unwrap());
                     (0, file_sz)
                 }
             };
 
-            res.headers_mut().insert(CONTENT_LENGTH, 
-                HeaderValue::from_str(&format!("{}",content_len)).unwrap());
+            res.headers_mut().insert(
+                CONTENT_LENGTH,
+                HeaderValue::from_str(&format!("{}", content_len)).unwrap(),
+            );
             if let Some(age) = caching {
-                let cache = CacheControl(vec![
-                    CacheDirective::Public,
-                    CacheDirective::MaxAge(age),
-                ]);
-                res.headers_mut().insert(CACHE_CONTROL, 
-                    HeaderValue::from_str(&format!("{}",cache)).unwrap());
+                let cache = CacheControl(vec![CacheDirective::Public, CacheDirective::MaxAge(age)]);
+                res.headers_mut().insert(
+                    CACHE_CONTROL,
+                    HeaderValue::from_str(&format!("{}", cache)).unwrap(),
+                );
                 if let Some(last_modified) = last_modified {
                     let lm = LastModified(last_modified.into());
-                    res.headers_mut().insert(LAST_MODIFIED,
-                        HeaderValue::from_str(&format!("{}",lm)).unwrap()
+                    res.headers_mut().insert(
+                        LAST_MODIFIED,
+                        HeaderValue::from_str(&format!("{}", lm)).unwrap(),
                     );
                 }
             }
@@ -275,7 +277,7 @@ pub fn send_file(
 }
 
 fn box_rx(rx: ::futures::sync::oneshot::Receiver<Response>) -> ResponseFuture {
-    Box::new(rx.map_err(|e| Error::new_with_cause(e)))
+    Box::new(rx.map_err(Error::new_with_cause))
 }
 
 pub fn get_folder(
@@ -461,8 +463,8 @@ pub fn search(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json;
     use config::init_default_config;
+    use serde_json;
 
     #[test]
     fn test_list_dir() {

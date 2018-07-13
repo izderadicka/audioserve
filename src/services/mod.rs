@@ -7,11 +7,12 @@ use self::subs::{
 use self::transcode::QualityLevel;
 use config::get_config;
 use futures::{future, Future};
-use hyper::header::{ HeaderValue, ACCESS_CONTROL_ALLOW_CREDENTIALS, 
-ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN, RANGE};
-use hyper::{Body, Request, Response, Method, StatusCode};
+use hyper::header::{
+    HeaderValue, ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN, RANGE,
+};
 use hyper::service::Service;
-use hyperx::header::{Header,Range};
+use hyper::{Body, Method, Request, Response, StatusCode};
+use hyperx::header::{Header, Range};
 use percent_encoding::percent_decode;
 use regex::Regex;
 use simple_thread_pool::Pool;
@@ -60,7 +61,11 @@ fn get_subpath(path: &str, prefix: &str) -> PathBuf {
     Path::new(&path).strip_prefix(prefix).unwrap().to_path_buf()
 }
 
-fn add_cors_headers<T: AsRef<str>>(mut resp: Response<Body>, origin: Option<T>, enabled: bool) -> Response<Body> {
+fn add_cors_headers<T: AsRef<str>>(
+    mut resp: Response<Body>,
+    origin: Option<T>,
+    enabled: bool,
+) -> Response<Body> {
     if enabled {
         return resp;
     }
@@ -69,7 +74,10 @@ fn add_cors_headers<T: AsRef<str>>(mut resp: Response<Body>, origin: Option<T>, 
             if let Ok(origin_value) = HeaderValue::from_str(o.as_ref()) {
                 let headers = resp.headers_mut();
                 headers.append(ACCESS_CONTROL_ALLOW_ORIGIN, origin_value);
-                headers.append(ACCESS_CONTROL_ALLOW_CREDENTIALS, HeaderValue::from_static("true"));
+                headers.append(
+                    ACCESS_CONTROL_ALLOW_CREDENTIALS,
+                    HeaderValue::from_static("true"),
+                );
             }
             resp
         }
@@ -80,8 +88,8 @@ fn add_cors_headers<T: AsRef<str>>(mut resp: Response<Body>, origin: Option<T>, 
 impl Service for FileSendService {
     type ReqBody = Body;
     type ResBody = Body;
-    type Error =  ::error::Error;
-    type Future = Box<Future<Item = Response<Self::ResBody>, Error = Self::Error>+Send>;
+    type Error = ::error::Error;
+    type Future = Box<Future<Item = Response<Self::ResBody>, Error = Self::Error> + Send>;
     fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
         if self.pool.queue_size() > get_config().pool_size.queue_size {
             warn!("Server is busy, refusing request");
@@ -109,7 +117,9 @@ impl Service for FileSendService {
         let searcher = self.search.clone();
         let transcoding = self.transcoding.clone();
         let cors = get_config().cors;
-        let origin = req.headers().get(ORIGIN)
+        let origin = req
+            .headers()
+            .get(ORIGIN)
             .and_then(|v| v.to_str().ok())
             .map(|v| v.to_owned());
 
@@ -136,7 +146,8 @@ impl FileSendService {
         transcoding: TranscodingDetails,
     ) -> ResponseFuture {
         let mut params = req
-            .uri().query()
+            .uri()
+            .query()
             .map(|query| form_urlencoded::parse(query.as_bytes()).collect::<HashMap<_, _>>());
         match *req.method() {
             Method::GET => {
@@ -175,9 +186,14 @@ impl FileSendService {
                     }
                     let base_dir = &get_config().base_dirs[colllection_index];
                     if path.starts_with("/audio/") {
-                        debug!("Received request with following headers {:?}", req.headers());
+                        debug!(
+                            "Received request with following headers {:?}",
+                            req.headers()
+                        );
 
-                        let range = req.headers().get(RANGE)
+                        let range = req
+                            .headers()
+                            .get(RANGE)
                             .and_then(|h| Range::parse_header(&h.as_ref().into()).ok());
                         let bytes_range = match range {
                             Some(Range::Bytes(bytes_ranges)) => {
