@@ -5,9 +5,8 @@ use super::types::*;
 use super::Counter;
 use config::get_config;
 use error::Error;
-use futures::future::{self, Future};
-use futures::sync::{mpsc, oneshot};
-use futures::{Sink, Stream};
+use futures::future::{self, Future, poll_fn};
+use futures::{Async, Stream};
 use hyper::header::{
     HeaderValue, ACCEPT_RANGES, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE,
     LAST_MODIFIED,
@@ -17,17 +16,18 @@ use hyperx::header::{CacheControl, CacheDirective, ContentRange, ContentRangeSpe
 use mime;
 use mime_guess::guess_mime_type;
 use serde_json;
-use simple_thread_pool::Pool;
-use std::fs::{self, File};
-use std::io::{self, Read, Seek, SeekFrom};
+use std::fs;
+use std::io::{self, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::thread;
 use taglib;
+use tokio::io::AsyncRead;
+use tokio_threadpool::blocking;
 
-const BUF_SIZE: usize = 8 * 1024;
 pub const NOT_FOUND_MESSAGE: &str = "Not Found";
-const THREAD_SEND_ERROR: &str = "Cannot communicate with other thread";
+const SEVER_ERROR_TRANSCODING:&str = "Server error during transcoding process";
 
 type Response = HyperResponse<Body>;
 
@@ -69,161 +69,153 @@ where
 }
 
 fn serve_file_transcoded(
-    full_path: &Path,
+    full_path: PathBuf,
     seek: Option<f32>,
-    transcoder: &Transcoder,
-    tx: ::futures::sync::oneshot::Sender<Response>,
-) {
-    let (body_tx, body_rx) = mpsc::channel(1);
-    let resp = HyperResponse::builder()
-        .header(CONTENT_TYPE, transcoder.transcoded_mime().as_ref())
-        .header("X-Transcode", transcoder.transcoding_params().as_bytes())
-        .body(Body::wrap_stream(body_rx.map_err(|_e| Error::new())))
-        .unwrap();
-    tx.send(resp).expect(THREAD_SEND_ERROR);
+    transcoder: &Transcoder
+) -> ResponseFuture {
+    match  transcoder.transcode(full_path, seek) {
+        Ok(stream) => {
+            let resp = HyperResponse::builder()
+            .header(CONTENT_TYPE, transcoder.transcoded_mime().as_ref())
+            .header("X-Transcode", transcoder.transcoding_params().as_bytes())
+            .body(Body::wrap_stream(stream.map_err(Error::new_with_cause)))
+            .unwrap();
 
-    transcoder.transcode(full_path, seek, body_tx);
+            Box::new(future::ok(resp))
+        },
+        Err(e) => {
+            error!("Cannot create transcoded stream, error: {}", e);
+            Box::new(future::ok(short_response(StatusCode::INTERNAL_SERVER_ERROR, SEVER_ERROR_TRANSCODING)))
+        }
+    }
+    
+    
+
+   
+}
+
+
+pub struct ChunkStream<T: AsyncRead> {
+    src: Option<T>,
+    remains: u64,
+    buf: [u8; 8 * 1024],
+}
+
+impl<T: AsyncRead> Stream for ChunkStream<T> {
+    type Item = Chunk;
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
+        if self.src.is_none() {
+            error!("Polling after stream is done");
+            return Ok(Async::Ready(None));
+        }
+         if self.remains == 0 {
+             self.src.take();
+            return Ok(Async::Ready(None));
+        }
+
+        let read = try_ready!{self.src.as_mut().unwrap().poll_read(&mut self.buf)};
+        if read == 0 {
+            self.src.take();
+            return Ok(Async::Ready(None));
+        } else {
+            let to_send = self.remains.min(read as u64);
+            self.remains -= to_send;
+            let chunk: Chunk = self.buf[..to_send as usize].to_vec().into();
+            Ok(Async::Ready(Some(chunk)))
+        }
+    }
+}
+
+impl<T: AsyncRead> ChunkStream<T> {
+    pub fn new(src: T, remains: u64) -> Self {
+        ChunkStream {
+            src:Some(src),
+            remains,
+            buf: [0u8; 8 * 1024],
+        }
+    }
 }
 
 fn serve_file_from_fs(
     full_path: &Path,
     range: Option<::hyperx::header::ByteRangeSpec>,
     caching: Option<u32>,
-    tx: ::futures::sync::oneshot::Sender<Response>,
-) {
-    match File::open(full_path) {
-        Ok(mut file) => {
-            let (mut body_tx, body_rx) = mpsc::channel(1);
-            let meta = file.metadata().expect("File stat error");
-            let file_sz = meta.len();
-            let last_modified = meta.modified().ok();
-            let mime = guess_mime_type(&full_path);
-            let mut res = HyperResponse::builder()
-                .header(CONTENT_TYPE, mime.as_ref())
-                .body(Body::wrap_stream(body_rx.map_err(|_e| Error::new())))
-                .unwrap();
-
-            let range = range
-                .and_then(|r| r.to_satisfiable_range(file_sz))
-                .map(|(s, e)| {
-                    assert!(e >= s);
-                    (s, e, e - s + 1)
-                });
-
-            let (start, content_len) = match range {
-                Some((s, e, l)) => {
-                    let range = ContentRange(ContentRangeSpec::Bytes {
-                        range: Some((s, e)),
-                        instance_length: Some(file_sz),
-                    });
-                    res.headers_mut().insert(
-                        CONTENT_RANGE,
-                        HeaderValue::from_str(&format!("{}", range)).unwrap(),
-                    );
-                    *res.status_mut() = StatusCode::PARTIAL_CONTENT;
-                    (s, l)
-                }
-                None => {
-                    res.headers_mut()
-                        .insert(ACCEPT_RANGES, HeaderValue::from_str("bytes").unwrap());
-                    (0, file_sz)
-                }
-            };
-
-            res.headers_mut().insert(
-                CONTENT_LENGTH,
-                HeaderValue::from_str(&format!("{}", content_len)).unwrap(),
-            );
-            if let Some(age) = caching {
-                let cache = CacheControl(vec![CacheDirective::Public, CacheDirective::MaxAge(age)]);
-                res.headers_mut().insert(
-                    CACHE_CONTROL,
-                    HeaderValue::from_str(&format!("{}", cache)).unwrap(),
-                );
-                if let Some(last_modified) = last_modified {
-                    let lm = LastModified(last_modified.into());
-                    res.headers_mut().insert(
-                        LAST_MODIFIED,
-                        HeaderValue::from_str(&format!("{}", lm)).unwrap(),
-                    );
-                }
-            }
-
-            tx.send(res).expect(THREAD_SEND_ERROR);
-            let mut buf = [0u8; BUF_SIZE];
-            if start > 0 {
-                file.seek(SeekFrom::Start(start)).expect("Seek error");
-            }
-            let mut remains = content_len as usize;
-            loop {
-                match file.read(&mut buf) {
-                    Ok(n) => if n == 0 {
-                        trace!("Received 0");
-                        body_tx.close().expect(THREAD_SEND_ERROR);
-                        break;
-                    } else {
-                        let to_send = n.min(remains);
-                        trace!("Received {}, remains {}, sending {}", n, remains, to_send);
-                        let slice = buf[..to_send].to_vec();
-                        let c: Chunk = slice.into();
-                        match body_tx.send(c).wait() {
-                            Ok(t) => body_tx = t,
-                            Err(_) => break,
-                        };
-
-                        if remains <= n {
-                            trace!("All send");
-                            body_tx.close().expect(THREAD_SEND_ERROR);
-                            break;
-                        } else {
-                            remains -= n
+) -> ResponseFuture {
+    let filename: PathBuf = full_path.into(); // we need to copy for lifetime issues as File::open and closures require 'static lifetime
+    let filename2: PathBuf = full_path.into();
+    let filename3: PathBuf = full_path.into();
+    Box::new(
+        ::tokio_fs::file::File::open(filename)
+            .and_then(move |file| {
+                file.metadata().and_then(move |(file, meta)| {
+                    let file_len = meta.len();
+                    let last_modified = meta.modified().ok();
+                    let mime = guess_mime_type(filename2);
+                    let mut resp = HyperResponse::builder();
+                    resp.header(CONTENT_TYPE, mime.as_ref());
+                    if let Some(age) = caching {
+                        let cache =
+                            CacheControl(vec![CacheDirective::Public, CacheDirective::MaxAge(age)]);
+                        resp.header(CACHE_CONTROL, format!("{}", cache).as_bytes());
+                        if let Some(last_modified) = last_modified {
+                            let lm = LastModified(last_modified.into());
+                            resp.header(LAST_MODIFIED, format!("{}", lm).as_bytes());
                         }
-                    },
-
-                    Err(e) => {
-                        error!("Sending file error {}", e);
-                        break;
                     }
-                }
-            }
-        }
-        Err(e) => {
-            error!("File opening error {}", e);
-            tx.send(short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE))
-                .expect(THREAD_SEND_ERROR);
-        }
-    }
-}
-
-macro_rules! spawn_in_pool {
-    ($pool:ident, $tx:ident, $rx:ident, $f:expr) => {
-        let ($tx, $rx) = oneshot::channel();
-        if $pool.spawn($f).is_err() {
-            return short_response_boxed(
-                StatusCode::SERVICE_UNAVAILABLE,
-                super::OVERLOADED_MESSAGE,
-            );
-        }
-        return box_rx($rx);
-    };
+                    let (start, end) = match range {
+                        Some(range) => match range.to_satisfiable_range(file_len) {
+                            Some(l) => {
+                                println!(
+                                    "Range is {} and limits are {:?}, length {}",
+                                    range, l, file_len
+                                );
+                                resp.status(StatusCode::PARTIAL_CONTENT);
+                                let h = ContentRange(ContentRangeSpec::Bytes {
+                                    range: Some((l.0, l.1)),
+                                    instance_length: Some(file_len),
+                                });
+                                resp.header(
+                                    CONTENT_RANGE,
+                                    HeaderValue::from_str(&format!("{}", h)).unwrap(),
+                                );
+                                l
+                            }
+                            None => {
+                                eprintln!("Wrong range {}", range);
+                                (0, file_len - 1)
+                            }
+                        },
+                        None => {
+                            resp.status(StatusCode::OK);
+                            resp.header(ACCEPT_RANGES, "bytes");
+                            (0, file_len - 1)
+                        }
+                    };
+                    file.seek(SeekFrom::Start(start))
+                        .map(move |(file, _pos)| {
+                            let stream = ChunkStream::new(file, end - start + 1);
+                            resp.header(CONTENT_LENGTH, end - start + 1)
+                                .body(Body::wrap_stream(stream))
+                                .unwrap()
+                        })
+                })
+            })
+            .or_else(move |_| {
+                error!("Error when sending file {:?}", filename3);
+                Ok(short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE))
+            }),
+    )
 }
 
 pub fn send_file_simple(
     base_path: &'static Path,
     file_path: PathBuf,
     cache: Option<u32>,
-    mut pool: Pool,
 ) -> ResponseFuture {
-    spawn_in_pool!(pool, tx, rx, move || {
-        let full_path = base_path.join(&file_path);
-        if full_path.exists() {
-            serve_file_from_fs(&full_path, None, cache, tx);
-        } else {
-            error!("File {:?} does not exists", full_path);
-            tx.send(short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE))
-                .expect(THREAD_SEND_ERROR);
-        }
-    });
+    let full_path = base_path.join(&file_path);
+    serve_file_from_fs(&full_path, None, cache)
 }
 
 pub fn send_file(
@@ -231,71 +223,61 @@ pub fn send_file(
     file_path: PathBuf,
     range: Option<::hyperx::header::ByteRangeSpec>,
     seek: Option<f32>,
-    mut pool: Pool,
     transcoding: super::TranscodingDetails,
     transcoding_quality: Option<QualityLevel>,
 ) -> ResponseFuture {
-    spawn_in_pool!(pool, tx, rx, move || {
-        let full_path = base_path.join(&file_path);
-        if full_path.exists() {
-            if transcoding_quality.is_some() {
-                debug!(
-                    "Sending file transcoded in quality {:?}",
-                    transcoding_quality
-                );
-                let counter = transcoding.transcodings;
-                let transcoder =
-                    Transcoder::new(get_config().transcoding.get(transcoding_quality.unwrap()));
-                let running_transcodings = counter.load(Ordering::SeqCst);
-                if running_transcodings >= transcoding.max_transcodings {
-                    warn!("Max transcodings reached {}", transcoding.max_transcodings);
-                    tx.send(short_response(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        "Max transcodings reached",
-                    )).expect(THREAD_SEND_ERROR)
-                } else {
-                    debug!(
-                        "Sendig file {:?} transcoded - remaining slots {}/{}",
-                        &full_path,
-                        transcoding.max_transcodings - running_transcodings - 1,
-                        transcoding.max_transcodings
-                    );
-                    guarded_spawn(counter, move || {
-                        serve_file_transcoded(&full_path, seek, &transcoder, tx)
-                    });
-                }
+    let full_path = base_path.join(&file_path);
+    if transcoding_quality.is_some() {
+            debug!(
+                "Sending file transcoded in quality {:?}",
+                transcoding_quality
+            );
+            let counter = transcoding.transcodings;
+            let transcoder =
+                Transcoder::new(get_config().transcoding.get(transcoding_quality.unwrap()));
+            let running_transcodings = counter.load(Ordering::SeqCst);
+            if running_transcodings >= transcoding.max_transcodings {
+                warn!("Max transcodings reached {}", transcoding.max_transcodings);
+                Box::new(future::ok(short_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Max transcodings reached",
+                )))
             } else {
-                debug!("Sending file directly from fs");
-                serve_file_from_fs(&full_path, range, None, tx);
+                debug!(
+                    "Sendig file {:?} transcoded - remaining slots {}/{}",
+                    &full_path,
+                    transcoding.max_transcodings - running_transcodings - 1,
+                    transcoding.max_transcodings
+                );
+                serve_file_transcoded(full_path, seek, &transcoder)
             }
-        } else {
-            error!("File {:?} does not exists", full_path);
-            tx.send(short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE))
-                .expect(THREAD_SEND_ERROR);
-        }
-    });
-}
-
-fn box_rx(rx: ::futures::sync::oneshot::Receiver<Response>) -> ResponseFuture {
-    Box::new(rx.map_err(Error::new_with_cause))
+        
+    } else {
+        debug!("Sending file directly from fs");
+        serve_file_from_fs(&full_path, range, None)
+    }
 }
 
 pub fn get_folder(
     base_path: &'static Path,
-    folder_path: PathBuf,
-    mut pool: Pool,
+    folder_path: PathBuf
 ) -> ResponseFuture {
-    spawn_in_pool!(pool, tx, rx, move || {
-        match list_dir(&base_path, &folder_path) {
+    Box::new(
+        poll_fn( move || blocking( || {
+            list_dir(&base_path, &folder_path)
+        }))
+        .map(|res| {
+            match res {
             Ok(folder) => {
-                tx.send(json_response(&folder)).expect(THREAD_SEND_ERROR);
+               json_response(&folder)
             }
             Err(_) => {
-                tx.send(short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE))
-                    .expect(THREAD_SEND_ERROR);
+                short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
             }
-        }
-    });
+            } 
+        })
+        .map_err(|e| Error::new_with_cause(e))  
+    )
 }
 
 fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
@@ -451,13 +433,16 @@ pub fn transcodings_list() -> ResponseFuture {
 pub fn search(
     base_dir: &'static Path,
     searcher: Search,
-    query: String,
-    mut pool: Pool,
+    query: String
 ) -> ResponseFuture {
-    spawn_in_pool!(pool, tx, rx, move || {
-        let res = searcher.search(base_dir, query);
-        tx.send(json_response(&res)).expect(THREAD_SEND_ERROR);
-    });
+    Box::new(
+        poll_fn(move || {
+            blocking( || {
+           let res = searcher.search(base_dir, &query);
+           json_response(&res)
+        })})
+        .map_err(|e| Error::new_with_cause(e))
+    )
 }
 
 #[cfg(test)]

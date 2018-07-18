@@ -24,6 +24,11 @@ num_cpus = "1.8"
 ring = "0.12"
 data-encoding = "2.1"
 regex = "1.0"
+tokio = "0.1"
+tokio-fs = "0.1.2"
+tokio-process = "0.2"
+tokio-threadpool = "0.1"
+
 
 # for ssl
 tokio-tls = {version="0.1", features=["tokio-proto"], optional=true}

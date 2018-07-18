@@ -1,9 +1,13 @@
-use futures::{self, Future, Sink};
-use hyper::{self, Chunk};
+use futures::Future;
+use futures::future::Either;
 use mime::Mime;
 use std::ffi::OsStr;
-use std::io::Read;
 use std::process::{Command, Stdio};
+use services::subs::ChunkStream;
+use tokio_process::{CommandExt, ChildStdout};
+use std::time::{Instant, Duration};
+use tokio::timer::Delay;
+use error::Error;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -157,69 +161,58 @@ impl Transcoder {
         "audio/ogg".parse().unwrap()
     }
 
-    pub fn transcode<S: AsRef<OsStr>>(
+    pub fn transcode<S: AsRef<OsStr>+Send+'static>(
         &self,
         file: S,
-        seek: Option<f32>,
-        mut body_tx: futures::sync::mpsc::Sender<hyper::Chunk>,
-    ) {
+        seek: Option<f32>
+    ) -> Result<ChunkStream<ChildStdout>, Error> {
         let mut cmd = self.build_command(&file, seek);
-        match cmd.spawn() {
-            Ok(mut child) => if child.stdout.is_some() {
-                let mut buf = [0u8; 1024 * 8];
-                let mut out = child.stdout.take().unwrap();
-                loop {
-                    match out.read(&mut buf) {
-                        Ok(n) => if n == 0 {
-                            body_tx
-                                .close()
-                                .map(|_| ())
-                                .unwrap_or_else(|e| error!("Cannot close sink {:?}", e));
-                            debug!("finished sending transcoded data");
-                            break;
-                        } else {
-                            let slice = buf[..n].to_vec();
-                            let c: Chunk = slice.into();
-                            trace!("Sending {} bytes", n);
-                            match body_tx.send(c).wait() {
-                                Ok(t) => body_tx = t,
-                                Err(_) => {
-                                    warn!("Cannot send data to response stream");
-                                    break;
-                                }
-                            };
-                        },
-                        Err(e) => {
-                            error!("Stdout read error {:?}", e);
-                            break;
-                        }
-                    };
-                }
-                // if preliminary_end {
-
-                //     debug!("Ending preliminary, need to kill transcoding process");
-                //     child.kill().unwrap_or_else(|e| error!{"Cannot kill process: {}", e});
-                // }
-
-                //must drop out to close subprocess stdout
-                drop(out);
+        match cmd.spawn_async() {
+            Ok(mut child) => if child.stdout().is_some() {
+                let mut out = child.stdout().take().unwrap();
+                let stream = ChunkStream::new(out, ::std::u64::MAX);
+                let pid =  child.id();
                 debug!("waiting for transcode process to end");
-                match child.wait() {
-                    Ok(status) => if !status.success() {
-                        warn!(
-                            "Transconding of file {:?} failed with code {:?}",
-                            file.as_ref(),
-                            status.code()
-                        )
-                    } else {
-                        debug!("Finished transcoding process normally")
-                    },
-                    Err(e) => error!("Cannot get process status: {}", e),
-                }
+                ::tokio::spawn(
+                    child.select2(Delay::new(Instant::now() + Duration::from_secs(24*3600)))
+                    .then(move |res| {
+                        match res {
+                            Ok(Either::A((res, _d))) => {
+                                if res.success() {
+                                    debug!("Finished transcoding process normally")
+                                } else {
+                                    warn!(
+                                    "Transconding of file {:?} failed with code {:?}",
+                                    file.as_ref(),
+                                    res.code()
+                                )
+                                }
+                                Ok(())
+                            }
+                            Ok(Either::B((_d, mut child))) => {
+                                eprintln!("Transcoding of file {:?} took longer then deadline", file.as_ref());
+                                child.kill().unwrap_or_else(|e| eprintln!("Failed to kill process pid {} error {}", pid, e));
+                                Err(())
+                            }
+                            Err(Either::A((e, _))) => {
+                                eprintln!("Error running transcoding process for file {:?} error {}", file.as_ref(), e);
+                                Err(())
+                            }
+                            Err(Either::B((e, _))) => {
+                                eprintln!("Timer error on process pid {} error {}", pid, e);
+                                Err(())
+                            }
+                        }
+                    }));
+                    Ok(stream)
             } else {
-                error!("Cannot get stdout")
+                error!("Cannot get stdout");
+                Err(Error::new())
             },
-            Err(e) => error!("Cannot spawn child process: {:?}", e),
+            Err(e) => {
+                error!("Cannot spawn child process: {:?}", e);
+                Err(Error::new())
+            }
         }
     }
 }

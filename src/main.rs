@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate clap;
 extern crate data_encoding;
+#[macro_use]
 extern crate futures;
 extern crate hyper;
 extern crate hyperx;
@@ -24,7 +25,11 @@ extern crate taglib;
 extern crate url;
 #[macro_use]
 extern crate lazy_static;
+extern crate tokio;
+extern crate tokio_fs;
 extern crate simple_thread_pool;
+extern crate tokio_threadpool;  
+extern crate tokio_process;
 // for TLS
 #[cfg(feature = "tls")]
 extern crate native_tls;
@@ -91,11 +96,6 @@ fn gen_my_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error> {
 fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
     let cfg = get_config();
     let svc = FileSendService {
-        pool: simple_thread_pool::Builder::new()
-            .set_max_queue(cfg.pool_size.queue_size)
-            .set_min_threads(cfg.pool_size.min_threads)
-            .set_max_threads(cfg.pool_size.max_threads)
-            .build(),
         authenticator: get_config().shared_secret.as_ref().map(
             |secret| -> Arc<Box<services::auth::Authenticator<Credentials = ()>>> {
                 Arc::new(Box::new(SharedSecretAuthenticator::new(
@@ -120,7 +120,19 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
             });
 
             info!("Server listening on {}", &get_config().local_addr);
-            hyper::rt::run(server.map_err(|e| error!("Server error {}", e)));
+
+            //hyper::rt::run(server.map_err(|e| error!("Server error {}", e)));
+            let mut builder = tokio_threadpool::Builder::new();
+            builder.pool_size(cfg.pool_size.min_threads);
+            builder.keep_alive(Some(std::time::Duration::from_secs(3600)));
+            builder.max_blocking(cfg.pool_size.queue_size);
+            let mut rt = tokio::runtime::Builder::new()
+                .threadpool_builder(builder)
+                .build()
+                .unwrap();
+
+            rt.spawn(server.map_err(|e| error!("Error running server: {}", e)));
+            rt. shutdown_on_idle().wait().unwrap();
         }
         Some(file) => {
             #[cfg(feature = "tls")]
