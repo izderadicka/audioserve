@@ -112,7 +112,7 @@ pub struct Config {
     pub ssl_key_password: Option<String>,
     pub allow_symlinks: bool,
     pub thread_keep_alive: Option<u32>,
-    pub transcoding_deadline: u32
+    pub transcoding_deadline: u32,
 }
 type Parser<'a> = App<'a, 'a>;
 
@@ -296,24 +296,19 @@ pub fn parse_args() -> Result<(), Error> {
         );
     }
 
-    let transcoding_deadline = match args.value_of("transcoding-deadline")
-    .map(|x| x.parse()) {
+    let transcoding_deadline = match args.value_of("transcoding-deadline").map(|x| x.parse()) {
         Some(Ok(0)) => return Err("transcoding-deadline must be positive".into()),
         Some(Err(_)) => return Err("invalid value for transcoding-deadline".into()),
         Some(Ok(x)) => x,
-        None => 24
-
+        None => 24,
     };
 
-    let thread_keep_alive = match  args.value_of("thread-keep-alive")
-        .map(|x| x.parse()) {
-            Some(Ok(0)) => return Err("thread-keep-alive must be positive".into()),
-            Some(Err(_)) => return Err("invalid value for thread-keep-alive".into()),
-            Some(Ok(x)) => Some(x),
-            None => None
-        };
-
-    
+    let thread_keep_alive = match args.value_of("thread-keep-alive").map(|x| x.parse()) {
+        Some(Ok(0)) => return Err("thread-keep-alive must be positive".into()),
+        Some(Err(_)) => return Err("invalid value for thread-keep-alive".into()),
+        Some(Ok(x)) => Some(x),
+        None => None,
+    };
 
     let token_validity_days: u64 = args.value_of("token-validity-days").unwrap().parse()?;
     if token_validity_days < 10 {
@@ -326,7 +321,7 @@ pub fn parse_args() -> Result<(), Error> {
 
     let secret_file = match args.value_of("secret-file") {
         Some(s) => s.into(),
-        None => match ::std::env::home_dir() {
+        None => match ::dirs::home_dir() {
             Some(home) => home.join(".audioserve.secret"),
             None => "./.audioserve.secret".into(),
         },
@@ -373,7 +368,7 @@ pub fn parse_args() -> Result<(), Error> {
         ssl_key_password,
         allow_symlinks,
         thread_keep_alive,
-        transcoding_deadline
+        transcoding_deadline,
     };
     unsafe {
         CONFIG = Some(config);
@@ -406,7 +401,7 @@ pub fn init_default_config() {
         ssl_key_password: None,
         allow_symlinks: false,
         thread_keep_alive: None,
-        transcoding_deadline: 24
+        transcoding_deadline: 24,
     };
     unsafe {
         CONFIG = Some(config);

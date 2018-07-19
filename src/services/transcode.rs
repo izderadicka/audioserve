@@ -1,15 +1,15 @@
-use futures::Future;
+use config::get_config;
+use error::Error;
 use futures::future::Either;
+use futures::Future;
 use mime::Mime;
+use services::subs::ChunkStream;
 use std::ffi::OsStr;
 use std::process::{Command, Stdio};
-use services::subs::ChunkStream;
-use tokio_process::{CommandExt, ChildStdout};
-use std::time::{Instant, Duration};
-use tokio::timer::Delay;
-use error::Error;
 use std::sync::atomic::Ordering;
-use config::get_config;
+use std::time::{Duration, Instant};
+use tokio::timer::Delay;
+use tokio_process::{ChildStdout, CommandExt};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -163,11 +163,11 @@ impl Transcoder {
         "audio/ogg".parse().unwrap()
     }
 
-    pub fn transcode<S: AsRef<OsStr>+Send+'static>(
+    pub fn transcode<S: AsRef<OsStr> + Send + 'static>(
         &self,
         file: S,
         seek: Option<f32>,
-        counter: super::Counter
+        counter: &super::Counter,
     ) -> Result<ChunkStream<ChildStdout>, Error> {
         let mut cmd = self.build_command(&file, seek);
         let counter2 = counter.clone();
@@ -177,43 +177,59 @@ impl Transcoder {
                 let start = Instant::now();
                 let mut out = child.stdout().take().unwrap();
                 let stream = ChunkStream::new(out, ::std::u64::MAX);
-                let pid =  child.id();
+                let pid = child.id();
                 debug!("waiting for transcode process to end");
                 ::tokio::spawn(
-                    child.select2(Delay::new(Instant::now() + Duration::from_secs((get_config().transcoding_deadline*3600) as u64)))
-                    .then(move |res| {
-                        counter2.fetch_sub(1, Ordering::SeqCst);
-                        match res {
-                            Ok(Either::A((res, _d))) => {
-                                if res.success() {
-                                    debug!("Finished transcoding process of {:?} normally after {:?}",
+                    child
+                        .select2(Delay::new(
+                            Instant::now()
+                                + Duration::from_secs(
+                                    u64::from(get_config().transcoding_deadline * 3600),
+                                ),
+                        ))
+                        .then(move |res| {
+                            counter2.fetch_sub(1, Ordering::SeqCst);
+                            match res {
+                                Ok(Either::A((res, _d))) => {
+                                    if res.success() {
+                                        debug!("Finished transcoding process of {:?} normally after {:?}",
                                     file.as_ref(),
                                     Instant::now() - start)
-                                } else {
-                                    warn!(
-                                    "Transconding of file {:?} failed with code {:?}",
-                                    file.as_ref(),
-                                    res.code()
-                                )
+                                    } else {
+                                        warn!(
+                                            "Transconding of file {:?} failed with code {:?}",
+                                            file.as_ref(),
+                                            res.code()
+                                        )
+                                    }
+                                    Ok(())
                                 }
-                                Ok(())
+                                Ok(Either::B((_d, mut child))) => {
+                                    eprintln!(
+                                        "Transcoding of file {:?} took longer then deadline",
+                                        file.as_ref()
+                                    );
+                                    child.kill().unwrap_or_else(|e| {
+                                        eprintln!("Failed to kill process pid {} error {}", pid, e)
+                                    });
+                                    Err(())
+                                }
+                                Err(Either::A((e, _))) => {
+                                    eprintln!(
+                                        "Error running transcoding process for file {:?} error {}",
+                                        file.as_ref(),
+                                        e
+                                    );
+                                    Err(())
+                                }
+                                Err(Either::B((e, _))) => {
+                                    eprintln!("Timer error on process pid {} error {}", pid, e);
+                                    Err(())
+                                }
                             }
-                            Ok(Either::B((_d, mut child))) => {
-                                eprintln!("Transcoding of file {:?} took longer then deadline", file.as_ref());
-                                child.kill().unwrap_or_else(|e| eprintln!("Failed to kill process pid {} error {}", pid, e));
-                                Err(())
-                            }
-                            Err(Either::A((e, _))) => {
-                                eprintln!("Error running transcoding process for file {:?} error {}", file.as_ref(), e);
-                                Err(())
-                            }
-                            Err(Either::B((e, _))) => {
-                                eprintln!("Timer error on process pid {} error {}", pid, e);
-                                Err(())
-                            }
-                        }
-                    }));
-                    Ok(stream)
+                        }),
+                );
+                Ok(stream)
             } else {
                 error!("Cannot get stdout");
                 Err(Error::new())

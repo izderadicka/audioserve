@@ -27,8 +27,9 @@ extern crate url;
 extern crate lazy_static;
 extern crate tokio;
 extern crate tokio_fs;
-extern crate tokio_threadpool;  
 extern crate tokio_process;
+extern crate tokio_threadpool;
+extern crate dirs;
 // for TLS
 #[cfg(feature = "tls")]
 extern crate native_tls;
@@ -50,21 +51,21 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
 #[cfg(feature = "tls")]
-use native_tls::{Pkcs12, TlsAcceptor};
+use native_tls::Identity;
 
 mod config;
 mod error;
 mod services;
 
 #[cfg(feature = "tls")]
-fn load_private_key<P>(file: P, pass: Option<&String>) -> Result<Pkcs12, io::Error>
+fn load_private_key<P>(file: P, pass: Option<&String>) -> Result<Identity, io::Error>
 where
     P: AsRef<Path>,
 {
     let mut bytes = vec![];
     let mut f = File::open(file)?;
     f.read_to_end(&mut bytes)?;
-    let key = Pkcs12::from_der(&bytes, pass.unwrap_or(&String::new()))
+    let key = Identity::from_pkcs12(&bytes, pass.unwrap_or(&String::new()))
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     Ok(key)
 }
@@ -111,48 +112,72 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
         },
     };
 
-    match get_config().ssl_key_file.as_ref() {
+    let server: Box<Future<Item = (), Error = ()> + Send> = match get_config().ssl_key_file.as_ref()
+    {
         None => {
-            let server = HttpServer::bind(&get_config().local_addr).serve(move || {
-                let s: Result<_, error::Error> = Ok(svc.clone());
-                s
-            });
-
+            let server = HttpServer::bind(&get_config().local_addr)
+                .serve(move || {
+                    let s: Result<_, error::Error> = Ok(svc.clone());
+                    s
+                })
+                .map_err(|e| error!("Cannot start HTTP server due to error {}", e));
             info!("Server listening on {}", &get_config().local_addr);
-
-            //hyper::rt::run(server.map_err(|e| error!("Server error {}", e)));
-            let mut builder = tokio_threadpool::Builder::new();
-            builder.pool_size(cfg.pool_size.num_threads);
-            builder.keep_alive(cfg.thread_keep_alive.map(|secs| std::time::Duration::from_secs(secs as u64)));
-            builder.max_blocking(cfg.pool_size.queue_size);
-            let mut rt = tokio::runtime::Builder::new()
-                .threadpool_builder(builder)
-                .build()
-                .unwrap();
-
-            rt.spawn(server.map_err(|e| error!("Error running server: {}", e)));
-            rt. shutdown_on_idle().wait().unwrap();
+            Box::new(server)
         }
         Some(file) => {
             #[cfg(feature = "tls")]
-            panic!("No tls now");
-            // {
-            //     let private_key =
-            //         match load_private_key(file, get_config().ssl_key_password.as_ref()) {
-            //             Ok(s) => s,
-            //             Err(e) => {
-            //                 error!("Error loading SSL/TLS private key: {}", e);
-            //                 return Err(Box::new(e));
-            //             }
-            //         };
-            //     let tls_cx = TlsAcceptor::builder(private_key)?.build()?;
-            //     let proto = proto::Server::new(HttpServer::new(), tls_cx);
+            {
+                use futures::Stream;
+                use hyper::server::conn::Http;
+                use native_tls::TlsAcceptor;
+                use tokio::net::TcpListener;
+                use tokio_tls::TlsAcceptorExt;
 
-            //     let addr = cfg.local_addr;
-            //     let srv = TcpServer::new(proto, addr);
-            //     println!("TLS Listening on {}", addr);
-            //     srv.serve(move || Ok(svc.clone()));
-            // }
+                let private_key =
+                    match load_private_key(file, get_config().ssl_key_password.as_ref()) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            error!("Error loading SSL/TLS private key: {}", e);
+                            return Err(Box::new(e));
+                        }
+                    };
+                let tls_cx = TlsAcceptor::builder(private_key).build()?;
+
+                let addr = cfg.local_addr;
+                let srv = TcpListener::bind(&addr)?;
+                let http_proto = Http::new();
+                let http_server = http_proto
+                    .serve_incoming(
+                        srv.incoming().and_then(move |socket| {
+                            tls_cx
+                                .accept_async(socket)
+                                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+                        }),
+                        move || {
+                            let s: Result<_, error::Error> = Ok(svc.clone());
+                            s
+                        },
+                    )
+                    .then(|res| match res {
+                        Ok(conn) => Ok(Some(conn)),
+                        Err(e) => {
+                            error!("TLS error: {}", e);
+                            Ok(None)
+                        }
+                    })
+                    .for_each(|conn_opt| {
+                        if let Some(conn) = conn_opt {
+                            tokio::spawn(
+                                conn.and_then(|c| c.map_err(error::Error::new_with_cause))
+                                    .map_err(|e| error!("Connection error {}", e)),
+                            );
+                        }
+
+                        Ok(())
+                    });
+                info!("Server Listening on {} with TLS", addr);
+                Box::new(http_server)
+            }
 
             #[cfg(not(feature = "tls"))]
             {
@@ -162,7 +187,23 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
                 )
             }
         }
-    }
+    };
+
+    let mut builder = tokio_threadpool::Builder::new();
+    builder.pool_size(cfg.pool_size.num_threads);
+    builder.keep_alive(
+        cfg.thread_keep_alive
+            .map(|secs| std::time::Duration::from_secs(u64::from(secs))),
+    );
+    builder.max_blocking(cfg.pool_size.queue_size);
+    let mut rt = tokio::runtime::Builder::new()
+        .threadpool_builder(builder)
+        .build()
+        .unwrap();
+
+    rt.spawn(server);
+    rt.shutdown_on_idle().wait().unwrap();
+
     Ok(())
 }
 

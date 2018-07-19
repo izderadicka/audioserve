@@ -92,15 +92,15 @@ impl Service for FileSendService {
         if req.uri().path() == "/" {
             return send_file_simple(
                 &get_config().client_dir,
-                "index.html".into(),
-                Some(APP_STATIC_FILES_CACHE_AGE)
+                "index.html",
+                Some(APP_STATIC_FILES_CACHE_AGE),
             );
         };
         if req.uri().path() == "/bundle.js" {
             return send_file_simple(
                 &get_config().client_dir,
-                "bundle.js".into(),
-                Some(APP_STATIC_FILES_CACHE_AGE)
+                "bundle.js",
+                Some(APP_STATIC_FILES_CACHE_AGE),
             );
         }
         // from here everything must be authenticated
@@ -235,13 +235,13 @@ impl FileSendService {
                         send_file_simple(
                             base_dir,
                             get_subpath(&path, "/cover"),
-                            Some(FOLDER_INFO_FILES_CACHE_AGE)
+                            Some(FOLDER_INFO_FILES_CACHE_AGE),
                         )
                     } else if path.starts_with("/desc/") {
                         send_file_simple(
                             base_dir,
                             get_subpath(&path, "/desc"),
-                            Some(FOLDER_INFO_FILES_CACHE_AGE)
+                            Some(FOLDER_INFO_FILES_CACHE_AGE),
                         )
                     } else {
                         short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)

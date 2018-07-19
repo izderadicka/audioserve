@@ -5,7 +5,7 @@ use super::types::*;
 use super::Counter;
 use config::get_config;
 use error::Error;
-use futures::future::{self, Future, poll_fn};
+use futures::future::{self, poll_fn, Future};
 use futures::{Async, Stream};
 use hyper::header::{
     HeaderValue, ACCEPT_RANGES, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE,
@@ -25,7 +25,7 @@ use tokio::io::AsyncRead;
 use tokio_threadpool::blocking;
 
 pub const NOT_FOUND_MESSAGE: &str = "Not Found";
-const SEVER_ERROR_TRANSCODING:&str = "Server error during transcoding process";
+const SEVER_ERROR_TRANSCODING: &str = "Server error during transcoding process";
 
 type Response = HyperResponse<Body>;
 
@@ -47,29 +47,27 @@ fn serve_file_transcoded(
     full_path: PathBuf,
     seek: Option<f32>,
     transcoder: &Transcoder,
-    counter: Counter
+    counter: &Counter,
 ) -> ResponseFuture {
-    match  transcoder.transcode(full_path, seek, counter) {
+    match transcoder.transcode(full_path, seek, counter) {
         Ok(stream) => {
             let resp = HyperResponse::builder()
-            .header(CONTENT_TYPE, transcoder.transcoded_mime().as_ref())
-            .header("X-Transcode", transcoder.transcoding_params().as_bytes())
-            .body(Body::wrap_stream(stream.map_err(Error::new_with_cause)))
-            .unwrap();
+                .header(CONTENT_TYPE, transcoder.transcoded_mime().as_ref())
+                .header("X-Transcode", transcoder.transcoding_params().as_bytes())
+                .body(Body::wrap_stream(stream.map_err(Error::new_with_cause)))
+                .unwrap();
 
             Box::new(future::ok(resp))
-        },
+        }
         Err(e) => {
             error!("Cannot create transcoded stream, error: {}", e);
-            Box::new(future::ok(short_response(StatusCode::INTERNAL_SERVER_ERROR, SEVER_ERROR_TRANSCODING)))
+            Box::new(future::ok(short_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                SEVER_ERROR_TRANSCODING,
+            )))
         }
     }
-    
-    
-
-   
 }
-
 
 pub struct ChunkStream<T: AsyncRead> {
     src: Option<T>,
@@ -86,15 +84,15 @@ impl<T: AsyncRead> Stream for ChunkStream<T> {
             error!("Polling after stream is done");
             return Ok(Async::Ready(None));
         }
-         if self.remains == 0 {
-             self.src.take();
+        if self.remains == 0 {
+            self.src.take();
             return Ok(Async::Ready(None));
         }
 
         let read = try_ready!{self.src.as_mut().unwrap().poll_read(&mut self.buf)};
         if read == 0 {
             self.src.take();
-            return Ok(Async::Ready(None));
+            Ok(Async::Ready(None))
         } else {
             let to_send = self.remains.min(read as u64);
             self.remains -= to_send;
@@ -107,7 +105,7 @@ impl<T: AsyncRead> Stream for ChunkStream<T> {
 impl<T: AsyncRead> ChunkStream<T> {
     pub fn new(src: T, remains: u64) -> Self {
         ChunkStream {
-            src:Some(src),
+            src: Some(src),
             remains,
             buf: [0u8; 8 * 1024],
         }
@@ -169,13 +167,12 @@ fn serve_file_from_fs(
                             (0, file_len - 1)
                         }
                     };
-                    file.seek(SeekFrom::Start(start))
-                        .map(move |(file, _pos)| {
-                            let stream = ChunkStream::new(file, end - start + 1);
-                            resp.header(CONTENT_LENGTH, end - start + 1)
-                                .body(Body::wrap_stream(stream))
-                                .unwrap()
-                        })
+                    file.seek(SeekFrom::Start(start)).map(move |(file, _pos)| {
+                        let stream = ChunkStream::new(file, end - start + 1);
+                        resp.header(CONTENT_LENGTH, end - start + 1)
+                            .body(Body::wrap_stream(stream))
+                            .unwrap()
+                    })
                 })
             })
             .or_else(move |_| {
@@ -185,18 +182,18 @@ fn serve_file_from_fs(
     )
 }
 
-pub fn send_file_simple(
+pub fn send_file_simple<P:AsRef<Path>>(
     base_path: &'static Path,
-    file_path: PathBuf,
+    file_path: P,
     cache: Option<u32>,
 ) -> ResponseFuture {
     let full_path = base_path.join(&file_path);
     serve_file_from_fs(&full_path, None, cache)
 }
 
-pub fn send_file(
+pub fn send_file<P:AsRef<Path>>(
     base_path: &'static Path,
-    file_path: PathBuf,
+    file_path: P,
     range: Option<::hyperx::header::ByteRangeSpec>,
     seek: Option<f32>,
     transcoding: super::TranscodingDetails,
@@ -204,55 +201,43 @@ pub fn send_file(
 ) -> ResponseFuture {
     let full_path = base_path.join(&file_path);
     if transcoding_quality.is_some() {
+        debug!(
+            "Sending file transcoded in quality {:?}",
+            transcoding_quality
+        );
+        let counter = transcoding.transcodings;
+        let transcoder =
+            Transcoder::new(get_config().transcoding.get(transcoding_quality.unwrap()));
+        let running_transcodings = counter.load(Ordering::SeqCst);
+        if running_transcodings >= transcoding.max_transcodings {
+            warn!("Max transcodings reached {}", transcoding.max_transcodings);
+            Box::new(future::ok(short_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Max transcodings reached",
+            )))
+        } else {
             debug!(
-                "Sending file transcoded in quality {:?}",
-                transcoding_quality
+                "Sendig file {:?} transcoded - remaining slots {}/{}",
+                &full_path,
+                transcoding.max_transcodings - running_transcodings - 1,
+                transcoding.max_transcodings
             );
-            let counter = transcoding.transcodings;
-            let transcoder =
-                Transcoder::new(get_config().transcoding.get(transcoding_quality.unwrap()));
-            let running_transcodings = counter.load(Ordering::SeqCst);
-            if running_transcodings >= transcoding.max_transcodings {
-                warn!("Max transcodings reached {}", transcoding.max_transcodings);
-                Box::new(future::ok(short_response(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "Max transcodings reached",
-                )))
-            } else {
-                debug!(
-                    "Sendig file {:?} transcoded - remaining slots {}/{}",
-                    &full_path,
-                    transcoding.max_transcodings - running_transcodings - 1,
-                    transcoding.max_transcodings
-                );
-                serve_file_transcoded(full_path, seek, &transcoder, counter)
-            }
-        
+            serve_file_transcoded(full_path, seek, &transcoder, &counter)
+        }
     } else {
         debug!("Sending file directly from fs");
         serve_file_from_fs(&full_path, range, None)
     }
 }
 
-pub fn get_folder(
-    base_path: &'static Path,
-    folder_path: PathBuf
-) -> ResponseFuture {
+pub fn get_folder(base_path: &'static Path, folder_path: PathBuf) -> ResponseFuture {
     Box::new(
-        poll_fn( move || blocking( || {
-            list_dir(&base_path, &folder_path)
-        }))
-        .map(|res| {
-            match res {
-            Ok(folder) => {
-               json_response(&folder)
-            }
-            Err(_) => {
-                short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
-            }
-            } 
-        })
-        .map_err(|e| Error::new_with_cause(e))  
+        poll_fn(move || blocking(|| list_dir(&base_path, &folder_path)))
+            .map(|res| match res {
+                Ok(folder) => json_response(&folder),
+                Err(_) => short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE),
+            })
+            .map_err(Error::new_with_cause),
     )
 }
 
@@ -406,18 +391,14 @@ pub fn transcodings_list() -> ResponseFuture {
     Box::new(future::ok(json_response(&transcodings)))
 }
 
-pub fn search(
-    base_dir: &'static Path,
-    searcher: Search,
-    query: String
-) -> ResponseFuture {
+pub fn search(base_dir: &'static Path, searcher: Search, query: String) -> ResponseFuture {
     Box::new(
         poll_fn(move || {
-            blocking( || {
-           let res = searcher.search(base_dir, &query);
-           json_response(&res)
-        })})
-        .map_err(|e| Error::new_with_cause(e))
+            blocking(|| {
+                let res = searcher.search(base_dir, &query);
+                json_response(&res)
+            })
+        }).map_err(Error::new_with_cause),
     )
 }
 
