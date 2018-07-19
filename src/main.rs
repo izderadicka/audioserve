@@ -27,7 +27,6 @@ extern crate url;
 extern crate lazy_static;
 extern crate tokio;
 extern crate tokio_fs;
-extern crate simple_thread_pool;
 extern crate tokio_threadpool;  
 extern crate tokio_process;
 // for TLS
@@ -123,8 +122,8 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
 
             //hyper::rt::run(server.map_err(|e| error!("Server error {}", e)));
             let mut builder = tokio_threadpool::Builder::new();
-            builder.pool_size(cfg.pool_size.min_threads);
-            builder.keep_alive(Some(std::time::Duration::from_secs(3600)));
+            builder.pool_size(cfg.pool_size.num_threads);
+            builder.keep_alive(cfg.thread_keep_alive.map(|secs| std::time::Duration::from_secs(secs as u64)));
             builder.max_blocking(cfg.pool_size.queue_size);
             let mut rt = tokio::runtime::Builder::new()
                 .threadpool_builder(builder)

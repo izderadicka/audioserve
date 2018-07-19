@@ -20,8 +20,6 @@ use std::fs;
 use std::io::{self, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
-use std::thread;
 use taglib;
 use tokio::io::AsyncRead;
 use tokio_threadpool::blocking;
@@ -45,35 +43,13 @@ pub fn short_response_boxed(status: StatusCode, msg: &'static str) -> ResponseFu
     Box::new(future::ok(short_response(status, msg)))
 }
 
-struct GuardedCounter(Counter);
-impl Drop for GuardedCounter {
-    fn drop(&mut self) {
-        if thread::panicking() {
-            error!("Worker thread panicked")
-        }
-        self.0.fetch_sub(1, Ordering::SeqCst);
-    }
-}
-
-fn guarded_spawn<F>(counter: Counter, f: F) -> thread::JoinHandle<()>
-where
-    F: FnOnce() -> () + Send + 'static,
-{
-    counter.fetch_add(1, Ordering::SeqCst);
-    let gc = GuardedCounter(counter);
-    thread::spawn(move || {
-        f();
-        drop(gc);
-        //counter.fetch_sub(1, Ordering::SeqCst);
-    })
-}
-
 fn serve_file_transcoded(
     full_path: PathBuf,
     seek: Option<f32>,
-    transcoder: &Transcoder
+    transcoder: &Transcoder,
+    counter: Counter
 ) -> ResponseFuture {
-    match  transcoder.transcode(full_path, seek) {
+    match  transcoder.transcode(full_path, seek, counter) {
         Ok(stream) => {
             let resp = HyperResponse::builder()
             .header(CONTENT_TYPE, transcoder.transcoded_mime().as_ref())
@@ -249,7 +225,7 @@ pub fn send_file(
                     transcoding.max_transcodings - running_transcodings - 1,
                     transcoding.max_transcodings
                 );
-                serve_file_transcoded(full_path, seek, &transcoder)
+                serve_file_transcoded(full_path, seek, &transcoder, counter)
             }
         
     } else {
@@ -470,29 +446,6 @@ mod tests {
         let folder = list_dir("./", "test_data/").unwrap();
         let json = serde_json::to_string(&folder).unwrap();
         println!("JSON: {}", &json);
-    }
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::Arc;
-
-    #[test]
-    fn test_guarded_spawn() {
-        let c = Arc::new(AtomicUsize::new(0));
-        let c2 = c.clone();
-        guarded_spawn(c.clone(), move || {
-            println!("hey");
-            assert_eq!(c2.load(Ordering::SeqCst), 1)
-        }).join()
-            .unwrap();
-
-        assert_eq!(c.load(Ordering::SeqCst), 0);
-
-        let res = guarded_spawn(c.clone(), || {
-            println!("Will panic");
-            panic!("panic");
-        }).join();
-        assert!(res.is_err());
-
-        assert_eq!(c.load(Ordering::SeqCst), 0)
     }
 
     #[test]

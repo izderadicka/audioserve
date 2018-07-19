@@ -83,16 +83,14 @@ impl TranscodingConfig {
 
 #[derive(Clone, Debug)]
 pub struct ThreadPoolSize {
-    pub min_threads: usize,
-    pub max_threads: usize,
+    pub num_threads: usize,
     pub queue_size: usize,
 }
 
 impl ThreadPoolSize {
     fn default() -> Self {
         ThreadPoolSize {
-            min_threads: 4,
-            max_threads: 8,
+            num_threads: 8,
             queue_size: 100,
         }
     }
@@ -113,6 +111,8 @@ pub struct Config {
     pub ssl_key_file: Option<PathBuf>,
     pub ssl_key_password: Option<String>,
     pub allow_symlinks: bool,
+    pub thread_keep_alive: Option<u32>,
+    pub transcoding_deadline: u32
 }
 type Parser<'a> = App<'a, 'a>;
 
@@ -135,6 +135,11 @@ fn create_parser<'a>() -> Parser<'a> {
         .arg(Arg::with_name("large-thread-pool")
             .long("large-thread-pool")
             .help("Use larger thread pool (usually will not be needed)")            
+        )
+        .arg(Arg::with_name("thread-keep-alive")
+            .long("thread-keep-alive")
+            .takes_value(true)
+            .help("Thread in pool will shutdown after given seconds, if there is no work. Default is to keep threads forever.")
         )
         .arg(Arg::with_name("base_dir")
             .value_name("BASE_DIR")
@@ -167,6 +172,12 @@ fn create_parser<'a>() -> Parser<'a> {
             .long("max-transcodings")
             .takes_value(true)
             .help("Maximum number of concurrent transcodings [default: 2 * number of cores]")
+        )
+        .arg(Arg::with_name("transcoding-deadline")
+            .long("transcoding-deadline")
+            .takes_value(true)
+            .help("Max duration of transcoding process in hours. If takes longer process is killed. Default is 24h")
+
         )
         .arg(Arg::with_name("token-validity-days")
             .long("token-validity-days")
@@ -247,8 +258,7 @@ pub fn parse_args() -> Result<(), Error> {
 
     let pool_size = if args.is_present("large-thread-pool") {
         ThreadPoolSize {
-            min_threads: 8,
-            max_threads: 32,
+            num_threads: 16,
             queue_size: 1000,
         }
     } else {
@@ -285,6 +295,25 @@ pub fn parse_args() -> Result<(), Error> {
             "As transcodings are resource intesive, having more then 100 is not wise".into(),
         );
     }
+
+    let transcoding_deadline = match args.value_of("transcoding-deadline")
+    .map(|x| x.parse()) {
+        Some(Ok(0)) => return Err("transcoding-deadline must be positive".into()),
+        Some(Err(_)) => return Err("invalid value for transcoding-deadline".into()),
+        Some(Ok(x)) => x,
+        None => 24
+
+    };
+
+    let thread_keep_alive = match  args.value_of("thread-keep-alive")
+        .map(|x| x.parse()) {
+            Some(Ok(0)) => return Err("thread-keep-alive must be positive".into()),
+            Some(Err(_)) => return Err("invalid value for thread-keep-alive".into()),
+            Some(Ok(x)) => Some(x),
+            None => None
+        };
+
+    
 
     let token_validity_days: u64 = args.value_of("token-validity-days").unwrap().parse()?;
     if token_validity_days < 10 {
@@ -343,6 +372,8 @@ pub fn parse_args() -> Result<(), Error> {
         ssl_key_file,
         ssl_key_password,
         allow_symlinks,
+        thread_keep_alive,
+        transcoding_deadline
     };
     unsafe {
         CONFIG = Some(config);
@@ -374,6 +405,8 @@ pub fn init_default_config() {
         ssl_key_file: None,
         ssl_key_password: None,
         allow_symlinks: false,
+        thread_keep_alive: None,
+        transcoding_deadline: 24
     };
     unsafe {
         CONFIG = Some(config);

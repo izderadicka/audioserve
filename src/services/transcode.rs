@@ -8,6 +8,8 @@ use tokio_process::{CommandExt, ChildStdout};
 use std::time::{Instant, Duration};
 use tokio::timer::Delay;
 use error::Error;
+use std::sync::atomic::Ordering;
+use config::get_config;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -164,22 +166,29 @@ impl Transcoder {
     pub fn transcode<S: AsRef<OsStr>+Send+'static>(
         &self,
         file: S,
-        seek: Option<f32>
+        seek: Option<f32>,
+        counter: super::Counter
     ) -> Result<ChunkStream<ChildStdout>, Error> {
         let mut cmd = self.build_command(&file, seek);
+        let counter2 = counter.clone();
         match cmd.spawn_async() {
             Ok(mut child) => if child.stdout().is_some() {
+                counter.fetch_add(1, Ordering::SeqCst);
+                let start = Instant::now();
                 let mut out = child.stdout().take().unwrap();
                 let stream = ChunkStream::new(out, ::std::u64::MAX);
                 let pid =  child.id();
                 debug!("waiting for transcode process to end");
                 ::tokio::spawn(
-                    child.select2(Delay::new(Instant::now() + Duration::from_secs(24*3600)))
+                    child.select2(Delay::new(Instant::now() + Duration::from_secs((get_config().transcoding_deadline*3600) as u64)))
                     .then(move |res| {
+                        counter2.fetch_sub(1, Ordering::SeqCst);
                         match res {
                             Ok(Either::A((res, _d))) => {
                                 if res.success() {
-                                    debug!("Finished transcoding process normally")
+                                    debug!("Finished transcoding process of {:?} normally after {:?}",
+                                    file.as_ref(),
+                                    Instant::now() - start)
                                 } else {
                                     warn!(
                                     "Transconding of file {:?} failed with code {:?}",
