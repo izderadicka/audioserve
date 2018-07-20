@@ -132,10 +132,10 @@ fn serve_file_from_fs(
                     if let Some(age) = caching {
                         let cache =
                             CacheControl(vec![CacheDirective::Public, CacheDirective::MaxAge(age)]);
-                        resp.header(CACHE_CONTROL, format!("{}", cache).as_bytes());
+                        resp.header(CACHE_CONTROL, cache.to_string().as_bytes());
                         if let Some(last_modified) = last_modified {
                             let lm = LastModified(last_modified.into());
-                            resp.header(LAST_MODIFIED, format!("{}", lm).as_bytes());
+                            resp.header(LAST_MODIFIED, lm.to_string().as_bytes());
                         }
                     }
                     let (start, end) = match range {
@@ -152,7 +152,7 @@ fn serve_file_from_fs(
                                 });
                                 resp.header(
                                     CONTENT_RANGE,
-                                    HeaderValue::from_str(&format!("{}", h)).unwrap(),
+                                    HeaderValue::from_str(&h.to_string()).unwrap(),
                                 );
                                 l
                             }
@@ -283,7 +283,7 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
                                         path,
                                         name: os_to_string(f.file_name()),
 
-                                        mime: format!("{}", mime),
+                                        mime: mime.to_string(),
                                     })
                                 } else if cover.is_none() && is_cover(&path) {
                                     cover = Some(TypedFile::new(path))
