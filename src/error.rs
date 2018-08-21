@@ -2,7 +2,7 @@ use std::error::Error as StdErr;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
-pub struct Error(Option<Box<dyn StdErr + Send + Sync>>);
+pub struct Error(Option<Box<dyn StdErr + Send + Sync +'static>>);
 
 impl Display for Error {
     fn fmt(&self, fmt: &mut Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {

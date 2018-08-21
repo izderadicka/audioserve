@@ -129,9 +129,9 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
             {
                 use futures::Stream;
                 use hyper::server::conn::Http;
-                use native_tls::TlsAcceptor;
+                use native_tls;
                 use tokio::net::TcpListener;
-                use tokio_tls::TlsAcceptorExt;
+                use tokio_tls;
 
                 let private_key =
                     match load_private_key(file, get_config().ssl_key_password.as_ref()) {
@@ -141,7 +141,8 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
                             return Err(Box::new(e));
                         }
                     };
-                let tls_cx = TlsAcceptor::builder(private_key).build()?;
+                let tls_cx = native_tls::TlsAcceptor::builder(private_key).build()?;
+                let tls_cx = tokio_tls::TlsAcceptor::from(tls_cx);
 
                 let addr = cfg.local_addr;
                 let srv = TcpListener::bind(&addr)?;
@@ -150,7 +151,7 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
                     .serve_incoming(
                         srv.incoming().and_then(move |socket| {
                             tls_cx
-                                .accept_async(socket)
+                                .accept(socket)
                                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
                         }),
                         move || {

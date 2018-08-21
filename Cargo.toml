@@ -31,7 +31,7 @@ tokio-threadpool = "0.1"
 dirs = "1.0"
 
 # for ssl
-tokio-tls = {git="https://github.com/izderadicka/tokio-tls.git", branch ="new-tokio", optional=true}
+tokio-tls = {version="0.2", optional=true}
 native-tls = {version="0.2", optional=true}
 
 [dependencies.taglib]
