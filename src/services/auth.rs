@@ -12,12 +12,12 @@ use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use url::form_urlencoded;
 
-type AuthResult = Result<(Request<Body>, ()), Response<Body>>;
-type AuthFuture = Box<Future<Item = AuthResult, Error = Error> + Send>;
+type AuthResult<T> = Result<(Request<Body>, T), Response<Body>>;
+type AuthFuture<T> = Box<Future<Item = AuthResult<T>, Error = Error> + Send>;
 
 pub trait Authenticator: Send + Sync {
     type Credentials;
-    fn authenticate(&self, req: Request<Body>) -> AuthFuture;
+    fn authenticate(&self, req: Request<Body>) -> AuthFuture<Self::Credentials>;
 }
 
 #[derive(Clone)]
@@ -42,8 +42,8 @@ const ACCESS_DENIED: &str = "Access denied";
 
 impl Authenticator for SharedSecretAuthenticator {
     type Credentials = ();
-    fn authenticate(&self, req: Request<Body>) -> AuthFuture {
-        fn deny() -> AuthResult {
+    fn authenticate(&self, req: Request<Body>) -> AuthFuture<()> {
+        fn deny() -> AuthResult<()> {
             Err(short_response(StatusCode::UNAUTHORIZED, ACCESS_DENIED))
         }
         // this is part where client can authenticate itself and get token
