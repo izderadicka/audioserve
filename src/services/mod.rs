@@ -47,8 +47,8 @@ pub struct TranscodingDetails {
 }
 
 #[derive(Clone)]
-pub struct FileSendService {
-    pub authenticator: Option<Arc<Box<Authenticator<Credentials = ()>>>>,
+pub struct FileSendService<T> {
+    pub authenticator: Option<Arc<Box<Authenticator<Credentials = T>>>>,
     pub search: Search,
     pub transcoding: TranscodingDetails,
 }
@@ -82,7 +82,7 @@ fn add_cors_headers<T: AsRef<str>>(
     }
 }
 
-impl Service for FileSendService {
+impl <C:'static>Service for FileSendService<C> {
     type ReqBody = Body;
     type ResBody = Body;
     type Error = ::error::Error;
@@ -117,18 +117,18 @@ impl Service for FileSendService {
             Some(ref auth) => {
                 Box::new(auth.authenticate(req).and_then(move |result| match result {
                     Ok((req, _creds)) => {
-                        FileSendService::process_checked(&req, searcher, transcoding)
+                        FileSendService::<C>::process_checked(&req, searcher, transcoding)
                     }
                     Err(resp) => Box::new(future::ok(resp)),
                 }))
             }
-            None => FileSendService::process_checked(&req, searcher, transcoding),
+            None => FileSendService::<C>::process_checked(&req, searcher, transcoding),
         };
         Box::new(resp.map(move |r| add_cors_headers(r, origin, cors)))
     }
 }
 
-impl FileSendService {
+impl <C> FileSendService<C> {
     fn process_checked<T>(
         req: &Request<T>,
         searcher: Search,
