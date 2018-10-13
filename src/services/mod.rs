@@ -63,7 +63,7 @@ fn add_cors_headers<T: AsRef<str>>(
     origin: Option<T>,
     enabled: bool,
 ) -> Response<Body> {
-    if enabled {
+    if !enabled {
         return resp;
     }
     match origin {

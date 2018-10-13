@@ -141,10 +141,6 @@ fn serve_file_from_fs(
                     let (start, end) = match range {
                         Some(range) => match range.to_satisfiable_range(file_len) {
                             Some(l) => {
-                                println!(
-                                    "Range is {} and limits are {:?}, length {}",
-                                    range, l, file_len
-                                );
                                 resp.status(StatusCode::PARTIAL_CONTENT);
                                 let h = ContentRange(ContentRangeSpec::Bytes {
                                     range: Some((l.0, l.1)),

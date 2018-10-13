@@ -1,16 +1,16 @@
 import "./player.css";
-import {debug, ifDebug} from "./debug.js";
+import { debug, ifDebug } from "./debug.js";
 
 export function formatTime(dur) {
-    if (! isFinite(dur)) return "?";
+    if (!isFinite(dur)) return "?";
     let hours = 0;
     let mins = Math.floor(dur / 60);
     let secs = Math.floor(dur % 60);
-    secs = ("0"+secs).slice(-2);
-    if (mins >=60) {
+    secs = ("0" + secs).slice(-2);
+    if (mins >= 60) {
         hours = Math.floor(mins / 60);
         mins = mins - hours * 60;
-        mins = ("0"+mins).slice(-2);
+        mins = ("0" + mins).slice(-2);
     }
     if (hours) {
         return `${hours}:${mins}:${secs}`;
@@ -24,7 +24,7 @@ const VOLUME_MED = 'M0 7.667v8h5.333L12 22.333V1L5.333 7.667M17.333 11.373C17.33
 const VOLUME_LOW = 'M0 7.667v8h5.333L12 22.333V1L5.333 7.667';
 const PLAY = "M18 12L0 24V0";
 const PAUSE = "M0 0h6v24H0zM12 0h6v24h-6z";
-const NO_RELOAD_JUMP=300; 
+const NO_RELOAD_JUMP = 300;
 const MEDIA_ERRORS = ["MEDIA_ERR_ABORTED", "MEDIA_ERR_NETWORK", "MEDIA_ERR_DECODE", "MEDIA_ERR_SRC_NOT_SUPPORTED"];
 
 export class AudioPlayer {
@@ -32,8 +32,8 @@ export class AudioPlayer {
 
     constructor() {
 
-        this.unsized = false;
-        this.knownDuration =null;
+        this.unsized = false; // true if stream does not have size - e.g. is chunked encoded
+        this.knownDuration = null; // duration of media provided in metadata - sent in options to this player
         this._timeOffset = 0; // offset of current steam in case time seeking was used
 
         let audioPlayer = document.querySelector('.audio-player');
@@ -49,7 +49,9 @@ export class AudioPlayer {
         this._currentTime = audioPlayer.querySelector('.current-time');
         this._totalTime = audioPlayer.querySelector('.total-time');
         this._speaker = audioPlayer.querySelector('#speaker');
+        this._cacheIndicator = audioPlayer.querySelector('.player-cache');
         this._currentlyDragged = null;
+        this._isChrome = !!window.chrome && !!window.chrome.webstore; // Chrome requires some tweaks
 
         let volumeBtn = audioPlayer.querySelector('.volume-btn');
         let sliderTime = audioPlayer.querySelector(".controls .slider");
@@ -86,43 +88,43 @@ export class AudioPlayer {
         });
 
         pinTime.addEventListener("touchstart", (event) => {
-            if (event.changedTouches.length == 1 && event.targetTouches.length ==1) {
+            if (event.changedTouches.length == 1 && event.targetTouches.length == 1) {
                 let touch = event.changedTouches[0];
                 this._currentlyDragged = touch.target;
                 let touchId = touch.identifier;
                 let clientX, clientY;
 
                 let myTouch = (event) => {
-                    for (let i = 0; i< event.changedTouches.length; i++) {
+                    for (let i = 0; i < event.changedTouches.length; i++) {
                         let t = event.changedTouches.item(i);
                         if (t.identifier === touch.identifier) return t;
                     }
                 };
-                
+
                 let handler = (event) => {
                     let t = myTouch(event);
                     if (t) {
-                    let evt = touchToEvent(t, "mousemove");
-                    clientX=evt.clientX;
-                    clientY=evt.clientY;
-                    this._onMoveSlider(evt);
+                        let evt = touchToEvent(t, "mousemove");
+                        clientX = evt.clientX;
+                        clientY = evt.clientY;
+                        this._onMoveSlider(evt);
                     }
                 };
                 window.addEventListener("touchmove", handler);
                 window.addEventListener("touchend", (event) => {
                     let t = myTouch(event);
                     if (t) {
-                    window.setTimeout( () => { this._currentlyDragged = false; }, 200);
-                    window.removeEventListener("touchmove", handler);
-                    let evt = touchToEvent(event, "mouseup");
-                    evt.clientX = clientX;
-                    evt.clientY = clientY;
-                    this._onMoveSlider(evt, true);
+                        window.setTimeout(() => { this._currentlyDragged = false; }, 200);
+                        window.removeEventListener("touchmove", handler);
+                        let evt = touchToEvent(event, "mouseup");
+                        evt.clientX = clientX;
+                        evt.clientY = clientY;
+                        this._onMoveSlider(evt, true);
                     }
 
-                }, {once:true});
+                }, { once: true });
             }
-        }, {passive:true});
+        }, { passive: true });
 
         pinVolume.addEventListener('mousedown', (event) => {
 
@@ -137,39 +139,41 @@ export class AudioPlayer {
         });
 
         pinVolume.addEventListener("touchstart", (event) => {
-            if (event.changedTouches.length == 1 && event.targetTouches.length ==1) {
+            if (event.changedTouches.length == 1 && event.targetTouches.length == 1) {
                 let touch = event.changedTouches[0];
                 this._currentlyDragged = touch.target;
                 let touchId = touch.identifier;
 
                 let myTouch = (event) => {
-                    for (let i = 0; i< event.changedTouches.length; i++) {
+                    for (let i = 0; i < event.changedTouches.length; i++) {
                         let t = event.changedTouches.item(i);
                         if (t.identifier === touch.identifier) return t;
                     }
                 };
-                
+
                 let handler = (event) => {
                     let t = myTouch(event);
                     if (t) {
-                    let evt = touchToEvent(t, "mousemove");
-                    this._onChangeVolume(evt);
+                        let evt = touchToEvent(t, "mousemove");
+                        this._onChangeVolume(evt);
                     }
                 };
                 window.addEventListener("touchmove", handler);
                 window.addEventListener("touchend", (event) => {
                     let t = myTouch(event);
                     if (t) {
-                    this._currentlyDragged = false;
-                    window.removeEventListener("touchmove", handler);
+                        this._currentlyDragged = false;
+                        window.removeEventListener("touchmove", handler);
                     }
 
-                }, {once:true});
+                }, { once: true });
             }
-        }, {passive:true});
+        }, { passive: true });
 
         sliderTime.addEventListener('click', (evt) => {
-            if (!this._currentlyDragged) this._onMoveSlider(evt, true);
+            if (!this._currentlyDragged && !evt.target.className.includes("cache")) {
+                this._onMoveSlider(evt, true);
+            }
         });
 
         sliderVolume.addEventListener('click', this._onChangeVolume.bind(this));
@@ -186,16 +190,16 @@ export class AudioPlayer {
 
     initPlayer() {
         ifDebug(() => {
-            this._player.addEventListener('abort', (evt)=> console.log("Player aborted"));
-            this._player.addEventListener('emptied', (evt)=> console.log("Player emptied"));
-            this._player.addEventListener('stalled', (evt)=> console.log("Player stalled"));
-            this._player.addEventListener('suspend', (evt)=> console.log("Player suspend"));
+            this._player.addEventListener('abort', (evt) => console.log("Player aborted"));
+            this._player.addEventListener('emptied', (evt) => console.log("Player emptied"));
+            this._player.addEventListener('stalled', (evt) => console.log("Player stalled"));
+            this._player.addEventListener('suspend', (evt) => console.log("Player suspend"));
         });
 
-        this._player.addEventListener('error', (evt)=> {
+        this._player.addEventListener('error', (evt) => {
             let codeName = (code) => {
-                if (code > 0 && code <= MEDIA_ERRORS.length) 
-                    return MEDIA_ERRORS[code-1];
+                if (code > 0 && code <= MEDIA_ERRORS.length)
+                    return MEDIA_ERRORS[code - 1];
                 else
                     return `UNKNOWN_${code}`;
             };
@@ -224,29 +228,63 @@ export class AudioPlayer {
         let state = this._player.readyState;
         if (state > 1) this._updateTotal();
         if (state > 2) this._showPlay();
-
-        // let show_buffered = () => {
-        //     let ranges =""
-        //     for (let i=0; i< this._player.buffered.length; i++) {
-        //         ranges += `${i}: ${this._player.buffered.start(i)} - ${this._player.buffered.end(i)}`;
-        //     }
-        //     console.log("Buffered: "+ranges);
-        // }
-        // window.setInterval(show_buffered, 5000);
-
     }
 
     _updateTotal() {
         this._totalTime.textContent = formatTime(this.getTotalTime());
     }
 
+    _updateCacheIndicator() {
+        let ranges = this._player.buffered;
+        let totalTime = this.getTotalTime();
+        let totalLength = this._cacheIndicator.offsetWidth;
+        let offset = totalLength * this._timeOffset / totalTime;
+        let indicator = this._cacheIndicator;
+        while (indicator.firstChild) {
+            indicator.removeChild(indicator.firstChild);
+        }
+
+        for (let i = 0; i < ranges.length; i++) {
+            let start = ranges.start(i);
+            let end = ranges.end(i);
+            start = offset + totalLength * start / totalTime;
+            end = offset + totalLength * end / totalTime;
+
+            let bar = document.createElement("div");
+            bar.setAttribute("class", "cache-bar");
+            bar.style.left = `${start}px`;
+            bar.style.width = `${end - start}px`;
+            indicator.appendChild(bar);
+        }
+    }
+
+    _isCached(time) {
+        let t = time - this._timeOffset;
+        let ranges = this._player.buffered;
+        let remainsToLoad = this.getTotalTime - time;
+        for (let i = 0; i < ranges.length; i++) {
+            let start = ranges.start(i);
+            let end = ranges.end(i);
+            if (t >= start && t <= end) return { isCached: true, remainsToLoad: 0 };
+            let fromEnd = time - end;
+            if (fromEnd >= 0 && fromEnd < remainsToLoad) {
+                remainsToLoad = fromEnd;
+            }
+        }
+        return { isCached: false, remainsToLoad: remainsToLoad };
+
+    }
+
     _updateProgress() {
-        let event = new CustomEvent('timeupdate', {detail:{
-            currentTime: this._player.currentTime + this._timeOffset,
-            totalTime: this.getTotalTime()
-        }});
+        let event = new CustomEvent('timeupdate', {
+            detail: {
+                currentTime: this._player.currentTime + this._timeOffset,
+                totalTime: this.getTotalTime()
+            }
+        });
         this._rootElem.dispatchEvent(event);
         if (!this._currentlyDragged) {
+            this._updateCacheIndicator();
             let current = this._player.currentTime + this._timeOffset;
             let percent = (current / this.getTotalTime()) * 100;
             if (percent > 100) percent = 100;
@@ -341,12 +379,12 @@ export class AudioPlayer {
     _jumpWithSeek(time) {
         debug("Reloading media by server seek");
         let queryIndex = this._player.src.indexOf("&seek=");
-        let baseUrl = queryIndex>0? this._player.src.substr(0,queryIndex): this._player.src;
-        let wasPlaying = ! this._player.paused; 
-        let url = baseUrl+`&seek=${time}`;
+        let baseUrl = queryIndex > 0 ? this._player.src.substr(0, queryIndex) : this._player.src;
+        let wasPlaying = !this._player.paused;
+        let url = baseUrl + `&seek=${time}`;
         this._timeOffset = time;
         this._player.src = url;
-        this._player.currentTime= 0;
+        this._player.currentTime = 0;
         if (wasPlaying) {
             this._player.play();
         } else {
@@ -357,24 +395,41 @@ export class AudioPlayer {
     jumpToTime(time) {
         time = parseFloat(time);
         debug(`Jumping to time ${time}, duration: ${this._player.duration}`);
-        
-        let currentTime =  this._player.currentTime + this._timeOffset;
+
+        let currentTime = this._player.currentTime + this._timeOffset;
         let diff = time - currentTime;
+
+        //do not jump less then 1 sec
         if (Math.abs(diff) > 1 && isFinite(time)) {
+
+            // if streamed without size we need special treatment
             if (this.unsized) {
-                
-                if (diff > NO_RELOAD_JUMP) {
-                    // jump with seek
-                    this._jumpWithSeek(time);
-                } else if (diff < 0 && (time - this._timeOffset < 0 || -diff > NO_RELOAD_JUMP)) {
-                    // jump back can work in FF, but Chrome does not seem to cache whole file so 
-                    // jumping back only limited
-                    this._jumpWithSeek(time);
+                let isCached = this._isCached(time);
+                debug("Is cached:", isCached.isCached);
+                if (isCached.isCached) {
+                    //safe to move player time there
+                    this._player.currentTime = time - this._timeOffset;
+                } else if (this._isChrome) {
+
+                    //Chrome tweak -  just look at delta if it is smaller then something or jumping before current offset
+
+                    if (diff > NO_RELOAD_JUMP) {
+                        // jump with seek
+                        this._jumpWithSeek(time);
+                    } else if (diff < 0 && (time - this._timeOffset < 0 || -diff > NO_RELOAD_JUMP)) {
+                        // jump back can work in FF, but Chrome does not seem to cache whole file so 
+                        // jumping back only limited
+                        this._jumpWithSeek(time);
+                    } else {
+                        this._player.currentTime = time - this._timeOffset;
+                    }
                 } else {
-                    this._player.currentTime = time - this._timeOffset; 
+
+                    this._jumpWithSeek(time);
                 }
+
             } else {
-            this._player.currentTime = time;
+                this._player.currentTime = time;
             }
         }
     }
@@ -418,17 +473,17 @@ export class AudioPlayer {
         this._playPause.attributes.d.value = PLAY;
     }
 
-    play() { 
+    play() {
         return this._player.play()
-        .catch((e) => {
-            this.pause();
-            console.log("Play error",e);
-        }
-        );
+            .catch((e) => {
+                this.pause();
+                console.log("Play error", e);
+            }
+            );
     }
 
     pause() {
         this._player.pause();
-        
+
     }
 }
