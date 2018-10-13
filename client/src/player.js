@@ -373,7 +373,7 @@ export class AudioPlayer {
 
     _hidePlay() {
         this._playpauseBtn.style.display = 'none';
-        this._loading.style.display = 'show';
+        this._loading.style.display = 'block';
     }
 
     _jumpWithSeek(time) {
