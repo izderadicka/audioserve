@@ -81,6 +81,15 @@ pub struct SearchResult {
     pub subfolders: Vec<AudioFolderShort>,
 }
 
+impl SearchResult {
+    pub fn new() -> Self {
+        SearchResult {
+            subfolders: vec![],
+            files: vec![],
+        }
+    }
+}
+
 fn has_subtype(mime: &Mime, subtypes: &[&str]) -> bool {
     subtypes.iter().any(|&s| s == mime.subtype())
 }

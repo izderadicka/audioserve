@@ -35,6 +35,8 @@ taglib = "1.0"
 tokio-tls = {version="0.2", optional=true}
 native-tls = {version="0.2", optional=true}
 
+cachedirtree = {git="https://github.com/izderadicka/cachedirtree.git"}
+
 [features]
 default = ["tls", "symlinks"]
 tls=["tokio-tls", "native-tls"]

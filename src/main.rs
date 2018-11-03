@@ -35,6 +35,7 @@ extern crate dirs;
 extern crate native_tls;
 #[cfg(feature = "tls")]
 extern crate tokio_tls;
+extern crate cachedirtree;
 
 use config::{get_config, parse_args};
 use hyper::rt::Future;
@@ -105,7 +106,7 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
                 )))
             },
         ),
-        search: Search::FoldersSearch,
+        search: Search::new(),
         transcoding: TranscodingDetails {
             transcodings: Arc::new(AtomicUsize::new(0)),
             max_transcodings: cfg.max_transcodings,

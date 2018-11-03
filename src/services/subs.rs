@@ -1,9 +1,9 @@
 use super::get_real_file_type;
-use super::search::{Search, SearchTrait};
 use super::transcode::{QualityLevel, Transcoder};
 use super::types::*;
 use super::Counter;
 use config::get_config;
+use super::search::{Search, SearchTrait};
 use error::Error;
 use futures::future::{self, poll_fn, Future};
 use futures::{Async, Stream};
@@ -125,6 +125,9 @@ fn serve_file_from_fs(
             .and_then(move |file| {
                 file.metadata().and_then(move |(file, meta)| {
                     let file_len = meta.len();
+                    if file_len == 0 {
+                        warn!("File {:?} has zero size ", &filename2)
+                    }
                     let last_modified = meta.modified().ok();
                     let mime = guess_mime_type(filename2);
                     let mut resp = HyperResponse::builder();
@@ -138,6 +141,15 @@ fn serve_file_from_fs(
                             resp.header(LAST_MODIFIED, lm.to_string().as_bytes());
                         }
                     }
+
+                    fn checked_dec(x:u64) -> u64{
+                        if x>0 {
+                            x-1
+                        } else {
+                            x
+                        }
+                    }
+
                     let (start, end) = match range {
                         Some(range) => match range.to_satisfiable_range(file_len) {
                             Some(l) => {
@@ -153,14 +165,14 @@ fn serve_file_from_fs(
                                 l
                             }
                             None => {
-                                eprintln!("Wrong range {}", range);
-                                (0, file_len - 1)
+                                error!("Wrong range {}", range);
+                                (0, checked_dec(file_len))
                             }
                         },
                         None => {
                             resp.status(StatusCode::OK);
                             resp.header(ACCEPT_RANGES, "bytes");
-                            (0, file_len - 1)
+                            (0, checked_dec(file_len))
                         }
                     };
                     file.seek(SeekFrom::Start(start)).map(move |(file, _pos)| {
@@ -387,11 +399,12 @@ pub fn transcodings_list() -> ResponseFuture {
     Box::new(future::ok(json_response(&transcodings)))
 }
 
-pub fn search(base_dir: &'static Path, searcher: Search, query: String) -> ResponseFuture {
+pub fn search(collection: usize, searcher: Search<String>, query: String) -> ResponseFuture {
     Box::new(
         poll_fn(move || {
+            let query = query.clone();
             blocking(|| {
-                let res = searcher.search(base_dir, &query);
+                let res = searcher.search(collection, query);
                 json_response(&res)
             })
         }).map_err(Error::new_with_cause),

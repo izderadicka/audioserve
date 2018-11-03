@@ -49,7 +49,7 @@ pub struct TranscodingDetails {
 #[derive(Clone)]
 pub struct FileSendService<T> {
     pub authenticator: Option<Arc<Box<Authenticator<Credentials = T>>>>,
-    pub search: Search,
+    pub search: Search<String>,
     pub transcoding: TranscodingDetails,
 }
 
@@ -131,7 +131,7 @@ impl <C:'static>Service for FileSendService<C> {
 impl <C> FileSendService<C> {
     fn process_checked<T>(
         req: &Request<T>,
-        searcher: Search,
+        searcher: Search<String>,
         transcoding: TranscodingDetails,
     ) -> ResponseFuture {
         let mut params = req
@@ -228,7 +228,7 @@ impl <C> FileSendService<C> {
                         get_folder(base_dir, get_subpath(&path, "/folder/"))
                     } else if path == "/search" {
                         if let Some(search_string) = params.and_then(|mut p| p.remove("q")) {
-                            return search(base_dir, searcher, search_string.into_owned());
+                            return search(colllection_index, searcher, search_string.into_owned());
                         }
                         short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
                     } else if path.starts_with("/cover/") {
