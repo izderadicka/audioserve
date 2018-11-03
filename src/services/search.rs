@@ -62,7 +62,7 @@ impl FoldersSearch {
                     if let Ok(ft) = get_real_file_type(&f, path, allow_symlinks) {
                         if ft.is_dir() {
                             let p = f.path();
-                            if let Ok(s) = p.clone().into_os_string().into_string() {
+                            if let Some(s) = p.to_str() {
                                 let lc_s = s.to_lowercase();
                                 let m = tokens.into_iter().all(|token| lc_s.contains(token));
                                 if m {

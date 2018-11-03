@@ -202,7 +202,7 @@ pub fn send_file<P:AsRef<Path>>(
             transcoding_quality
         );
         let counter = transcoding.transcodings;
-        let transcoder =
+        let transcoder = 
             Transcoder::new(get_config().transcoding.get(transcoding_quality.unwrap()));
         let running_transcodings = counter.load(Ordering::SeqCst);
         if running_transcodings >= transcoding.max_transcodings {
