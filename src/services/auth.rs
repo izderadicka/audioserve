@@ -47,7 +47,7 @@ impl Authenticator for SharedSecretAuthenticator {
             Err(short_response(StatusCode::UNAUTHORIZED, ACCESS_DENIED))
         }
         // this is part where client can authenticate itself and get token
-        if req.method() == &Method::POST && req.uri().path() == "/authenticate" {
+        if req.method() == Method::POST && req.uri().path() == "/authenticate" {
             debug!("Authentication request");
             let auth = self.clone();
             return Box::new(

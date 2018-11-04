@@ -150,7 +150,7 @@ mod cache {
                     res
                 })
                 .map_err(|e| error!("Search failed {}", e))
-                .unwrap_or(SearchResult::new())
+                .unwrap_or_else(|_| SearchResult::new())
         }
     }
 }
