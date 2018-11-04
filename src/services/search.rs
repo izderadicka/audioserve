@@ -4,44 +4,54 @@ use config::get_config;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use cachedirtree::{DirCache, OptionsBuilder};
 
-
-pub trait SearchTrait< S: AsRef<str>> {
+pub trait SearchTrait<S: AsRef<str>> {
     fn search(&self, collection: usize, query: S) -> SearchResult;
 }
-
 
 struct FoldersSearch;
 
 #[derive(Clone)]
-pub struct Search< S: AsRef<str>> {
-    inner: Arc<Box<SearchTrait<S>+Send+Sync>>
-
+pub struct Search<S: AsRef<str>> {
+    inner: Arc<Box<SearchTrait<S> + Send + Sync>>,
 }
 
-impl < S: AsRef<str>> SearchTrait<S> for Search<S> {
+impl<S: AsRef<str>> SearchTrait<S> for Search<S> {
     fn search(&self, collection: usize, query: S) -> SearchResult {
         self.inner.search(collection, query)
     }
 }
 
-impl < S: AsRef<str>> Search<S> {
+impl<S: AsRef<str>> Search<S> {
+    #[cfg(feature = "search-cache")]
     pub fn new() -> Self {
-        Search{
-            inner: Arc::new(Box::new(CachedSearch::new()))
+        if get_config().search_cache {
+            info!("Using search cache");
+            Search {
+                inner: Arc::new(Box::new(cache::CachedSearch::new())),
+            }
+        } else {
+            Search {
+                inner: Arc::new(Box::new(FoldersSearch)),
+            }
+        }
+    }
+
+    #[cfg(not(feature = "search-cache"))]
+    pub fn new() -> Self {
+        Search {
+            inner: Arc::new(Box::new(FoldersSearch)),
         }
     }
 }
 
-impl < S: AsRef<str>>SearchTrait<S> for FoldersSearch {
+impl<S: AsRef<str>> SearchTrait<S> for FoldersSearch {
     fn search(&self, collection: usize, query: S) -> SearchResult {
         self.search_folder(&get_config().base_dirs[collection], query)
     }
 }
 
 impl FoldersSearch {
-
     fn search_folder<P: AsRef<Path>, S: AsRef<str>>(&self, base_dir: P, query: S) -> SearchResult {
         let tokens: Vec<String> = query
             .as_ref()
@@ -59,7 +69,6 @@ impl FoldersSearch {
         );
         res
     }
-    
 
     fn search_recursive(
         base_path: &Path,
@@ -100,46 +109,49 @@ impl FoldersSearch {
     }
 }
 
-struct CachedSearch {
-    caches: Vec<DirCache>
-}
+#[cfg(feature = "search-cache")]
+mod cache {
+    use super::*;
+    use cachedirtree::{DirCache, OptionsBuilder};
 
-impl CachedSearch {
-    fn new() -> Self {
-        let opts = OptionsBuilder::default()
-        .include_files(false)
-        .watch_changes(true)
-        .follow_symlinks(get_config().allow_symlinks)
-        .build()
-        .unwrap();
-        let caches = get_config().base_dirs.iter()
-            .map(|p| DirCache::new_with_options(p, opts))
-            .collect();
-
-        CachedSearch{caches}
+    pub struct CachedSearch {
+        caches: Vec<DirCache>,
     }
-}
 
-impl <S: AsRef<str>> SearchTrait<S> for CachedSearch {
-    fn search(&self, collection: usize, query: S) -> SearchResult{
-        self.caches[collection].search_collected(query, |iter|{
-            let mut res =  SearchResult::new();
-            iter.for_each(|e| {
-                res.subfolders.push(
-                    AudioFolderShort {
-                        name: e.name(),
-                        path: e.path(),
-                                    }
-                )
-            });
-            res
-        })
-        .map_err(|e| error!("Search failed {}",e))
-        .unwrap_or(SearchResult::new())
-        
+    impl CachedSearch {
+        pub fn new() -> Self {
+            let opts = OptionsBuilder::default()
+                .include_files(false)
+                .watch_changes(true)
+                .follow_symlinks(get_config().allow_symlinks)
+                .build()
+                .unwrap();
+            let caches = get_config()
+                .base_dirs
+                .iter()
+                .map(|p| DirCache::new_with_options(p, opts))
+                .collect();
 
+            CachedSearch { caches }
+        }
+    }
 
-        
+    impl<S: AsRef<str>> SearchTrait<S> for CachedSearch {
+        fn search(&self, collection: usize, query: S) -> SearchResult {
+            self.caches[collection]
+                .search_collected(query, |iter| {
+                    let mut res = SearchResult::new();
+                    iter.for_each(|e| {
+                        res.subfolders.push(AudioFolderShort {
+                            name: e.name(),
+                            path: e.path(),
+                        })
+                    });
+                    res
+                })
+                .map_err(|e| error!("Search failed {}", e))
+                .unwrap_or(SearchResult::new())
+        }
     }
 }
 

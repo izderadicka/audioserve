@@ -73,7 +73,8 @@ impl Authenticator for SharedSecretAuthenticator {
                                             COOKIE_NAME,
                                             token,
                                             10 * 365 * 24 * 3600
-                                        ).as_str(),
+                                        )
+                                        .as_str(),
                                     )
                                     .body(token.into())
                                     .unwrap())

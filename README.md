@@ -1,10 +1,11 @@
 Audioserve
 ==========
+
 [![Build Status](https://travis-ci.org/izderadicka/audioserve.svg?branch=master)](https://travis-ci.org/izderadicka/audioserve)
 
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalistic design.
 
-Server is in Rust,  default client is in Javascript intended for modern browsers (latest Firefox or Chrome) and is integrated with the server. There is also [Android client](https://github.com/izderadicka/audioserve-android) and API for custom clients. 
+Server is in Rust,  default client is in Javascript intended for modern browsers (latest Firefox or Chrome) and is integrated with the server. There is also [Android client](https://github.com/izderadicka/audioserve-android) and API for custom clients.
 
 For some background and video demo check this article [Audioserve Audiobooks Server - Stupidly Simple or Simply Stupid?](http://zderadicka.eu/audioserve-audiobooks-server-stupidly-simple-or-simply-stupid)
 
@@ -36,9 +37,9 @@ Security
 
 Audioserve is not writing anything to your media library, so read only access is OK.  The only one file where it needs to write is a file were it keeps its secret key for authentication (by default in `~/.audioserve.secret`, but it can be specified by command line argument).
 
-Authentication is done by shared secret phrase (supplied to server on command line), which client must know.  Secret phrase is never sent in plain (it's sent as salted hash). If correct shared secret hash is provided sever generates a token, using its secret key.  Token then can be used in cookie or HTTP Authorization header (Bearer method). 
-Token validity period is one year by default, but can be set as command line argument, but system 
-generaly expects token validity to be at least 10 days.
+Authentication is done by shared secret phrase (supplied to server on command line), which client must know.
+Secret phrase is never sent in plain (it's sent as salted hash). If correct shared secret hash is provided sever generates a token, using its secret key.  Token then can be used in cookie or HTTP Authorization header (Bearer method).
+Token validity period is one year by default, but can be set as command line argument, but system generaly expects token validity to be at least 10 days.
 As the token can be used to steal the session https is recomended (TLS support is build in).
 
 ### TLS/SSL
@@ -52,16 +53,18 @@ Audioserve supports TLS/SSL - to enable it you need to provide your private serv
 
 You can also run behind reverse proxy like nginx or ha-proxy and perminate SSL there (in that case you can compile audioserve without TLS support see below)
 
-
 Performance
 -----------
 
 Audioserve is inteded to serve personal audio collections of moderate sizes. For sake of simplicity it does not provide any large scale perfomance optimalizations.  It's fine to serve couple of users from collection of couple of thousands audiobooks, if they are reasonably organized. That's it, if you're looking for solution for thousands or millions of users, look elsewere. To compensate for this audioserve is very lightweight and by itself takes minimum of system resources.
 
-Browsing of collections is limited by speed of the file system. As directory listing needs to read audio files metadata (duration and bitrate), folders with too many files (> 200) will be slow. Search is done by walking through collection, it can be slow - especially the first search (subsequent searches are much, much faster, as directory structure from previous search is cached by OS for some time).
+Browsing of collections is limited by speed of the file system. As directory listing needs to read audio files metadata (duration and bitrate), folders with too many files (> 200) will be slow. Search is done by walking through collection, it can be slow - especially the first search (subsequent searches are much, much faster, as directory structure from previous search is cached by OS for some time). Recent versions provides possibility for seach cache, to speed up search significantly - see below.
 
-But true limiting factor is transcoding - as it's quite CPU intensive. Normally you should run only a handful of transcodings in parallel, not much then 2x - 4x more then there is the number of cores in the machine. 
+But true limiting factor is transcoding - as it's quite CPU intensive. Normally you should run only a handful of transcodings in parallel, not much then 2x - 4x more then there is the number of cores in the machine.
 
+### Search Cache
+
+For fast searches enable search cache with `--search-cache`, it will load directory structure of collections into memory, so searches will be blazingly fast (for price of more occupied memory). Search cache monitors directories and update itself upon changes (make take a while). Also after start of audioserve it takes some time before cache is filled (especially when large collections are used), so search might not work initially.
 
 Transcoding
 -----------
@@ -74,6 +77,7 @@ Transconding is provided in three variants and client can choose between then (u
 * high - (default 64 kbps opus with 20kHz cutoff)
 
 As already noted audioserve is intended primarily for audiobooks and believe me opus codec is excellent there even in low bitrates. However if you want to change parameters of these three trancodings you can easily do so by providing yaml confing file to parameter `--transcoding-config`. Here is sample file:
+
 ```yaml
 low:
   bitrate: 16
@@ -88,24 +92,26 @@ high:
   compression_level: 9
   cutoff: SuperWideBand
 ```
+
 Where bitrate is desired bitrate in kbps, compression_level is determining audio quality and speed of transcoding with values 1-10 ( 1 - worst quality, but fastest, 10 - best quality, but slowest ) and cutoff is determining audio freq. bandwith (NarrowBand => 4kHz, MediumBand => 6kHz, WideBand => 8kHz, SuperWideBand => 12kHz, FullBand => 20kHz).
 You can overide one two or all three defaults, depending on what sections you have in this config file.
 
 Command line
 ------------
+
 Check with `audioserve -h`. Only two required arguments are shared secrect and root of media library (as noted above you can have severals libraries).
-`audioserve`  is server executable and it also needs web client files , which are `index.html` and `bundle.js`, which are defaultly in `./client/dist`, but their location can by specified by argument `-c` 
+`audioserve`  is server executable and it also needs web client files , which are `index.html` and `bundle.js`, which are defaultly in `./client/dist`, but their location can by specified by argument `-c`.
 
 Android client
 --------------
+
 Android client code is [available on github](https://github.com/izderadicka/audioserve-android)
 Client is in early beta stage (I'm using it now to listen to my audiobooks).
 
 API
 ---
-audioserve server provides very simple API (see [api.md](./docs/api.md) for documentation), 
-so it's easy to write your own clients.
 
+audioserve server provides very simple API (see [api.md](./docs/api.md) for documentation), so it's easy to write your own clients.
 
 Installation (Linux)
 ------------
@@ -115,7 +121,7 @@ Install required dependencies:
     # Ubuntu - for other distros look for equivalent packages
     sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev ffmpeg
 
-Clone repo with: 
+Clone repo with:
 
     git clone https://github.com/izderadicka/audioserve
 
@@ -129,16 +135,16 @@ But easiest way how to test audioserve is to run it as docker container with pro
     docker build --tag audioserve .
     docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  audioserve  
 
-Then open https://localhost:3000 and accept insecure connection, shared secret to enter in client is mypass
+Then open <https://localhost:3000> and accept insecure connection, shared secret to enter in client is mypass
 
 Other platforms - theoretically audioserve can work on Windows and MacOS (probably with few changes), 
 but I never tried to build it there. Any help in this area is welcomed.
 
 ### Compiling without default features
-TLS support and symbolic links  are default features, but you can compile without it - just add `--no-default-features` option to cargo. And then evetually choose only features you need.
 
+TLS support and symbolic links  are default features, but you can compile without it - just add `--no-default-features` option to cargo. And then evetually choose only features you need.
 
 License
 -------
 
-[MIT](https://opensource.org/licenses/MIT) 
+[MIT](https://opensource.org/licenses/MIT)

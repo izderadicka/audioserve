@@ -1,9 +1,9 @@
 use super::get_real_file_type;
+use super::search::{Search, SearchTrait};
 use super::transcode::{QualityLevel, Transcoder};
 use super::types::*;
 use super::Counter;
 use config::get_config;
-use super::search::{Search, SearchTrait};
 use error::Error;
 use futures::future::{self, poll_fn, Future};
 use futures::{Async, Stream};
@@ -142,9 +142,9 @@ fn serve_file_from_fs(
                         }
                     }
 
-                    fn checked_dec(x:u64) -> u64{
-                        if x>0 {
-                            x-1
+                    fn checked_dec(x: u64) -> u64 {
+                        if x > 0 {
+                            x - 1
                         } else {
                             x
                         }
@@ -190,7 +190,7 @@ fn serve_file_from_fs(
     )
 }
 
-pub fn send_file_simple<P:AsRef<Path>>(
+pub fn send_file_simple<P: AsRef<Path>>(
     base_path: &'static Path,
     file_path: P,
     cache: Option<u32>,
@@ -199,7 +199,7 @@ pub fn send_file_simple<P:AsRef<Path>>(
     serve_file_from_fs(&full_path, None, cache)
 }
 
-pub fn send_file<P:AsRef<Path>>(
+pub fn send_file<P: AsRef<Path>>(
     base_path: &'static Path,
     file_path: P,
     range: Option<::hyperx::header::ByteRangeSpec>,
@@ -214,7 +214,7 @@ pub fn send_file<P:AsRef<Path>>(
             transcoding_quality
         );
         let counter = transcoding.transcodings;
-        let transcoder = 
+        let transcoder =
             Transcoder::new(get_config().transcoding.get(transcoding_quality.unwrap()));
         let running_transcodings = counter.load(Ordering::SeqCst);
         if running_transcodings >= transcoding.max_transcodings {
@@ -407,7 +407,8 @@ pub fn search(collection: usize, searcher: Search<String>, query: String) -> Res
                 let res = searcher.search(collection, query);
                 json_response(&res)
             })
-        }).map_err(Error::new_with_cause),
+        })
+        .map_err(Error::new_with_cause),
     )
 }
 

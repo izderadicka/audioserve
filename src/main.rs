@@ -25,17 +25,18 @@ extern crate taglib;
 extern crate url;
 #[macro_use]
 extern crate lazy_static;
+extern crate dirs;
 extern crate tokio;
 extern crate tokio_fs;
 extern crate tokio_process;
 extern crate tokio_threadpool;
-extern crate dirs;
 // for TLS
+#[cfg(feature = "search-cache")]
+extern crate cachedirtree;
 #[cfg(feature = "tls")]
 extern crate native_tls;
 #[cfg(feature = "tls")]
 extern crate tokio_tls;
-extern crate cachedirtree;
 
 use config::{get_config, parse_args};
 use hyper::rt::Future;
@@ -191,15 +192,16 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
         }
     };
 
-    let mut builder = tokio_threadpool::Builder::new();
-    builder.pool_size(cfg.pool_size.num_threads);
-    builder.keep_alive(
-        cfg.thread_keep_alive
-            .map(|secs| std::time::Duration::from_secs(u64::from(secs))),
-    );
-    builder.max_blocking(cfg.pool_size.queue_size);
+    // let mut builder = tokio_threadpool::Builder::new();
+    // builder.keep_alive(
+    //     cfg.thread_keep_alive
+    //         .map(|secs| std::time::Duration::from_secs(u64::from(secs))),
+    // );
     let mut rt = tokio::runtime::Builder::new()
-        .threadpool_builder(builder)
+        .blocking_threads(cfg.pool_size.queue_size)
+        .core_threads(cfg.pool_size.num_threads)
+        .name_prefix("tokio-pool-")
+        //.keep_alive()
         .build()
         .unwrap();
 

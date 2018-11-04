@@ -113,6 +113,7 @@ pub struct Config {
     pub allow_symlinks: bool,
     pub thread_keep_alive: Option<u32>,
     pub transcoding_deadline: u32,
+    pub search_cache: bool,
 }
 type Parser<'a> = App<'a, 'a>;
 
@@ -221,6 +222,14 @@ fn create_parser<'a>() -> Parser<'a> {
             Arg::with_name("allow-symlinks")
                 .long("allow-symlinks")
                 .help("Will follow symbolic/sof links in collections directories"),
+        );
+    }
+
+    if cfg!(feature = "search-cache") {
+        parser=parser.arg(
+            Arg::with_name("search-cache")
+            .long("search-cache")
+            .help("Caches collections directory structure for quick search, monitors directories for changes")
         );
     }
 
@@ -353,6 +362,12 @@ pub fn parse_args() -> Result<(), Error> {
         None
     };
 
+    let search_cache = if cfg!(feature = "search-cache") {
+        args.is_present("search-cache")
+    } else {
+        false
+    };
+
     let config = Config {
         base_dirs,
         local_addr,
@@ -369,6 +384,7 @@ pub fn parse_args() -> Result<(), Error> {
         allow_symlinks,
         thread_keep_alive,
         transcoding_deadline,
+        search_cache,
     };
     unsafe {
         CONFIG = Some(config);
@@ -402,6 +418,7 @@ pub fn init_default_config() {
         allow_symlinks: false,
         thread_keep_alive: None,
         transcoding_deadline: 24,
+        search_cache: false,
     };
     unsafe {
         CONFIG = Some(config);

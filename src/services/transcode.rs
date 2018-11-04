@@ -172,14 +172,15 @@ impl Transcoder {
         let mut cmd = self.build_command(&file, seek);
         let counter2 = counter.clone();
         match cmd.spawn_async() {
-            Ok(mut child) => if child.stdout().is_some() {
-                counter.fetch_add(1, Ordering::SeqCst);
-                let start = Instant::now();
-                let mut out = child.stdout().take().unwrap();
-                let stream = ChunkStream::new(out, ::std::u64::MAX);
-                let pid = child.id();
-                debug!("waiting for transcode process to end");
-                ::tokio::spawn(
+            Ok(mut child) => {
+                if child.stdout().is_some() {
+                    counter.fetch_add(1, Ordering::SeqCst);
+                    let start = Instant::now();
+                    let mut out = child.stdout().take().unwrap();
+                    let stream = ChunkStream::new(out, ::std::u64::MAX);
+                    let pid = child.id();
+                    debug!("waiting for transcode process to end");
+                    ::tokio::spawn(
                     child
                         .select2(Delay::new(
                             Instant::now()
@@ -229,11 +230,12 @@ impl Transcoder {
                             }
                         }),
                 );
-                Ok(stream)
-            } else {
-                error!("Cannot get stdout");
-                Err(Error::new())
-            },
+                    Ok(stream)
+                } else {
+                    error!("Cannot get stdout");
+                    Err(Error::new())
+                }
+            }
             Err(e) => {
                 error!("Cannot spawn child process: {:?}", e);
                 Err(Error::new())
@@ -265,11 +267,13 @@ mod tests {
             let mut out = child.stdout.take().unwrap();
             loop {
                 match out.read(&mut buf) {
-                    Ok(n) => if n == 0 {
-                        break;
-                    } else {
-                        file.write_all(&mut buf).expect("Write to file error")
-                    },
+                    Ok(n) => {
+                        if n == 0 {
+                            break;
+                        } else {
+                            file.write_all(&mut buf).expect("Write to file error")
+                        }
+                    }
                     Err(e) => panic!("stdout read error {:?}", e),
                 }
             }

@@ -82,7 +82,7 @@ fn add_cors_headers<T: AsRef<str>>(
     }
 }
 
-impl <C:'static>Service for FileSendService<C> {
+impl<C: 'static> Service for FileSendService<C> {
     type ReqBody = Body;
     type ResBody = Body;
     type Error = ::error::Error;
@@ -128,7 +128,7 @@ impl <C:'static>Service for FileSendService<C> {
     }
 }
 
-impl <C> FileSendService<C> {
+impl<C> FileSendService<C> {
     fn process_checked<T>(
         req: &Request<T>,
         searcher: Search<String>,
