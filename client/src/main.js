@@ -250,6 +250,12 @@ $(function () {
             });
     }
 
+    function dirname(p) {
+        let m = p.match(/(.*)\//);
+        return m?m[1]:m;
+
+    }
+
     function search(query, fromHistory, scrollTo) {
         ajax({
             url: collectionUrl + "/search",
@@ -273,8 +279,16 @@ $(function () {
                 count.text(data.subfolders.length);
                 for (let subfolder of data.subfolders) {
                     let item = $('<a class="list-group-item list-group-item-action">')
-                        .attr("href", subfolder.path)
-                        .text(subfolder.name);
+                        .attr("href", subfolder.path);
+                        
+                    let title = $("<span>").addClass("title").text(subfolder.name);
+                    item.append(title);
+
+                    let dir = dirname(subfolder.path);
+                    if (dir) {
+                    let path = $("<span>").addClass("subtitle").text(dir);
+                    item.append(path);
+                    }
                     subfolders.append(item);
                 }
                 if (data.subfolders.length) {

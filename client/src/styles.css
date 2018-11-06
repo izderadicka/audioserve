@@ -157,6 +157,15 @@ span.transcoded {
     
     }
 
+span.title {
+    display: block;
+}
+
+span.subtitle {
+    font-size: 80%;
+    font-style: italic;
+}
+
 @media (max-width: 1024px) {
     h1.top-header {
         font-size: 1.6rem;
