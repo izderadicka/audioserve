@@ -83,10 +83,11 @@ impl FoldersSearch {
                     if let Ok(ft) = get_real_file_type(&f, path, allow_symlinks) {
                         if ft.is_dir() {
                             let p = f.path();
-                            if let Some(s) = p.to_str() {
+                            if let Some(s) = p.strip_prefix(base_path).ok().and_then(|p| p.to_str()) {
                                 let lc_s = s.to_lowercase();
                                 let m = tokens.into_iter().all(|token| lc_s.contains(token));
                                 if m {
+                                    debug!("Found {:?} in {}", tokens, lc_s);
                                     results.subfolders.push(AudioFolderShort {
                                         name: p.file_name().unwrap().to_str().unwrap().into(),
                                         path: p.strip_prefix(base_path).unwrap().into(),
@@ -168,6 +169,9 @@ mod tests {
         assert_eq!(res.subfolders.len(), 1);
 
         let res = search.search_folder("./test_data", "usak nexistuje");
+        assert_eq!(res.subfolders.len(), 0);
+
+        let res = search.search_folder("./test_data", "t");
         assert_eq!(res.subfolders.len(), 0);
     }
 }
