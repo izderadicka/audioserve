@@ -50,9 +50,16 @@ RUN mkdir ssl &&\
 
 EXPOSE 3000
 
-CMD ./audioserve -s mypass --ssl-key ./ssl/audioserve.p12 --ssl-key-password mypass /audiobooks
+ENV SECRET=mypass
 
-    
+ENV SSLKEY=./ssl/audioserve.p12
 
+ENV SSLPASS=mypass
 
+ENV DIRS=/audiobooks
 
+WORKDIR /audioserve
+
+COPY audioserve.sh .
+
+CMD ./audioserve.sh
