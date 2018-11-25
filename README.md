@@ -137,6 +137,34 @@ But easiest way how to test audioserve is to run it as docker container with pro
 
 Then open <https://localhost:3000> and accept insecure connection, shared secret to enter in client is mypass
 
+The following environment variables can be used to customise how audioserve runs:
+
+    DIRS - Space separated list of audio folders (defaults to: /audiobooks)
+    SECRET - The shared secret key (defaults to: mypass)
+    SSLKEY - Path to the SSL key (defaults to: ./ssl/audioserve.p12)
+    SSLPASS - Password to the SSL key (defaults to: mypass)
+    OTHER_ARGS - Any of the other audioserve command line options, such as --search-cache, space separated
+
+Note: If you do not wish to use the SSL certificate, blank values for SSLKEY and SSLPASS will suffice.
+
+A more detailed example:
+
+    docker run -d --name audioserve -p 3000:3000 \
+        -v /path/to/your/audiobooks1:/collection1 \
+        -v /path/to/your/audiobooks2:/collection2 \
+        -e DIRS=/collection1 /collection2 \
+        -e SECRET=mypassword \
+        -e SSLKEY= \
+        -e SSLPASS= \
+        -e OTHER_ARGS=--search-cache \
+        audioserve
+
+In the above example, we are adding two different collections of audiobooks (collection1 and collection2).
+Both are made available to the container via -v option and passed to audioserve in the -e DIRS ENV variable.
+We set the shared secret via -e SECRET and specify the use of a search cache via -e OTHER_ARGS.
+In this case, we are not using SSL and this is determined via the blank values in -e SSLKEY and -e SSLPASS.
+    
+
 Other platforms - theoretically audioserve can work on Windows and MacOS (probably with few changes), 
 but I never tried to build it there. Any help in this area is welcomed.
 
