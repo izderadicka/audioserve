@@ -1,6 +1,6 @@
 use config::get_config;
 use error::Error;
-use futures::future::Either;
+use futures::future::{Either, self};
 use futures::Future;
 use mime::Mime;
 use services::subs::ChunkStream;
@@ -10,6 +10,7 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
 use tokio_process::{ChildStdout, CommandExt};
+use crate::cache::{cache_key, get_cache};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -179,13 +180,14 @@ impl Transcoder {
         file: S,
         seek: Option<f32>,
         counter: &super::Counter,
-    ) -> Result<ChunkStream<ChildStdout>, Error> {
+    ) -> impl Future<Item=ChunkStream<ChildStdout>, Error=Error> {
 
-        self.transcode_inner(file, seek, counter)
+        future::result(self.transcode_inner(file, seek, counter)
         .map(|(stream, f)| {
             tokio::spawn(f);
             stream
         })
+        )
     }
 
     #[cfg(feature = "transcoding-cache")]
@@ -194,13 +196,16 @@ impl Transcoder {
         file: S,
         seek: Option<f32>,
         counter: &super::Counter,
-    ) -> Result<ChunkStream<ChildStdout>, Error> {
-
-        self.transcode_inner(file, seek, counter)
+    ) -> impl Future<Item=ChunkStream<ChildStdout>, Error=Error> {
+        let cache = get_cache();
+        //let key = cache_key(file.as_ref(), &self.quality);
+        future::result(self.transcode_inner(file, seek, counter)
         .map(|(stream, f)| {
             tokio::spawn(f);
+            
             stream
         })
+        )
     }
 
     fn transcode_inner<S: AsRef<OsStr> + Send + 'static>(

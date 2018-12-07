@@ -126,7 +126,8 @@ fn serve_file_transcoded(
     counter: &Counter,
 ) -> ResponseFuture {
     let transcoder = Transcoder::new(get_config().transcoding.get(transcoding_quality));
-    match transcoder.transcode(full_path, seek, counter) {
+    let fut = transcoder.transcode(full_path, seek, counter).then(move |res| {
+    match res {
         Ok(stream) => {
             let resp = HyperResponse::builder()
                 .header(CONTENT_TYPE, Transcoder::transcoded_mime().as_ref())
@@ -134,16 +135,18 @@ fn serve_file_transcoded(
                 .body(Body::wrap_stream(stream.map_err(Error::new_with_cause)))
                 .unwrap();
 
-            Box::new(future::ok(resp))
+            Ok(resp)
         }
         Err(e) => {
             error!("Cannot create transcoded stream, error: {}", e);
-            Box::new(future::ok(short_response(
+            Ok(short_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 SEVER_ERROR_TRANSCODING,
-            )))
+            ))
         }
     }
+    });
+    Box::new(fut)
 }
 
 pub struct ChunkStream<T> {
