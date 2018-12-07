@@ -58,7 +58,7 @@ impl QualityLevel {
             _ => None,
         }
     }
-    
+
     #[allow(dead_code)]
     pub fn to_letter(&self) -> &'static str {
         use self::QualityLevel::*;
@@ -173,12 +173,42 @@ impl Transcoder {
         "audio/ogg".parse().unwrap()
     }
 
+    #[cfg(not(feature = "transcoding-cache"))]
     pub fn transcode<S: AsRef<OsStr> + Send + 'static>(
         &self,
         file: S,
         seek: Option<f32>,
         counter: &super::Counter,
     ) -> Result<ChunkStream<ChildStdout>, Error> {
+
+        self.transcode_inner(file, seek, counter)
+        .map(|(stream, f)| {
+            tokio::spawn(f);
+            stream
+        })
+    }
+
+    #[cfg(feature = "transcoding-cache")]
+    pub fn transcode<S: AsRef<OsStr> + Send + 'static>(
+        &self,
+        file: S,
+        seek: Option<f32>,
+        counter: &super::Counter,
+    ) -> Result<ChunkStream<ChildStdout>, Error> {
+
+        self.transcode_inner(file, seek, counter)
+        .map(|(stream, f)| {
+            tokio::spawn(f);
+            stream
+        })
+    }
+
+    fn transcode_inner<S: AsRef<OsStr> + Send + 'static>(
+        &self,
+        file: S,
+        seek: Option<f32>,
+        counter: &super::Counter,
+    ) -> Result<(ChunkStream<ChildStdout>, impl Future<Item=(), Error=()>), Error> {
         let mut cmd = self.build_command(&file, seek);
         let counter2 = counter.clone();
         match cmd.spawn_async() {
@@ -190,7 +220,8 @@ impl Transcoder {
                     let stream = ChunkStream::new(out);
                     let pid = child.id();
                     debug!("waiting for transcode process to end");
-                    ::tokio::spawn(
+                    let fut = 
+                    
                     child
                         .select2(Delay::new(
                             Instant::now()
@@ -205,15 +236,17 @@ impl Transcoder {
                                     if res.success() {
                                         debug!("Finished transcoding process of {:?} normally after {:?}",
                                     file.as_ref(),
-                                    Instant::now() - start)
+                                    Instant::now() - start);
+                                    Ok(())
                                     } else {
                                         warn!(
                                             "Transconding of file {:?} failed with code {:?}",
                                             file.as_ref(),
                                             res.code()
-                                        )
+                                        );
+                                        Err(())
                                     }
-                                    Ok(())
+                                   
                                 }
                                 Ok(Either::B((_d, mut child))) => {
                                     eprintln!(
@@ -238,9 +271,8 @@ impl Transcoder {
                                     Err(())
                                 }
                             }
-                        }),
-                );
-                    Ok(stream)
+                        });
+                    Ok((stream, fut))
                 } else {
                     error!("Cannot get stdout");
                     Err(Error::new())
