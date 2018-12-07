@@ -27,7 +27,6 @@ extern crate url;
 extern crate lazy_static;
 extern crate dirs;
 extern crate tokio;
-extern crate tokio_fs;
 extern crate tokio_process;
 extern crate tokio_threadpool;
 // for TLS

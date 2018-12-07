@@ -193,7 +193,7 @@ impl<T: AsyncRead> ChunkStream<T> {
 }
 
 fn serve_opened_file(
-    file: tokio_fs::File,
+    file: tokio::fs::File,
     range: Option<::hyperx::header::ByteRangeSpec>,
     caching: Option<u32>,
     mime: mime::Mime,
@@ -266,7 +266,7 @@ fn serve_file_from_fs(
     let filename2: PathBuf = full_path.into();
     let filename3: PathBuf = full_path.into();
     Box::new(
-        ::tokio_fs::file::File::open(filename)
+        tokio::fs::File::open(filename)
             .and_then(move |file| {
                 let mime = guess_mime_type(filename2);
                 serve_opened_file(file, range, caching, mime)
