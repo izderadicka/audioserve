@@ -4,7 +4,6 @@ use super::transcode::{QualityLevel, Transcoder};
 use super::types::*;
 use super::Counter;
 use config::get_config;
-use crate::cache::{cache_key, get_cache};
 use error::Error;
 use futures::future::{self, poll_fn, Future};
 use futures::{Async, Stream};
@@ -44,6 +43,18 @@ pub fn short_response_boxed(status: StatusCode, msg: &'static str) -> ResponseFu
     Box::new(future::ok(short_response(status, msg)))
 }
 
+#[cfg(not(feature = "transcoding-cache"))]
+fn serve_file_cached_or_transcoded(
+    full_path: PathBuf,
+    seek: Option<f32>,
+    _range: Option<::hyperx::header::ByteRangeSpec>,
+    transcoding: super::TranscodingDetails,
+    transcoding_quality: QualityLevel,
+) -> ResponseFuture {
+    serve_file_transcoded_checked(full_path, seek, transcoding, transcoding_quality)
+}
+
+#[cfg(feature = "transcoding-cache")]
 fn serve_file_cached_or_transcoded(
     full_path: PathBuf,
     seek: Option<f32>,
@@ -51,6 +62,7 @@ fn serve_file_cached_or_transcoded(
     transcoding: super::TranscodingDetails,
     transcoding_quality: QualityLevel,
 ) -> ResponseFuture {
+    use crate::cache::{cache_key, get_cache};
     let cache = get_cache();
     let cache_key = cache_key(&full_path, &transcoding_quality);
     let fut = cache
@@ -64,33 +76,47 @@ fn serve_file_cached_or_transcoded(
         })
         .and_then(move |maybe_file| match maybe_file {
             None => {
-                let counter = transcoding.transcodings;
-
-                let running_transcodings = counter.load(Ordering::SeqCst);
-                if running_transcodings >= transcoding.max_transcodings {
-                    warn!("Max transcodings reached {}", transcoding.max_transcodings);
-                    Box::new(future::ok(short_response(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        "Max transcodings reached",
-                    )))
-                } else {
-                    debug!(
-                        "Sendig file {:?} transcoded - remaining slots {}/{}",
-                        &full_path,
-                        transcoding.max_transcodings - running_transcodings - 1,
-                        transcoding.max_transcodings
-                    );
-                    serve_file_transcoded(full_path, seek, transcoding_quality, &counter)
-                }
+                serve_file_transcoded_checked(full_path, seek, transcoding, transcoding_quality)
             }
-            Some(f) => { 
-                serve_opened_file(f, range, None, Transcoder::transcoded_mime());
-                panic!("Not yet implemented") 
-            
-            },
+            Some(f) => {
+                debug!("Sending file {:?} from transcoded cache", &full_path);
+                Box::new(
+                    serve_opened_file(f, range, None, Transcoder::transcoded_mime())
+                    .map_err(|e| {
+                        error!("Error sending cached file: {}", e);
+                        Error::new_with_cause(e)
+                        })
+                    )
+            }
         });
 
     Box::new(fut)
+}
+
+fn serve_file_transcoded_checked(
+    full_path: PathBuf,
+    seek: Option<f32>,
+    transcoding: super::TranscodingDetails,
+    transcoding_quality: QualityLevel,
+) -> ResponseFuture {
+    let counter = transcoding.transcodings;
+
+    let running_transcodings = counter.load(Ordering::SeqCst);
+    if running_transcodings >= transcoding.max_transcodings {
+        warn!("Max transcodings reached {}", transcoding.max_transcodings);
+        Box::new(future::ok(short_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Max transcodings reached",
+        )))
+    } else {
+        debug!(
+            "Sendig file {:?} transcoded - remaining slots {}/{}",
+            &full_path,
+            transcoding.max_transcodings - running_transcodings - 1,
+            transcoding.max_transcodings
+        );
+        serve_file_transcoded(full_path, seek, transcoding_quality, &counter)
+    }
 }
 
 fn serve_file_transcoded(
@@ -242,8 +268,8 @@ fn serve_file_from_fs(
     Box::new(
         ::tokio_fs::file::File::open(filename)
             .and_then(move |file| {
-               let mime = guess_mime_type(filename2); 
-               serve_opened_file(file, range, caching, mime)
+                let mime = guess_mime_type(filename2);
+                serve_opened_file(file, range, caching, mime)
             })
             .or_else(move |_| {
                 error!("Error when sending file {:?}", filename3);

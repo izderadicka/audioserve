@@ -37,6 +37,7 @@ extern crate cachedirtree;
 extern crate native_tls;
 #[cfg(feature = "tls")]
 extern crate tokio_tls;
+#[cfg(feature = "transcoding-cache")]
 extern crate simple_file_cache;
 
 use config::{get_config, parse_args};
@@ -59,6 +60,7 @@ use native_tls::Identity;
 mod config;
 mod error;
 mod services;
+#[cfg(feature = "transcoding-cache")]
 mod cache;
 
 #[cfg(feature = "tls")]

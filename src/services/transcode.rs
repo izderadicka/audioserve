@@ -58,7 +58,8 @@ impl QualityLevel {
             _ => None,
         }
     }
-
+    
+    #[allow(dead_code)]
     pub fn to_letter(&self) -> &'static str {
         use self::QualityLevel::*;
         match *self {
