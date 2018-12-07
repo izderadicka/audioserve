@@ -23,8 +23,8 @@ percent-encoding = "1.0"
 num_cpus = "1.8"
 ring = "0.13"
 data-encoding = "2.1"
-regex = "1.0"
-tokio = "0.1.11"
+regex = "1.1"
+tokio = "0.1.13"
 tokio-fs = "0.1.4"
 tokio-process = "0.2"
 tokio-threadpool = "0.1"
@@ -36,6 +36,7 @@ tokio-tls = {version="0.2", optional=true}
 native-tls = {version="0.2", optional=true}
 
 cachedirtree = {git="https://github.com/izderadicka/cachedirtree.git", optional=true}
+simple-file-cache = {git="https://github.com/izderadicka/simple-file-cache.git", features=["asynch"], version="0.1.1"}
 
 [features]
 default = ["tls", "symlinks", "search-cache"]

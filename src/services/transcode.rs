@@ -58,6 +58,15 @@ impl QualityLevel {
             _ => None,
         }
     }
+
+    pub fn to_letter(&self) -> &'static str {
+        use self::QualityLevel::*;
+        match *self {
+            Low => "l",
+            Medium => "m",
+            High => "h"
+        }
+    }
 }
 
 impl Quality {
@@ -159,7 +168,7 @@ impl Transcoder {
         bitrate > self.quality.transcode_from()
     }
 
-    pub fn transcoded_mime(&self) -> Mime {
+    pub fn transcoded_mime() -> Mime {
         "audio/ogg".parse().unwrap()
     }
 
@@ -177,7 +186,7 @@ impl Transcoder {
                     counter.fetch_add(1, Ordering::SeqCst);
                     let start = Instant::now();
                     let mut out = child.stdout().take().unwrap();
-                    let stream = ChunkStream::new(out, ::std::u64::MAX);
+                    let stream = ChunkStream::new(out);
                     let pid = child.id();
                     debug!("waiting for transcode process to end");
                     ::tokio::spawn(

@@ -37,6 +37,7 @@ extern crate cachedirtree;
 extern crate native_tls;
 #[cfg(feature = "tls")]
 extern crate tokio_tls;
+extern crate simple_file_cache;
 
 use config::{get_config, parse_args};
 use hyper::rt::Future;
@@ -58,6 +59,7 @@ use native_tls::Identity;
 mod config;
 mod error;
 mod services;
+mod cache;
 
 #[cfg(feature = "tls")]
 fn load_private_key<P>(file: P, pass: Option<&String>) -> Result<Identity, io::Error>

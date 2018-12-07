@@ -4,6 +4,7 @@ use super::transcode::{QualityLevel, Transcoder};
 use super::types::*;
 use super::Counter;
 use config::get_config;
+use crate::cache::{cache_key, get_cache};
 use error::Error;
 use futures::future::{self, poll_fn, Future};
 use futures::{Async, Stream};
@@ -11,7 +12,7 @@ use hyper::header::{
     HeaderValue, ACCEPT_RANGES, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE,
     LAST_MODIFIED,
 };
-use hyper::{Body, Chunk, Response as HyperResponse, StatusCode};
+use hyper::{Body, Response as HyperResponse, StatusCode};
 use hyperx::header::{CacheControl, CacheDirective, ContentRange, ContentRangeSpec, LastModified};
 use mime;
 use mime_guess::guess_mime_type;
@@ -43,16 +44,66 @@ pub fn short_response_boxed(status: StatusCode, msg: &'static str) -> ResponseFu
     Box::new(future::ok(short_response(status, msg)))
 }
 
+fn serve_file_cached_or_transcoded(
+    full_path: PathBuf,
+    seek: Option<f32>,
+    range: Option<::hyperx::header::ByteRangeSpec>,
+    transcoding: super::TranscodingDetails,
+    transcoding_quality: QualityLevel,
+) -> ResponseFuture {
+    let cache = get_cache();
+    let cache_key = cache_key(&full_path, &transcoding_quality);
+    let fut = cache
+        .get_async(cache_key)
+        .then(|res| match res {
+            Err(e) => {
+                error!("Cache lookup error: {}", e);
+                Ok(None)
+            }
+            Ok(f) => Ok(f),
+        })
+        .and_then(move |maybe_file| match maybe_file {
+            None => {
+                let counter = transcoding.transcodings;
+
+                let running_transcodings = counter.load(Ordering::SeqCst);
+                if running_transcodings >= transcoding.max_transcodings {
+                    warn!("Max transcodings reached {}", transcoding.max_transcodings);
+                    Box::new(future::ok(short_response(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "Max transcodings reached",
+                    )))
+                } else {
+                    debug!(
+                        "Sendig file {:?} transcoded - remaining slots {}/{}",
+                        &full_path,
+                        transcoding.max_transcodings - running_transcodings - 1,
+                        transcoding.max_transcodings
+                    );
+                    serve_file_transcoded(full_path, seek, transcoding_quality, &counter)
+                }
+            }
+            Some(f) => { 
+                serve_opened_file(f, range, None, Transcoder::transcoded_mime());
+                panic!("Not yet implemented") 
+            
+            },
+        });
+
+    Box::new(fut)
+}
+
 fn serve_file_transcoded(
     full_path: PathBuf,
     seek: Option<f32>,
-    transcoder: &Transcoder,
+    transcoding_quality: QualityLevel,
     counter: &Counter,
 ) -> ResponseFuture {
+    let transcoder = Transcoder::new(get_config().transcoding.get(transcoding_quality));
     match transcoder.transcode(full_path, seek, counter) {
         Ok(stream) => {
             let resp = HyperResponse::builder()
-                .header(CONTENT_TYPE, transcoder.transcoded_mime().as_ref())
+                .header(CONTENT_TYPE, Transcoder::transcoded_mime().as_ref())
                 .header("X-Transcode", transcoder.transcoding_params().as_bytes())
                 .body(Body::wrap_stream(stream.map_err(Error::new_with_cause)))
                 .unwrap();
@@ -69,14 +120,14 @@ fn serve_file_transcoded(
     }
 }
 
-pub struct ChunkStream<T: AsyncRead> {
+pub struct ChunkStream<T> {
     src: Option<T>,
     remains: u64,
     buf: [u8; 8 * 1024],
 }
 
 impl<T: AsyncRead> Stream for ChunkStream<T> {
-    type Item = Chunk;
+    type Item = Vec<u8>;
     type Error = io::Error;
 
     fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
@@ -96,20 +147,88 @@ impl<T: AsyncRead> Stream for ChunkStream<T> {
         } else {
             let to_send = self.remains.min(read as u64);
             self.remains -= to_send;
-            let chunk: Chunk = self.buf[..to_send as usize].to_vec().into();
+            let chunk = self.buf[..to_send as usize].to_vec();
             Ok(Async::Ready(Some(chunk)))
         }
     }
 }
 
 impl<T: AsyncRead> ChunkStream<T> {
-    pub fn new(src: T, remains: u64) -> Self {
+    pub fn new(src: T) -> Self {
+        ChunkStream::new_with_limit(src, std::u64::MAX)
+    }
+    pub fn new_with_limit(src: T, remains: u64) -> Self {
         ChunkStream {
             src: Some(src),
             remains,
             buf: [0u8; 8 * 1024],
         }
     }
+}
+
+fn serve_opened_file(
+    file: tokio_fs::File,
+    range: Option<::hyperx::header::ByteRangeSpec>,
+    caching: Option<u32>,
+    mime: mime::Mime,
+) -> impl Future<Item = Response, Error = io::Error> {
+    file.metadata().and_then(move |(file, meta)| {
+        let file_len = meta.len();
+        if file_len == 0 {
+            warn!("File has zero size ")
+        }
+        let last_modified = meta.modified().ok();
+        let mut resp = HyperResponse::builder();
+        resp.header(CONTENT_TYPE, mime.as_ref());
+        if let Some(age) = caching {
+            let cache = CacheControl(vec![CacheDirective::Public, CacheDirective::MaxAge(age)]);
+            resp.header(CACHE_CONTROL, cache.to_string().as_bytes());
+            if let Some(last_modified) = last_modified {
+                let lm = LastModified(last_modified.into());
+                resp.header(LAST_MODIFIED, lm.to_string().as_bytes());
+            }
+        }
+
+        fn checked_dec(x: u64) -> u64 {
+            if x > 0 {
+                x - 1
+            } else {
+                x
+            }
+        }
+
+        let (start, end) = match range {
+            Some(range) => match range.to_satisfiable_range(file_len) {
+                Some(l) => {
+                    resp.status(StatusCode::PARTIAL_CONTENT);
+                    let h = ContentRange(ContentRangeSpec::Bytes {
+                        range: Some((l.0, l.1)),
+                        instance_length: Some(file_len),
+                    });
+                    resp.header(
+                        CONTENT_RANGE,
+                        HeaderValue::from_str(&h.to_string()).unwrap(),
+                    );
+                    l
+                }
+                None => {
+                    error!("Wrong range {}", range);
+                    (0, checked_dec(file_len))
+                }
+            },
+            None => {
+                resp.status(StatusCode::OK);
+                resp.header(ACCEPT_RANGES, "bytes");
+                (0, checked_dec(file_len))
+            }
+        };
+        file.seek(SeekFrom::Start(start)).map(move |(file, _pos)| {
+            let stream = ChunkStream::new_with_limit(file, end - start + 1);
+            resp.header(CONTENT_LENGTH, end - start + 1)
+                .body(Body::wrap_stream(stream))
+                .unwrap()
+        })
+    })
 }
 
 fn serve_file_from_fs(
@@ -123,65 +242,8 @@ fn serve_file_from_fs(
     Box::new(
         ::tokio_fs::file::File::open(filename)
             .and_then(move |file| {
-                file.metadata().and_then(move |(file, meta)| {
-                    let file_len = meta.len();
-                    if file_len == 0 {
-                        warn!("File {:?} has zero size ", &filename2)
-                    }
-                    let last_modified = meta.modified().ok();
-                    let mime = guess_mime_type(filename2);
-                    let mut resp = HyperResponse::builder();
-                    resp.header(CONTENT_TYPE, mime.as_ref());
-                    if let Some(age) = caching {
-                        let cache =
-                            CacheControl(vec![CacheDirective::Public, CacheDirective::MaxAge(age)]);
-                        resp.header(CACHE_CONTROL, cache.to_string().as_bytes());
-                        if let Some(last_modified) = last_modified {
-                            let lm = LastModified(last_modified.into());
-                            resp.header(LAST_MODIFIED, lm.to_string().as_bytes());
-                        }
-                    }
-
-                    fn checked_dec(x: u64) -> u64 {
-                        if x > 0 {
-                            x - 1
-                        } else {
-                            x
-                        }
-                    }
-
-                    let (start, end) = match range {
-                        Some(range) => match range.to_satisfiable_range(file_len) {
-                            Some(l) => {
-                                resp.status(StatusCode::PARTIAL_CONTENT);
-                                let h = ContentRange(ContentRangeSpec::Bytes {
-                                    range: Some((l.0, l.1)),
-                                    instance_length: Some(file_len),
-                                });
-                                resp.header(
-                                    CONTENT_RANGE,
-                                    HeaderValue::from_str(&h.to_string()).unwrap(),
-                                );
-                                l
-                            }
-                            None => {
-                                error!("Wrong range {}", range);
-                                (0, checked_dec(file_len))
-                            }
-                        },
-                        None => {
-                            resp.status(StatusCode::OK);
-                            resp.header(ACCEPT_RANGES, "bytes");
-                            (0, checked_dec(file_len))
-                        }
-                    };
-                    file.seek(SeekFrom::Start(start)).map(move |(file, _pos)| {
-                        let stream = ChunkStream::new(file, end - start + 1);
-                        resp.header(CONTENT_LENGTH, end - start + 1)
-                            .body(Body::wrap_stream(stream))
-                            .unwrap()
-                    })
-                })
+               let mime = guess_mime_type(filename2); 
+               serve_opened_file(file, range, caching, mime)
             })
             .or_else(move |_| {
                 error!("Error when sending file {:?}", filename3);
@@ -208,30 +270,12 @@ pub fn send_file<P: AsRef<Path>>(
     transcoding_quality: Option<QualityLevel>,
 ) -> ResponseFuture {
     let full_path = base_path.join(&file_path);
-    if transcoding_quality.is_some() {
+    if let Some(transcoding_quality) = transcoding_quality {
         debug!(
             "Sending file transcoded in quality {:?}",
             transcoding_quality
         );
-        let counter = transcoding.transcodings;
-        let transcoder =
-            Transcoder::new(get_config().transcoding.get(transcoding_quality.unwrap()));
-        let running_transcodings = counter.load(Ordering::SeqCst);
-        if running_transcodings >= transcoding.max_transcodings {
-            warn!("Max transcodings reached {}", transcoding.max_transcodings);
-            Box::new(future::ok(short_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "Max transcodings reached",
-            )))
-        } else {
-            debug!(
-                "Sendig file {:?} transcoded - remaining slots {}/{}",
-                &full_path,
-                transcoding.max_transcodings - running_transcodings - 1,
-                transcoding.max_transcodings
-            );
-            serve_file_transcoded(full_path, seek, &transcoder, &counter)
-        }
+        serve_file_cached_or_transcoded(full_path, seek, range, transcoding, transcoding_quality)
     } else {
         debug!("Sending file directly from fs");
         serve_file_from_fs(&full_path, range, None)
@@ -367,7 +411,7 @@ pub fn get_audio_properties(audio_file_name: &Path) -> Option<AudioMeta> {
     None
 }
 
-fn json_response<T: ::serde::Serialize>(data: &T) -> Response {
+fn json_response<T: serde::Serialize>(data: &T) -> Response {
     let json = serde_json::to_string(data).expect("Serialization error");
     HyperResponse::builder()
         .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
