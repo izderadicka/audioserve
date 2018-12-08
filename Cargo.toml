@@ -35,7 +35,7 @@ tokio-tls = {version="0.2", optional=true}
 native-tls = {version="0.2", optional=true}
 
 cachedirtree = {git="https://github.com/izderadicka/cachedirtree.git", optional=true}
-simple-file-cache = {git="https://github.com/izderadicka/simple-file-cache.git", features=["asynch"], version="0.1.1", optional=true}
+simple-file-cache = {git="https://github.com/izderadicka/simple-file-cache.git", features=["asynch"], version="0.1.2", optional=true}
 
 
 [features]

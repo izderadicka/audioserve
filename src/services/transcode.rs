@@ -205,7 +205,19 @@ impl Transcoder {
         counter: super::Counter,
         quality: QualityLevel
     ) -> TranscodedFuture {
+
         use crate::cache::{cache_key, get_cache};
+        use futures::future;
+
+        if seek.is_some() {
+            debug!("Shoud not add to cache as seeking");
+            return Box::new(future::result(self.transcode_inner(file, seek, counter)
+            .map(|(stream, f)| {
+                tokio::spawn(f);
+            Box::new(stream) as TranscodedStream
+        })))
+        }
+        
         let cache = get_cache();
         let key = cache_key(file.as_ref(), &quality);
         let fut = cache.add_async(key).then( move |res| {
@@ -222,9 +234,22 @@ impl Transcoder {
                 Ok((cache_file, cache_finish)) => {
                     self.transcode_inner(file, seek, counter)
                     .map(|(stream, f)| {
-                        tokio::spawn(f.and_then(|_| {
+                        tokio::spawn(f.then(|res| {
 
-                            Ok(())
+                            fn box_me<I,E,F:Future<Item=I, Error=E>+'static+Send>(f: F ) -> 
+                            Box<Future<Item=I, Error=E>+'static+Send> {
+                                Box::new(f)
+                            };
+
+                            match res {
+                                Ok(()) => box_me(cache_finish.roll_back()
+                                    .map_err(|e| error!("Error in cache: {}", e))),
+                                Err(()) => box_me(cache_finish.roll_back()
+                                    .map_err(|e| error!("Error in cache: {}", e))),
+                            }
+                            
+
+                            
                         }
                         ));
             
