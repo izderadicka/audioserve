@@ -1,6 +1,6 @@
 use config::get_config;
 use error::Error;
-use futures::future::{Either, self};
+use futures::future::{Either};
 use futures::Future;
 use mime::Mime;
 use services::subs::ChunkStream;
@@ -10,7 +10,7 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
 use tokio_process::{ChildStdout, CommandExt};
-use crate::cache::{cache_key, get_cache};
+
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -111,6 +111,13 @@ pub struct Transcoder {
     quality: Quality,
 }
 
+#[cfg(feature = "transcoding-cache")]
+type TranscodedStream = Box<dyn futures::Stream<Item=Vec<u8>, Error=std::io::Error>+Send+'static>;
+#[cfg(feature = "transcoding-cache")]
+type TranscodedFuture = Box<dyn Future<Item=TranscodedStream, Error=Error>+Send>;
+
+
+
 impl Transcoder {
     pub fn new(quality: Quality) -> Self {
         Transcoder { quality }
@@ -176,13 +183,13 @@ impl Transcoder {
 
     #[cfg(not(feature = "transcoding-cache"))]
     pub fn transcode<S: AsRef<OsStr> + Send + 'static>(
-        &self,
+        self,
         file: S,
         seek: Option<f32>,
-        counter: &super::Counter,
+        counter: super::Counter,
+        _quality: QualityLevel
     ) -> impl Future<Item=ChunkStream<ChildStdout>, Error=Error> {
-
-        future::result(self.transcode_inner(file, seek, counter)
+        futures::future::result(self.transcode_inner(file, seek, counter)
         .map(|(stream, f)| {
             tokio::spawn(f);
             stream
@@ -192,27 +199,48 @@ impl Transcoder {
 
     #[cfg(feature = "transcoding-cache")]
     pub fn transcode<S: AsRef<OsStr> + Send + 'static>(
-        &self,
+        self,
         file: S,
         seek: Option<f32>,
-        counter: &super::Counter,
-    ) -> impl Future<Item=ChunkStream<ChildStdout>, Error=Error> {
+        counter: super::Counter,
+        quality: QualityLevel
+    ) -> TranscodedFuture {
+        use crate::cache::{cache_key, get_cache};
         let cache = get_cache();
-        //let key = cache_key(file.as_ref(), &self.quality);
-        future::result(self.transcode_inner(file, seek, counter)
-        .map(|(stream, f)| {
-            tokio::spawn(f);
+        let key = cache_key(file.as_ref(), &quality);
+        let fut = cache.add_async(key).then( move |res| {
+            match res {
+                Err(e) => {
+                    warn!("Cannot create cache entry: {}", e);
+                    self.transcode_inner(file, seek, counter)
+                    .map(|(stream, f)| {
+                        tokio::spawn(f);
             
-            stream
-        })
-        )
+                    Box::new(stream) as TranscodedStream
+                    })
+                },
+                Ok((cache_file, cache_finish)) => {
+                    self.transcode_inner(file, seek, counter)
+                    .map(|(stream, f)| {
+                        tokio::spawn(f.and_then(|_| {
+
+                            Ok(())
+                        }
+                        ));
+            
+                    Box::new(stream) as TranscodedStream
+                    })
+                }
+            }
+        });
+        Box::new(fut)
     }
 
     fn transcode_inner<S: AsRef<OsStr> + Send + 'static>(
         &self,
         file: S,
         seek: Option<f32>,
-        counter: &super::Counter,
+        counter: super::Counter,
     ) -> Result<(ChunkStream<ChildStdout>, impl Future<Item=(), Error=()>), Error> {
         let mut cmd = self.build_command(&file, seek);
         let counter2 = counter.clone();

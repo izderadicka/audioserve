@@ -126,12 +126,13 @@ fn serve_file_transcoded(
     counter: &Counter,
 ) -> ResponseFuture {
     let transcoder = Transcoder::new(get_config().transcoding.get(transcoding_quality));
-    let fut = transcoder.transcode(full_path, seek, counter).then(move |res| {
+    let params = transcoder.transcoding_params();
+    let fut = transcoder.transcode(full_path, seek, counter.clone(), transcoding_quality).then(move |res| {
     match res {
         Ok(stream) => {
             let resp = HyperResponse::builder()
                 .header(CONTENT_TYPE, Transcoder::transcoded_mime().as_ref())
-                .header("X-Transcode", transcoder.transcoding_params().as_bytes())
+                .header("X-Transcode", params.as_bytes())
                 .body(Body::wrap_stream(stream.map_err(Error::new_with_cause)))
                 .unwrap();
 
