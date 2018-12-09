@@ -226,6 +226,12 @@ fn main() {
     };
     pretty_env_logger::init();
     debug!("Started with following config {:?}", get_config());
+    #[cfg(feature="transcoding-cache")]
+    {
+        use cache::get_cache;
+        let c = get_cache();
+        info!("Using transcoding cache, remaining capacity (files,size) : {:?}", c.free_capacity())
+    }
     let my_secret = match gen_my_secret(&get_config().secret_file) {
         Ok(s) => s,
         Err(e) => {
@@ -241,4 +247,6 @@ fn main() {
             process::exit(3)
         }
     }
+
+    info!("Server finished");
 }

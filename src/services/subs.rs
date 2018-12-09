@@ -1,6 +1,6 @@
 use super::get_real_file_type;
 use super::search::{Search, SearchTrait};
-use super::transcode::{QualityLevel, Transcoder};
+use super::transcode::{QualityLevel, Transcoder, AudioFilePath};
 use super::types::*;
 use super::Counter;
 use config::get_config;
@@ -51,7 +51,7 @@ fn serve_file_cached_or_transcoded(
     transcoding: super::TranscodingDetails,
     transcoding_quality: QualityLevel,
 ) -> ResponseFuture {
-    serve_file_transcoded_checked(full_path, seek, transcoding, transcoding_quality)
+    serve_file_transcoded_checked(AudioFilePath::Original(full_path), seek, transcoding, transcoding_quality)
 }
 
 #[cfg(feature = "transcoding-cache")]
@@ -66,7 +66,7 @@ fn serve_file_cached_or_transcoded(
     let cache = get_cache();
     let cache_key = cache_key(&full_path, &transcoding_quality);
     let fut = cache
-        .get_async(cache_key)
+        .get_async2(cache_key)
         .then(|res| match res {
             Err(e) => {
                 error!("Cache lookup error: {}", e);
@@ -76,17 +76,23 @@ fn serve_file_cached_or_transcoded(
         })
         .and_then(move |maybe_file| match maybe_file {
             None => {
-                serve_file_transcoded_checked(full_path, seek, transcoding, transcoding_quality)
+                serve_file_transcoded_checked(AudioFilePath::Original(full_path), seek, transcoding, transcoding_quality)
             }
-            Some(f) => {
-                debug!("Sending file {:?} from transcoded cache", &full_path);
-                Box::new(
-                    serve_opened_file(f, range, None, Transcoder::transcoded_mime())
-                    .map_err(|e| {
-                        error!("Error sending cached file: {}", e);
-                        Error::new_with_cause(e)
-                        })
+            Some((f,path)) => {
+                if seek.is_some() {
+                    debug!("File is in cache, but time seek is required");
+                    serve_file_transcoded_checked(AudioFilePath::Transcoded(path), seek,transcoding, transcoding_quality)
+                } else {
+                    debug!("Sending file {:?} from transcoded cache", &full_path);
+                    Box::new(
+                        serve_opened_file(f, range, None, Transcoder::transcoded_mime()).map_err(
+                            |e| {
+                                error!("Error sending cached file: {}", e);
+                                Error::new_with_cause(e)
+                            },
+                        ),
                     )
+                }
             }
         });
 
@@ -94,7 +100,7 @@ fn serve_file_cached_or_transcoded(
 }
 
 fn serve_file_transcoded_checked(
-    full_path: PathBuf,
+    full_path: AudioFilePath<PathBuf>,
     seek: Option<f32>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: QualityLevel,
@@ -120,33 +126,33 @@ fn serve_file_transcoded_checked(
 }
 
 fn serve_file_transcoded(
-    full_path: PathBuf,
+    full_path: AudioFilePath<PathBuf>,
     seek: Option<f32>,
     transcoding_quality: QualityLevel,
     counter: &Counter,
 ) -> ResponseFuture {
     let transcoder = Transcoder::new(get_config().transcoding.get(transcoding_quality));
     let params = transcoder.transcoding_params();
-    let fut = transcoder.transcode(full_path, seek, counter.clone(), transcoding_quality).then(move |res| {
-    match res {
-        Ok(stream) => {
-            let resp = HyperResponse::builder()
-                .header(CONTENT_TYPE, Transcoder::transcoded_mime().as_ref())
-                .header("X-Transcode", params.as_bytes())
-                .body(Body::wrap_stream(stream.map_err(Error::new_with_cause)))
-                .unwrap();
+    let fut = transcoder
+        .transcode(full_path, seek, counter.clone(), transcoding_quality)
+        .then(move |res| match res {
+            Ok(stream) => {
+                let resp = HyperResponse::builder()
+                    .header(CONTENT_TYPE, Transcoder::transcoded_mime().as_ref())
+                    .header("X-Transcode", params.as_bytes())
+                    .body(Body::wrap_stream(stream.map_err(Error::new_with_cause)))
+                    .unwrap();
 
-            Ok(resp)
-        }
-        Err(e) => {
-            error!("Cannot create transcoded stream, error: {}", e);
-            Ok(short_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                SEVER_ERROR_TRANSCODING,
-            ))
-        }
-    }
-    });
+                Ok(resp)
+            }
+            Err(e) => {
+                error!("Cannot create transcoded stream, error: {}", e);
+                Ok(short_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    SEVER_ERROR_TRANSCODING,
+                ))
+            }
+        });
     Box::new(fut)
 }
 

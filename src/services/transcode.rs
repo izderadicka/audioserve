@@ -8,6 +8,7 @@ use std::ffi::OsStr;
 use std::process::{Command, Stdio};
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
+use std::fmt::Debug;
 use tokio::timer::Delay;
 use tokio_process::{ChildStdout, CommandExt};
 
@@ -106,6 +107,23 @@ impl Quality {
     }
 }
 
+#[derive(Clone,Debug)]
+pub enum AudioFilePath<S> {
+    Original(S),
+    #[cfg(feature="transcoding-cache")]
+    Transcoded(S)
+}
+
+impl <S> std::convert::AsRef<S> for AudioFilePath<S> {
+    fn as_ref(&self) -> &S {
+        use self::AudioFilePath::*;
+        match self {
+            Original(ref f) => f,
+            Transcoded(ref f) => f
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Transcoder {
     quality: Quality,
@@ -154,6 +172,34 @@ impl Transcoder {
         cmd
     }
 
+    // should not transcode, just copy audio stream
+    fn build_copy_command<S: AsRef<OsStr>>(&self, file: S, seek: Option<f32>) -> Command {
+        let mut cmd = Command::new("ffmpeg");
+        cmd.args(&["-nostdin", "-v", "error"]);
+        if let Some(s) = seek {
+            cmd.args(&["-accurate_seek", "-ss"]);
+            let time_spec = format!("{:2}", s);
+            cmd.arg(time_spec);
+        }
+        cmd.arg("-i")
+            .arg(file)
+            .args(&[
+                "-y",
+                "-map_metadata",
+                "0",
+                "-map",
+                "a",
+                "-acodec",
+                "copy",
+                
+            ])
+            .args(&["-f", "opus", "pipe:1"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit());
+        cmd
+    }
+
     pub fn transcoding_params(&self) -> String {
         format!(
             "codec=opus; bitrate={}; compression_level={}; cutoff={}",
@@ -182,9 +228,9 @@ impl Transcoder {
     }
 
     #[cfg(not(feature = "transcoding-cache"))]
-    pub fn transcode<S: AsRef<OsStr> + Send + 'static>(
+    pub fn transcode<S: AsRef<OsStr> + Send + Debug+ 'static>(
         self,
-        file: S,
+        file: AudioFilePath<S>,
         seek: Option<f32>,
         counter: super::Counter,
         _quality: QualityLevel
@@ -198,9 +244,9 @@ impl Transcoder {
     }
 
     #[cfg(feature = "transcoding-cache")]
-    pub fn transcode<S: AsRef<OsStr> + Send + 'static>(
+    pub fn transcode<S: AsRef<OsStr> + Debug+ Send + 'static>(
         self,
-        file: S,
+        file: AudioFilePath<S>,
         seek: Option<f32>,
         counter: super::Counter,
         quality: QualityLevel
@@ -214,15 +260,18 @@ impl Transcoder {
 
         if seek.is_some() {
             debug!("Shoud not add to cache as seeking");
-            return Box::new(future::result(self.transcode_inner(file, seek, counter)
+            return Box::new(future::result(
+            self.transcode_inner(file, seek, counter)
             .map(|(stream, f)| {
-                tokio::spawn(f);
-            Box::new(stream) as TranscodedStream
-        })))
+                    tokio::spawn(f);
+                    Box::new(stream) as TranscodedStream
+            })))
         }
         
+
         let cache = get_cache();
-        let key = cache_key(file.as_ref(), &quality);
+        //TODO: this is ugly -  unify either we will use Path or OsStr!
+        let key = cache_key(file.as_ref().as_ref(), &quality);
         let fut = cache.add_async(key).then( move |res| {
             match res {
                 Err(e) => {
@@ -247,7 +296,11 @@ impl Transcoder {
                             match res {
                                 Ok(()) => box_me(cache_finish.commit()
                                     .map_err(|e| error!("Error in cache: {}", e))
-                                    .and_then(|_| {debug!("Added to cache"); Ok(())})),
+                                    .and_then(|_| {
+                                        debug!("Added to cache"); 
+                                        get_cache().save_index_async()
+                                        .map_err(|e| error!("Error when saving cache index: {}", e))
+                                        })),
                                 Err(()) => box_me(cache_finish.roll_back()
                                     .map_err(|e| error!("Error in cache: {}", e))),
                             }
@@ -262,7 +315,7 @@ impl Transcoder {
                     tokio::spawn(tx.send_all(stream)
                     .then(|res| {
                         if let Err(e) = res {
-                            error!("Error in channel: {}",e)
+                            warn!("Error in channel: {}",e)
                         }
                         Ok(())
                     }));
@@ -277,13 +330,16 @@ impl Transcoder {
         Box::new(fut)
     }
 
-    fn transcode_inner<S: AsRef<OsStr> + Send + 'static>(
+    fn transcode_inner<S: AsRef<OsStr> + Debug+ Send + 'static>(
         &self,
-        file: S,
+        file: AudioFilePath<S>,
         seek: Option<f32>,
         counter: super::Counter,
     ) -> Result<(ChunkStream<ChildStdout>, impl Future<Item=(), Error=()>), Error> {
-        let mut cmd = self.build_command(&file, seek);
+        let mut cmd = match file {
+            AudioFilePath::Original(ref file) => self.build_command(file, seek),
+            AudioFilePath::Transcoded(ref file) => self.build_command(file, seek)
+        };
         let counter2 = counter.clone();
         match cmd.spawn_async() {
             Ok(mut child) => {
@@ -389,14 +445,17 @@ mod tests {
     use std::env::temp_dir;
     use std::fs::{remove_file, File};
     use std::io::{Read, Write};
-    //use pretty_env_logger;
     use std::path::Path;
 
-    fn dummy_transcode<P: AsRef<Path>>(output_file: P, seek: Option<f32>) {
-        //pretty_env_logger::init().unwrap();
+    fn dummy_transcode<P: AsRef<Path>, R: AsRef<Path>>(output_file: P, seek: Option<f32>, 
+        copy_file: Option<R>, remove: bool) {
+        pretty_env_logger::try_init().ok();
         let t = Transcoder::new(Quality::default_level(QualityLevel::Low));
         let out_file = temp_dir().join(output_file);
-        let mut cmd = t.build_command("./test_data/01-file.mp3", seek);
+        let mut cmd = match copy_file {
+            None => t.build_command("./test_data/01-file.mp3", seek),
+            Some(ref p) => t.build_copy_command(p.as_ref(), seek)
+        };
         let mut child = cmd.spawn().expect("Cannot spawn subprocess");
 
         if child.stdout.is_some() {
@@ -421,20 +480,29 @@ mod tests {
         assert!(out_file.exists());
         //TODO: for some reasons sometimes cannot get meta - but file is OK
         if let Some(meta) = get_audio_properties(&out_file) {
-            let dur = 2 - seek.map(|s| s.round() as u32).unwrap_or(0);
+            let audio_len = if copy_file.is_some() {1} else {2};
+            let dur = audio_len - seek.map(|s| s.round() as u32).unwrap_or(0);
             assert_eq!(meta.duration, dur);
         }
-        remove_file(&out_file).expect("error deleting tmp file");
+        if remove { 
+            remove_file(&out_file).expect("error deleting tmp file");
+        }
     }
 
     #[test]
     fn test_transcode() {
-        dummy_transcode("audioserve_transcoded.opus", None)
+        dummy_transcode("audioserve_transcoded.opus", None, None as Option<&str>, true)
     }
 
     #[test]
     fn test_transcode_seek() {
-        dummy_transcode("audioserve_transcoded2.opus", Some(0.8))
+        dummy_transcode("audioserve_transcoded2.opus", Some(0.8), None as Option<&str>, false);
+        let out_file = temp_dir().join("audioserve_transcoded2.opus");
+        dummy_transcode("audioserve_transcoded3.opus", Some(0.8), Some(&out_file), true);
+        remove_file(out_file).unwrap();
+
     }
+
+    
 
 }
