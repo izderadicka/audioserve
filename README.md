@@ -24,7 +24,7 @@ Files should be named so they are in right alphabetical order - ideal is:
 
 But this structure is not mandatory -  you will just see whatever directories and files you have, so use anything that will suite you.
 
-In folders you can have additional metadata files - first available image (jpeg or png) is taken as a coverage picture and first text file (html, txt, md) is taken as description of the folder.
+In folders you can have additional metadata files - first available image (jpeg or png) is taken as a cover picture and first text file (html, txt, md) is taken as description of the folder.
 
 Search is done for folder names only (not individual files, neither audio metadata tags).
 
@@ -35,9 +35,9 @@ By default symbolic(soft) links are not followed in the collections directory (b
 Security
 --------
 
-Audioserve is not writing anything to your media library, so read only access is OK.  The only one file where it needs to write is a file were it keeps its secret key for authentication (by default in `~/.audioserve.secret`, but it can be specified by command line argument).
+Audioserve is not writing anything to your media library, so read only access is OK.  The only one file where it needs to write is a file were it keeps its secret key for authentication (by default in `~/.audioserve.secret`, but it can be specified by command line argument). And optionaly it writes files to transcoding cache ([see below](#transcoding-cache)).
 
-Authentication is done by shared secret phrase (supplied to server on command line), which client must know.
+Authentication is done by shared secret phrase (supplied to server on command line), which clients must know.
 Secret phrase is never sent in plain (it's sent as salted hash). If correct shared secret hash is provided sever generates a token, using its secret key.  Token then can be used in cookie or HTTP Authorization header (Bearer method).
 Token validity period is one year by default, but can be set as command line argument, but system generaly expects token validity to be at least 10 days.
 As the token can be used to steal the session https is recomended (TLS support is build in).
@@ -58,13 +58,16 @@ Performance
 
 Audioserve is inteded to serve personal audio collections of moderate sizes. For sake of simplicity it does not provide any large scale perfomance optimalizations.  It's fine to serve couple of users from collection of couple of thousands audiobooks, if they are reasonably organized. That's it, if you're looking for solution for thousands or millions of users, look elsewere. To compensate for this audioserve is very lightweight and by itself takes minimum of system resources.
 
-Browsing of collections is limited by speed of the file system. As directory listing needs to read audio files metadata (duration and bitrate), folders with too many files (> 200) will be slow. Search is done by walking through collection, it can be slow - especially the first search (subsequent searches are much, much faster, as directory structure from previous search is cached by OS for some time). Recent versions provides possibility for seach cache, to speed up search significantly - see below.
+Browsing of collections is limited by speed of the file system. As directory listing needs to read audio files metadata (duration and bitrate), folders with too many files (> 200) will be slow. Search is done by walking through collection, it can be slow - especially the first search (subsequent searches are much, much faster, as directory structure from previous search is cached by OS for some time). Recent versions provides possibility for seach cache, to speed up search significantly - [see below](#search-cache).
 
-But true limiting factor is transcoding - as it's quite CPU intensive. Normally you should run only a handful of transcodings in parallel, not much then 2x - 4x more then there is the number of cores in the machine.
+But true limiting factor is transcoding - as it's quite CPU intensive. Normally you should run only a handful of transcodings in parallel, not much then 2x - 4x more then there is the number of cores in the machine. For certain usage scenarios enabling of [transcoding cache](#transcoding-cache) can help a bit.
 
 ### Search Cache
 
 For fast searches enable search cache with `--search-cache`, it will load directory structure of collections into memory, so searches will be blazingly fast (for price of more occupied memory). Search cache monitors directories and update itself upon changes (make take a while). Also after start of audioserve it takes some time before cache is filled (especially when large collections are used), so search might not work initially.
+
+### Transcoding Cache
+Optionally you can enable transcoding cache (by compiling audioserve with transcoding-cache feature). Contribution of this cache to overall performance depends very much on usage scenarios.  If there is only one user, which basically listens to audiobooks in linear order (chapter after chapter, not jumping back and forth), benefit will be minimal. If there are more users, listening to same audiobook (with same transcoding levels) and/or jumping often back and forth between chapters, then benefit of this cache can be significat. You should test to see the difference (when transcoding cache is compiled in it can be still disabled by `--t-cache-disable` option).
 
 Transcoding
 -----------
@@ -137,12 +140,12 @@ But easiest way how to test audioserve is to run it as docker container with pro
 
 Then open <https://localhost:3000> and accept insecure connection, shared secret to enter in client is mypass
 
-Other platforms - theoretically audioserve can work on Windows and MacOS (probably with few changes), 
+Other platforms - theoretically audioserve can work on Windows and MacOS (probably with few changes),
 but I never tried to build it there. Any help in this area is welcomed.
 
-### Compiling without default features
+### Compiling without default features or with non-default features
 
-TLS support and symbolic links  are default features, but you can compile without it - just add `--no-default-features` option to cargo. And then evetually choose only features you need.
+TLS support, symbolic links and search cache are default features, but you can compile without them - just add `--no-default-features` option to cargo. And then evetually choose only features you need. To add non-default features (like transcoding-cache) compile with this option `--features transcoding-cache` in `cargo build` command. Or you can use option `--all-features` to enable all available features.
 
 License
 -------
