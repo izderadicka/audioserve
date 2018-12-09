@@ -110,7 +110,7 @@ impl Quality {
 #[derive(Clone,Debug)]
 pub enum AudioFilePath<S> {
     Original(S),
-    #[cfg(feature="transcoding-cache")]
+    #[allow(dead_code)]
     Transcoded(S)
 }
 
@@ -173,6 +173,7 @@ impl Transcoder {
     }
 
     // should not transcode, just copy audio stream
+    #[allow(dead_code)]
     fn build_copy_command<S: AsRef<OsStr>>(&self, file: S, seek: Option<f32>) -> Command {
         let mut cmd = Command::new("ffmpeg");
         cmd.args(&["-nostdin", "-v", "error"]);
