@@ -38,6 +38,8 @@ extern crate native_tls;
 extern crate tokio_tls;
 #[cfg(feature = "transcoding-cache")]
 extern crate simple_file_cache;
+#[cfg(feature = "transcoding-cache")]
+extern crate bytes;
 
 use config::{get_config, parse_args};
 use hyper::rt::Future;

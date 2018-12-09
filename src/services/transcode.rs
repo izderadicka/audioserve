@@ -208,6 +208,9 @@ impl Transcoder {
 
         use crate::cache::{cache_key, get_cache};
         use futures::future;
+        use futures::sync::mpsc;
+        use futures::{Stream,Sink};
+        use std::io;
 
         if seek.is_some() {
             debug!("Shoud not add to cache as seeking");
@@ -242,8 +245,9 @@ impl Transcoder {
                             };
 
                             match res {
-                                Ok(()) => box_me(cache_finish.roll_back()
-                                    .map_err(|e| error!("Error in cache: {}", e))),
+                                Ok(()) => box_me(cache_finish.commit()
+                                    .map_err(|e| error!("Error in cache: {}", e))
+                                    .and_then(|_| {debug!("Added to cache"); Ok(())})),
                                 Err(()) => box_me(cache_finish.roll_back()
                                     .map_err(|e| error!("Error in cache: {}", e))),
                             }
@@ -252,8 +256,20 @@ impl Transcoder {
                             
                         }
                         ));
-            
-                    Box::new(stream) as TranscodedStream
+                    let cache_sink = tokio::codec::FramedWrite::new(cache_file, self::vec_codec::VecEncoder);
+                    let (tx,rx) = mpsc::channel(64);
+                    let tx = cache_sink.fanout(tx.sink_map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
+                    tokio::spawn(tx.send_all(stream)
+                    .then(|res| {
+                        if let Err(e) = res {
+                            error!("Error in channel: {}",e)
+                        }
+                        Ok(())
+                    }));
+                    Box::new(rx.map_err(|_| {
+                        error!("Error in chanel");
+                        io::Error::new(io::ErrorKind::Other, "Error in channel")
+                    })) as TranscodedStream
                     })
                 }
             }
@@ -341,6 +357,28 @@ impl Transcoder {
                 Err(Error::new())
             }
         }
+    }
+}
+
+#[cfg(feature="transcoding-cache")]
+mod vec_codec {
+    use tokio::codec::Encoder;
+    use std::io;
+    use bytes::{BufMut};
+
+    pub struct VecEncoder;
+
+    impl Encoder for VecEncoder {
+        type Item = Vec<u8>;
+        type Error = io::Error;
+
+    fn encode(&mut self, data: Self::Item, buf: &mut bytes::BytesMut) -> Result<(), Self::Error> {
+        buf.reserve(data.len());
+        buf.put(data);
+        Ok(())
+    }
+
+
     }
 }
 
