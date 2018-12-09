@@ -259,8 +259,9 @@ impl Transcoder {
         use futures::{Stream,Sink};
         use std::io;
 
-        if seek.is_some() {
-            debug!("Shoud not add to cache as seeking");
+
+        if seek.is_some() || get_config().transcoding_cache.disabled {
+            debug!("Shoud not add to cache as seeking or cache is disabled");
             return Box::new(future::result(
             self.transcode_inner(file, seek, counter)
             .map(|(stream, f)| {

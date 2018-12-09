@@ -49,13 +49,34 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone)]
+pub struct TranscodingCacheConfig {
+    pub root_dir: PathBuf,
+    pub max_size: u64,
+    pub max_files: u64,
+    pub disabled: bool
+}
+
+impl Default for TranscodingCacheConfig {
+
+    fn default() -> Self {
+        let root_dir = env::temp_dir().join("audioserve-cache");
+        TranscodingCacheConfig {
+            root_dir,
+            max_size: 1024*1024*1024,
+            max_files: 1024,
+            disabled: false
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct TranscodingConfig {
     low: Option<Quality>,
     medium: Option<Quality>,
     high: Option<Quality>,
 }
 
-impl TranscodingConfig {
+impl Default for TranscodingConfig {
     fn default() -> Self {
         TranscodingConfig {
             low: None,
@@ -63,6 +84,11 @@ impl TranscodingConfig {
             high: None,
         }
     }
+}
+
+
+impl TranscodingConfig {
+    
     pub fn get(&self, quality: QualityLevel) -> Quality {
         match quality {
             l @ QualityLevel::Low => self
@@ -87,7 +113,7 @@ pub struct ThreadPoolSize {
     pub queue_size: usize,
 }
 
-impl ThreadPoolSize {
+impl Default for ThreadPoolSize {
     fn default() -> Self {
         ThreadPoolSize {
             num_threads: 8,
@@ -114,6 +140,8 @@ pub struct Config {
     pub thread_keep_alive: Option<u32>,
     pub transcoding_deadline: u32,
     pub search_cache: bool,
+    #[cfg(feature="transcoding-cache")]
+    pub transcoding_cache: TranscodingCacheConfig
 }
 type Parser<'a> = App<'a, 'a>;
 
@@ -221,7 +249,7 @@ fn create_parser<'a>() -> Parser<'a> {
         parser = parser.arg(
             Arg::with_name("allow-symlinks")
                 .long("allow-symlinks")
-                .help("Will follow symbolic/sof links in collections directories"),
+                .help("Will follow symbolic/soft links in collections directories"),
         );
     }
 
@@ -231,6 +259,30 @@ fn create_parser<'a>() -> Parser<'a> {
             .long("search-cache")
             .help("Caches collections directory structure for quick search, monitors directories for changes")
         );
+    }
+
+    if cfg!(feature = "transcoding-cache") {
+
+        parser=parser.arg(
+            Arg::with_name("t-cache-dir")
+            .long("t-cache-dir")
+            .takes_value(true)
+            .help("Directory for transcoding cache [default is 'audioserve-cache' under system wide temp dirrectory]")
+        ).arg(
+            Arg::with_name("t-cache-size")
+            .long("t-cache-size")
+            .takes_value(true)
+            .help("Max size of transcoding cache in MBi, when reached LRU items are deleted, [default is 1024]")
+        ).arg(
+            Arg::with_name("t-cache-max-files")
+            .long("t-cache-max-files")
+            .takes_value(true)
+            .help("Max number of files in transcoding cache, when reached LRU items are deleted, [default is 1024]")
+        ).arg(
+            Arg::with_name("t-cache-disable")
+            .long("t-cache-disable")
+            .help("Transaction cache is disabled. If you want to completely get rid of it, compile without 'transcoding-cache'")
+            )
     }
 
     parser
@@ -368,6 +420,37 @@ pub fn parse_args() -> Result<(), Error> {
         false
     };
 
+    let _transcoding_cache = if cfg!(feature="transcoding-cache") {
+        let mut c = TranscodingCacheConfig::default();
+        if let Some(d) = args.value_of("t-cache-dir") {
+            c.root_dir = d.into()
+        }
+
+        if let Some(n) = args.value_of("t-cache-size") {
+            let size: u64 = n.parse()?;
+            if size < 50 {
+                return Err("Cache smaller then 50Mbi does not make much sense".into())
+            }
+            c.max_size = 1024*1024 * size;
+        }
+
+        if let Some(n) = args.value_of("t-cache-max-files") {
+            let num: u64 = n.parse()?;
+            if num < 10 {
+                return Err("Cache smaller then 10 files does not make much sense".into())
+            }
+            c.max_files = num;
+        }
+
+        if args.is_present("t-cache-disable") {
+            c.disabled = true;
+        }
+
+        Some(c)
+    } else {
+        None
+    };
+
     let config = Config {
         base_dirs,
         local_addr,
@@ -385,6 +468,8 @@ pub fn parse_args() -> Result<(), Error> {
         thread_keep_alive,
         transcoding_deadline,
         search_cache,
+        #[cfg(feature="transcoding-cache")]
+        transcoding_cache: _transcoding_cache.unwrap()
     };
     unsafe {
         CONFIG = Some(config);
@@ -419,6 +504,8 @@ pub fn init_default_config() {
         thread_keep_alive: None,
         transcoding_deadline: 24,
         search_cache: false,
+        #[cfg(feature="transcoding-cache")]
+        transcoding_cache: TranscodingCacheConfig::default()
     };
     unsafe {
         CONFIG = Some(config);

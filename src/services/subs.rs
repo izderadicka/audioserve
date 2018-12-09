@@ -62,6 +62,12 @@ fn serve_file_cached_or_transcoded(
     transcoding: super::TranscodingDetails,
     transcoding_quality: QualityLevel,
 ) -> ResponseFuture {
+    if get_config().transcoding_cache.disabled {
+        return Box::new(
+            serve_file_transcoded_checked(AudioFilePath::Original(full_path), seek, transcoding, transcoding_quality)
+        )
+    }
+    
     use crate::cache::{cache_key, get_cache};
     let cache = get_cache();
     let cache_key = cache_key(&full_path, &transcoding_quality);
