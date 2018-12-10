@@ -275,7 +275,8 @@ export class AudioPlayer {
         for (let i = 0; i < ranges.length; i++) {
             let start = ranges.start(i);
             let end = ranges.end(i);
-            if (t >= start && t <= end) return { isCached: true, remainsToLoad: 0 };
+            //                            V-- 10 secs will be loaded soon - it's like it would be cached
+            if (t >= start && t <= end + 10) return { isCached: true, remainsToLoad: 0 };
             let fromEnd = time - end;
             if (fromEnd >= 0 && fromEnd < remainsToLoad) {
                 remainsToLoad = fromEnd;
@@ -387,7 +388,9 @@ export class AudioPlayer {
     }
 
     _jumpWithSeek(time) {
-        debug("Reloading media by server seek");
+        debug(`Reloading media by server seek with time ${time}`);
+        //This is a hack - it's just not good to jump directly to the end 
+        if (time>= this.getTotalTime() && time >=1) time = this.getTotalTime() - 0.51;
         let queryIndex = this._player.src.indexOf("&seek=");
         let baseUrl = queryIndex > 0 ? this._player.src.substr(0, queryIndex) : this._player.src;
         let wasPlaying = !this._player.paused;
