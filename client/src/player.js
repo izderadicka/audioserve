@@ -32,9 +32,10 @@ export class AudioPlayer {
 
     constructor() {
 
-        this.unsized = false; // true if stream does not have size - e.g. is chunked encoded
-        this.knownDuration = null; // duration of media provided in metadata - sent in options to this player
+        this.transcoded = false; // true if stream does not have size - e.g. is chunked encoded
+        this.knownDuration = null; // duration of media provided in external metadata - sent in options to this player
         this._timeOffset = 0; // offset of current steam in case time seeking was used
+        this._sizedContent = false;  // If clip size is known - e.g. HTTP response has content-length 
 
         let audioPlayer = document.querySelector('.audio-player');
         this._rootElem = audioPlayer;
@@ -212,7 +213,16 @@ export class AudioPlayer {
         this._player.addEventListener('timeupdate', this._updateProgress.bind(this));
         this._player.addEventListener('volumechange', this._updateVolume.bind(this));
         this._player.addEventListener('durationchange', this._updateTotal.bind(this));
-        //this._player.addEventListener('loadedmetadata', this._updateTotal.bind(this));
+        this._player.addEventListener('loadedmetadata', (evt) => {  
+            if (isFinite(this._player.duration) && this._player.duration>0) {
+                debug(`Known duration ${this._player.duration}`);
+                this._sizedContent = true;
+                this._updateTotal();
+            } else {
+                this._sizedContent = false;
+            }
+            
+        });
         this._player.addEventListener('canplay', () => {
             this._showPlay();
         });
@@ -340,7 +350,7 @@ export class AudioPlayer {
     }
 
     getTotalTime() {
-        if (this.unsized && this.knownDuration) {
+        if (this.transcoded && this.knownDuration) {
             return this.knownDuration;
         } else {
             return this._player.duration;
@@ -403,7 +413,7 @@ export class AudioPlayer {
         if (Math.abs(diff) > 1 && isFinite(time)) {
 
             // if streamed without size we need special treatment
-            if (this.unsized) {
+            if (this.transcoded && !this._sizedContent) {
                 let isCached = this._isCached(time);
                 debug("Is cached:", isCached.isCached);
                 if (isCached.isCached) {
@@ -449,9 +459,9 @@ export class AudioPlayer {
         } else {
             this.knownDuration = null;
         }
-        if (options && options.transcoded) this.unsized = true;
-        else if (options && options.unsized) this.unsized = true;
-        else this.unsized = false;
+        if (options && options.transcoded) this.transcoded = true;
+        else if (options && options.unsized) this.transcoded = true;
+        else this.transcoded = false;
         if (!url) {
             this._player.removeAttribute("src");
             this._player.load();
