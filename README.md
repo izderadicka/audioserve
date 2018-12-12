@@ -100,7 +100,7 @@ high:
     cutoff: SuperWideBand
 ```
 
-In each key first you have specification of codec-container combination, currently it supports `opus-in-ogg` or `opus-in-webm` (but other containers or codecs can relatively easily added, provided they are supported by ffmpeg). I have good experinces with `opus-in-ogg`, which is also default. `opus-in-webm` works well in browsers (and is supported  in browsers MCE API), but as it does not contain audio duration after trascoding, audio cannot be sought during playback in Android client, which is significant drawback.
+In each key first you have specification of codec-container combination, currently it supports `opus-in-ogg` or `opus-in-webm` (but other containers or codecs can relatively easily added, provided they are supported by ffmpeg). I have good experinces with `opus-in-ogg`, which is also default. `opus-in-webm` works well in browsers (and is supported  in browsers MSE API), but as it does not contain audio duration after trascoding, audio cannot be sought during playback in Android client, which is significant drawback.
 
 Then there are 3 other parameters, where bitrate is desired bitrate in kbps, compression_level is determining audio quality and speed of transcoding with values 1-10 ( 1 - worst quality, but fastest, 10 - best quality, but slowest ) and cutoff is determining audio freq. bandwith (NarrowBand => 4kHz, MediumBand => 6kHz, WideBand => 8kHz, SuperWideBand => 12kHz, FullBand => 20kHz).
 You can overide one two or all three defaults, depending on what sections you have in this config file.
