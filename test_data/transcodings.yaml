@@ -1,13 +1,16 @@
 low:
-  bitrate: 16
-  compression_level: 3
-  cutoff: WideBand
+  opus-in-webm:
+    bitrate: 16
+    compression_level: 3
+    cutoff: WideBand
 medium:
-  bitrate: 24
-  compression_level: 6
-  cutoff: SuperWideBand
+  opus-in-webm:
+    bitrate: 24
+    compression_level: 6
+    cutoff: SuperWideBand
 high:
-  bitrate: 32
-  compression_level: 9
-  cutoff: SuperWideBand
+  opus-in-webm:
+    bitrate: 32
+    compression_level: 9
+    cutoff: SuperWideBand
   

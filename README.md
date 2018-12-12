@@ -67,36 +67,42 @@ But true limiting factor is transcoding - as it's quite CPU intensive. Normally 
 For fast searches enable search cache with `--search-cache`, it will load directory structure of collections into memory, so searches will be blazingly fast (for price of more occupied memory). Search cache monitors directories and update itself upon changes (make take a while). Also after start of audioserve it takes some time before cache is filled (especially when large collections are used), so search might not work initially.
 
 ### Transcoding Cache
+
 Optionally you can enable transcoding cache (by compiling audioserve with transcoding-cache feature). Contribution of this cache to overall performance depends very much on usage scenarios.  If there is only one user, which basically listens to audiobooks in linear order (chapter after chapter, not jumping back and forth), benefit will be minimal. If there are more users, listening to same audiobook (with same transcoding levels) and/or jumping often back and forth between chapters, then benefit of this cache can be significat. You should test to see the difference (when transcoding cache is compiled in it can be still disabled by `--t-cache-disable` option).
 
 Transcoding
 -----------
 
-Audioserve offers possibility to transcode audio files to opus format (opus codec, ogg container) to save bandwidth and volume of transfered data. For transcoding to work `ffmpeg` program must be installed and available on system's PATH.
+Audioserve offers possibility to transcode audio files to opus format (opus codec, ogg or webm container) to save bandwidth and volume of transfered data. For transcoding to work `ffmpeg` program must be installed and available on system's PATH.
 Transconding is provided in three variants and client can choose between then (using query parameter trans with value l,m or h):
 
 * low - (default 32 kbps opus with 12kHz cutoff)
 * medium - (default 48 kbps opus with 12kHz cutoff)
 * high - (default 64 kbps opus with 20kHz cutoff)
 
-As already noted audioserve is intended primarily for audiobooks and believe me opus codec is excellent there even in low bitrates. However if you want to change parameters of these three trancodings you can easily do so by providing yaml confing file to parameter `--transcoding-config`. Here is sample file:
+As already noted audioserve is intended primarily for audiobooks and believe me opus codec is excellent there even in low bitrates. However if you want to change parameters of these three trancodings you can easily do so by providing yaml confing file to argument `--transcoding-config`. Here is sample file:
 
 ```yaml
 low:
-  bitrate: 16
-  compression_level: 3
-  cutoff: WideBand
+  opus-in-ogg:
+    bitrate: 16
+    compression_level: 3
+    cutoff: WideBand
 medium:
-  bitrate: 24
-  compression_level: 6
-  cutoff: SuperWideBand
+  opus-in-ogg:
+    bitrate: 24
+    compression_level: 6
+    cutoff: SuperWideBand
 high:
-  bitrate: 32
-  compression_level: 9
-  cutoff: SuperWideBand
+  opus-in-ogg:
+    bitrate: 32
+    compression_level: 9
+    cutoff: SuperWideBand
 ```
 
-Where bitrate is desired bitrate in kbps, compression_level is determining audio quality and speed of transcoding with values 1-10 ( 1 - worst quality, but fastest, 10 - best quality, but slowest ) and cutoff is determining audio freq. bandwith (NarrowBand => 4kHz, MediumBand => 6kHz, WideBand => 8kHz, SuperWideBand => 12kHz, FullBand => 20kHz).
+In each key first you have specification of codec-container combination, currently it supports `opus-in-ogg` or `opus-in-webm` (but other containers or codecs can relatively easily added, provided they are supported by ffmpeg). I have good experinces with `opus-in-ogg`, which is also default. `opus-in-webm` works well in browsers (and is supported  in browsers MCE API), but as it does not contain audio duration after trascoding, audio cannot be sought during playback in Android client, which is significant drawback.
+
+Then there are 3 other parameters, where bitrate is desired bitrate in kbps, compression_level is determining audio quality and speed of transcoding with values 1-10 ( 1 - worst quality, but fastest, 10 - best quality, but slowest ) and cutoff is determining audio freq. bandwith (NarrowBand => 4kHz, MediumBand => 6kHz, WideBand => 8kHz, SuperWideBand => 12kHz, FullBand => 20kHz).
 You can overide one two or all three defaults, depending on what sections you have in this config file.
 
 Command line

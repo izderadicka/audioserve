@@ -11,35 +11,87 @@ use std::time::{Duration, Instant};
 use std::fmt::Debug;
 use tokio::timer::Delay;
 use tokio_process::{ChildStdout, CommandExt};
+use self::codecs::*;
+
+pub mod codecs;
+
+pub trait AudioCodec {
+    fn quality_args(&self) -> Vec<String>;
+    fn codec_args(&self) -> &'static[&'static str];
+    /// in kbps
+    fn bitrate(&self) -> u32;
+    fn transcode_from(&self) -> u32 {
+        (f64::from(self.bitrate()) * 1.2) as u32
+    }
 
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum Bandwidth {
-    NarrowBand,
-    MediumBand,
-    WideBand,
-    SuperWideBand,
-    FullBand,
 }
 
-impl Bandwidth {
-    fn to_hz(&self) -> u16 {
-        match *self {
-            Bandwidth::NarrowBand => 4000,
-            Bandwidth::MediumBand => 6000,
-            Bandwidth::WideBand => 8000,
-            Bandwidth::SuperWideBand => 12000,
-            Bandwidth::FullBand => 20000,
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum TranscodingFormat {
+    OpusInOgg(Opus),
+    OpusInWebm(Opus)
+}
+
+pub struct TranscodingArgs {
+    format: &'static str,
+    codec_args: &'static[&'static str],
+    quality_args: Vec<String>,
+}
+
+macro_rules! targs {
+    ($n:ident, $f:expr) => {
+         TranscodingArgs {
+             format: $f,
+            codec_args: $n.codec_args(),
+            quality_args: $n.quality_args()
+         }
+    };
+}
+
+impl TranscodingFormat {
+    
+    pub fn args(&self) -> TranscodingArgs {
+        match self {
+            TranscodingFormat::OpusInOgg(args) => targs!(args, "opus"),
+            TranscodingFormat::OpusInWebm(args) => targs!(args, "webm"),
+        }
+    }
+
+    pub fn bitrate(&self) -> u32 {
+        match self {
+            TranscodingFormat::OpusInOgg(args) => args.bitrate(),
+            TranscodingFormat::OpusInWebm(args) => args.bitrate()
+        }
+    }
+
+    pub fn format_name(&self) -> &'static str {
+        match self {
+            TranscodingFormat::OpusInOgg(_) => "opus-in-ogg",
+            TranscodingFormat::OpusInWebm(_) => "opus-in-webm"
+        }
+    }
+
+    pub fn mime(&self) -> Mime {
+        match self {
+            TranscodingFormat::OpusInOgg(_) => "audio/ogg".parse().unwrap(),
+            TranscodingFormat::OpusInWebm(_) => "audio/webm".parse().unwrap(),
+
         }
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct Quality {
-    bitrate: u16,
-    compression_level: u8,
-    cutoff: Bandwidth,
+impl TranscodingFormat {
+
+    pub fn default_level(l: QualityLevel) -> Self {
+        match l {
+            QualityLevel::Low => TranscodingFormat::OpusInOgg(Opus::new(32, 5, Bandwidth::SuperWideBand)),
+            QualityLevel::Medium => TranscodingFormat::OpusInOgg(Opus::new(48, 8, Bandwidth::SuperWideBand)),
+            QualityLevel::High => TranscodingFormat::OpusInOgg(Opus::new(64, 10, Bandwidth::FullBand)),
+        }
+    }
+
 }
 
 #[derive(Clone, Debug, PartialEq, Copy)]
@@ -72,40 +124,7 @@ impl QualityLevel {
     }
 }
 
-impl Quality {
-    fn new(bitrate: u16, compression_level: u8, cutoff: Bandwidth) -> Self {
-        Quality {
-            bitrate,
-            compression_level,
-            cutoff,
-        }
-    }
 
-    pub fn default_level(l: QualityLevel) -> Self {
-        match l {
-            QualityLevel::Low => Quality::new(32, 5, Bandwidth::SuperWideBand),
-            QualityLevel::Medium => Quality::new(48, 8, Bandwidth::SuperWideBand),
-            QualityLevel::High => Quality::new(64, 10, Bandwidth::FullBand),
-        }
-    }
-
-    fn quality_args(&self) -> Vec<String> {
-        let mut v = vec![];
-        v.push("-b:a".into());
-        v.push(format!("{}k", self.bitrate));
-        v.push("-compression_level".into());
-        v.push(format!("{}", self.compression_level));
-        v.push("-cutoff".into());
-        v.push(format!("{}", self.cutoff.to_hz()));
-        v
-    }
-
-    /// Bitrate from which it make sense to transcode - kbps
-
-    fn transcode_from(&self) -> u32 {
-        (f32::from(self.bitrate) * 1.2) as u32
-    }
-}
 
 #[derive(Clone,Debug)]
 pub enum AudioFilePath<S> {
@@ -126,7 +145,7 @@ impl <S> std::convert::AsRef<S> for AudioFilePath<S> {
 
 #[derive(Clone, Debug)]
 pub struct Transcoder {
-    quality: Quality,
+    quality: TranscodingFormat,
 }
 
 #[cfg(feature = "transcoding-cache")]
@@ -137,7 +156,7 @@ type TranscodedFuture = Box<dyn Future<Item=TranscodedStream, Error=Error>+Send>
 
 
 impl Transcoder {
-    pub fn new(quality: Quality) -> Self {
+    pub fn new(quality: TranscodingFormat) -> Self {
         Transcoder { quality }
     }
 
@@ -151,6 +170,7 @@ impl Transcoder {
             let time_spec = format!("{:2}", s);
             cmd.arg(time_spec);
         }
+        let targs = self.quality.args();
         cmd.arg("-i")
             .arg(file)
             .args(&[
@@ -159,13 +179,12 @@ impl Transcoder {
                 "0",
                 "-map",
                 "a",
-                "-acodec",
-                "libopus",
-                "-vbr",
-                "on",
             ])
-            .args(self.quality.quality_args())
-            .args(&["-f", "opus", "pipe:1"])
+            .args(targs.codec_args)
+            .args(targs.quality_args)
+            .arg("-f")
+            .arg(targs.format)
+            .arg("pipe:1")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
@@ -194,7 +213,9 @@ impl Transcoder {
                 "copy",
                 
             ])
-            .args(&["-f", "opus", "pipe:1"])
+            .arg("-f")
+            .arg(self.quality.args().format)
+            .arg("pipe:1")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
@@ -203,29 +224,28 @@ impl Transcoder {
 
     pub fn transcoding_params(&self) -> String {
         format!(
-            "codec=opus; bitrate={}; compression_level={}; cutoff={}",
-            self.quality.bitrate,
-            self.quality.compression_level,
-            self.quality.cutoff.to_hz()
+            "codec={}; bitrate={}",
+            self.quality.format_name(),
+            self.quality.bitrate(),
         )
     }
 
     //TODO - keeping it for a while if we need to check clients
-    #[allow(dead_code)]
-    pub fn should_transcode(&self, bitrate: u32, mime: &Mime) -> bool {
-        if super::types::must_transcode(mime) {
-            return true;
-        }
-        trace!(
-            "Should transcode {} > {}",
-            bitrate,
-            self.quality.transcode_from()
-        );
-        bitrate > self.quality.transcode_from()
-    }
+    // #[allow(dead_code)]
+    // pub fn should_transcode(&self, bitrate: u32, mime: &Mime) -> bool {
+    //     if super::types::must_transcode(mime) {
+    //         return true;
+    //     }
+    //     trace!(
+    //         "Should transcode {} > {}",
+    //         bitrate,
+    //         self.quality.transcode_from()
+    //     );
+    //     bitrate > self.quality.transcode_from()
+    // }
 
-    pub fn transcoded_mime() -> Mime {
-        "audio/ogg".parse().unwrap()
+    pub fn transcoded_mime(&self) -> Mime {
+        self.quality.mime()
     }
 
     #[cfg(not(feature = "transcoding-cache"))]
@@ -452,7 +472,7 @@ mod tests {
     fn dummy_transcode<P: AsRef<Path>, R: AsRef<Path>>(output_file: P, seek: Option<f32>, 
         copy_file: Option<R>, remove: bool) {
         pretty_env_logger::try_init().ok();
-        let t = Transcoder::new(Quality::default_level(QualityLevel::Low));
+        let t = Transcoder::new(TranscodingFormat::default_level(QualityLevel::Low));
         let out_file = temp_dir().join(output_file);
         let mut cmd = match copy_file {
             None => t.build_command("./test_data/01-file.mp3", seek),

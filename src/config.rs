@@ -1,4 +1,4 @@
-use super::services::transcode::{Quality, QualityLevel};
+use super::services::transcode::{TranscodingFormat, QualityLevel, Transcoder};
 use clap::{App, Arg};
 use num_cpus;
 use serde_yaml;
@@ -71,9 +71,9 @@ impl Default for TranscodingCacheConfig {
 
 #[derive(Debug, Clone)]
 pub struct TranscodingConfig {
-    low: Option<Quality>,
-    medium: Option<Quality>,
-    high: Option<Quality>,
+    low: Option<TranscodingFormat>,
+    medium: Option<TranscodingFormat>,
+    high: Option<TranscodingFormat>,
 }
 
 impl Default for TranscodingConfig {
@@ -89,20 +89,20 @@ impl Default for TranscodingConfig {
 
 impl TranscodingConfig {
     
-    pub fn get(&self, quality: QualityLevel) -> Quality {
+    pub fn get(&self, quality: QualityLevel) -> TranscodingFormat {
         match quality {
             l @ QualityLevel::Low => self
                 .low
                 .as_ref()
-                .map_or(Quality::default_level(l), |c| c.clone()),
+                .map_or(TranscodingFormat::default_level(l), |c| c.clone()),
             l @ QualityLevel::Medium => self
                 .medium
                 .as_ref()
-                .map_or(Quality::default_level(l), |c| c.clone()),
+                .map_or(TranscodingFormat::default_level(l), |c| c.clone()),
             l @ QualityLevel::High => self
                 .high
                 .as_ref()
-                .map_or(Quality::default_level(l), |c| c.clone()),
+                .map_or(TranscodingFormat::default_level(l), |c| c.clone()),
         }
     }
 }
@@ -142,6 +142,13 @@ pub struct Config {
     pub search_cache: bool,
     #[cfg(feature="transcoding-cache")]
     pub transcoding_cache: TranscodingCacheConfig
+}
+
+
+impl Config {
+    pub fn transcoder(&self, transcoding_quality: QualityLevel) -> Transcoder{
+        Transcoder::new(get_config().transcoding.get(transcoding_quality))
+    }
 }
 type Parser<'a> = App<'a, 'a>;
 
@@ -336,7 +343,7 @@ pub fn parse_args() -> Result<(), Error> {
         None => TranscodingConfig::default(),
         Some(f) => {
             let config_file = File::open(f)?;
-            let mut qs: BTreeMap<String, Quality> = serde_yaml::from_reader(config_file)?;
+            let mut qs: BTreeMap<String, TranscodingFormat> = serde_yaml::from_reader(config_file)?;
             TranscodingConfig {
                 low: qs.remove("low"),
                 medium: qs.remove("medium"),
@@ -519,20 +526,20 @@ mod tests {
     #[test]
     fn test_yaml_serialize() {
         let mut qualities = BTreeMap::new();
-        qualities.insert("low", Quality::default_level(QualityLevel::Low));
-        qualities.insert("medium", Quality::default_level(QualityLevel::Medium));
-        qualities.insert("high", Quality::default_level(QualityLevel::High));
+        qualities.insert("low", TranscodingFormat::default_level(QualityLevel::Low));
+        qualities.insert("medium", TranscodingFormat::default_level(QualityLevel::Medium));
+        qualities.insert("high", TranscodingFormat::default_level(QualityLevel::High));
         let s = serde_yaml::to_string(&qualities).unwrap();
         assert!(s.len() > 20);
         println!("{}", s);
 
-        let des: BTreeMap<String, Quality> = serde_yaml::from_str(&s).unwrap();
+        let des: BTreeMap<String, TranscodingFormat> = serde_yaml::from_str(&s).unwrap();
         assert_eq!(des.get("medium"), qualities.get("medium"));
     }
     #[test]
     fn test_yaml_deserialize() {
         let f = File::open("./test_data/transcodings.yaml").unwrap();
-        let des: BTreeMap<String, Quality> = serde_yaml::from_reader(f).unwrap();
+        let des: BTreeMap<String, TranscodingFormat> = serde_yaml::from_reader(f).unwrap();
         assert_eq!(3, des.len());
         assert!(des.get("high").is_some());
     }

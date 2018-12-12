@@ -1,7 +1,7 @@
 use config::get_config;
 use mime::Mime;
 use mime_guess::guess_mime_type;
-use services::transcode::{Quality, QualityLevel};
+use services::transcode::{TranscodingFormat, QualityLevel};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize)]
@@ -48,11 +48,26 @@ pub struct Collections {
 }
 
 #[derive(Debug, Serialize)]
+pub struct TranscodingSummary {
+    bitrate: u32,
+    name: &'static str
+}
+
+impl From<TranscodingFormat> for TranscodingSummary {
+    fn from(f: TranscodingFormat) -> Self {
+        TranscodingSummary {
+            bitrate: f.bitrate(),
+            name: f.format_name()
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
 pub struct Transcodings {
     pub max_transcodings: usize,
-    pub low: Quality,
-    pub medium: Quality,
-    pub high: Quality,
+    pub low: TranscodingSummary,
+    pub medium: TranscodingSummary,
+    pub high: TranscodingSummary,
 }
 
 impl Transcodings {
@@ -60,9 +75,9 @@ impl Transcodings {
         let cfg = get_config();
         Transcodings {
             max_transcodings: cfg.max_transcodings,
-            low: cfg.transcoding.get(QualityLevel::Low),
-            medium: cfg.transcoding.get(QualityLevel::Medium),
-            high: cfg.transcoding.get(QualityLevel::High),
+            low: cfg.transcoding.get(QualityLevel::Low).into(),
+            medium: cfg.transcoding.get(QualityLevel::Medium).into(),
+            high: cfg.transcoding.get(QualityLevel::High).into(),
         }
     }
 }
@@ -107,11 +122,6 @@ const AUDIO: &[&str] = &[
 pub fn is_audio<P: AsRef<Path>>(path: P) -> bool {
     let mime = guess_mime_type(path);
     mime.type_() == "audio" && has_subtype(&mime, AUDIO)
-}
-
-const AUDIO_T: &[&str] = &["aac", "m4a", "m4b", "x-matroska"];
-pub fn must_transcode(mime: &Mime) -> bool {
-    has_subtype(&mime, AUDIO_T)
 }
 
 const COVERS: &[&str] = &["jpeg", "png"];

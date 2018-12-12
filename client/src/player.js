@@ -415,8 +415,8 @@ export class AudioPlayer {
         //do not jump less then 1 sec
         if (Math.abs(diff) > 1 && isFinite(time)) {
 
-            // if streamed without size we need special treatment
-            if (this.transcoded && !this._sizedContent) {
+            // if streamed without previously known size we need special treatment
+            if (this.transcoded) {
                 let isCached = this._isCached(time);
                 debug("Is cached:", isCached.isCached);
                 if (isCached.isCached) {

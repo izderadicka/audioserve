@@ -64,23 +64,20 @@ Gets current transcoding settings.
     "max_transcodings":8,
     "low":{
         "bitrate":32,
-        "compression_level":5,
-        "cutoff":"SuperWideBand"
+        "name":"opus-in-ogg"
         },
     "medium":{
         "bitrate":48,
-        "compression_level":8,
-        "cutoff":"SuperWideBand"
+        "name":"opus-in-ogg"
         },
     "high":{
         "bitrate":64,
-        "compression_level":10,
-        "cutoff":"FullBand"
+        "name":"opus-in-ogg"
         }
     }
 ```
 
-There are 3 possible level of transcoding `low`, `medium`, `high`, each with parameters for opus audio codec - for details about parameters see general [README.md](../README.md). `max_transcodings` is maximum number of trancoding processes, that can run on server in parallel. If this maximum is reached server returns 503 Service Unavailable -  it's client responsibility to retry later.
+There are 3 possible level of transcoding `low`, `medium`, `high`, each with name of transcoding and expected for resulting data stream - for details about transcoding general [README.md](../README.md). `max_transcodings` is maximum number of trancoding processes, that can run on server in parallel. If this maximum is reached server returns 503 Service Unavailable -  it's client responsibility to retry later.
 
 **folder**
 
