@@ -9,7 +9,7 @@ before_install:
   - sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev ffmpeg
 cache: cargo
 script:
-  - cargo test --verbose
+  - cargo test --verbose --all-features
   - cargo test --verbose --no-default-features
 matrix:
   fast_finish: true
