@@ -1,0 +1,16 @@
+low:
+  mp3:
+    bitrate: 32
+    compression_level: 6
+    abr: true
+medium:
+  mp3:
+    bitrate: 64
+    compression_level: 3
+    abr: false
+high:
+  mp3:
+    bitrate: 96
+    compression_level: 0
+    abr: false
+  

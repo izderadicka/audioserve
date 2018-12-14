@@ -259,6 +259,7 @@ export class AudioPlayer {
             let end = ranges.end(i);
             start = offset + totalLength * start / totalTime;
             end = offset + totalLength * end / totalTime;
+            end = Math.min(totalLength, end);
 
             let bar = document.createElement("div");
             bar.setAttribute("class", "cache-bar");

@@ -31,7 +31,9 @@ pub trait AudioCodec {
 #[serde(rename_all = "kebab-case")]
 pub enum TranscodingFormat {
     OpusInOgg(Opus),
-    OpusInWebm(Opus)
+    OpusInWebm(Opus),
+    Mp3(Mp3),
+    AacInAdts(Aac)
 }
 
 pub struct TranscodingArgs {
@@ -56,29 +58,38 @@ impl TranscodingFormat {
         match self {
             TranscodingFormat::OpusInOgg(args) => targs!(args, "opus"),
             TranscodingFormat::OpusInWebm(args) => targs!(args, "webm"),
+            TranscodingFormat::Mp3(args) => targs!(args, "mp3"),
+            TranscodingFormat::AacInAdts(args) => targs!(args, "adts")
         }
     }
 
     pub fn bitrate(&self) -> u32 {
         match self {
             TranscodingFormat::OpusInOgg(args) => args.bitrate(),
-            TranscodingFormat::OpusInWebm(args) => args.bitrate()
+            TranscodingFormat::OpusInWebm(args) => args.bitrate(),
+            TranscodingFormat::Mp3(args) => args.bitrate(),
+            TranscodingFormat::AacInAdts(args) => args.bitrate()
         }
     }
 
     pub fn format_name(&self) -> &'static str {
         match self {
             TranscodingFormat::OpusInOgg(_) => "opus-in-ogg",
-            TranscodingFormat::OpusInWebm(_) => "opus-in-webm"
+            TranscodingFormat::OpusInWebm(_) => "opus-in-webm",
+            TranscodingFormat::Mp3(_) => "mp3",
+            TranscodingFormat::AacInAdts(_) => "aac-in-adts"
         }
     }
 
     pub fn mime(&self) -> Mime {
-        match self {
-            TranscodingFormat::OpusInOgg(_) => "audio/ogg".parse().unwrap(),
-            TranscodingFormat::OpusInWebm(_) => "audio/webm".parse().unwrap(),
+        let m = match self {
+            TranscodingFormat::OpusInOgg(_) => "audio/ogg",
+            TranscodingFormat::OpusInWebm(_) => "audio/webm",
+            TranscodingFormat::Mp3(_) => "audio/mpeg",
+            TranscodingFormat::AacInAdts(_) => "audio/aac"
 
-        }
+        };
+        m.parse().unwrap()
     }
 }
 

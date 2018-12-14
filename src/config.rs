@@ -538,10 +538,15 @@ mod tests {
     }
     #[test]
     fn test_yaml_deserialize() {
-        let f = File::open("./test_data/transcodings.yaml").unwrap();
-        let des: BTreeMap<String, TranscodingFormat> = serde_yaml::from_reader(f).unwrap();
-        assert_eq!(3, des.len());
-        assert!(des.get("high").is_some());
+        fn load_file(fname: &str) {
+           let f = File::open(fname).unwrap();
+            let des: BTreeMap<String, TranscodingFormat> = serde_yaml::from_reader(f).unwrap();
+            assert_eq!(3, des.len());
+            assert!(des.get("high").is_some()); 
+        }
+        load_file("./test_data/transcodings.yaml");
+        load_file("./test_data/transcodings.1.yaml");
+        load_file("./test_data/transcodings.2.yaml");
     }
 
 }
