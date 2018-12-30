@@ -115,9 +115,18 @@ $(function () {
         $("#main").scrollTop(to || 0);
     }
 
+    function forcedTranscode(file) {
+        //FF does not support matroska
+        if(navigator.userAgent.indexOf("Firefox") != -1 && file.mime.indexOf("matroska")>0) return true;
+
+        return false;
+    }
+
     function calcTranscoding(file) {
-        let bitrate = parseInt(file.meta.bitrate);
-        if (transcodingLimit >= 0 && bitrate > transcodingLimit) {
+        let mustTranscode = forcedTranscode(file);
+        let bitrate = file.meta?parseInt(file.meta.bitrate):-1;
+
+        if (mustTranscode || bitrate >= 0 && transcodingLimit >= 0 && bitrate > transcodingLimit) {
             file.trans = true;
             file.path = file.path + `?trans=${transcoding}`;
         } else {
@@ -197,7 +206,7 @@ $(function () {
                     calcTranscoding(file);
                     let item = $('<a class="list-group-item list-group-item-action">')
                         .attr("href", file.path)
-                        .data("duration", file.meta.duration)
+                        .data("duration", file.meta?file.meta.duration:0)
                         .data("transcoded", file.trans)
                         .text(file.name);
 
