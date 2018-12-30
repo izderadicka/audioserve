@@ -21,7 +21,6 @@ extern crate serde_derive;
 extern crate regex;
 extern crate serde_json;
 extern crate serde_yaml;
-extern crate taglib;
 extern crate url;
 #[macro_use]
 extern crate lazy_static;
@@ -29,6 +28,11 @@ extern crate dirs;
 extern crate tokio;
 extern crate tokio_process;
 extern crate tokio_threadpool;
+#[cfg(not(feature="libavformat"))]
+extern crate taglib;
+#[cfg(feature="libavformat")]
+extern crate media_info;
+
 // for TLS
 #[cfg(feature = "search-cache")]
 extern crate cachedirtree;
@@ -226,6 +230,11 @@ fn main() {
     };
     pretty_env_logger::init();
     debug!("Started with following config {:?}", get_config());
+
+    #[cfg(feature="libavformat")] {
+        media_info::init()
+    }
+    
     #[cfg(feature="transcoding-cache")]
     {
         use cache::get_cache;

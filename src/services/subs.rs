@@ -3,6 +3,7 @@ use super::search::{Search, SearchTrait};
 use super::transcode::{QualityLevel, AudioFilePath};
 use super::types::*;
 use super::Counter;
+use super::audio_meta::get_audio_properties;
 use config::get_config;
 use error::Error;
 use futures::future::{self, poll_fn, Future};
@@ -20,7 +21,6 @@ use std::fs;
 use std::io::{self, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
-use taglib;
 use tokio::io::AsyncRead;
 use tokio_threadpool::blocking;
 
@@ -419,41 +419,7 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     }
 }
 
-pub fn get_audio_properties(audio_file_name: &Path) -> Option<AudioMeta> {
-    let filename = audio_file_name.as_os_str().to_str();
-    match filename {
-        Some(fname) => {
-            let audio_file = taglib::File::new(fname);
-            match audio_file {
-                Ok(f) => match f.audioproperties() {
-                    Ok(ap) => {
-                        return Some(AudioMeta {
-                            duration: ap.length(),
-                            bitrate: {
-                                let mut bitrate = ap.bitrate();
-                                let duration = ap.length();
-                                if bitrate == 0 && duration != 0 {
-                                    // estimate from duration and file size
-                                    // Will not work well for small files
-                                    if let Ok(size) = audio_file_name.metadata().map(|m| m.len()) {
-                                        bitrate = (size * 8 / u64::from(duration) / 1024) as u32;
-                                        debug!("Estimating bitrate to {}", bitrate);
-                                    };
-                                }
-                                bitrate
-                            },
-                        });
-                    }
-                    Err(e) => warn!("File {} does not have audioproperties {:?}", fname, e),
-                },
-                Err(e) => warn!("Cannot get audiofile {} error {:?}", fname, e),
-            }
-        }
-        None => warn!("File name {:?} is not utf8", filename),
-    };
 
-    None
-}
 
 fn json_response<T: serde::Serialize>(data: &T) -> Response {
     let json = serde_json::to_string(data).expect("Serialization error");
@@ -509,6 +475,10 @@ mod tests {
     #[test]
     fn test_list_dir() {
         init_default_config();
+        #[cfg(feature="libavformat")]
+        {
+            media_info::init()
+        }
         let res = list_dir("/non-existent", "folder");
         assert!(res.is_err());
         let res = list_dir("./", "test_data/");
@@ -529,6 +499,10 @@ mod tests {
 
     #[test]
     fn test_meta() {
+        #[cfg(feature="libavformat")]
+        {
+            media_info::init()
+        }
         let res = get_audio_properties(Path::new("./test_data/01-file.mp3"));
         assert!(res.is_some());
         let meta = res.unwrap();

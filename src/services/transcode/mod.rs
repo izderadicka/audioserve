@@ -473,7 +473,7 @@ mod vec_codec {
 
 #[cfg(test)]
 mod tests {
-    use super::super::subs::get_audio_properties;
+    use super::super::audio_meta::get_audio_properties;
     use super::*;
     use std::env::temp_dir;
     use std::fs::{remove_file, File};

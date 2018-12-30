@@ -1,6 +1,6 @@
 [package]
 name = "audioserve"
-version = "0.7.1"
+version = "0.8.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 
 [dependencies]
@@ -37,6 +37,9 @@ native-tls = {version="0.2", optional=true}
 cachedirtree = {git="https://github.com/izderadicka/cachedirtree.git", optional=true}
 
 bytes = {version="0.4", optional=true}
+
+media_info = {git="https://github.com/izderadicka/media_info", optional=true}
+
 [dependencies.simple-file-cache]
 #path="../file-cache"
 git="https://github.com/izderadicka/simple-file-cache.git"
@@ -51,4 +54,5 @@ tls=["tokio-tls", "native-tls"]
 symlinks=["cachedirtree/symlinks"]
 search-cache=["cachedirtree"]
 transcoding-cache=["simple-file-cache", "bytes"]
+libavformat = ["media_info"]
 
