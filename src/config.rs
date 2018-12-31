@@ -231,7 +231,7 @@ fn create_parser<'a>() -> Parser<'a> {
         .arg(Arg::with_name("secret-file")
             .long("secret-file")
             .takes_value(true)
-            .help("Path to file where server is kept - it's generated if it does not exists [default: is $HOME/.audioserve.secret]")
+            .help("Path to file where server secret is kept - it's generated if it does not exists [default: is $HOME/.audioserve.secret]")
         )
         .arg(Arg::with_name("cors")
             .long("cors")

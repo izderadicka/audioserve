@@ -1,9 +1,11 @@
 FROM ubuntu:16.04
 MAINTAINER Ivan <ivan@zderadicka.eu>
 
+ARG FEATURES
+
 RUN apt -o Acquire::https::No-Cache=True -o Acquire::http::No-Cache=True update &&\
     apt-get update &&\
-    apt-get install -y pkg-config openssl libssl-dev libtag1-dev libtagc0-dev curl ffmpeg &&\
+    apt-get install -y pkg-config openssl libssl-dev libtag1-dev libtagc0-dev curl ffmpeg yasm build-essential wget libbz2-dev &&\
     curl -sL https://deb.nodesource.com/setup_8.x | bash - &&\
     apt-get install -y nodejs &&\
     adduser audioserve
@@ -26,8 +28,8 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 RUN export PATH=/home/audioserve/.cargo/bin:$PATH &&\
     cd audioserve_src &&\
-    cargo build --release &&\
-    cargo test --release
+    cargo build --release ${FEATURES} &&\
+    cargo test --release ${FEATURES}
 
 RUN cd audioserve_src/client &&\
     npm install &&\
@@ -57,8 +59,6 @@ ENV SSLKEY=./ssl/audioserve.p12
 ENV SSLPASS=mypass
 
 ENV DIRS=/audiobooks
-
-WORKDIR /audioserve
 
 COPY audioserve.sh .
 

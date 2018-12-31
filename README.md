@@ -134,16 +134,18 @@ audioserve server provides very simple API (see [api.md](./docs/api.md) for docu
 Installation (Linux)
 ------------
 
-Install required dependencies:
+Install required dependencies (some dependecies are optional, depending on features chosen in build):
 
     # Ubuntu - for other distros look for equivalent packages
-    sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev ffmpeg
+    sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev ffmpeg yasm build-essential wget libbz2-dev
 
 Clone repo with:
 
     git clone https://github.com/izderadicka/audioserve
 
-To install locally you need [Rust](https://www.rust-lang.org/en-US/install.html) and [NodeJS](https://nodejs.org/en/download/package-manager/) installed - compile with `cargo build --release` (Rust code have system dependencies to openssl and taglib) and build client in its directory:
+To install locally you need [Rust](https://www.rust-lang.org/en-US/install.html) and [NodeJS](https://nodejs.org/en/download/package-manager/) installed - compile with `cargo build --release` (Rust code have optional system dependencies to openssl, taglib, zlib, bz2lib). Optionaly you can compile with/without features (see below for details).
+
+Build client in its directory (`cd client`):
 
     npm install
     npm run build
@@ -154,6 +156,8 @@ But easiest way how to test audioserve is to run it as docker container with pro
     docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  audioserve  
 
 Then open <https://localhost:3000> and accept insecure connection, shared secret to enter in client is mypass
+
+When building docker image you can use `--build-arg FEATURES=` to modify cargo build command and to add/or remove features (see below for details). For instance this command will build audioserve with all available features `docker build --tag audioserve --build-arg FEATURES=--all-features .`
 
 The following environment variables can be used to customise how audioserve runs:
 
@@ -187,7 +191,20 @@ but I never tried to build it there. Any help in this area is welcomed.
 
 ### Compiling without default features or with non-default features
 
-TLS support, symbolic links and search cache are default features, but you can compile without them - just add `--no-default-features` option to cargo. And then evetually choose only features you need. To add non-default features (like transcoding-cache) compile with this option `--features transcoding-cache` in `cargo build` command. Or you can use option `--all-features` to enable all available features.
+TLS support (feature `tls`), symbolic links (feature `symlinks`) and search cache (feature `search-cache`) are default features, but you can compile without them - just add `--no-default-features` option to `cargo build` command. And then evetually choose only features you need. 
+To add non-default features (like `transcoding-cache` or `libavformat`) compile with this option `--features transcoding-cache` in `cargo build` command. Or you can use option `--all-features` to enable all available features.
+
+**Available features:**
+
+Feature | Desc |Default |Program options
+--------|------|:------:|---------------
+| tls | Enables TLS support (e.g https) (requires openssl and libssl-dev) | Yes | --ssl-key --ssl-key-password to define server key
+| symlinks | Enables to use symbolic link is media folders | Yes | Use --allow-symlinks to follow symbolic links
+| search-cache | Caches structure of media directories for fast search | Yes | Use --search-cache to enable this cache
+| transcoding-cache | Cache to save transcoded files for fast next use | No | Can be disabled by --t-cache-disable and modified by --t-cache-dir --t-cache-size --t-cache-max-files
+| libavformat | Uses libavformat to extract media info instead of libtag (which does not support matroska/webm container) | No |
+
+
 
 License
 -------
