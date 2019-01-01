@@ -51,14 +51,14 @@ Audioserve supports TLS/SSL - to enable it you need to provide your private serv
     openssl pkcs12 -inkey key.pem -in certificate.pem -export  -passout pass:mypass -out audioserve.p12
     rm key.pem certificate.pem
 
-You can also run behind reverse proxy like nginx or ha-proxy and perminate SSL there (in that case you can compile audioserve without TLS support see below)
+You can also run audioserve behind reverse proxy like nginx or ha-proxy and terminate SSL there (in that case you can compile audioserve without TLS support see compilation without default features below)
 
 Performance
 -----------
 
 Audioserve is inteded to serve personal audio collections of moderate sizes. For sake of simplicity it does not provide any large scale perfomance optimalizations.  It's fine to serve couple of users from collection of couple of thousands audiobooks, if they are reasonably organized. That's it, if you're looking for solution for thousands or millions of users, look elsewere. To compensate for this audioserve is very lightweight and by itself takes minimum of system resources.
 
-Browsing of collections is limited by speed of the file system. As directory listing needs to read audio files metadata (duration and bitrate), folders with too many files (> 200) will be slow. Search is done by walking through collection, it can be slow - especially the first search (subsequent searches are much, much faster, as directory structure from previous search is cached by OS for some time). Recent versions provides possibility for seach cache, to speed up search significantly - [see below](#search-cache).
+Browsing of collections is limited by speed of the file system. As directory listing needs to read audio files metadata (duration and bitrate), folders with too many files (> 200) will be slow to open. Search is done by walking through collection directory structure, it can be slow - especially the first search (subsequent searches are much, much faster, as directory structure from previous search is cached by OS for some time). Recent audioserve versions provides optional seach cache, to speed up search significantly - [see below](#search-cache).
 
 But true limiting factor is transcoding - as it's quite CPU intensive. Normally you should run only a handful of transcodings in parallel, not much then 2x - 4x more then there is the number of cores in the machine. For certain usage scenarios enabling of [transcoding cache](#transcoding-cache) can help a bit.
 
@@ -100,11 +100,11 @@ high:
     cutoff: SuperWideBand
 ```
 
-In each key first you have specification of codec-container combination, currently it supports `opus-in-ogg`, `opus-in-webm`, `mp3`, `aac-in-adts` (but other containers or codecs can relatively easily added, provided they are supported by ffmpeg and container creation does not require seekable output - like MP4 container).
+In each key first you have specification of codec-container combination, currently it supports `opus-in-ogg`, `opus-in-webm`, `mp3`, `aac-in-adts` (but other containers or codecs can relatively easily be added, provided they are supported by ffmpeg and container creation does not require seekable output - like MP4 container).
 
 I have good experinces with `opus-in-ogg`, which is also default. `opus-in-webm` works well in browsers (and is supported  in browsers MSE API), but as it does not contain audio duration after trascoding, audio cannot be sought during playback in Android client, which is significant drawback. `mp3` is classical MPEG-2 Audio Layer III audio stream. It has three parametes. `aac-in-adts` AAC encoded audio in ADTS stream, similarly as `opus-in-webm` it has problems with seeking in Android client.
 
-For opus transcodings there are 3 other parameters, where `bitrate` is desired bitrate in kbps, `compression_level` is determining audio quality and speed of transcoding with values 1-10 ( 1 - worst quality, but fastest, 10 - best quality, but slowest ) and `cutoff` is determining audio freq. bandwith (NarrowBand => 4kHz, MediumBand => 6kHz, WideBand => 8kHz, SuperWideBand => 12kHz, FullBand => 20kHz).
+For opus transcodings there are 3 other parameters, where `bitrate` is desired bitrate in kbps, `compression_level` is determining audio quality and speed of transcoding with values 1-10 ( 1 - worst quality, but fastest, 10 - best quality, but slowest ) and `cutoff` is determining audio freq. bandwidth (NarrowBand => 4kHz, MediumBand => 6kHz, WideBand => 8kHz, SuperWideBand => 12kHz, FullBand => 20kHz).
 
 For mp3 transcoding there are also 3 parameters: `bitrate` (in kbps), `compression_level` with values 0-9 (0 - best quality, slowest, 9-worst quality, fastest; so meaning is inverse then for opus codec) and `abr` (optional), which can be `true` or `false` (ABR = average bit rate - enables ABR, which is similar to VBR, so it can improve quality on same bitrate, however can cause problems, when seeking in audion stream).
 
@@ -124,38 +124,27 @@ Android client
 --------------
 
 Android client code is [available on github](https://github.com/izderadicka/audioserve-android)
-Client is in early beta stage (I'm using it now to listen to my audiobooks).
+Client is in beta stage (I'm using it now to listen to my audiobooks for more then half year).
 
 API
 ---
 
 audioserve server provides very simple API (see [api.md](./docs/api.md) for documentation), so it's easy to write your own clients.
 
-Installation (Linux)
+Installation
 ------------
 
-Install required dependencies (some dependecies are optional, depending on features chosen in build):
+### Docker Image
 
-    # Ubuntu - for other distros look for equivalent packages
-    sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev ffmpeg yasm build-essential wget libbz2-dev
+Easiest way how to test audioserve is to run it as docker container with prebuild [Docker image](https://cloud.docker.com/u/izderadicka/repository/docker/izderadicka/audioserve) (from Docker Hub):
 
-Clone repo with:
-
-    git clone https://github.com/izderadicka/audioserve
-
-To install locally you need [Rust](https://www.rust-lang.org/en-US/install.html) and [NodeJS](https://nodejs.org/en/download/package-manager/) installed - compile with `cargo build --release` (Rust code have optional system dependencies to openssl, taglib, zlib, bz2lib). Optionaly you can compile with/without features (see below for details).
-
-Build client in its directory (`cd client`):
-
-    npm install
-    npm run build
-
-But easiest way how to test audioserve is to run it as docker container with provided `Dockerfile`, just run:
-
-    docker build --tag audioserve .
-    docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  audioserve  
+    docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve  
 
 Then open <https://localhost:3000> and accept insecure connection, shared secret to enter in client is mypass
+
+Of course you can build your own image very easily with provided `Dockerfile`, just run:
+
+    docker build --tag audioserve .
 
 When building docker image you can use `--build-arg FEATURES=` to modify cargo build command and to add/or remove features (see below for details). For instance this command will build audioserve with all available features `docker build --tag audioserve --build-arg FEATURES=--all-features .`
 
@@ -186,8 +175,27 @@ Both are made available to the container via -v option and passed to audioserve 
 We set the shared secret via -e SECRET and specify the use of a search cache via -e OTHER_ARGS.
 In this case, we are not using SSL and this is determined via the blank values in -e SSLKEY and -e SSLPASS.
 
-Other platforms - theoretically audioserve can work on Windows and MacOS (probably with few changes),
-but I never tried to build it there. Any help in this area is welcomed.
+### Local installation (Linux)
+
+Install required dependencies (some dependecies are optional, depending on features chosen in build):
+
+    # Ubuntu - for other distros look for equivalent packages
+    sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev ffmpeg yasm build-essential wget libbz2-dev
+
+Clone repo with:
+
+    git clone https://github.com/izderadicka/audioserve
+
+To install locally you need [Rust](https://www.rust-lang.org/en-US/install.html) and [NodeJS](https://nodejs.org/en/download/package-manager/) installed - compile with `cargo build --release` (Rust code have optional system dependencies to openssl, taglib, zlib, bz2lib). Optionaly you can compile with/without features (see below for details).
+
+Build client in its directory (`cd client`):
+
+    npm install
+    npm run build
+
+### Other platforms
+
+Theoretically audioserve can work on Windows and MacOS (probably with few changes in code), but I never tried to build it there. Any help in this area is welcomed.
 
 ### Compiling without default features or with non-default features
 
