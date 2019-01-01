@@ -1,4 +1,6 @@
 language: rust
+services:
+  - docker
 rust:
   - stable
   - beta
@@ -27,5 +29,10 @@ matrix:
       - cd client
       - npm install
       - npm run build
+deploy:
+  provider: script
+  script: bash docker_push.sh
+  on:
+    branch: master
 
 

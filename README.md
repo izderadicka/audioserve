@@ -199,7 +199,7 @@ To add non-default features (like `transcoding-cache` or `libavformat`) compile 
 Feature | Desc |Default |Program options
 --------|------|:------:|---------------
 | tls | Enables TLS support (e.g https) (requires openssl and libssl-dev) | Yes | --ssl-key --ssl-key-password to define server key
-| symlinks | Enables to use symbolic link is media folders | Yes | Use --allow-symlinks to follow symbolic links
+| symlinks | Enables to use symbolic link in media folders | Yes | Use --allow-symlinks to follow symbolic links
 | search-cache | Caches structure of media directories for fast search | Yes | Use --search-cache to enable this cache
 | transcoding-cache | Cache to save transcoded files for fast next use | No | Can be disabled by --t-cache-disable and modified by --t-cache-dir --t-cache-size --t-cache-max-files
 | libavformat | Uses libavformat to extract media info instead of libtag (which does not support matroska/webm container) | No |
