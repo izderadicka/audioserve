@@ -32,8 +32,8 @@ matrix:
 jobs:
   include:
     - stage: deploy
-    script: bash docker_push.sh
-    on:
-      branch: master
+      script: bash docker_push.sh
+      on:
+        branch: master
 
 
