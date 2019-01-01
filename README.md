@@ -136,6 +136,8 @@ Installation
 
 ### Docker Image
 
+**Note**: currently docker image is rather big, sorry for that, I'm looking into it. It was intended just for testing, but as I changed it couple of times it got monsterous. It works fine, but >95% of it's size is not needed. Docker layered fs shoot in in foot here.
+
 Easiest way how to test audioserve is to run it as docker container with prebuild [Docker image](https://cloud.docker.com/u/izderadicka/repository/docker/izderadicka/audioserve) (from Docker Hub):
 
     docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve  
