@@ -9,7 +9,7 @@ before_install:
   - sudo add-apt-repository -y ppa:mc3man/trusty-media
   - sudo apt-get -qq update
   - sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev ffmpeg yasm
-cache: cargo
+#cache: cargo
 script:
   - cargo test --verbose
   - cargo test --verbose --all-features
@@ -35,6 +35,5 @@ deploy:
   on:
     branch: master
     rust: stable
-    node_js: ignore
 
 
