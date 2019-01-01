@@ -29,11 +29,11 @@ matrix:
       - cd client
       - npm install
       - npm run build
-jobs:
-  include:
-    - stage: deploy
-      script: bash docker_push.sh
-      on:
-        branch: master
+deploy:
+  rust: stable
+  provider: script
+  script: bash docker_push.sh
+  on:
+    branch: master
 
 
