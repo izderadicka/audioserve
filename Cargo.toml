@@ -56,3 +56,6 @@ search-cache=["cachedirtree"]
 transcoding-cache=["simple-file-cache", "bytes"]
 libavformat = ["media_info"]
 
+[[bin]]
+name = "audioserve"
+path = "src/main.rs"
