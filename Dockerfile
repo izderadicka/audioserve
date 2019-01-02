@@ -48,15 +48,13 @@ RUN adduser audioserve &&\
 WORKDIR /audioserve
 USER audioserve
 
-EXPOSE 3000
-
 ENV SECRET=mypass
-
 ENV SSLKEY=./ssl/audioserve.p12
-
 ENV SSLPASS=mypass
-
 ENV DIRS=/audiobooks
+ENV PORT=3000
+
+EXPOSE ${PORT}
 
 COPY audioserve.sh .
 
