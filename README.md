@@ -136,8 +136,6 @@ Installation
 
 ### Docker Image
 
-**Note**: currently docker image is rather big, sorry for that, I'm looking into it. It was intended just for testing, but as I changed it couple of times it got monsterous. It works fine, but >95% of it's size is not needed. Docker layered fs shoot in in foot here.
-
 Easiest way how to test audioserve is to run it as docker container with prebuild [Docker image](https://cloud.docker.com/u/izderadicka/repository/docker/izderadicka/audioserve) (from Docker Hub):
 
     docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve  
@@ -147,6 +145,8 @@ Then open <https://localhost:3000> and accept insecure connection, shared secret
 Of course you can build your own image very easily with provided `Dockerfile`, just run:
 
     docker build --tag audioserve .
+
+Currently size of Docker image is rather big (~200MB) - it's due to fact that it contains basic Debian files (and around 60MB is static ffmpeg executable). For space saving either use localy in Linux (see below instructions how to compile). We are also looking at possibility of completely static build of audioserve (check on github).
 
 When building docker image you can use `--build-arg FEATURES=` to modify cargo build command and to add/or remove features (see below for details). For instance this command will build audioserve with all available features `docker build --tag audioserve --build-arg FEATURES=--all-features .`
 
