@@ -156,6 +156,7 @@ The following environment variables can be used to customise how audioserve runs
     SECRET - The shared secret key (defaults to: mypass)
     SSLKEY - Path to the SSL key (defaults to: ./ssl/audioserve.p12)
     SSLPASS - Password to the SSL key (defaults to: mypass)
+    PORT - TCP port on which audioserve serves http(s) requests (defaults to: 3000)
     OTHER_ARGS - Any of the other audioserve command line options, such as --search-cache, space separated
 
 Note: If you do not wish to use the SSL certificate, blank values for SSLKEY and SSLPASS will suffice.
