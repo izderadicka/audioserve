@@ -39,8 +39,8 @@ RUN npm install && \
 FROM debian:stretch-slim
 
 VOLUME /audiobooks
-COPY --from=build /audioserve_src/target/release/audioserve /audioserve/audioserve
-COPY --from=frontend /audioserve_src/client/dist /audioserve/client/dist
+COPY --from=build /src/target/release/audioserve /audioserve/audioserve
+COPY --from=frontend /src/client/dist /audioserve/client/dist
 COPY --from=build /ffmpeg-static/ffmpeg /usr/bin
 
 RUN adduser audioserve && \
