@@ -1,6 +1,6 @@
 {
   "name": "audioserve-client",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Simple HTML5 client for audioserve",
   "main": "dist/bundle.js",
   "scripts": {
@@ -14,20 +14,21 @@
   "author": "Ivan<ivan@zderadicka.eu>",
   "license": "MIT",
   "devDependencies": {
-    "css-loader": "^0.28.8",
-    "jshint": "^2.9.5",
-    "style-loader": "^0.19.1",
-    "uglifyjs-webpack-plugin": "^1.1.6",
-    "webpack": "^3.10.0",
-    "webpack-dev-server": "^2.10.1",
-    "webpack-merge": "^4.1.1"
+    "css-loader": "^2.1.0",
+    "jshint": "^2.9.7",
+    "style-loader": "^0.23.1",
+    "terser-webpack-plugin": "^1.2.1",
+    "webpack": "^4.28.3",
+    "webpack-cli": "3.2.0",
+    "webpack-dev-server": "^3.1.14",
+    "webpack-merge": "^4.2.1"
   },
   "dependencies": {
     "base64js": "^1.0.1",
-    "bootstrap": "^4.0.0-beta.3",
-    "jquery": "^3.2.1",
+    "bootstrap": "^4.2.1",
+    "jquery": "^3.3.1",
     "js-sha256": "^0.9.0",
-    "popper.js": "^1.12.9",
-    "showdown": "^1.8.6"
+    "popper.js": "^1.14.6",
+    "showdown": "^1.9.0"
   }
 }
