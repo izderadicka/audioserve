@@ -31,14 +31,17 @@ pub struct Opus {
     bitrate: u16,
     compression_level: u8,
     cutoff: Bandwidth,
+    #[serde(default)]
+    mono: bool
 }
 
 impl Opus {
-    pub fn new(bitrate: u16, compression_level: u8, cutoff: Bandwidth) -> Self {
+    pub fn new(bitrate: u16, compression_level: u8, cutoff: Bandwidth, mono: bool) -> Self {
         Opus {
             bitrate,
             compression_level,
             cutoff,
+            mono
         }
     }
 }
@@ -46,6 +49,10 @@ impl Opus {
 impl AudioCodec for Opus {
     fn quality_args(&self) -> Vec<String> {
         let mut v = vec![];
+        if self.mono {
+            v.push("-ac".into());
+            v.push("1".into());
+        }
         v.push("-b:a".into());
         v.push(format!("{}k", self.bitrate));
         v.push("-compression_level".into());
@@ -77,12 +84,18 @@ pub struct Mp3 {
     compression_level: u8,
     /// ABR = average bit rate - something like variable bit rate
     #[serde(default)]
-    abr: bool
+    abr: bool,
+    #[serde(default)]
+    mono: bool
 }
 
 impl AudioCodec for Mp3 {
     fn quality_args(&self) -> Vec<String> {
         let mut v = vec![];
+        if self.mono {
+            v.push("-ac".into());
+            v.push("1".into());
+        }
         if self.abr {
             v.push("-abr".into());
             v.push("1".into());
@@ -154,13 +167,19 @@ pub struct Aac {
     #[serde(default)]
     sr: SampleRate,
     #[serde(default)]
-    ltp: bool
+    ltp: bool,
+    #[serde(default)]
+    mono: bool
 }
 
 
 impl AudioCodec for Aac {
     fn quality_args(&self) -> Vec<String> {
         let mut v = vec![];
+        if self.mono {
+            v.push("-ac".into());
+            v.push("1".into());
+        }
         if self.sr != SampleRate::Unlimited {
             v.push("-ar".into());
             v.push(self.sr.to_sr().to_string())

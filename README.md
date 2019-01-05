@@ -76,7 +76,7 @@ Transcoding
 Audioserve offers possibility to transcode audio files to opus format (opus codec, ogg or webm container) to save bandwidth and volume of transfered data. For transcoding to work `ffmpeg` program must be installed and available on system's PATH.
 Transconding is provided in three variants and client can choose between then (using query parameter trans with value l,m or h):
 
-* low - (default 32 kbps opus with 12kHz cutoff)
+* low - (default 32 kbps opus with 12kHz cutoff mono)
 * medium - (default 48 kbps opus with 12kHz cutoff)
 * high - (default 64 kbps opus with 20kHz cutoff)
 
@@ -88,11 +88,13 @@ low:
     bitrate: 16
     compression_level: 3
     cutoff: WideBand
+    mono: true
 medium:
   opus-in-ogg:
     bitrate: 24
     compression_level: 6
     cutoff: SuperWideBand
+    mono: true
 high:
   opus-in-ogg:
     bitrate: 32
@@ -109,6 +111,8 @@ For opus transcodings there are 3 other parameters, where `bitrate` is desired b
 For mp3 transcoding there are also 3 parameters: `bitrate` (in kbps), `compression_level` with values 0-9 (0 - best quality, slowest, 9-worst quality, fastest; so meaning is inverse then for opus codec) and `abr` (optional), which can be `true` or `false` (ABR = average bit rate - enables ABR, which is similar to VBR, so it can improve quality on same bitrate, however can cause problems, when seeking in audion stream).
 
 `aac-in-adts` has one mandatory parameter `bitrate` (in kbps) and two optional parameters `sr` - which is sample rate of transcoded stream (8kHz, 12kHz, 16kHz, 24kHz, 32kHz, 48kHz, unlimited) and `ltp` (Long Term Prediction), which is `true` or `false` and can improve audio quality, especially for lower bitrates, but for significant performance costs ( abou 10x slower).
+
+All encodings have optional parameter `mono`, if set to `true` audio will be down-mixed to mono.
 
 Overall `opus-in-ogg` provides best results from both quality and  functionality perspective, so I'd highly recommend to stick to it, unless you have some problem with it.
 

@@ -34,6 +34,7 @@ deploy:
   script: bash docker_push.sh
   on:
     branch: master
+    tags: true
     rust: stable
 
 

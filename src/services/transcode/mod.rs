@@ -97,9 +97,9 @@ impl TranscodingFormat {
 
     pub fn default_level(l: QualityLevel) -> Self {
         match l {
-            QualityLevel::Low => TranscodingFormat::OpusInOgg(Opus::new(32, 5, Bandwidth::SuperWideBand)),
-            QualityLevel::Medium => TranscodingFormat::OpusInOgg(Opus::new(48, 8, Bandwidth::SuperWideBand)),
-            QualityLevel::High => TranscodingFormat::OpusInOgg(Opus::new(64, 10, Bandwidth::FullBand)),
+            QualityLevel::Low => TranscodingFormat::OpusInOgg(Opus::new(32, 5, Bandwidth::SuperWideBand, true)),
+            QualityLevel::Medium => TranscodingFormat::OpusInOgg(Opus::new(48, 8, Bandwidth::SuperWideBand, false)),
+            QualityLevel::High => TranscodingFormat::OpusInOgg(Opus::new(64, 10, Bandwidth::FullBand, false)),
         }
     }
 
