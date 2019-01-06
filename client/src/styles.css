@@ -47,8 +47,14 @@ body {
     min-height: 160px;
     max-width: 300px;
     max-height: 424px;
-    float: left;
-    margin-right: 1em;  
+    margin-right: 1em; 
+    margin-bottom: 1em;
+}
+
+@media (min-width: 740px) {
+    #info-cover {
+        float: left;
+    }
 }
 
 #info-desc {

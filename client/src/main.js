@@ -175,6 +175,10 @@ $(function () {
                             } else if (mime == "text/x-markdown") {
                                 let converter = new showdown.Converter();
                                 $("#info-desc").html(converter.makeHtml(text));
+                            } else if (mime == "text/plain") {
+                                let pre = $('<pre>');
+                                pre.text(text);
+                                $("#info-desc").append(pre);
                             } else {
                                 $("#info-desc").text(text);
                             }
