@@ -184,7 +184,7 @@ impl<C> FileSendService<C> {
                         let range = req
                             .headers()
                             .get(RANGE)
-                            .and_then(|h| Range::parse_header(&h.as_ref().into()).ok());
+                            .and_then(|h| Range::parse_header(&h).ok());
                         let bytes_range = match range {
                             Some(Range::Bytes(bytes_ranges)) => {
                                 if bytes_ranges.is_empty() {

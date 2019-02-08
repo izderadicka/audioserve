@@ -5,9 +5,9 @@ use serde_yaml;
 use std::collections::BTreeMap;
 use std::env;
 use std::fs::File;
-use std::io;
+use std::io::{self, Read};
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{PathBuf,Path};
 
 static mut CONFIG: Option<Config> = None;
 
@@ -33,6 +33,10 @@ pub enum Error {
     }
 
     InvalidLimitValue(err: &'static str) {
+        from()
+    }
+
+    OtherError(err: String) {
         from()
     }
 
@@ -195,8 +199,16 @@ fn create_parser<'a>() -> Parser<'a> {
             .short("s")
             .long("shared-secret")
             .takes_value(true)
-            .required_unless("no-authentication")
+            .conflicts_with("no-authentication")
+            .required_unless_one(&["no-authentication", "shared-secret-file"])
             .help("Shared secret for client authentication")
+        )
+        .arg(Arg::with_name("shared-secret-file")
+            .long("shared-secret-file")
+            .takes_value(true)
+            .conflicts_with("no-authentication")
+            .required_unless("shared-secret")
+            .help("File containing shared secret, it's slightly safer to read it from file, then provide as command argument")
         )
         .arg(Arg::with_name("transcoding-config")
             .long("transcoding-config")
@@ -336,7 +348,28 @@ pub fn parse_args() -> Result<(), Error> {
     let shared_secret = if args.is_present("no-authentication") {
         None
     } else {
-        Some(args.value_of("shared-secret").unwrap().into())
+        if args.is_present("shared-secret") {
+            Some(args.value_of("shared-secret").unwrap().into())
+        } else if args.is_present("shared-secret-file") {
+            let p = Path::new(args.value_of_os("shared-secret-file").unwrap());
+         match File::open(p) {
+             Ok(mut f) => {
+                 let mut secret = String::new();
+                 f.read_to_string(&mut secret)
+                 .map_err(|e| format!("Error reading from shared secret file: {}",e))?;
+                 Some(secret)
+             }
+             Err(e) => {
+                 return Err(format!("Shared secret file does not exists or is not readable: {}", e).into())
+             }
+         }
+            
+            
+            
+        
+        } else {
+            None
+        }
     };
 
     let transcoding = match args.value_of("transcoding-config") {

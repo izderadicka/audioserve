@@ -7,7 +7,7 @@ pub struct Error(Option<Box<dyn StdErr + Send + Sync + 'static>>);
 impl Display for Error {
     fn fmt(&self, fmt: &mut Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
         fmt.write_str("Audioserve error")?;
-        if let Some(e) = self.cause() {
+        if let Some(e) = self.source() {
             write!(fmt, "\nCause: {}", e)
         } else {
             Ok(())

@@ -91,13 +91,13 @@ impl Authenticator for SharedSecretAuthenticator {
             let mut token = req
                 .headers()
                 .get(AUTHORIZATION)
-                .and_then(|h| Authorization::<Bearer>::parse_header(&h.as_bytes().into()).ok())
+                .and_then(|h| Authorization::<Bearer>::parse_header(&h).ok())
                 .map(|a| a.0.token.to_owned());
             if token.is_none() {
                 token = req
                     .headers()
                     .get(COOKIE)
-                    .and_then(|h| Cookie::parse_header(&h.as_bytes().into()).ok())
+                    .and_then(|h| Cookie::parse_header(&h).ok())
                     .and_then(|c| c.get(COOKIE_NAME).map(|v| v.to_owned()));
             }
 

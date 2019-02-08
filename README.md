@@ -35,12 +35,12 @@ By default symbolic(soft) links are not followed in the collections directory (b
 Security
 --------
 
-Audioserve is not writing anything to your media library, so read only access is OK.  The only one file where it needs to write is a file were it keeps its secret key for authentication (by default in `~/.audioserve.secret`, but it can be specified by command line argument). And optionaly it writes files to transcoding cache ([see below](#transcoding-cache)).
+Audioserve is not writing anything to your media library, so read only access is OK.  The only file where it needs to write is a file were it keeps its secret key for authentication (by default in `~/.audioserve.secret`, but it can be specified by command line argument). And optionaly it writes files to transcoding cache ([see below](#transcoding-cache)).
 
-Authentication is done by shared secret phrase (supplied to server on command line), which clients must know.
-Secret phrase is never sent in plain (it's sent as salted hash). If correct shared secret hash is provided sever generates a token, using its secret key.  Token then can be used in cookie or HTTP Authorization header (Bearer method).
-Token validity period is one year by default, but can be set as command line argument, but system generaly expects token validity to be at least 10 days.
-As the token can be used to steal the session https is recomended (TLS support is build in).
+Authentication is done by shared secret phrase (supplied to server on command line - either directly or as a file that contains the phrase, former is covenient, but less secure, because often one can see process arguments for other users), which clients must know.
+Shared secret phrase is never sent in plain (it's sent as salted hash). If correct shared secret hash is provided by client, sever generates a token, using its secret key, which is then used for individual requests authentication.  Token then can be used in cookie or HTTP Authorization header (Bearer method).
+Token validity period is one year by default, but can be set with command line argument, but system generally expects token validity to be at least 10 days.
+As the token can be used to steal the session, https is recommended (TLS support is build in).
 
 ### TLS/SSL
 
