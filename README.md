@@ -142,45 +142,36 @@ Installation
 
 Easiest way how to test audioserve is to run it as docker container with prebuild [Docker image](https://cloud.docker.com/u/izderadicka/repository/docker/izderadicka/audioserve) (from Docker Hub):
 
-    docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve  
+    docker run -d --init --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve  
 
-Then open <https://localhost:3000> and accept insecure connection, shared secret to enter in client is mypass
+Then open <http://localhost:3000> - and browse your collection.  This is indeed the very minimal configuration of audioserve. For real deployment you'd like provide provide more parameters - see more complex example below.
 
 Of course you can build your own image very easily with provided `Dockerfile`, just run:
 
     docker build --tag audioserve .
 
-Currently size of Docker image is rather big (~200MB) - it's due to fact that it contains basic Debian files (and around 60MB is static ffmpeg executable). For space saving either use localy in Linux (see below instructions how to compile). We are also looking at possibility of completely static build of audioserve (check on github).
+Currently size of Docker image is rather big (~200MB) - it's due to fact that it contains basic Debian files (and around 60MB is static ffmpeg executable). For space saving use locally in Linux (see below instructions for how to compile). We are also looking at possibility of completely static build of audioserve (check on github).
 
 When building docker image you can use `--build-arg FEATURES=` to modify cargo build command and to add/or remove features (see below for details). For instance this command will build audioserve with all available features `docker build --tag audioserve --build-arg FEATURES=--all-features .`
 
-The following environment variables can be used to customise how audioserve runs:
+The following environment variable can be used to customise how audioserve runs:
+    PORT - TCP port on which audioserve serves http(s) requests (defaults to: 3000) - this is useful for services like Heroku, where container must accept PORT variable from the service
 
-    DIRS - Space separated list of audio folders (defaults to: /audiobooks)
-    SECRET - The shared secret key (defaults to: mypass)
-    SSLKEY - Path to the SSL key (defaults to: ./ssl/audioserve.p12)
-    SSLPASS - Password to the SSL key (defaults to: mypass)
-    PORT - TCP port on which audioserve serves http(s) requests (defaults to: 3000)
-    OTHER_ARGS - Any of the other audioserve command line options, such as --search-cache, space separated
+A more detailed example (audioserve is an entry point to this container, so you can use all command line arguments of the program):
 
-Note: If you do not wish to use the SSL certificate, blank values for SSLKEY and SSLPASS will suffice.
-
-A more detailed example:
-
-    docker run -d --name audioserve -p 3000:3000 \
+    docker run -d --init --name audioserve -p 3000:3000 \
         -v /path/to/your/audiobooks1:/collection1 \
         -v /path/to/your/audiobooks2:/collection2 \
-        -e DIRS=/collection1 /collection2 \
-        -e SECRET=mypassword \
-        -e SSLKEY= \
-        -e SSLPASS= \
-        -e OTHER_ARGS=--search-cache \
-        audioserve
+        audioserve \
+        -s mypass \
+        --ssl-key /audioserve/ssl/audioserve.p12 --ssl-key-password mypass \
+        --search-cache \
+        /collection1 /collection2
 
 In the above example, we are adding two different collections of audiobooks (collection1 and collection2).
-Both are made available to the container via -v option and passed to audioserve in the -e DIRS ENV variable.
-We set the shared secret via -e SECRET and specify the use of a search cache via -e OTHER_ARGS.
-In this case, we are not using SSL and this is determined via the blank values in -e SSLKEY and -e SSLPASS.
+Both are made available to the container via `-v` option and then passed to audioserve on command line.
+We set the shared secret via `-s` argument and specify use of TLS via `--ssl-key` and `ssl-key-password` (the test key is already prebundled in the image). We also enable search cache with `--search-cache` argument.
+
 
 ### Local installation (Linux)
 
@@ -193,7 +184,7 @@ Clone repo with:
 
     git clone https://github.com/izderadicka/audioserve
 
-To install locally you need [Rust](https://www.rust-lang.org/en-US/install.html) and [NodeJS](https://nodejs.org/en/download/package-manager/) installed - compile with `cargo build --release` (Rust code have optional system dependencies to openssl, taglib, zlib, bz2lib). Optionaly you can compile with/without features (see below for details).
+To install locally you need recent [Rust](https://www.rust-lang.org/en-US/install.html) and [NodeJS](https://nodejs.org/en/download/package-manager/) installed - compile with `cargo build --release` (Rust code have optional system dependencies to openssl, taglib, zlib, bz2lib). Optionaly you can compile with/without features (see below for details).
 
 Build client in its directory (`cd client`):
 
@@ -202,7 +193,7 @@ Build client in its directory (`cd client`):
 
 ### Other platforms
 
-Theoretically audioserve can work on Windows and MacOS (probably with few changes in code), but I never tried to build it there. Any help in this area is welcomed.
+Theoretically audioserve can work on Windows and MacOS (probably with few changes in the code), but I never tried to build it there. Any help in this area is welcomed.
 
 ### Compiling without default features or with non-default features
 

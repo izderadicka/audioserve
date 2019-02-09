@@ -168,9 +168,8 @@ fn create_parser<'a>() -> Parser<'a> {
         .arg(Arg::with_name("local_addr")
             .short("l")
             .long("listen")
-            .help("Address and port server is listening on as address:port")
+            .help("Address and port server is listening on as address:port (by default listen on port 3000 on all interfaces)")
             .takes_value(true)
-            .default_value("0.0.0.0:3000")
         )
         .arg(Arg::with_name("large-thread-pool")
             .long("large-thread-pool")
@@ -334,7 +333,15 @@ pub fn parse_args() -> Result<(), Error> {
         base_dirs.push(base_dir);
     }
 
-    let local_addr = args.value_of("local_addr").unwrap().parse()?;
+    let local_addr = if args.is_present("local_addr") {
+        args.value_of("local_addr").unwrap().parse()? 
+    } else {
+        SocketAddr::from(([0,0,0,0], 
+        env::var("PORT")
+            .map_err(|_| ())
+            .and_then(|v| v.parse().map_err(|_| error!("Invalid value in $PORT")))
+            .unwrap_or(3000u16)))
+    };
 
     let pool_size = if args.is_present("large-thread-pool") {
         ThreadPoolSize {
