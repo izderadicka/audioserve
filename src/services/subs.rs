@@ -10,10 +10,11 @@ use futures::future::{self, poll_fn, Future};
 use futures::{Async, Stream};
 use hyper::header::{
     HeaderValue, ACCEPT_RANGES, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE,
-    LAST_MODIFIED,
+    LAST_MODIFIED, CONTENT_DISPOSITION
 };
 use hyper::{Body, Response as HyperResponse, StatusCode};
-use hyperx::header::{CacheControl, CacheDirective, ContentRange, ContentRangeSpec, LastModified};
+use hyperx::header::{CacheControl, CacheDirective, ContentRange, ContentRangeSpec, LastModified,
+    ContentDisposition, DispositionType, Charset, DispositionParam};
 use mime;
 use mime_guess::guess_mime_type;
 use serde_json;
@@ -336,6 +337,32 @@ pub fn get_folder(base_path: &'static Path, folder_path: PathBuf) -> ResponseFut
             .map_err(Error::new_with_cause),
     )
 }
+
+pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> ResponseFuture {
+    let mut download_name = folder_path.file_name()
+            .and_then(|fname| fname.to_str())
+            .map(|fname| fname.to_owned())
+            .unwrap_or_else(|| "audio".into());
+    download_name.push_str(".tar");
+    let full_path = base_path.join(&folder_path);
+    let tar = async_tar::TarStream::tar_dir(full_path);
+    let f = tar.map(move |tar_stream| {
+        let mut resp = HyperResponse::builder();
+        resp.header(CONTENT_TYPE, "application/x-tar");
+        let disposition = ContentDisposition{
+            disposition: DispositionType::Attachment,
+            parameters: vec![DispositionParam::Filename(
+                Charset::Ext("UTF-8".into()),
+                None,
+                download_name.into()
+            )]
+        };
+        resp.header(CONTENT_DISPOSITION, disposition.to_string().as_bytes());
+        resp.body(Body::wrap_stream(tar_stream)).unwrap()
+    });
+    Box::new(f.map_err(Error::new_with_cause))
+}
+
 
 fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     base_dir: P,

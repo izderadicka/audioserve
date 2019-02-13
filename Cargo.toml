@@ -47,6 +47,8 @@ features=["asynch"]
 #version="0.1.3"
 optional=true
 
+[dependencies.async-tar]
+path="../async-tar"
 
 [features]
 default = ["tls", "symlinks", "search-cache"]

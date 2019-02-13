@@ -45,6 +45,8 @@ extern crate simple_file_cache;
 #[cfg(feature = "transcoding-cache")]
 extern crate bytes;
 
+extern crate async_tar;
+
 use config::{get_config, parse_args};
 use hyper::rt::Future;
 use hyper::Server as HttpServer;
