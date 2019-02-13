@@ -145,7 +145,8 @@ pub struct Config {
     pub transcoding_deadline: u32,
     pub search_cache: bool,
     #[cfg(feature="transcoding-cache")]
-    pub transcoding_cache: TranscodingCacheConfig
+    pub transcoding_cache: TranscodingCacheConfig,
+    pub disable_folder_download: bool
 }
 
 
@@ -246,8 +247,13 @@ fn create_parser<'a>() -> Parser<'a> {
         )
         .arg(Arg::with_name("cors")
             .long("cors")
-            .help("Enable CORS - enables any origin of requests")
+            .help("Enable CORS - enabled any origin of requests")
         );
+
+    parser = parser.arg(Arg::with_name("disable-folder-download")
+            .long("disable-folder-download")
+            .help("Disables API point for downloading whole folder")
+    );
 
     if cfg!(feature = "tls") {
         parser = parser.arg(Arg::with_name("ssl-key")
@@ -498,6 +504,8 @@ pub fn parse_args() -> Result<(), Error> {
         None
     };
 
+    let disable_folder_download = args.is_present("disable-folder-download");
+
     let config = Config {
         base_dirs,
         local_addr,
@@ -516,7 +524,8 @@ pub fn parse_args() -> Result<(), Error> {
         transcoding_deadline,
         search_cache,
         #[cfg(feature="transcoding-cache")]
-        transcoding_cache: _transcoding_cache.unwrap()
+        transcoding_cache: _transcoding_cache.unwrap(),
+        disable_folder_download
     };
     unsafe {
         CONFIG = Some(config);
@@ -552,7 +561,8 @@ pub fn init_default_config() {
         transcoding_deadline: 24,
         search_cache: false,
         #[cfg(feature="transcoding-cache")]
-        transcoding_cache: TranscodingCacheConfig::default()
+        transcoding_cache: TranscodingCacheConfig::default(),
+        disable_folder_download: false
     };
     unsafe {
         CONFIG = Some(config);

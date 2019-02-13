@@ -227,7 +227,7 @@ impl<C> FileSendService<C> {
                         )
                     } else if path.starts_with("/folder/") {
                         get_folder(base_dir, get_subpath(&path, "/folder/"))
-                    } else if path.starts_with("/download") {
+                    } else if !get_config().disable_folder_download && path.starts_with("/download") {
                         download_folder(base_dir, get_subpath(&path, "/download/"))
                     } else if path == "/search" {
                         if let Some(search_string) = params.and_then(|mut p| p.remove("q")) {

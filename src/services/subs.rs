@@ -360,7 +360,10 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
         resp.header(CONTENT_DISPOSITION, disposition.to_string().as_bytes());
         resp.body(Body::wrap_stream(tar_stream)).unwrap()
     });
-    Box::new(f.map_err(Error::new_with_cause))
+    Box::new(f.map_err(|e| {
+        error!("Cannot create tar because of error {}",e);
+        Error::new_with_cause(e)
+        }))
 }
 
 
