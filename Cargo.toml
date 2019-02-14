@@ -48,7 +48,8 @@ features=["asynch"]
 optional=true
 
 [dependencies.async-tar]
-path="../async-tar"
+#path="../async-tar"
+git="https://github.com/izderadicka/async-tar.git"
 
 [features]
 default = ["tls", "symlinks", "search-cache"]
