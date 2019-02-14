@@ -38,6 +38,20 @@ body {
     
 }
 
+.download {
+    display: block;
+    width: 1.1em;
+    height: 1.2em;
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 91.852 100'%3E%3Cpath d='M78.281 2.444H57.887v34.393h15.04L45.595 61.521 19.116 36.837h14.648V2.444H13.762S.189 2.444.189 16.017v70.409S.189 100 13.762 100h64.519s13.572 0 13.572-13.574V16.017s0-13.573-13.572-13.573zm1.385 80.494H13.213V56.426h8.682v17.83h49.087v-17.83h8.684v26.512z' stroke='%23007bff' fill='%23007bff'/%3E%3C/svg%3E"); 
+    background-size: cover;
+  }
+
+.folder-download {
+    display: block;
+    float: right;
+}
+  
+
 .content-section {
     clear: both;
 }

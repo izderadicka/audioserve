@@ -229,6 +229,7 @@ $(function () {
                 }
                 if (data.files.length) {
                     $("#files-container").show();
+                    $("#folder-download-link").attr("href", collectionUrl + "/download/" + path);
                 } else {
                     $("#files-container").hide();
                 }
@@ -563,6 +564,10 @@ $(function () {
         setTranscoding(val);
         document.location.reload();
 
+    });
+
+    $("#folder-download-link").on('click', (evt) => {
+        evt.stopPropagation();
     });
 
     loadCollections().then(() => {
