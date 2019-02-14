@@ -344,27 +344,72 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
             .map(|fname| fname.to_owned())
             .unwrap_or_else(|| "audio".into());
     download_name.push_str(".tar");
-    let full_path = base_path.join(&folder_path);
-    let tar = async_tar::TarStream::tar_dir(full_path);
-    let f = tar.map(move |tar_stream| {
-        let mut resp = HyperResponse::builder();
-        resp.header(CONTENT_TYPE, "application/x-tar");
-        let disposition = ContentDisposition{
-            disposition: DispositionType::Attachment,
-            parameters: vec![DispositionParam::Filename(
-                Charset::Ext("UTF-8".into()),
-                None,
-                download_name.into()
-            )]
-        };
-        resp.header(CONTENT_DISPOSITION, disposition.to_string().as_bytes());
-        resp.body(Body::wrap_stream(tar_stream)).unwrap()
-    });
-    Box::new(f.map_err(|e| {
-        error!("Cannot create tar because of error {}",e);
-        Error::new_with_cause(e)
-        }))
+    let f = poll_fn(move || blocking(|| list_dir(&base_path, &folder_path)))
+            .map(move |res| match res {
+                Ok(folder) => {
+                    let cover = folder.cover.map(|t| t.path);
+                    let desc = folder.description.map(|t| t.path);
+                    let mut files = folder.files.into_iter().map(|i| i.path).collect::<Vec<_>>();
+                    if let Some(cover) = cover {
+                        files.push(cover);
+                    }
+                    if let Some(desc) = desc {
+                        files.push(desc)
+                    }
+                    let tar_stream = async_tar::TarStream::tar_iter_rel(files.into_iter(), base_path);
+                    let mut resp = HyperResponse::builder();
+                    resp.header(CONTENT_TYPE, "application/x-tar");
+                    let disposition = ContentDisposition{
+                        disposition: DispositionType::Attachment,
+                        parameters: vec![DispositionParam::Filename(
+                            Charset::Ext("UTF-8".into()),
+                            None,
+                            download_name.into()
+                        )]
+                    };
+                    resp.header(CONTENT_DISPOSITION, disposition.to_string().as_bytes());
+                    resp.body(Body::wrap_stream(tar_stream)).unwrap()
+
+
+                    
+                },
+                Err(_) => short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE),
+            })
+            .map_err(|e| {
+                error!("Error listing files for tar: {}", e);
+                Error::new_with_cause(e)
+                });
+
+    Box::new(f)
 }
+
+// pub fn download_folder_old(base_path: &'static Path, folder_path: PathBuf) -> ResponseFuture {
+//     let mut download_name = folder_path.file_name()
+//             .and_then(|fname| fname.to_str())
+//             .map(|fname| fname.to_owned())
+//             .unwrap_or_else(|| "audio".into());
+//     download_name.push_str(".tar");
+//     let full_path = base_path.join(&folder_path);
+//     let tar = async_tar::TarStream::tar_dir(full_path);
+//     let f = tar.map(move |tar_stream| {
+//         let mut resp = HyperResponse::builder();
+//         resp.header(CONTENT_TYPE, "application/x-tar");
+//         let disposition = ContentDisposition{
+//             disposition: DispositionType::Attachment,
+//             parameters: vec![DispositionParam::Filename(
+//                 Charset::Ext("UTF-8".into()),
+//                 None,
+//                 download_name.into()
+//             )]
+//         };
+//         resp.header(CONTENT_DISPOSITION, disposition.to_string().as_bytes());
+//         resp.body(Body::wrap_stream(tar_stream)).unwrap()
+//     });
+//     Box::new(f.map_err(|e| {
+//         error!("Cannot create tar because of error {}",e);
+//         Error::new_with_cause(e)
+//         }))
+// }
 
 
 fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
