@@ -518,6 +518,7 @@ const UKNOWN_NAME: &str = "unknown";
 
 pub fn collections_list() -> ResponseFuture {
     let collections = Collections {
+        folder_download: ! get_config().disable_folder_download, 
         count: get_config().base_dirs.len() as u32,
         names: get_config()
             .base_dirs

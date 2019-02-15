@@ -43,6 +43,7 @@ pub struct AudioFolderShort {
 
 #[derive(Debug, Serialize)]
 pub struct Collections {
+    pub folder_download: bool,
     pub count: u32,
     pub names: Vec<&'static str>,
 }

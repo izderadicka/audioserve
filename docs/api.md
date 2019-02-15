@@ -45,6 +45,7 @@ Returns list of available collections (collection is a directory provided as par
 
 ```json
     {
+    "folder_download": true,
     "count":2,
     "names":[
         "test_audiobooks_eng",
@@ -52,6 +53,7 @@ Returns list of available collections (collection is a directory provided as par
         }
 ```
 
+`folder_download` - is folder download enabled on the server
 `count` - number of collections
 `names` - array of collection names
 

@@ -81,6 +81,10 @@ $(function () {
                     window.localStorage.removeItem("audioserve_collection");
 
                 }
+                // hide folder download is disabled
+                if (!data.folder_download) {
+                    $("#folder-download-link").hide();
+                }
             })
             .then(() => {
                 return ajax({ url: baseUrl + "/transcodings" })
