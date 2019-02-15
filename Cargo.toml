@@ -1,6 +1,6 @@
 [package]
 name = "audioserve"
-version = "0.8.3"
+version = "0.8.4"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 
 [dependencies]
@@ -50,12 +50,14 @@ optional=true
 [dependencies.async-tar]
 #path="../async-tar"
 git="https://github.com/izderadicka/async-tar.git"
+optional=true
 
 [features]
-default = ["tls", "symlinks", "search-cache"]
+default = ["tls", "symlinks", "search-cache", "folder-download"]
 tls=["tokio-tls", "native-tls"]
 symlinks=["cachedirtree/symlinks"]
 search-cache=["cachedirtree"]
 transcoding-cache=["simple-file-cache", "bytes"]
 libavformat = ["media_info"]
+folder-download = ["async-tar"]
 

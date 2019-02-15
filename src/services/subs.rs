@@ -10,11 +10,14 @@ use futures::future::{self, poll_fn, Future};
 use futures::{Async, Stream};
 use hyper::header::{
     HeaderValue, ACCEPT_RANGES, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE,
-    LAST_MODIFIED, CONTENT_DISPOSITION
+    LAST_MODIFIED
 };
+#[cfg(feature = "folder-download")]
+use hyper::header::CONTENT_DISPOSITION;
 use hyper::{Body, Response as HyperResponse, StatusCode};
-use hyperx::header::{CacheControl, CacheDirective, ContentRange, ContentRangeSpec, LastModified,
-    ContentDisposition, DispositionType, Charset, DispositionParam};
+use hyperx::header::{CacheControl, CacheDirective, ContentRange, ContentRangeSpec, LastModified,};
+#[cfg(feature = "folder-download")]
+use hyperx::header::{ContentDisposition, DispositionType, Charset, DispositionParam};
 use mime;
 use mime_guess::guess_mime_type;
 use serde_json;
@@ -338,6 +341,12 @@ pub fn get_folder(base_path: &'static Path, folder_path: PathBuf) -> ResponseFut
     )
 }
 
+#[cfg(not(feature = "folder-download"))]
+pub fn download_folder(_base_path: &'static Path, _folder_path: PathBuf) -> ResponseFuture {
+    unimplemented!();
+}
+
+#[cfg(feature = "folder-download")]
 pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> ResponseFuture {
     let mut download_name = folder_path.file_name()
             .and_then(|fname| fname.to_str())

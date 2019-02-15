@@ -23,6 +23,7 @@ Response code 200, Content-Type: text/plain,  whole response is the token
 Response code 401 Unauthorised - invalid shared secret  
 
 Salted shared secret is calculated as:
+
 * shared secret is encoded as UTF-8 bytes
 * client generates 32 random bytes
 * secret is concatated with random bytes (secret+random_bytes)
@@ -33,6 +34,7 @@ Salted shared secret is calculated as:
 
 API endpoints
 ----------------------
+
 All are GET requests with valid token, 401 Unauthorised is returned, if token is missing or invalid
 
 **collections**
@@ -140,6 +142,15 @@ subfolders.  `meta` contains some metadata about audio file - `duration` in seco
 of the audio file.
 
 Folder can contain additional information `cover`, which is cover image (first .jpg or .png file encountered in the folder) and text information `description` (first .txt, .html, .md file encoutered in the folder). Both can be null, if there is no appropriate file and if not null, file can be retrieved in appropriate API end point by using the `path`.
+
+**download**
+
+Sample URL: https://your_server_name:3000/download/author_name/audio_book  
+Sample URL: https://your_server_name:3000/1/download/author_name/audio_book
+
+Downloads all files (audio files, cover, description) from this folder as a tar archive. The path to folder is same as in folder list endpoint `folder` - so it can start with collection number.
+
+This endpoint can be disabled, if audioserve is compiled without default feature `folder-download` or with command line argument `--disable-folder-download` .
 
 **search**
 

@@ -250,10 +250,12 @@ fn create_parser<'a>() -> Parser<'a> {
             .help("Enable CORS - enabled any origin of requests")
         );
 
-    parser = parser.arg(Arg::with_name("disable-folder-download")
-            .long("disable-folder-download")
-            .help("Disables API point for downloading whole folder")
-    );
+    if cfg!(feature = "folder-download")   {
+        parser = parser.arg(Arg::with_name("disable-folder-download")
+                .long("disable-folder-download")
+                .help("Disables API point for downloading whole folder")
+        );
+    }
 
     if cfg!(feature = "tls") {
         parser = parser.arg(Arg::with_name("ssl-key")
@@ -504,7 +506,11 @@ pub fn parse_args() -> Result<(), Error> {
         None
     };
 
-    let disable_folder_download = args.is_present("disable-folder-download");
+    let disable_folder_download =  if cfg!(feature = "folder-download")   {
+        args.is_present("disable-folder-download")
+    } else {
+        true
+    };
 
     let config = Config {
         base_dirs,

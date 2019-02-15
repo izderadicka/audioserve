@@ -44,7 +44,7 @@ extern crate tokio_tls;
 extern crate simple_file_cache;
 #[cfg(feature = "transcoding-cache")]
 extern crate bytes;
-
+#[cfg(feature = "folder-download")]
 extern crate async_tar;
 
 use config::{get_config, parse_args};
