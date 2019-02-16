@@ -353,21 +353,20 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
             .map(|fname| fname.to_owned())
             .unwrap_or_else(|| "audio".into());
     download_name.push_str(".tar");
-    let f = poll_fn(move || blocking(|| list_dir(&base_path, &folder_path)))
+    let f = poll_fn(move || blocking(|| list_dir_files_only(&base_path, &folder_path)))
             .map(move |res| match res {
                 Ok(folder) => {
-                    let cover = folder.cover.map(|t| t.path);
-                    let desc = folder.description.map(|t| t.path);
-                    let mut files = folder.files.into_iter().map(|i| i.path).collect::<Vec<_>>();
-                    if let Some(cover) = cover {
-                        files.push(cover);
+                    let total_len: u64;
+                    {
+                    let lens_iter = (&folder).iter().map(|i| i.1);
+                    total_len = async_tar::calc_size(lens_iter);
                     }
-                    if let Some(desc) = desc {
-                        files.push(desc)
-                    }
-                    let tar_stream = async_tar::TarStream::tar_iter_rel(files.into_iter(), base_path);
+                    debug!("Total len of folder is {}", total_len);
+                    let files = folder.into_iter().map(|i| i.0);
+                    let tar_stream = async_tar::TarStream::tar_iter_rel(files, base_path);
                     let mut resp = HyperResponse::builder();
                     resp.header(CONTENT_TYPE, "application/x-tar");
+                    resp.header(CONTENT_LENGTH, total_len);
                     let disposition = ContentDisposition{
                         disposition: DispositionType::Attachment,
                         parameters: vec![DispositionParam::Filename(
@@ -382,7 +381,10 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
 
                     
                 },
-                Err(_) => short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE),
+                Err(e) => {
+                    error!("Cannot list download dir: {}", e);
+                    short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
+                    }
             })
             .map_err(|e| {
                 error!("Error listing files for tar: {}", e);
@@ -503,6 +505,72 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     }
 }
 
+fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
+    base_dir: P,
+    dir_path: P2,
+) -> Result<Vec<(PathBuf,u64)>, io::Error> {
+    let full_path = base_dir.as_ref().join(&dir_path);
+    match fs::read_dir(&full_path) {
+        Ok(dir_iter) => {
+            let mut files = vec![];
+            let mut cover = None;
+            let mut description = None;
+            let allow_symlinks = get_config().allow_symlinks;
+
+            fn get_size(p:PathBuf) -> Result<(PathBuf,u64), io::Error> {
+                let meta = p.metadata()?;
+                Ok((p,meta.len()))
+            }
+
+            for item in dir_iter {
+                match item {
+                    Ok(f) => match get_real_file_type(&f, &full_path, allow_symlinks) {
+                        Ok(ft) => {
+                            let path = f.path();
+                            if ft.is_file() {
+                                if is_audio(&path) {
+                                    files.push(get_size(path)?)
+                                } else if cover.is_none() && is_cover(&path) {
+                                    cover = Some(get_size(path)?)
+                                } else if description.is_none() && is_description(&path) {
+                                    description = Some(get_size(path)?)
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Cannot get dir entry type for {:?}, error: {}", f.path(), e)
+                        }
+                    },
+                    Err(e) => warn!(
+                        "Cannot list items in directory {:?}, error {}",
+                        dir_path.as_ref().as_os_str(),
+                        e
+                    ),
+                }
+            }
+
+            if let Some(cover) = cover {
+                files.push(cover);
+            };
+
+            if let Some(description) = description {
+                files.push(description);
+            }
+
+            
+            Ok(files)
+        }
+        Err(e) => {
+            error!(
+                "Requesting wrong directory {:?} : {}",
+                (&full_path).as_os_str(),
+                e
+            );
+            Err(e)
+        }
+    }
+}
+
 
 
 fn json_response<T: serde::Serialize>(data: &T) -> Response {
@@ -572,6 +640,18 @@ mod tests {
         assert_eq!(folder.files.len(), 3);
         assert!(folder.cover.is_some());
         assert!(folder.description.is_some());
+    }
+
+    #[test]
+    fn test_list_dir_files_only() {
+        init_default_config();
+        let res = list_dir_files_only("/non-existent", "folder");
+        assert!(res.is_err());
+        let res = list_dir_files_only("./", "test_data/");
+        assert!(res.is_ok());
+        let folder = res.unwrap();
+        assert_eq!(folder.len(), 5);
+        
     }
 
     #[test]
