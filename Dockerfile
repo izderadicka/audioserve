@@ -4,7 +4,7 @@ MAINTAINER Ivan <ivan@zderadicka.eu>
 ARG FEATURES
 
 RUN apt -o Acquire::https::No-Cache=True -o Acquire::http::No-Cache=True update &&\
-    apt-get install -y pkg-config openssl libssl-dev libtag1-dev libtagc0-dev curl yasm build-essential wget libbz2-dev zlib1g-dev &&\
+    apt-get install -y git pkg-config openssl libssl-dev libtag1-dev libtagc0-dev curl yasm build-essential wget libbz2-dev zlib1g-dev &&\
     curl -sL https://deb.nodesource.com/setup_8.x | bash - &&\
     apt-get install -y nodejs 
 
