@@ -41,6 +41,16 @@ pub struct AudioFolderShort {
     pub path: PathBuf,
 }
 
+impl AudioFolderShort {
+    pub fn from_path<P:AsRef<Path>>(base_path: &Path, p: P) -> Self {
+        let p = p.as_ref();
+        AudioFolderShort {
+            name: p.file_name().unwrap().to_str().unwrap().into(),
+            path: p.strip_prefix(base_path).unwrap().into(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct Collections {
     pub folder_download: bool,
