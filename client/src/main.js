@@ -9,6 +9,7 @@ import showdown from "showdown";
 import { debug } from "./debug.js";
 
 $(function () {
+    const RECENT_QUERY = "__RECENT__";
     let baseUrl;
     if (AUDIOSERVE_DEVELOPMENT) {
         baseUrl = `${window.location.protocol}//${window.location.hostname}:3000`;
@@ -24,6 +25,10 @@ $(function () {
     let transcodingLimit = 58;
     let transcoding = "m";
     let transcodingLimits = { l: 38, m: 56, h: 76 };
+
+    function isRecent(q) {
+        return q == RECENT_QUERY;
+    }
 
     function showSpinner() {
         pendingSpinner = window.setTimeout(() =>
@@ -277,11 +282,16 @@ $(function () {
     }
 
     function search(query, fromHistory, scrollTo) {
-        ajax({
-            url: collectionUrl + "/search",
-            type: "GET",
-            data: { q: query }
-        }
+        ajax(isRecent(query)?
+            {
+                url: collectionUrl +"/recent",
+                type: "GET"
+            }
+            :{
+                url: collectionUrl + "/search",
+                type: "GET",
+                data: { q: query }
+            }
         )
             .fail(err => {
                 console.log("Search error", err);
@@ -355,11 +365,15 @@ $(function () {
 
     function updateBreadcrumbSearch(query) {
         let bc = $("#breadcrumb");
+        let recent = isRecent(query);
+        let name = recent?"Recent":"Search";
         bc.empty();
         bc.append($('<li class="breadcrumb-item"><a href="">Home</a></li>'));
-        bc.append($('<li class="breadcrumb-item">Search</li>'));
-        let item = $('<li class="breadcrumb-item"></li>').text(query);
-        bc.append(item);
+        bc.append($(`<li class="breadcrumb-item">${name}</li>`));
+        if (!recent) {
+            let item = $('<li class="breadcrumb-item"></li>').text(query);
+            bc.append(item);
+        }
     }
 
     let player = new AudioPlayer();
@@ -501,6 +515,10 @@ $(function () {
         if (query.length) {
             search(query);
         }
+    });
+
+    $('#recent-btn').on('click', evt => {
+        search(RECENT_QUERY);
     });
 
     $("#main").on("scroll", (evt) => {

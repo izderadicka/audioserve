@@ -619,6 +619,18 @@ pub fn search(collection: usize, searcher: Search<String>, query: String) -> Res
     )
 }
 
+pub fn recent(collection: usize, searcher: Search<String>) -> ResponseFuture {
+    Box::new(
+        poll_fn(move || {
+            blocking(|| {
+                let res = searcher.recent(collection);
+                json_response(&res)
+            })
+        })
+        .map_err(Error::new_with_cause),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

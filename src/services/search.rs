@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 
+const RECENT_LIST_SIZE: usize = 64;
+
 pub trait SearchTrait<S: AsRef<str>> {
     fn search(&self, collection: usize, query: S) -> SearchResult;
     fn recent(&self, collection: usize) -> SearchResult;
@@ -57,7 +59,7 @@ impl<S: AsRef<str>> SearchTrait<S> for FoldersSearch {
     }
 
     fn recent(&self, collection: usize) -> SearchResult {
-        self.search_folder_for_recent(&get_config().base_dirs[collection], 50)
+        self.search_folder_for_recent(&get_config().base_dirs[collection], RECENT_LIST_SIZE)
     }
 }
 
@@ -104,13 +106,13 @@ impl FoldersSearch {
                                 let p = f.path();
                                 search_recursive(base_path, &p, res, allow_symlinks, limit);
                                 if let Ok(meta) = p.metadata() {
-                                    let created = meta.created().or_else(|_| meta.modified());
+                                    let changed = meta.modified();
 
-                                    if let Ok(created) = created {
+                                    if let Ok(changed) = changed {
                                         if res.len() >= limit {
                                             res.pop();
                                         }
-                                        res.push(DirEntry { path: p, created })
+                                        res.push(DirEntry { path: p, created:changed })
                                     }
                                 }
                             }
@@ -234,7 +236,7 @@ mod cache {
                 .unwrap_or_else(|_| SearchResult::new())
         }
 
-        fn recent(&self, collection: usize) -> SearchResult {
+        fn recent(&self, _collection: usize) -> SearchResult {
             unimplemented!();
         }
     }
@@ -270,7 +272,7 @@ mod tests {
         let times = res.subfolders.into_iter().map(|p| {
             let path = Path::new(TEST_DATA_DIR).join(p.path);
             let meta = path.metadata().unwrap();
-            meta.created().or_else(|_| meta.modified()).unwrap()
+            meta.modified().unwrap()
         }).collect::<Vec<_>>();
         assert!(times[0]>= times[1]);
     }

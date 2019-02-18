@@ -177,9 +177,14 @@ but search is not implemented for file names now), which can be used is same way
 }
 ```
 
-Currently search is implemented only for folder names. Search term is split to words and each word is searched in full path 
-(relative collection root - the path you see in folder listing). 
+Currently search is implemented only for folder names. Search term is split to words and each word is searched in full path (relative collection root - the path you see in folder listing).
 First path that includes all words in added to results (and it's subfolders are not searched further).
+
+**recent**
+Sample URL: https://your_server_name:3000/recent  
+Sample URL: https://your_server_name:3000/1/recent
+
+Lists top 64 most recent folders in the collection (based on folder modification time). Returns same json object as previous API endpoint `search`, but here subfolders are sorted by folder modification time descendently - e.g most recent is first.
 
 **audio**
 

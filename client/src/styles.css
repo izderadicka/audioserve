@@ -87,6 +87,11 @@ body {
   margin:0 0.5em;
 }
 
+#recent-btn {
+    margin-bottom: 5px;
+    margin-left: 5px;
+}
+
 .duration, .bitrate {
   margin-left: 1em;
   font-size: 70%
