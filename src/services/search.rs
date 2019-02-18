@@ -207,6 +207,7 @@ mod cache {
                 .include_files(false)
                 .watch_changes(true)
                 .follow_symlinks(get_config().allow_symlinks)
+                .recent_list_size(RECENT_LIST_SIZE)
                 .build()
                 .unwrap();
             let caches = get_config()
@@ -236,8 +237,21 @@ mod cache {
                 .unwrap_or_else(|_| SearchResult::new())
         }
 
-        fn recent(&self, _collection: usize) -> SearchResult {
-            unimplemented!();
+        fn recent(&self, collection: usize) -> SearchResult {
+           let mut res = SearchResult::new();
+
+            self.caches[collection]
+                .recent()
+                .map(|v| {
+                    let subfolders = v.into_iter().map(|p| {
+                        AudioFolderShort::from_path(Path::new(""), p)
+                    }).collect();
+                    res.subfolders = subfolders;
+                })
+                .map_err(|e| error!("Recents failed {}", e))
+                .ok();
+
+            res
         }
     }
 }
