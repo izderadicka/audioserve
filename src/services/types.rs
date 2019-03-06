@@ -22,11 +22,19 @@ impl TypedFile {
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct FileSection {
+    start: u64,
+    end: u64
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AudioFile {
     pub name: String,
     pub path: PathBuf,
     pub meta: Option<AudioMeta>,
     pub mime: String,
+    pub section: Option<FileSection>
+
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]

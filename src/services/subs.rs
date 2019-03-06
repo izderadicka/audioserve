@@ -1,23 +1,23 @@
+use super::audio_meta::{get_audio_properties, MediaInfo};
 use super::get_real_file_type;
 use super::search::{Search, SearchTrait};
-use super::transcode::{QualityLevel, AudioFilePath};
+use super::transcode::{AudioFilePath, QualityLevel};
 use super::types::*;
 use super::Counter;
-use super::audio_meta::get_audio_properties;
 use config::get_config;
 use error::Error;
 use futures::future::{self, poll_fn, Future};
 use futures::{Async, Stream};
-use hyper::header::{
-    HeaderValue, ACCEPT_RANGES, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE,
-    LAST_MODIFIED
-};
 #[cfg(feature = "folder-download")]
 use hyper::header::CONTENT_DISPOSITION;
+use hyper::header::{
+    HeaderValue, ACCEPT_RANGES, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE,
+    LAST_MODIFIED,
+};
 use hyper::{Body, Response as HyperResponse, StatusCode};
-use hyperx::header::{CacheControl, CacheDirective, ContentRange, ContentRangeSpec, LastModified,};
+use hyperx::header::{CacheControl, CacheDirective, ContentRange, ContentRangeSpec, LastModified};
 #[cfg(feature = "folder-download")]
-use hyperx::header::{ContentDisposition, DispositionType, Charset, DispositionParam};
+use hyperx::header::{Charset, ContentDisposition, DispositionParam, DispositionType};
 use mime;
 use mime_guess::guess_mime_type;
 use serde_json;
@@ -55,7 +55,12 @@ fn serve_file_cached_or_transcoded(
     transcoding: super::TranscodingDetails,
     transcoding_quality: QualityLevel,
 ) -> ResponseFuture {
-    serve_file_transcoded_checked(AudioFilePath::Original(full_path), seek, transcoding, transcoding_quality)
+    serve_file_transcoded_checked(
+        AudioFilePath::Original(full_path),
+        seek,
+        transcoding,
+        transcoding_quality,
+    )
 }
 
 #[cfg(feature = "transcoding-cache")]
@@ -67,11 +72,14 @@ fn serve_file_cached_or_transcoded(
     transcoding_quality: QualityLevel,
 ) -> ResponseFuture {
     if get_config().transcoding_cache.disabled {
-        return Box::new(
-            serve_file_transcoded_checked(AudioFilePath::Original(full_path), seek, transcoding, transcoding_quality)
-        )
+        return Box::new(serve_file_transcoded_checked(
+            AudioFilePath::Original(full_path),
+            seek,
+            transcoding,
+            transcoding_quality,
+        ));
     }
-    
+
     use crate::cache::{cache_key, get_cache};
     let cache = get_cache();
     let cache_key = cache_key(&full_path, &transcoding_quality);
@@ -85,24 +93,30 @@ fn serve_file_cached_or_transcoded(
             Ok(f) => Ok(f),
         })
         .and_then(move |maybe_file| match maybe_file {
-            None => {
-                serve_file_transcoded_checked(AudioFilePath::Original(full_path), seek, transcoding, transcoding_quality)
-            }
-            Some((f,path)) => {
+            None => serve_file_transcoded_checked(
+                AudioFilePath::Original(full_path),
+                seek,
+                transcoding,
+                transcoding_quality,
+            ),
+            Some((f, path)) => {
                 if seek.is_some() {
                     debug!("File is in cache, but time seek is required");
-                    serve_file_transcoded_checked(AudioFilePath::Transcoded(path), seek,transcoding, transcoding_quality)
+                    serve_file_transcoded_checked(
+                        AudioFilePath::Transcoded(path),
+                        seek,
+                        transcoding,
+                        transcoding_quality,
+                    )
                 } else {
                     debug!("Sending file {:?} from transcoded cache", &full_path);
-                    let mime = get_config().transcoder(transcoding_quality).transcoded_mime();
-                    Box::new(
-                        serve_opened_file(f, range, None, mime).map_err(
-                            |e| {
-                                error!("Error sending cached file: {}", e);
-                                Error::new_with_cause(e)
-                            },
-                        ),
-                    )
+                    let mime = get_config()
+                        .transcoder(transcoding_quality)
+                        .transcoded_mime();
+                    Box::new(serve_opened_file(f, range, None, mime).map_err(|e| {
+                        error!("Error sending cached file: {}", e);
+                        Error::new_with_cause(e)
+                    }))
                 }
             }
         });
@@ -188,7 +202,7 @@ impl<T: AsyncRead> Stream for ChunkStream<T> {
             return Ok(Async::Ready(None));
         }
 
-        let read = try_ready!{self.src.as_mut().unwrap().poll_read(&mut self.buf)};
+        let read = try_ready! {self.src.as_mut().unwrap().poll_read(&mut self.buf)};
         if read == 0 {
             self.src.take();
             Ok(Async::Ready(None))
@@ -348,48 +362,46 @@ pub fn download_folder(_base_path: &'static Path, _folder_path: PathBuf) -> Resp
 
 #[cfg(feature = "folder-download")]
 pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> ResponseFuture {
-    let mut download_name = folder_path.file_name()
-            .and_then(|fname| fname.to_str())
-            .map(|fname| fname.to_owned())
-            .unwrap_or_else(|| "audio".into());
+    let mut download_name = folder_path
+        .file_name()
+        .and_then(|fname| fname.to_str())
+        .map(|fname| fname.to_owned())
+        .unwrap_or_else(|| "audio".into());
     download_name.push_str(".tar");
     let f = poll_fn(move || blocking(|| list_dir_files_only(&base_path, &folder_path)))
-            .map(move |res| match res {
-                Ok(folder) => {
-                    let total_len: u64;
-                    {
+        .map(move |res| match res {
+            Ok(folder) => {
+                let total_len: u64;
+                {
                     let lens_iter = (&folder).iter().map(|i| i.1);
                     total_len = async_tar::calc_size(lens_iter);
-                    }
-                    debug!("Total len of folder is {}", total_len);
-                    let files = folder.into_iter().map(|i| i.0);
-                    let tar_stream = async_tar::TarStream::tar_iter_rel(files, base_path);
-                    let mut resp = HyperResponse::builder();
-                    resp.header(CONTENT_TYPE, "application/x-tar");
-                    resp.header(CONTENT_LENGTH, total_len);
-                    let disposition = ContentDisposition{
-                        disposition: DispositionType::Attachment,
-                        parameters: vec![DispositionParam::Filename(
-                            Charset::Ext("UTF-8".into()),
-                            None,
-                            download_name.into()
-                        )]
-                    };
-                    resp.header(CONTENT_DISPOSITION, disposition.to_string().as_bytes());
-                    resp.body(Body::wrap_stream(tar_stream)).unwrap()
-
-
-                    
-                },
-                Err(e) => {
-                    error!("Cannot list download dir: {}", e);
-                    short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
-                    }
-            })
-            .map_err(|e| {
-                error!("Error listing files for tar: {}", e);
-                Error::new_with_cause(e)
-                });
+                }
+                debug!("Total len of folder is {}", total_len);
+                let files = folder.into_iter().map(|i| i.0);
+                let tar_stream = async_tar::TarStream::tar_iter_rel(files, base_path);
+                let mut resp = HyperResponse::builder();
+                resp.header(CONTENT_TYPE, "application/x-tar");
+                resp.header(CONTENT_LENGTH, total_len);
+                let disposition = ContentDisposition {
+                    disposition: DispositionType::Attachment,
+                    parameters: vec![DispositionParam::Filename(
+                        Charset::Ext("UTF-8".into()),
+                        None,
+                        download_name.into(),
+                    )],
+                };
+                resp.header(CONTENT_DISPOSITION, disposition.to_string().as_bytes());
+                resp.body(Body::wrap_stream(tar_stream)).unwrap()
+            }
+            Err(e) => {
+                error!("Cannot list download dir: {}", e);
+                short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
+            }
+        })
+        .map_err(|e| {
+            error!("Error listing files for tar: {}", e);
+            Error::new_with_cause(e)
+        });
 
     Box::new(f)
 }
@@ -421,7 +433,6 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
 //         Error::new_with_cause(e)
 //         }))
 // }
-
 
 fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     base_dir: P,
@@ -459,14 +470,22 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
                             } else if ft.is_file() {
                                 if is_audio(&path) {
                                     let mime = ::mime_guess::guess_mime_type(&path);
-                                    let meta = get_audio_properties(&base_dir.as_ref().join(&path));
-                                    files.push(AudioFile {
-                                        meta,
-                                        path,
-                                        name: os_to_string(f.file_name()),
+                                    let audio_file_path = base_dir.as_ref().join(&path);
+                                    let meta = match get_audio_properties(&audio_file_path) {
+                                        Ok(meta) => meta,
+                                        Err(e) => {
+                                            error!("Cannot add file because error in extraction audio meta: {}",e);
+                                            continue
+                                        }
+                                    };
 
-                                        mime: mime.to_string(),
-                                    })
+                                    files.push(AudioFile {
+                                            meta: meta.get_audio_info(),
+                                            path,
+                                            name: os_to_string(f.file_name()),
+                                            section: None,
+                                            mime: mime.to_string(),
+                                    });
                                 } else if cover.is_none() && is_cover(&path) {
                                     cover = Some(TypedFile::new(path))
                                 } else if description.is_none() && is_description(&path) {
@@ -505,10 +524,11 @@ fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     }
 }
 
+#[cfg(feature="folder-download")]
 fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
     base_dir: P,
     dir_path: P2,
-) -> Result<Vec<(PathBuf,u64)>, io::Error> {
+) -> Result<Vec<(PathBuf, u64)>, io::Error> {
     let full_path = base_dir.as_ref().join(&dir_path);
     match fs::read_dir(&full_path) {
         Ok(dir_iter) => {
@@ -517,9 +537,9 @@ fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
             let mut description = None;
             let allow_symlinks = get_config().allow_symlinks;
 
-            fn get_size(p:PathBuf) -> Result<(PathBuf,u64), io::Error> {
+            fn get_size(p: PathBuf) -> Result<(PathBuf, u64), io::Error> {
                 let meta = p.metadata()?;
-                Ok((p,meta.len()))
+                Ok((p, meta.len()))
             }
 
             for item in dir_iter {
@@ -557,7 +577,6 @@ fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
                 files.push(description);
             }
 
-            
             Ok(files)
         }
         Err(e) => {
@@ -570,8 +589,6 @@ fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
         }
     }
 }
-
-
 
 fn json_response<T: serde::Serialize>(data: &T) -> Response {
     let json = serde_json::to_string(data).expect("Serialization error");
@@ -586,7 +603,7 @@ const UKNOWN_NAME: &str = "unknown";
 
 pub fn collections_list() -> ResponseFuture {
     let collections = Collections {
-        folder_download: ! get_config().disable_folder_download, 
+        folder_download: !get_config().disable_folder_download,
         count: get_config().base_dirs.len() as u32,
         names: get_config()
             .base_dirs
@@ -640,7 +657,7 @@ mod tests {
     #[test]
     fn test_list_dir() {
         init_default_config();
-        #[cfg(feature="libavformat")]
+        #[cfg(feature = "libavformat")]
         {
             media_info::init()
         }
@@ -649,11 +666,13 @@ mod tests {
         let res = list_dir("./", "test_data/");
         assert!(res.is_ok());
         let folder = res.unwrap();
-        assert_eq!(folder.files.len(), 3);
+        let num_media_files = if cfg!(feature="libavformat") {3} else {2};
+        assert_eq!(folder.files.len(), num_media_files);
         assert!(folder.cover.is_some());
         assert!(folder.description.is_some());
     }
 
+    #[cfg(feature="folder-download")]
     #[test]
     fn test_list_dir_files_only() {
         init_default_config();
@@ -663,7 +682,6 @@ mod tests {
         assert!(res.is_ok());
         let folder = res.unwrap();
         assert_eq!(folder.len(), 5);
-        
     }
 
     #[test]
@@ -676,13 +694,15 @@ mod tests {
 
     #[test]
     fn test_meta() {
-        #[cfg(feature="libavformat")]
+        #[cfg(feature = "libavformat")]
         {
             media_info::init()
         }
-        let res = get_audio_properties(Path::new("./test_data/01-file.mp3"));
-        assert!(res.is_some());
-        let meta = res.unwrap();
+        let path = Path::new("./test_data/01-file.mp3");
+        let res = get_audio_properties(path);
+        assert!(res.is_ok());
+        let media_info = res.unwrap();
+        let meta = media_info.get_audio_info().unwrap();
         assert_eq!(meta.bitrate, 220);
         assert_eq!(meta.duration, 2);
     }

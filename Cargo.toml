@@ -28,7 +28,8 @@ tokio = "0.1.15"
 tokio-process = "0.2"
 tokio-threadpool = "0.1"
 dirs = "1.0"
-taglib = "1.0"
+
+taglib = {version="1.0", optional=false}
 
 # for ssl
 tokio-tls = {version="0.2", optional=true}
@@ -53,11 +54,12 @@ git="https://github.com/izderadicka/async-tar.git"
 optional=true
 
 [features]
-default = ["tls", "symlinks", "search-cache", "folder-download"]
+default = ["tls", "symlinks", "search-cache", "folder-download", "chapters"]
 tls=["tokio-tls", "native-tls"]
 symlinks=["cachedirtree/symlinks"]
 search-cache=["cachedirtree"]
 transcoding-cache=["simple-file-cache", "bytes"]
 libavformat = ["media_info"]
 folder-download = ["async-tar"]
+chapters = ["libavformat"]
 

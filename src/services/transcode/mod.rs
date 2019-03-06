@@ -473,7 +473,7 @@ mod vec_codec {
 
 #[cfg(test)]
 mod tests {
-    use super::super::audio_meta::get_audio_properties;
+    use super::super::audio_meta::{get_audio_properties, MediaInfo};
     use super::*;
     use std::env::temp_dir;
     use std::fs::{remove_file, File};
@@ -512,11 +512,16 @@ mod tests {
         assert!(status.success());
         assert!(out_file.exists());
         //TODO: for some reasons sometimes cannot get meta - but file is OK
-        if let Some(meta) = get_audio_properties(&out_file) {
-            let audio_len = if copy_file.is_some() {1} else {2};
-            let dur = audio_len - seek.map(|s| s.round() as u32).unwrap_or(0);
-            assert_eq!(meta.duration, dur);
+        let meta = get_audio_properties(&out_file).expect("Cannot get audio file meta") ;
+        let audio_len = if copy_file.is_some() {1} else {2};
+        let dur = audio_len - seek.map(|s| s.round() as u32).unwrap_or(0);
+        match meta.get_audio_info() {
+            Some(ai) => assert_eq!(ai.duration, dur ),
+            //for some reason libtag sometimes is not able to get info, but it looks like file is OK
+            None => if cfg!(feature="libavformat") {panic!("Cannot get audio info")}
         }
+        
+        
         if remove { 
             remove_file(&out_file).expect("error deleting tmp file");
         }
