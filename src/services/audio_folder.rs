@@ -26,7 +26,7 @@ pub fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
    let full_path = base_dir.as_ref().join(&dir_path);
    match get_dir_type(&full_path)? {
        DirType::Dir => list_dir_dir(base_dir, full_path),
-       DirType::File(chapters) => list_dir_file(base_dir, full_path, chapters),
+       DirType::File{chapters, audio_meta} => list_dir_file(base_dir, full_path, audio_meta, chapters),
        DirType::Other => Err(io::Error::new(io::ErrorKind::Other, "Not folder or chapterised audio file"))
 
    }
@@ -35,7 +35,10 @@ pub fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
 }
 
 enum DirType {
-    File(Vec<Chapter>),
+    File{
+        chapters: Vec<Chapter>,
+        audio_meta: AudioMeta
+        },
     Dir,
     Other
 }
@@ -51,9 +54,9 @@ fn get_dir_type<P:AsRef<Path>>(path: P) -> Result<DirType, io::Error> {
         Ok(DirType::Dir)
     } else if meta.is_file() && is_audio(path) {
         let meta = get_audio_properties(&path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-        match meta.get_chapters() {
-            Some(chapters) => Ok(DirType::File(chapters)),
-            None => Ok(DirType::Other)
+        match (meta.get_chapters(), meta.get_audio_info()) {
+            (Some(chapters), Some(audio_meta)) => Ok(DirType::File{chapters, audio_meta}),
+            _ => Ok(DirType::Other)
         }
     } else {
          Ok(DirType::Other)
@@ -63,9 +66,36 @@ fn get_dir_type<P:AsRef<Path>>(path: P) -> Result<DirType, io::Error> {
 fn list_dir_file<P: AsRef<Path>>(
     base_dir: P,
     full_path: PathBuf,
+    audio_meta: AudioMeta,
     chapters: Vec<Chapter>
 ) -> Result<AudioFolder, io::Error> {
-    unimplemented!()
+    let path = full_path.strip_prefix(&base_dir).unwrap();
+    let mime = ::mime_guess::guess_mime_type(&path);
+    let files = chapters.into_iter().map(|chap| {
+    let new_meta = {
+        AudioMeta {
+            bitrate: audio_meta.bitrate,
+            duration: ((chap.end - chap.start) / 1000) as u32
+        }
+    };
+     AudioFile {
+        meta: Some(new_meta),
+        path: path.to_owned(),
+        name: chap.title,
+        section: Some(FileSection{start:chap.start, duration: Some(chap.end - chap.start)}),
+        mime: mime.to_string(),
+    }
+    }).collect();
+
+    Ok(AudioFolder {
+        files,
+        subfolders: vec![],
+        cover: None,
+        description: None,
+            })
+
+
+    
 }
 
 fn list_dir_dir<P: AsRef<Path>>(

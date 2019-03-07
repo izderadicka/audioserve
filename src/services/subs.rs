@@ -1,5 +1,5 @@
 use super::search::{Search, SearchTrait};
-use super::transcode::{AudioFilePath, QualityLevel};
+use super::transcode::{AudioFilePath, QualityLevel, TimeSpan};
 use super::audio_folder::list_dir;
 #[cfg(feature="folder-download")]
 use super::audio_folder::list_dir_files_only;
@@ -51,6 +51,7 @@ pub fn short_response_boxed(status: StatusCode, msg: &'static str) -> ResponseFu
 fn serve_file_cached_or_transcoded(
     full_path: PathBuf,
     seek: Option<f32>,
+    span: Option<TimeSpan>,
     _range: Option<::hyperx::header::ByteRangeSpec>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: QualityLevel,
@@ -58,6 +59,7 @@ fn serve_file_cached_or_transcoded(
     serve_file_transcoded_checked(
         AudioFilePath::Original(full_path),
         seek,
+        span,
         transcoding,
         transcoding_quality,
     )
@@ -67,6 +69,7 @@ fn serve_file_cached_or_transcoded(
 fn serve_file_cached_or_transcoded(
     full_path: PathBuf,
     seek: Option<f32>,
+    span: Option<TimeSpan>,
     range: Option<::hyperx::header::ByteRangeSpec>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: QualityLevel,
@@ -75,6 +78,7 @@ fn serve_file_cached_or_transcoded(
         return Box::new(serve_file_transcoded_checked(
             AudioFilePath::Original(full_path),
             seek,
+            span,
             transcoding,
             transcoding_quality,
         ));
@@ -96,6 +100,7 @@ fn serve_file_cached_or_transcoded(
             None => serve_file_transcoded_checked(
                 AudioFilePath::Original(full_path),
                 seek,
+                span,
                 transcoding,
                 transcoding_quality,
             ),
@@ -105,6 +110,7 @@ fn serve_file_cached_or_transcoded(
                     serve_file_transcoded_checked(
                         AudioFilePath::Transcoded(path),
                         seek,
+                        span,
                         transcoding,
                         transcoding_quality,
                     )
@@ -127,6 +133,7 @@ fn serve_file_cached_or_transcoded(
 fn serve_file_transcoded_checked(
     full_path: AudioFilePath<PathBuf>,
     seek: Option<f32>,
+    span: Option<TimeSpan>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: QualityLevel,
 ) -> ResponseFuture {
@@ -146,13 +153,14 @@ fn serve_file_transcoded_checked(
             transcoding.max_transcodings - running_transcodings - 1,
             transcoding.max_transcodings
         );
-        serve_file_transcoded(full_path, seek, transcoding_quality, &counter)
+        serve_file_transcoded(full_path, seek, span, transcoding_quality, &counter)
     }
 }
 
 fn serve_file_transcoded(
     full_path: AudioFilePath<PathBuf>,
     seek: Option<f32>,
+    span: Option<TimeSpan>,
     transcoding_quality: QualityLevel,
     counter: &Counter,
 ) -> ResponseFuture {
@@ -160,7 +168,7 @@ fn serve_file_transcoded(
     let params = transcoder.transcoding_params();
     let mime = transcoder.transcoded_mime();
     let fut = transcoder
-        .transcode(full_path, seek, counter.clone(), transcoding_quality)
+        .transcode(full_path, seek, span, counter.clone(), transcoding_quality)
         .then(move |res| match res {
             Ok(stream) => {
                 let resp = HyperResponse::builder()
@@ -328,6 +336,7 @@ pub fn send_file<P: AsRef<Path>>(
     file_path: P,
     range: Option<::hyperx::header::ByteRangeSpec>,
     seek: Option<f32>,
+    span: Option<TimeSpan>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: Option<QualityLevel>,
 ) -> ResponseFuture {
@@ -337,7 +346,7 @@ pub fn send_file<P: AsRef<Path>>(
             "Sending file transcoded in quality {:?}",
             transcoding_quality
         );
-        serve_file_cached_or_transcoded(full_path, seek, range, transcoding, transcoding_quality)
+        serve_file_cached_or_transcoded(full_path, seek, span, range, transcoding, transcoding_quality)
     } else {
         debug!("Sending file directly from fs");
         serve_file_from_fs(&full_path, range, None)

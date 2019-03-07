@@ -24,7 +24,7 @@ mod libavformat {
 
     fn get_audio_info(&self) -> Option<AudioMeta>{
         Some(AudioMeta {
-                    duration: (self.media_file.duration() / 1000) as u32,
+                    duration: (self.media_file.duration() as f32 / 1000.0).round() as u32,
                     bitrate: self.media_file.bitrate(),
                 })
     }

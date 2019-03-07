@@ -154,6 +154,12 @@ impl <S> std::convert::AsRef<S> for AudioFilePath<S> {
     }
 }
 
+// part of audio file - from start to start+duration (in ms)
+pub struct TimeSpan {
+    pub start: u64,
+    pub duration: Option<u64>
+}
+
 #[derive(Clone, Debug)]
 pub struct Transcoder {
     quality: TranscodingFormat,
@@ -171,17 +177,33 @@ impl Transcoder {
         Transcoder { quality }
     }
 
-    // ffmpeg -nostdin -v error -i 01-file.mp3 -y -map_metadata 0 -map a -acodec libopus \
-    // -b:a 48k -vbr on -compression_level 10 -application audio -cutoff 12000 -f opus pipe:1
-    fn build_command<S: AsRef<OsStr>>(&self, file: S, seek: Option<f32>) -> Command {
-        let mut cmd = Command::new("ffmpeg");
+    fn base_ffmpeg(&self,
+        seek: Option<f32>,
+        span: Option<TimeSpan>
+     ) -> Command {
+         let mut cmd = Command::new("ffmpeg");
         cmd.args(&["-nostdin", "-v", "error"]);
-        if let Some(s) = seek {
+        let offset = span.as_ref().map(|s| s.start).unwrap_or(0) as f32;
+        let time = span.and_then(|s| s.duration).unwrap_or(0);
+        let seek = seek.unwrap_or(0f32);
+        let start = offset as f32/1000.0+seek;
+        
+        if start > 0.0 {
             cmd.args(&["-accurate_seek", "-ss"]);
-            let time_spec = format!("{:2}", s);
+            let time_spec = format!("{:3}", start);
             cmd.arg(time_spec);
         }
-        let targs = self.quality.args();
+
+        if time > 0 {
+            cmd.arg("-t");
+            let t = time as f32 / 1000.0;
+            cmd.arg(format!("{:3}", t));
+        }
+
+        cmd
+     }
+
+     fn input_file_args<S: AsRef<OsStr>>(&self, cmd: &mut Command, file:S) {
         cmd.arg("-i")
             .arg(file)
             .args(&[
@@ -190,8 +212,19 @@ impl Transcoder {
                 "0",
                 "-map",
                 "a",
-            ])
-            .args(targs.codec_args)
+            ]); 
+     } 
+
+    // ffmpeg -nostdin -v error -i 01-file.mp3 -y -map_metadata 0 -map a -acodec libopus \
+    // -b:a 48k -vbr on -compression_level 10 -application audio -cutoff 12000 -f opus pipe:1
+    fn build_command<S: AsRef<OsStr>>(&self, 
+        file: S, 
+        seek: Option<f32>,
+        span: Option<TimeSpan>) -> Command {
+        let mut cmd = self.base_ffmpeg(seek, span);
+        let targs = self.quality.args();
+        self.input_file_args(&mut cmd, file);
+        cmd.args(targs.codec_args)
             .args(targs.quality_args)
             .arg("-f")
             .arg(targs.format)
@@ -204,25 +237,13 @@ impl Transcoder {
 
     // should not transcode, just copy audio stream
     #[allow(dead_code)]
-    fn build_copy_command<S: AsRef<OsStr>>(&self, file: S, seek: Option<f32>) -> Command {
-        let mut cmd = Command::new("ffmpeg");
-        cmd.args(&["-nostdin", "-v", "error"]);
-        if let Some(s) = seek {
-            cmd.args(&["-accurate_seek", "-ss"]);
-            let time_spec = format!("{:2}", s);
-            cmd.arg(time_spec);
-        }
-        cmd.arg("-i")
-            .arg(file)
-            .args(&[
-                "-y",
-                "-map_metadata",
-                "0",
-                "-map",
-                "a",
+    fn build_copy_command<S: AsRef<OsStr>>(&self, file: S, 
+        seek: Option<f32>, span: Option<TimeSpan>) -> Command {
+        let mut cmd = self.base_ffmpeg(seek,span);
+        self.input_file_args(&mut cmd, file);
+        cmd.args(&[
                 "-acodec",
                 "copy",
-                
             ])
             .arg("-f")
             .arg(self.quality.args().format)
@@ -264,10 +285,11 @@ impl Transcoder {
         self,
         file: AudioFilePath<S>,
         seek: Option<f32>,
+        span: Option<TimeSpan>,
         counter: super::Counter,
         _quality: QualityLevel
     ) -> impl Future<Item=ChunkStream<ChildStdout>, Error=Error> {
-        futures::future::result(self.transcode_inner(file, seek, counter)
+        futures::future::result(self.transcode_inner(file, seek, span, counter)
         .map(|(stream, f)| {
             tokio::spawn(f);
             stream
@@ -280,6 +302,7 @@ impl Transcoder {
         self,
         file: AudioFilePath<S>,
         seek: Option<f32>,
+        span: Option<TimeSpan>,
         counter: super::Counter,
         quality: QualityLevel
     ) -> TranscodedFuture {
@@ -294,7 +317,7 @@ impl Transcoder {
         if seek.is_some() || get_config().transcoding_cache.disabled {
             debug!("Shoud not add to cache as seeking or cache is disabled");
             return Box::new(future::result(
-            self.transcode_inner(file, seek, counter)
+            self.transcode_inner(file, seek, span, counter)
             .map(|(stream, f)| {
                     tokio::spawn(f);
                     Box::new(stream) as TranscodedStream
@@ -309,7 +332,7 @@ impl Transcoder {
             match res {
                 Err(e) => {
                     warn!("Cannot create cache entry: {}", e);
-                    self.transcode_inner(file, seek, counter)
+                    self.transcode_inner(file, seek, span, counter)
                     .map(|(stream, f)| {
                         tokio::spawn(f);
             
@@ -317,7 +340,7 @@ impl Transcoder {
                     })
                 },
                 Ok((cache_file, cache_finish)) => {
-                    self.transcode_inner(file, seek, counter)
+                    self.transcode_inner(file, seek, span, counter)
                     .map(|(stream, f)| {
                         tokio::spawn(f.then(|res| {
 
@@ -367,11 +390,12 @@ impl Transcoder {
         &self,
         file: AudioFilePath<S>,
         seek: Option<f32>,
+        span: Option<TimeSpan>,
         counter: super::Counter,
     ) -> Result<(ChunkStream<ChildStdout>, impl Future<Item=(), Error=()>), Error> {
         let mut cmd = match file {
-            AudioFilePath::Original(ref file) => self.build_command(file, seek),
-            AudioFilePath::Transcoded(ref file) => self.build_command(file, seek)
+            AudioFilePath::Original(ref file) => self.build_command(file, seek, span),
+            AudioFilePath::Transcoded(ref file) => self.build_command(file, seek, span)
         };
         let counter2 = counter.clone();
         match cmd.spawn_async() {
@@ -480,15 +504,19 @@ mod tests {
     use std::io::{Read, Write};
     use std::path::Path;
 
-    fn dummy_transcode<P: AsRef<Path>, R: AsRef<Path>>(output_file: P, seek: Option<f32>, 
-        copy_file: Option<R>, remove: bool) {
+    fn dummy_transcode<P: AsRef<Path>, R: AsRef<Path>>(output_file: P, 
+        seek: Option<f32>, 
+        copy_file: Option<R>, 
+        remove: bool,
+        span: Option<TimeSpan>) {
         pretty_env_logger::try_init().ok();
         let t = Transcoder::new(TranscodingFormat::default_level(QualityLevel::Low));
         let out_file = temp_dir().join(output_file);
         let mut cmd = match copy_file {
-            None => t.build_command("./test_data/01-file.mp3", seek),
-            Some(ref p) => t.build_copy_command(p.as_ref(), seek)
+            None => t.build_command("./test_data/01-file.mp3", seek, span),
+            Some(ref p) => t.build_copy_command(p.as_ref(), seek, span)
         };
+        println!("Command is {:?}", cmd);
         let mut child = cmd.spawn().expect("Cannot spawn subprocess");
 
         if child.stdout.is_some() {
@@ -515,10 +543,12 @@ mod tests {
         let meta = get_audio_properties(&out_file).expect("Cannot get audio file meta") ;
         let audio_len = if copy_file.is_some() {1} else {2};
         let dur = audio_len - seek.map(|s| s.round() as u32).unwrap_or(0);
+        if cfg!(feature="libavformat") {
         match meta.get_audio_info() {
             Some(ai) => assert_eq!(ai.duration, dur ),
-            //for some reason libtag sometimes is not able to get info, but it looks like file is OK
-            None => if cfg!(feature="libavformat") {panic!("Cannot get audio info")}
+            //for some reason libtag sometimes is not able to get info or is unreliable, but it looks like file is OK
+            None =>  {panic!("Cannot get audio info")}
+        }
         }
         
         
@@ -529,15 +559,23 @@ mod tests {
 
     #[test]
     fn test_transcode() {
-        dummy_transcode("audioserve_transcoded.opus", None, None as Option<&str>, true)
+        dummy_transcode("audioserve_transcoded.opus", None, None as Option<&str>, true, None)
     }
 
     #[test]
     fn test_transcode_seek() {
-        dummy_transcode("audioserve_transcoded2.opus", Some(0.8), None as Option<&str>, false);
+        dummy_transcode("audioserve_transcoded2.opus", Some(0.8), None as Option<&str>, false, None);
         let out_file = temp_dir().join("audioserve_transcoded2.opus");
-        dummy_transcode("audioserve_transcoded3.opus", Some(0.8), Some(&out_file), true);
+        dummy_transcode("audioserve_transcoded3.opus", Some(0.8), Some(&out_file), true, None);
         remove_file(out_file).unwrap();
+
+    }
+
+    #[test]
+    fn test_transcode_span() {
+        dummy_transcode("audioserve_transcoded5.opus", Some(0.1), None as Option<&str>, false, 
+            Some(TimeSpan{start: 100, duration: Some(1800)}));
+        
 
     }
 

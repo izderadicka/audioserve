@@ -23,8 +23,8 @@ impl TypedFile {
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FileSection {
-    start: u64,
-    end: u64
+    pub start: u64,
+    pub duration: Option<u64>
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -37,7 +37,7 @@ pub struct AudioFile {
 
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct AudioMeta {
     pub duration: u32, // duration in seconds, if available
     pub bitrate: u32,  // bitrate in kB/s
