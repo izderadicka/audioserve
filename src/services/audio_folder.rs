@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::io;
-use std::fs::read_link;
 use std::fs::DirEntry;
 
 use crate::config::get_config;
@@ -235,7 +234,7 @@ pub fn get_real_file_type<P: AsRef<Path>>(
     let ft = dir_entry.file_type()?;
 
     if allow_symlinks && ft.is_symlink() {
-        let p = read_link(dir_entry.path())?;
+        let p = fs::read_link(dir_entry.path())?;
         let ap = if p.is_relative() {
             full_path.as_ref().join(p)
         } else {

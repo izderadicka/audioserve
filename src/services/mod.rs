@@ -16,8 +16,6 @@ use hyperx::header::{Header, Range};
 use percent_encoding::percent_decode;
 use regex::Regex;
 use std::collections::HashMap;
-#[cfg(feature = "symlinks")]
-
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;

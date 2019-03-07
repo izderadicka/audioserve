@@ -1,6 +1,8 @@
 use super::search::{Search, SearchTrait};
 use super::transcode::{AudioFilePath, QualityLevel};
-use super::audio_folder::{list_dir, list_dir_files_only};
+use super::audio_folder::list_dir;
+#[cfg(feature="folder-download")]
+use super::audio_folder::list_dir_files_only;
 use super::types::*;
 use super::Counter;
 use config::get_config;
