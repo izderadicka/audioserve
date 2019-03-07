@@ -47,6 +47,7 @@ pub struct AudioMeta {
 pub struct AudioFolderShort {
     pub name: String,
     pub path: PathBuf,
+    pub is_file: bool
 }
 
 impl AudioFolderShort {
@@ -55,6 +56,7 @@ impl AudioFolderShort {
         AudioFolderShort {
             name: p.file_name().unwrap().to_str().unwrap().into(),
             path: p.strip_prefix(base_path).unwrap().into(),
+            is_file: false
         }
     }
 }

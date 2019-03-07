@@ -17,9 +17,7 @@ use percent_encoding::percent_decode;
 use regex::Regex;
 use std::collections::HashMap;
 #[cfg(feature = "symlinks")]
-use std::fs::read_link;
-use std::fs::DirEntry;
-use std::io;
+
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
@@ -31,6 +29,7 @@ mod subs;
 pub mod transcode;
 mod types;
 pub mod audio_meta;
+pub mod audio_folder;
 
 const APP_STATIC_FILES_CACHE_AGE: u32 = 30 * 24 * 3600;
 const FOLDER_INFO_FILES_CACHE_AGE: u32 = 24 * 3600;
@@ -260,32 +259,4 @@ impl<C> FileSendService<C> {
     }
 }
 
-#[cfg(feature = "symlinks")]
-fn get_real_file_type<P: AsRef<Path>>(
-    dir_entry: &DirEntry,
-    full_path: P,
-    allow_symlinks: bool,
-) -> Result<::std::fs::FileType, io::Error> {
-    let ft = dir_entry.file_type()?;
 
-    if allow_symlinks && ft.is_symlink() {
-        let p = read_link(dir_entry.path())?;
-        let ap = if p.is_relative() {
-            full_path.as_ref().join(p)
-        } else {
-            p
-        };
-        Ok(ap.metadata()?.file_type())
-    } else {
-        Ok(ft)
-    }
-}
-
-#[cfg(not(feature = "symlinks"))]
-fn get_real_file_type<P: AsRef<Path>>(
-    dir_entry: &DirEntry,
-    _full_path: P,
-    _allow_symlinks: bool,
-) -> Result<::std::fs::FileType, io::Error> {
-    dir_entry.file_type()
-}

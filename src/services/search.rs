@@ -1,4 +1,4 @@
-use super::get_real_file_type;
+use super::audio_folder::get_real_file_type;
 use super::types::{AudioFolderShort, SearchResult};
 use config::get_config;
 use std::collections::BinaryHeap;
@@ -229,6 +229,7 @@ mod cache {
                         res.subfolders.push(AudioFolderShort {
                             name: e.name(),
                             path: e.path(),
+                            is_file: false //TODO: this will require  improvement if to support file search
                         })
                     });
                     res
