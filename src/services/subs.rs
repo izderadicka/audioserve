@@ -2,7 +2,7 @@ use super::search::{Search, SearchTrait};
 use super::transcode::{AudioFilePath, QualityLevel, TimeSpan};
 use super::audio_folder::list_dir;
 #[cfg(feature="folder-download")]
-use super::audio_folder::list_dir_files_only;
+use super::audio_folder::{list_dir_files_only, parse_chapter_path};
 use super::types::*;
 use super::Counter;
 use config::get_config;
@@ -339,8 +339,8 @@ pub fn send_file<P: AsRef<Path>>(
     transcoding: super::TranscodingDetails,
     transcoding_quality: Option<QualityLevel>,
 ) -> ResponseFuture {
-    let span = None; // TODO - get span from file name
-    let full_path = base_path.join(&file_path);
+    let (real_path,span) = parse_chapter_path(file_path.as_ref());
+    let full_path = base_path.join(real_path);
     if let Some(transcoding_quality) = transcoding_quality {
         debug!(
             "Sending file transcoded in quality {:?}",

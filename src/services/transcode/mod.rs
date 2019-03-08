@@ -196,7 +196,8 @@ impl Transcoder {
 
         if time > 0 {
             cmd.arg("-t");
-            let t = time as f32 / 1000.0;
+            let mut t = time as f32 / 1000.0 - seek;
+            if t<0.0 {t = 0.0};
             cmd.arg(format!("{:3}", t));
         }
 
@@ -238,15 +239,20 @@ impl Transcoder {
     // should not transcode, just copy audio stream
     #[allow(dead_code)]
     fn build_copy_command<S: AsRef<OsStr>>(&self, file: S, 
-        seek: Option<f32>, span: Option<TimeSpan>) -> Command {
+        seek: Option<f32>, span: Option<TimeSpan>, use_transcoding_format: bool) -> Command {
         let mut cmd = self.base_ffmpeg(seek,span);
+        let fmt = if !use_transcoding_format {
+            guess_format(file.as_ref())
+        } else {
+            self.quality.args().format
+        };
         self.input_file_args(&mut cmd, file);
         cmd.args(&[
                 "-acodec",
                 "copy",
             ])
             .arg("-f")
-            .arg(self.quality.args().format)
+            .arg(fmt)
             .arg("pipe:1")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -473,6 +479,24 @@ impl Transcoder {
     }
 }
 
+fn guess_format<P:AsRef<std::path::Path>>(p:P) -> &'static str {
+    const DEFAULT_FORMAT: &'static str = "matroska"; // matroska is fairly universal, so it's good chance that audio stream will fit in
+        match p.as_ref().extension() {
+            Some(e) => {
+                let e = e.to_string_lossy().to_lowercase();
+                match e.as_str() {
+                    "opus" => "opus",
+                    "mp3"  => "mp3",
+                    "m4b" => "adts", // we cannot create mp4 container in pipe
+                    "m4a" => "adts",
+                    _ => DEFAULT_FORMAT
+                }
+
+            },
+            None => DEFAULT_FORMAT
+        }
+}
+
 #[cfg(feature="transcoding-cache")]
 mod vec_codec {
     use tokio::codec::Encoder;
@@ -514,7 +538,7 @@ mod tests {
         let out_file = temp_dir().join(output_file);
         let mut cmd = match copy_file {
             None => t.build_command("./test_data/01-file.mp3", seek, span),
-            Some(ref p) => t.build_copy_command(p.as_ref(), seek, span)
+            Some(ref p) => t.build_copy_command(p.as_ref(), seek, span, false)
         };
         println!("Command is {:?}", cmd);
         let mut child = cmd.spawn().expect("Cannot spawn subprocess");

@@ -66,7 +66,8 @@ fn get_dir_type<P:AsRef<Path>>(path: P) -> Result<DirType, io::Error> {
 }
 
 fn path_for_chapter(p: &Path, chap: &Chapter) -> PathBuf {
-    let ext = p.extension().and_then(|s| s.to_str()).unwrap_or("");
+    let ext = p.extension().and_then(|s| s.to_str()).map(|e| "."
+    .to_owned()+e).unwrap_or_else(|| "".to_owned());
     let pseudo_file = format!("{:03} - {}$${}-{}$${}", 
         chap.number, chap.title, chap.start,chap.end, ext);
     p.join(pseudo_file)
