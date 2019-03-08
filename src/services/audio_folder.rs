@@ -67,7 +67,7 @@ fn get_dir_type<P:AsRef<Path>>(path: P) -> Result<DirType, io::Error> {
 
 fn path_for_chapter(p: &Path, chap: &Chapter) -> PathBuf {
     let ext = p.extension().and_then(|s| s.to_str()).unwrap_or("");
-    let pseudo_file = format!("{:3} - {}$${}-{}$${}", 
+    let pseudo_file = format!("{:03} - {}$${}-{}$${}", 
         chap.number, chap.title, chap.start,chap.end, ext);
     p.join(pseudo_file)
 }
@@ -109,7 +109,7 @@ fn list_dir_file<P: AsRef<Path>>(
      AudioFile {
         meta: Some(new_meta),
         path: path_for_chapter(path, &chap),
-        name: chap.title,
+        name: format!("{:03} - {}", chap.number,chap.title),
         section: Some(FileSection{start:chap.start, duration: Some(chap.end - chap.start)}),
         mime: mime.to_string(),
     }
