@@ -4,7 +4,7 @@ use self::subs::{
     collections_list, get_folder, search, send_file, send_file_simple, short_response_boxed,
     transcodings_list, ResponseFuture, NOT_FOUND_MESSAGE, download_folder, recent
 };
-use self::transcode::{QualityLevel, TimeSpan};
+use self::transcode::QualityLevel;
 use config::get_config;
 use futures::{future, Future};
 use hyper::header::{
@@ -210,24 +210,15 @@ impl<C> FileSendService<C> {
                             .as_mut()
                             .and_then(|p| p.remove("seek"))
                             .and_then(|s| s.parse().ok());
-                        let offset: Option<u64> = params.as_mut()
-                            .and_then(|p| p.remove("offset"))
-                            .and_then(|s| s.parse().ok());
-                        let time: Option<u64> = params.as_mut()
-                            .and_then(|p| p.remove("time"))
-                            .and_then(|s| s.parse().ok());    
                         let transcoding_quality: Option<QualityLevel> = params
                             .and_then(|mut p| p.remove("trans"))
                             .and_then(|t| QualityLevel::from_letter(&t));
-
-                        let span = offset.map(|start| TimeSpan{start,duration:time });
 
                         send_file(
                             base_dir,
                             get_subpath(&path, "/audio/"),
                             bytes_range,
                             seek,
-                            span,
                             transcoding,
                             transcoding_quality,
                         )

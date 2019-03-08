@@ -3,6 +3,7 @@ use std::path::Path;
 use crate::error::Error;
 
 pub struct Chapter {
+    pub number: u32,
     pub title:String,
     pub start: u64,
     pub end: u64
@@ -32,6 +33,7 @@ mod libavformat {
         self.media_file.chapters().map(|l| {
             l.into_iter().map(|c| 
             Chapter{
+                number: c.num as u32,
                 title: c.title,
                 start: c.start,
                 end: c.end

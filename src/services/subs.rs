@@ -336,10 +336,10 @@ pub fn send_file<P: AsRef<Path>>(
     file_path: P,
     range: Option<::hyperx::header::ByteRangeSpec>,
     seek: Option<f32>,
-    span: Option<TimeSpan>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: Option<QualityLevel>,
 ) -> ResponseFuture {
+    let span = None; // TODO - get span from file name
     let full_path = base_path.join(&file_path);
     if let Some(transcoding_quality) = transcoding_quality {
         debug!(

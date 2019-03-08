@@ -6,6 +6,8 @@ use std::fs::DirEntry;
 use crate::config::get_config;
 use super::types::*;
 use super::audio_meta::{get_audio_properties, MediaInfo, Chapter};
+use super::transcode::TimeSpan;
+use regex::Regex;
 
 
 fn os_to_string(s: ::std::ffi::OsString) -> String {
@@ -63,6 +65,32 @@ fn get_dir_type<P:AsRef<Path>>(path: P) -> Result<DirType, io::Error> {
     }
 }
 
+fn path_for_chapter(p: &Path, chap: &Chapter) -> PathBuf {
+    let ext = p.extension().and_then(|s| s.to_str()).unwrap_or("");
+    let pseudo_file = format!("{:3} - {}$${}-{}$${}", 
+        chap.number, chap.title, chap.start,chap.end, ext);
+    p.join(pseudo_file)
+}
+
+lazy_static!{
+    static ref CHAPTER_PSEUDO_RE: Regex = Regex::new(r"\$\$(\d+)-(\d*)\$\$").unwrap();
+}
+
+pub fn parse_chapter_path(p: &Path) -> (&Path, Option<TimeSpan>) {
+    let fname = p.file_name().and_then(|s| s.to_str());
+    if let Some(fname) = fname {
+        if let Some(cap) =  CHAPTER_PSEUDO_RE.captures(fname) {
+            let start: u64 = cap.get(1).unwrap().as_str().parse().unwrap();
+            let end: Option<u64> =  cap.get(2).and_then(|g| g.as_str().parse().ok());
+            let duration = end.map(|end| end - start);
+            let parent = p.parent().unwrap_or_else(|| Path::new(""));
+            return (parent, Some(TimeSpan{start, duration}))
+        }
+    };
+
+    (p, None)
+}
+
 fn list_dir_file<P: AsRef<Path>>(
     base_dir: P,
     full_path: PathBuf,
@@ -80,7 +108,7 @@ fn list_dir_file<P: AsRef<Path>>(
     };
      AudioFile {
         meta: Some(new_meta),
-        path: path.to_owned(),
+        path: path_for_chapter(path, &chap),
         name: chap.title,
         section: Some(FileSection{start:chap.start, duration: Some(chap.end - chap.start)}),
         mime: mime.to_string(),
@@ -343,6 +371,17 @@ mod tests {
         let meta = media_info.get_audio_info().unwrap();
         assert_eq!(meta.bitrate, 220);
         assert_eq!(meta.duration, 2);
+    }
+
+    #[test]
+    fn test_pseudo_file() {
+        let fname = format!("kniha/{:3} - {}$${}-{}$${}", 
+        1, "Usak Jede", 1234, 5678, ".opus");
+        let (p, span) = parse_chapter_path(Path::new(&fname));
+        let span = span.unwrap();
+        assert_eq!(Path::new("kniha"), p);
+        assert_eq!(span.start, 1234);
+        assert_eq!(span.duration, Some(5678u64-1234));
     }
 
 }
