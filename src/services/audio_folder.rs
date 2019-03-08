@@ -76,7 +76,12 @@ fn path_for_chapter(p: &Path, chap: &Chapter) -> PathBuf {
 lazy_static!{
     static ref CHAPTER_PSEUDO_RE: Regex = Regex::new(r"\$\$(\d+)-(\d*)\$\$").unwrap();
 }
+#[cfg(not(feature = "chapters"))]
+pub fn parse_chapter_path(p: &Path) -> (&Path, Option<TimeSpan>) {
+    (p,None)
+}
 
+#[cfg(feature = "chapters")]
 pub fn parse_chapter_path(p: &Path) -> (&Path, Option<TimeSpan>) {
     let fname = p.file_name().and_then(|s| s.to_str());
     if let Some(fname) = fname {
@@ -374,6 +379,7 @@ mod tests {
         assert_eq!(meta.duration, 2);
     }
 
+    #[cfg(feature="chapters")]
     #[test]
     fn test_pseudo_file() {
         let fname = format!("kniha/{:3} - {}$${}-{}$${}", 

@@ -1,7 +1,6 @@
 use super::audio_folder::list_dir;
 #[cfg(feature = "folder-download")]
 use super::audio_folder::list_dir_files_only;
-#[cfg(feature = "chapters")]
 use super::audio_folder::parse_chapter_path;
 use super::search::{Search, SearchTrait};
 use super::transcode::{guess_format, AudioFilePath, QualityLevel, TimeSpan};
