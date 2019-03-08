@@ -107,6 +107,7 @@ impl TranscodingConfig {
                 .high
                 .as_ref()
                 .map_or(TranscodingFormat::default_level(l), |c| c.clone()),
+            QualityLevel::Passthrough => TranscodingFormat::Remux
         }
     }
 }

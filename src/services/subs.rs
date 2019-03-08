@@ -1,8 +1,10 @@
-use super::search::{Search, SearchTrait};
-use super::transcode::{AudioFilePath, QualityLevel, TimeSpan};
 use super::audio_folder::list_dir;
-#[cfg(feature="folder-download")]
-use super::audio_folder::{list_dir_files_only, parse_chapter_path};
+#[cfg(feature = "folder-download")]
+use super::audio_folder::list_dir_files_only;
+#[cfg(feature = "chapters")]
+use super::audio_folder::parse_chapter_path;
+use super::search::{Search, SearchTrait};
+use super::transcode::{guess_format, AudioFilePath, QualityLevel, TimeSpan};
 use super::types::*;
 use super::Counter;
 use config::get_config;
@@ -166,7 +168,12 @@ fn serve_file_transcoded(
 ) -> ResponseFuture {
     let transcoder = get_config().transcoder(transcoding_quality);
     let params = transcoder.transcoding_params();
-    let mime = transcoder.transcoded_mime();
+    let mime = if let QualityLevel::Passthrough = transcoding_quality {
+        guess_format(full_path.as_ref()).mime
+    } else {
+        transcoder.transcoded_mime()
+    };
+
     let fut = transcoder
         .transcode(full_path, seek, span, counter.clone(), transcoding_quality)
         .then(move |res| match res {
@@ -339,14 +346,30 @@ pub fn send_file<P: AsRef<Path>>(
     transcoding: super::TranscodingDetails,
     transcoding_quality: Option<QualityLevel>,
 ) -> ResponseFuture {
-    let (real_path,span) = parse_chapter_path(file_path.as_ref());
+    let (real_path, span) = parse_chapter_path(file_path.as_ref());
     let full_path = base_path.join(real_path);
     if let Some(transcoding_quality) = transcoding_quality {
         debug!(
             "Sending file transcoded in quality {:?}",
             transcoding_quality
         );
-        serve_file_cached_or_transcoded(full_path, seek, span, range, transcoding, transcoding_quality)
+        serve_file_cached_or_transcoded(
+            full_path,
+            seek,
+            span,
+            range,
+            transcoding,
+            transcoding_quality,
+        )
+    } else if span.is_some() {
+        debug!("Sending part of file remuxed");
+        serve_file_transcoded_checked(
+            AudioFilePath::Original(full_path),
+            seek,
+            span,
+            transcoding,
+            QualityLevel::Passthrough,
+        )
     } else {
         debug!("Sending file directly from fs");
         serve_file_from_fs(&full_path, range, None)
@@ -371,79 +394,62 @@ pub fn download_folder(_base_path: &'static Path, _folder_path: PathBuf) -> Resp
 
 #[cfg(feature = "folder-download")]
 pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> ResponseFuture {
-    let mut download_name = folder_path
-        .file_name()
-        .and_then(|fname| fname.to_str())
-        .map(|fname| fname.to_owned())
-        .unwrap_or_else(|| "audio".into());
-    download_name.push_str(".tar");
-    let f = poll_fn(move || blocking(|| list_dir_files_only(&base_path, &folder_path)))
-        .map(move |res| match res {
-            Ok(folder) => {
-                let total_len: u64;
-                {
-                    let lens_iter = (&folder).iter().map(|i| i.1);
-                    total_len = async_tar::calc_size(lens_iter);
-                }
-                debug!("Total len of folder is {}", total_len);
-                let files = folder.into_iter().map(|i| i.0);
-                let tar_stream = async_tar::TarStream::tar_iter_rel(files, base_path);
-                let mut resp = HyperResponse::builder();
-                resp.header(CONTENT_TYPE, "application/x-tar");
-                resp.header(CONTENT_LENGTH, total_len);
-                let disposition = ContentDisposition {
-                    disposition: DispositionType::Attachment,
-                    parameters: vec![DispositionParam::Filename(
-                        Charset::Ext("UTF-8".into()),
-                        None,
-                        download_name.into(),
-                    )],
-                };
-                resp.header(CONTENT_DISPOSITION, disposition.to_string().as_bytes());
-                resp.body(Body::wrap_stream(tar_stream)).unwrap()
-            }
-            Err(e) => {
-                error!("Cannot list download dir: {}", e);
-                short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
-            }
-        })
+    let full_path = base_path.join(&folder_path);
+    let f = tokio::fs::metadata(full_path.clone())
         .map_err(|e| {
-            error!("Error listing files for tar: {}", e);
+            error!("Cannot get meta for download path");
             Error::new_with_cause(e)
-        });
+        })
+        .and_then(move |meta| {
+            if meta.is_file() {
+                serve_file_from_fs(&full_path, None, None)
+            } else {
+                let mut download_name = folder_path
+                    .file_name()
+                    .and_then(|fname| fname.to_str())
+                    .map(|fname| fname.to_owned())
+                    .unwrap_or_else(|| "audio".into());
+                download_name.push_str(".tar");
+                let f = poll_fn(move || blocking(|| list_dir_files_only(&base_path, &folder_path)))
+                    .map(move |res| match res {
+                        Ok(folder) => {
+                            let total_len: u64;
+                            {
+                                let lens_iter = (&folder).iter().map(|i| i.1);
+                                total_len = async_tar::calc_size(lens_iter);
+                            }
+                            debug!("Total len of folder is {}", total_len);
+                            let files = folder.into_iter().map(|i| i.0);
+                            let tar_stream = async_tar::TarStream::tar_iter_rel(files, base_path);
+                            let mut resp = HyperResponse::builder();
+                            resp.header(CONTENT_TYPE, "application/x-tar");
+                            resp.header(CONTENT_LENGTH, total_len);
+                            let disposition = ContentDisposition {
+                                disposition: DispositionType::Attachment,
+                                parameters: vec![DispositionParam::Filename(
+                                    Charset::Ext("UTF-8".into()),
+                                    None,
+                                    download_name.into(),
+                                )],
+                            };
+                            resp.header(CONTENT_DISPOSITION, disposition.to_string().as_bytes());
+                            resp.body(Body::wrap_stream(tar_stream)).unwrap()
+                        }
+                        Err(e) => {
+                            error!("Cannot list download dir: {}", e);
+                            short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
+                        }
+                    })
+                    .map_err(|e| {
+                        error!("Error listing files for tar: {}", e);
+                        Error::new_with_cause(e)
+                    });
 
+                Box::new(f)
+            }
+        });
     Box::new(f)
 }
-
-// pub fn download_folder_old(base_path: &'static Path, folder_path: PathBuf) -> ResponseFuture {
-//     let mut download_name = folder_path.file_name()
-//             .and_then(|fname| fname.to_str())
-//             .map(|fname| fname.to_owned())
-//             .unwrap_or_else(|| "audio".into());
-//     download_name.push_str(".tar");
-//     let full_path = base_path.join(&folder_path);
-//     let tar = async_tar::TarStream::tar_dir(full_path);
-//     let f = tar.map(move |tar_stream| {
-//         let mut resp = HyperResponse::builder();
-//         resp.header(CONTENT_TYPE, "application/x-tar");
-//         let disposition = ContentDisposition{
-//             disposition: DispositionType::Attachment,
-//             parameters: vec![DispositionParam::Filename(
-//                 Charset::Ext("UTF-8".into()),
-//                 None,
-//                 download_name.into()
-//             )]
-//         };
-//         resp.header(CONTENT_DISPOSITION, disposition.to_string().as_bytes());
-//         resp.body(Body::wrap_stream(tar_stream)).unwrap()
-//     });
-//     Box::new(f.map_err(|e| {
-//         error!("Cannot create tar because of error {}",e);
-//         Error::new_with_cause(e)
-//         }))
-// }
-
-
 
 fn json_response<T: serde::Serialize>(data: &T) -> Response {
     let json = serde_json::to_string(data).expect("Serialization error");
@@ -502,5 +508,3 @@ pub fn recent(collection: usize, searcher: Search<String>) -> ResponseFuture {
         .map_err(Error::new_with_cause),
     )
 }
-
-

@@ -21,6 +21,11 @@ impl TypedFile {
     }
 }
 
+pub struct AudioFormat {
+    pub ffmpeg: &'static str,
+    pub mime: Mime
+}
+
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FileSection {
     pub start: u64,

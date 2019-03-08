@@ -12,6 +12,7 @@ use std::fmt::Debug;
 use tokio::timer::Delay;
 use tokio_process::{ChildStdout, CommandExt};
 use self::codecs::*;
+use super::types::AudioFormat;
 
 pub mod codecs;
 
@@ -33,7 +34,8 @@ pub enum TranscodingFormat {
     OpusInOgg(Opus),
     OpusInWebm(Opus),
     Mp3(Mp3),
-    AacInAdts(Aac)
+    AacInAdts(Aac),
+    Remux
 }
 
 pub struct TranscodingArgs {
@@ -59,7 +61,8 @@ impl TranscodingFormat {
             TranscodingFormat::OpusInOgg(args) => targs!(args, "opus"),
             TranscodingFormat::OpusInWebm(args) => targs!(args, "webm"),
             TranscodingFormat::Mp3(args) => targs!(args, "mp3"),
-            TranscodingFormat::AacInAdts(args) => targs!(args, "adts")
+            TranscodingFormat::AacInAdts(args) => targs!(args, "adts"),
+            TranscodingFormat::Remux => TranscodingArgs{format:"", codec_args: &[], quality_args: vec![]}
         }
     }
 
@@ -68,7 +71,8 @@ impl TranscodingFormat {
             TranscodingFormat::OpusInOgg(args) => args.bitrate(),
             TranscodingFormat::OpusInWebm(args) => args.bitrate(),
             TranscodingFormat::Mp3(args) => args.bitrate(),
-            TranscodingFormat::AacInAdts(args) => args.bitrate()
+            TranscodingFormat::AacInAdts(args) => args.bitrate(),
+            TranscodingFormat::Remux => 0
         }
     }
 
@@ -77,7 +81,8 @@ impl TranscodingFormat {
             TranscodingFormat::OpusInOgg(_) => "opus-in-ogg",
             TranscodingFormat::OpusInWebm(_) => "opus-in-webm",
             TranscodingFormat::Mp3(_) => "mp3",
-            TranscodingFormat::AacInAdts(_) => "aac-in-adts"
+            TranscodingFormat::AacInAdts(_) => "aac-in-adts",
+            TranscodingFormat::Remux => "remux"
         }
     }
 
@@ -86,7 +91,8 @@ impl TranscodingFormat {
             TranscodingFormat::OpusInOgg(_) => "audio/ogg",
             TranscodingFormat::OpusInWebm(_) => "audio/webm",
             TranscodingFormat::Mp3(_) => "audio/mpeg",
-            TranscodingFormat::AacInAdts(_) => "audio/aac"
+            TranscodingFormat::AacInAdts(_) => "audio/aac",
+            TranscodingFormat::Remux => unreachable!("mime for Remux should never be used!")
 
         };
         m.parse().unwrap()
@@ -100,6 +106,7 @@ impl TranscodingFormat {
             QualityLevel::Low => TranscodingFormat::OpusInOgg(Opus::new(32, 5, Bandwidth::SuperWideBand, true)),
             QualityLevel::Medium => TranscodingFormat::OpusInOgg(Opus::new(48, 8, Bandwidth::SuperWideBand, false)),
             QualityLevel::High => TranscodingFormat::OpusInOgg(Opus::new(64, 10, Bandwidth::FullBand, false)),
+            QualityLevel::Passthrough => TranscodingFormat::Remux
         }
     }
 
@@ -110,6 +117,7 @@ pub enum QualityLevel {
     Low,
     Medium,
     High,
+    Passthrough
 }
 
 impl QualityLevel {
@@ -130,7 +138,8 @@ impl QualityLevel {
         match *self {
             Low => "l",
             Medium => "m",
-            High => "h"
+            High => "h",
+            Passthrough => "p"
         }
     }
 }
@@ -238,11 +247,11 @@ impl Transcoder {
 
     // should not transcode, just copy audio stream
     #[allow(dead_code)]
-    fn build_copy_command<S: AsRef<OsStr>>(&self, file: S, 
+    fn build_remux_command<S: AsRef<OsStr>>(&self, file: S, 
         seek: Option<f32>, span: Option<TimeSpan>, use_transcoding_format: bool) -> Command {
         let mut cmd = self.base_ffmpeg(seek,span);
         let fmt = if !use_transcoding_format {
-            guess_format(file.as_ref())
+            guess_format(file.as_ref()).ffmpeg
         } else {
             self.quality.args().format
         };
@@ -399,9 +408,10 @@ impl Transcoder {
         span: Option<TimeSpan>,
         counter: super::Counter,
     ) -> Result<(ChunkStream<ChildStdout>, impl Future<Item=(), Error=()>), Error> {
-        let mut cmd = match file {
-            AudioFilePath::Original(ref file) => self.build_command(file, seek, span),
-            AudioFilePath::Transcoded(ref file) => self.build_command(file, seek, span)
+        let mut cmd = if let TranscodingFormat::Remux = self.quality {
+            self.build_remux_command(file.as_ref(), seek, span, false)
+        } else {
+            self.build_command(file.as_ref(), seek, span)
         };
         let counter2 = counter.clone();
         match cmd.spawn_async() {
@@ -479,21 +489,25 @@ impl Transcoder {
     }
 }
 
-fn guess_format<P:AsRef<std::path::Path>>(p:P) -> &'static str {
-    const DEFAULT_FORMAT: &'static str = "matroska"; // matroska is fairly universal, so it's good chance that audio stream will fit in
-        match p.as_ref().extension() {
+pub fn guess_format<P:AsRef<std::path::Path>>(p:P) -> AudioFormat {
+    const DEFAULT_FORMAT: (&'static str, &'static str) = ("matroska", "audio/x-matroska"); // matroska is fairly universal, so it's good chance that audio stream will fit in
+        let t = match p.as_ref().extension() {
             Some(e) => {
                 let e = e.to_string_lossy().to_lowercase();
                 match e.as_str() {
-                    "opus" => "opus",
-                    "mp3"  => "mp3",
-                    "m4b" => "adts", // we cannot create mp4 container in pipe
-                    "m4a" => "adts",
+                    "opus" => ("opus", "audio/ogg"),
+                    "mp3"  => ("mp3", "audio/mpeg"),
+                    "m4b" => ("adts", "audio/aac"), // we cannot create mp4 container in pipe
+                    "m4a" => ("adts", "audion/aac"),
                     _ => DEFAULT_FORMAT
                 }
 
             },
             None => DEFAULT_FORMAT
+        };
+        AudioFormat{
+            ffmpeg: t.0,
+            mime: <Mime as std::str::FromStr>::from_str(t.1).unwrap()
         }
 }
 
@@ -538,7 +552,7 @@ mod tests {
         let out_file = temp_dir().join(output_file);
         let mut cmd = match copy_file {
             None => t.build_command("./test_data/01-file.mp3", seek, span),
-            Some(ref p) => t.build_copy_command(p.as_ref(), seek, span, false)
+            Some(ref p) => t.build_remux_command(p.as_ref(), seek, span, false)
         };
         println!("Command is {:?}", cmd);
         let mut child = cmd.spawn().expect("Cannot spawn subprocess");
