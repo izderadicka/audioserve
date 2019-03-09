@@ -1,6 +1,6 @@
 {
   "name": "audioserve-client",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Simple HTML5 client for audioserve",
   "main": "dist/bundle.js",
   "scripts": {
