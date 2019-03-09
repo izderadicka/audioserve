@@ -137,7 +137,8 @@ $(function () {
 
         if (mustTranscode || bitrate >= 0 && transcodingLimit >= 0 && bitrate > transcodingLimit) {
             file.trans = true;
-            file.path = file.path + `?trans=${transcoding}`;
+            file.path = file.path + `?trans=${mustTranscode && 
+                (! transcoding ||transcoding=='0')?'h': transcoding}`;
         } else {
             file.trans = false;
             file.path = file.path + `?trans=0`;

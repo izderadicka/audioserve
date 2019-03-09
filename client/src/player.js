@@ -24,7 +24,8 @@ const VOLUME_MED = 'M0 7.667v8h5.333L12 22.333V1L5.333 7.667M17.333 11.373C17.33
 const VOLUME_LOW = 'M0 7.667v8h5.333L12 22.333V1L5.333 7.667';
 const PLAY = "M18 12L0 24V0";
 const PAUSE = "M0 0h6v24H0zM12 0h6v24h-6z";
-const NO_RELOAD_JUMP = 300;
+const NO_RELOAD_JUMP_BACK = 300;
+const NO_RELOAD_JUMP_FWD = 120;
 const MEDIA_ERRORS = ["MEDIA_ERR_ABORTED", "MEDIA_ERR_NETWORK", "MEDIA_ERR_DECODE", "MEDIA_ERR_SRC_NOT_SUPPORTED"];
 
 export class AudioPlayer {
@@ -52,7 +53,7 @@ export class AudioPlayer {
         this._speaker = audioPlayer.querySelector('#speaker');
         this._cacheIndicator = audioPlayer.querySelector('.player-cache');
         this._currentlyDragged = null;
-        this._isChrome = !!window.chrome && !!window.chrome.webstore; // Chrome requires some tweaks
+        this._isChrome = !!window.chrome; // Chrome requires some tweaks
 
         let volumeBtn = audioPlayer.querySelector('.volume-btn');
         let sliderTime = audioPlayer.querySelector(".controls .slider");
@@ -244,8 +245,21 @@ export class AudioPlayer {
         this._totalTime.textContent = formatTime(this.getTotalTime());
     }
 
+    get _cacheRanges() {
+        if (this._isChrome) {
+            // in chrome seekable is whole range of media even for chunked streams
+            // which is not good for transcoded audio - as seek their means reloading from 0 !
+            // so here is better to look for .buffered, which basically says what can be seeked
+            // without reloading media
+            return this._player.buffered;
+        } else {
+            // in FF for chunked streams is what is in buffers
+            return this._player.seekable;
+        }
+    }
+
     _updateCacheIndicator() {
-        let ranges = this._player.buffered;
+        let ranges = this._cacheRanges;
         let totalTime = this.getTotalTime();
         let totalLength = this._cacheIndicator.offsetWidth;
         let offset = totalLength * this._timeOffset / totalTime;
@@ -271,7 +285,7 @@ export class AudioPlayer {
 
     _isCached(time) {
         let t = time - this._timeOffset;
-        let ranges = this._player.buffered;
+        let ranges = this._cacheRanges;
         let remainsToLoad = this.getTotalTime - time;
         for (let i = 0; i < ranges.length; i++) {
             let start = ranges.start(i);
@@ -427,10 +441,10 @@ export class AudioPlayer {
 
                     //Chrome tweak -  just look at delta if it is smaller then something or jumping before current offset
 
-                    if (diff > NO_RELOAD_JUMP) {
+                    if (diff > NO_RELOAD_JUMP_FWD) {
                         // jump with seek
                         this._jumpWithSeek(time);
-                    } else if (diff < 0 && (time - this._timeOffset < 0 || -diff > NO_RELOAD_JUMP)) {
+                    } else if (diff < 0 && (time - this._timeOffset < 0 || -diff > NO_RELOAD_JUMP_BACK)) {
                         // jump back can work in FF, but Chrome does not seem to cache whole file so 
                         // jumping back only limited
                         this._jumpWithSeek(time);
@@ -465,6 +479,7 @@ export class AudioPlayer {
         }
         if (options && options.transcoded) this.transcoded = true;
         else if (options && options.unsized) this.transcoded = true;
+        else if (/\$\$[\d\-]+\$\$/.test(url)) this.transcoded = true;
         else this.transcoded = false;
         if (!url) {
             this._player.removeAttribute("src");
