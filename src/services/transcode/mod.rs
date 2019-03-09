@@ -164,9 +164,19 @@ impl <S> std::convert::AsRef<S> for AudioFilePath<S> {
 }
 
 // part of audio file - from start to start+duration (in ms)
+#[derive(Clone,Copy)]
 pub struct TimeSpan {
     pub start: u64,
     pub duration: Option<u64>
+}
+
+impl std::fmt::Display for TimeSpan {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
+        match self.duration {
+            Some(d) => write!(f, "{}-{}", self.start, d),
+            None => write!(f, "{}", self.start)
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -342,7 +352,7 @@ impl Transcoder {
 
         let cache = get_cache();
         //TODO: this is ugly -  unify either we will use Path or OsStr!
-        let key = cache_key(file.as_ref().as_ref(), &quality);
+        let key = cache_key(file.as_ref().as_ref(), quality, span);
         let fut = cache.add_async(key).then( move |res| {
             match res {
                 Err(e) => {
