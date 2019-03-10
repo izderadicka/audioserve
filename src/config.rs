@@ -129,8 +129,8 @@ impl Default for ThreadPoolSize {
 
 #[derive(Clone, Debug)]
 pub struct ChaptersSize {
-    pub from_duration: usize,
-    pub duration: usize
+    pub from_duration: u32,
+    pub duration: u32
 }
 
 impl Default for ChaptersSize {
