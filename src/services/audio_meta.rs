@@ -121,7 +121,7 @@ impl <'a> Info<'a> {
                         Ok(media_file) => Ok(Info{media_file, path}),
                         Err(e) => {
                             error!("Cannot get audiofile {} error {:?}", fname, e);
-                            Err(Error::new_with_cause(e))
+                            Err(Error::new_with_cause(format!("taglib error: {:?}", e)))
                         }
                     }
                 }

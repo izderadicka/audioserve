@@ -127,6 +127,21 @@ impl Default for ThreadPoolSize {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ChaptersSize {
+    pub from_duration: usize,
+    pub duration: usize
+}
+
+impl Default for ChaptersSize {
+    fn default() -> Self {
+        ChaptersSize {
+            from_duration: 240,
+            duration: 30
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub local_addr: SocketAddr,
@@ -147,7 +162,9 @@ pub struct Config {
     pub search_cache: bool,
     #[cfg(feature="transcoding-cache")]
     pub transcoding_cache: TranscodingCacheConfig,
-    pub disable_folder_download: bool
+    pub disable_folder_download: bool,
+    #[cfg(feature="chapters")]
+    pub chapters: ChaptersSize
 }
 
 
@@ -256,6 +273,20 @@ fn create_parser<'a>() -> Parser<'a> {
                 .long("disable-folder-download")
                 .help("Disables API point for downloading whole folder")
         );
+    }
+
+    if cfg!(feature = "chapters") {
+        parser = parser
+        .arg(Arg::with_name("chapters-from-duration")
+            .long("chapters-from-duration")
+            .takes_value(true)
+            .help("forces split of audio file larger then x mins into chapters (not physically, but it'll be just visible as folder with chapters)[default:240]")
+        )
+        .arg(Arg::with_name("chapters-duration")
+            .long("chapters-duration")
+            .takes_value(true)
+            .help("If long files is presented as chapters, one chapter has x mins [default: 30]")
+        )
     }
 
     if cfg!(feature = "tls") {
@@ -513,6 +544,27 @@ pub fn parse_args() -> Result<(), Error> {
         true
     };
 
+    #[cfg(feature="chapters")]
+    let chapters = {
+        let mut c = ChaptersSize::default();
+        let from_duration = args.value_of("chapters-from-duration")
+            .and_then(|v| v.parse().ok());
+        if let Some(from_duration) = from_duration {
+            c.from_duration = from_duration
+        }
+
+        let duration = args.value_of("chapters-duration")
+            .and_then(|v| v.parse().ok());
+        if let Some(duration) = duration {
+            if duration < 10 {
+                return Err(Error::InvalidLimitValue("chapter should have at least 10 mins"))
+            }
+            c.duration = duration;
+        }
+
+        c
+    };
+
     let config = Config {
         base_dirs,
         local_addr,
@@ -532,7 +584,10 @@ pub fn parse_args() -> Result<(), Error> {
         search_cache,
         #[cfg(feature="transcoding-cache")]
         transcoding_cache: _transcoding_cache.unwrap(),
-        disable_folder_download
+        disable_folder_download,
+        #[cfg(feature="chapters")]
+        chapters
+
     };
     unsafe {
         CONFIG = Some(config);
@@ -569,7 +624,9 @@ pub fn init_default_config() {
         search_cache: false,
         #[cfg(feature="transcoding-cache")]
         transcoding_cache: TranscodingCacheConfig::default(),
-        disable_folder_download: false
+        disable_folder_download: false,
+        #[cfg(feature="chapters")]
+        chapters: ChaptersSize::default()
     };
     unsafe {
         CONFIG = Some(config);

@@ -22,10 +22,6 @@ impl StdErr for Error {
 }
 
 impl Error {
-    pub fn new() -> Self {
-        Error(None)
-    }
-
     pub fn new_with_cause<E: Into<Box< dyn StdErr + Send + Sync + 'static>>>(cause: E) -> Self {
         Error(Some(cause.into()))
     }
