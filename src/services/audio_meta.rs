@@ -58,7 +58,7 @@ mod libavformat {
         },
         None => {
             error!("Invalid file name {:?}, not utf-8", path);
-            Err(Error::new())
+            Err(Error::new_with_cause("Non UTF-8 file name"))
         },
     }
     }
@@ -121,13 +121,13 @@ impl <'a> Info<'a> {
                         Ok(media_file) => Ok(Info{media_file, path}),
                         Err(e) => {
                             error!("Cannot get audiofile {} error {:?}", fname, e);
-                            Err(Error::new())
+                            Err(Error::new_with_cause(e))
                         }
                     }
                 }
                 None => {
                     error!("File name {:?} is not utf8", filename);
-                    Err(Error::new())
+                    Err(Error::new_with_cause("Non UTF-8 file"))
                 }
             }
         }

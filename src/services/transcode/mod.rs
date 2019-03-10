@@ -488,12 +488,12 @@ impl Transcoder {
                     Ok((stream, fut))
                 } else {
                     error!("Cannot get stdout");
-                    Err(Error::new())
+                    Err(Error::new_with_cause("Cannot get stdout"))
                 }
             }
             Err(e) => {
                 error!("Cannot spawn child process: {:?}", e);
-                Err(Error::new())
+                Err(Error::new_with_cause("Cannot spawn child"))
             }
         }
     }
