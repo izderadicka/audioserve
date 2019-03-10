@@ -136,7 +136,7 @@ pub struct ChaptersSize {
 impl Default for ChaptersSize {
     fn default() -> Self {
         ChaptersSize {
-            from_duration: 240,
+            from_duration: 0,
             duration: 30
         }
     }
@@ -280,7 +280,7 @@ fn create_parser<'a>() -> Parser<'a> {
         .arg(Arg::with_name("chapters-from-duration")
             .long("chapters-from-duration")
             .takes_value(true)
-            .help("forces split of audio file larger then x mins into chapters (not physically, but it'll be just visible as folder with chapters)[default:240]")
+            .help("forces split of audio file larger then x mins into chapters (not physically, but it'll be just visible as folder with chapters)[default:0 e.g. disabled]")
         )
         .arg(Arg::with_name("chapters-duration")
             .long("chapters-duration")

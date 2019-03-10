@@ -53,7 +53,7 @@ Returns list of available collections (collection is a directory provided as par
         }
 ```
 
-`folder_download` - is folder download enabled on the server
+`folder_download` - is folder download is enabled on the server
 `count` - number of collections
 `names` - array of collection names
 
@@ -93,7 +93,8 @@ Lists available subfolders or audio files in the folder. Path starts either with
  (list of collections can be retrieved by API endpoint `collections`) or directly with `/folder/`, which uses then 
  collection 0 as default.
 
- Returns JSON:
+Returns JSON:
+
  ```json
  {
     "files":
@@ -104,7 +105,8 @@ Lists available subfolders or audio files in the folder. Path starts either with
                 "duration":2518,
                 "bitrate":80
                 },
-            "mime":"audio/mpeg"
+            "mime":"audio/mpeg",
+            "section": null
         },
         {
             "name":"Barvir na penzi.opus",
@@ -112,16 +114,19 @@ Lists available subfolders or audio files in the folder. Path starts either with
             "meta":{
                 "duration":1612,
                 "bitrate":31},
-            "mime":"audio/ogg"
+            "mime":"audio/ogg",
+            "section": null
         }],
     "subfolders":
         [{
             "name":"Berylova korunka",
-            "path":"Doyle Arthur Conan/Berylova korunka"
+            "path":"Doyle Arthur Conan/Berylova korunka",
+            "is_file": false
         },
         {
             "name":"Domaci pacient",
-            "path":"Doyle Arthur Conan/Domaci pacient"
+            "path":"Doyle Arthur Conan/Domaci pacient",
+            "is_file": false
         }],
     "cover":
         {
@@ -137,11 +142,12 @@ Lists available subfolders or audio files in the folder. Path starts either with
 ```
 
 Data contains `files` and/or `subfolders` (each can be null or empty array). Subfolders can be listed using this API endpoint
-using path `/folder/` + `path` (for collection 0) or `/x/folder/` + `path` (for collection x). Root folder of collection is retrieved with path `/folder/` (collection 0) or `/x/folder` (for colections x, x>=0)
+using path `/folder/` + `path` (for collection 0) or `/x/folder/` + `path` (for collection x). Root folder of collection is retrieved with path `/folder/` (collection 0) or `/x/folder` (for colections x, x>=0).
 
-`files` contains playable files -  `path` should be used with `audio` endpoint - see below - in similar way as in listing 
-subfolders.  `meta` contains some metadata about audio file - `duration` in seconds and `bitrate` in kbps. `mime` is mime type
-of the audio file.
+`files` contains playable files -  `path` should be used with `audio` endpoint - see below - in similar way as in listing subfolders.  `meta` contains some metadata about audio file - `duration` in seconds and `bitrate` in kbps. `mime` is mime type
+of the audio file and `section` is only used with chapters extracted from single file audiobook (then it contains `start` and `duration` of the chapters in ms).
+
+`subfolders` entries contain also field `is_file`, which is true for single file audibooks that are presented as folders. 
 
 Folder can contain additional information `cover`, which is cover image (first .jpg or .png file encountered in the folder) and text information `description` (first .txt, .html, .md file encoutered in the folder). Both can be null, if there is no appropriate file and if not null, file can be retrieved in appropriate API end point by using the `path`.
 
