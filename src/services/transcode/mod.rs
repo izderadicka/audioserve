@@ -150,7 +150,7 @@ impl QualityLevel {
 pub enum AudioFilePath<S> {
     Original(S),
     #[allow(dead_code)]
-    Transcoded(S)
+    Transcoded(S),
 }
 
 impl <S> std::convert::AsRef<S> for AudioFilePath<S> {
@@ -158,13 +158,13 @@ impl <S> std::convert::AsRef<S> for AudioFilePath<S> {
         use self::AudioFilePath::*;
         match self {
             Original(ref f) => f,
-            Transcoded(ref f) => f
+            Transcoded(ref f) => f,
         }
     }
 }
 
 // part of audio file - from start to start+duration (in ms)
-#[derive(Clone,Copy)]
+#[derive(Clone,Copy, Debug)]
 pub struct TimeSpan {
     pub start: u64,
     pub duration: Option<u64>
@@ -338,9 +338,9 @@ impl Transcoder {
         use futures::{Stream,Sink};
         use std::io;
 
-
-        if seek.is_some() || get_config().transcoding_cache.disabled {
-            debug!("Shoud not add to cache as seeking or cache is disabled");
+        let is_transcoded = if let  AudioFilePath::Transcoded(_)=file {true} else {false};
+        if is_transcoded || seek.is_some() || get_config().transcoding_cache.disabled {
+            debug!("Shoud not add to cache as is already transcoded, seeking or cache is disabled");
             return Box::new(future::result(
             self.transcode_inner(file, seek, span, counter)
             .map(|(stream, f)| {
@@ -418,10 +418,16 @@ impl Transcoder {
         span: Option<TimeSpan>,
         counter: super::Counter,
     ) -> Result<(ChunkStream<ChildStdout>, impl Future<Item=(), Error=()>), Error> {
-        let mut cmd = if let TranscodingFormat::Remux = self.quality {
-            self.build_remux_command(file.as_ref(), seek, span, false)
-        } else {
+        let mut cmd = match (&file, &self.quality) { 
+            (_, TranscodingFormat::Remux) => {
+                self.build_remux_command(file.as_ref(), seek, span, false)
+            } 
+             (AudioFilePath::Transcoded(_), _) => {
+                 self.build_remux_command(file.as_ref(), seek, span, true)
+             } 
+             _ => {
             self.build_command(file.as_ref(), seek, span)
+            }
         };
         let counter2 = counter.clone();
         match cmd.spawn_async() {

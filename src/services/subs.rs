@@ -107,11 +107,12 @@ fn serve_file_cached_or_transcoded(
             ),
             Some((f, path)) => {
                 if seek.is_some() {
-                    debug!("File is in cache, but time seek is required");
+                    debug!("File is in cache and seek is needed -  will send remuxed from {:?} {:?}",
+                        path, span);
                     serve_file_transcoded_checked(
                         AudioFilePath::Transcoded(path),
                         seek,
-                        span,
+                        None,
                         transcoding,
                         transcoding_quality,
                     )
