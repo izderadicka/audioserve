@@ -63,3 +63,10 @@ libavformat = ["media_info"]
 folder-download = ["async-tar"]
 chapters = ["libavformat"]
 
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+
+
