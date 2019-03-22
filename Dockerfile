@@ -1,30 +1,17 @@
-FROM debian:stretch-slim AS build
+FROM alpine:edge AS build
 MAINTAINER Ivan <ivan@zderadicka.eu>
 
-ARG FEATURES
+ARG CARGO_ARGS
 
-RUN apt -o Acquire::https::No-Cache=True -o Acquire::http::No-Cache=True update &&\
-    apt-get install -y git pkg-config openssl libssl-dev libtag1-dev libtagc0-dev curl yasm build-essential wget libbz2-dev zlib1g-dev &&\
-    curl -sL https://deb.nodesource.com/setup_8.x | bash - &&\
-    apt-get install -y nodejs 
+RUN apk update &&\
+    apk add git bash openssl openssl-dev taglib taglib-dev curl yasm build-base \
+    wget libbz2 bzip2-dev  zlib zlib-dev rust cargo ffmpeg-dev ffmpeg
 
-COPY . /audioserve_src
+COPY . /audioserve 
+WORKDIR /audioserve
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-
-RUN mkdir ffmpeg-static &&\
-    curl -sL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar xJv -C ffmpeg-static --strip-components=1 --wildcards "*/ffmpeg" &&\
-    cp /ffmpeg-static/ffmpeg /usr/bin
-
-
-RUN export PATH=${HOME}/.cargo/bin:$PATH &&\
-    cd audioserve_src &&\
-    cargo build --release ${FEATURES} &&\
-    cargo test --release ${FEATURES}
-
-RUN cd audioserve_src/client &&\
-    npm install &&\
-    npm run build
+RUN cargo build --release ${CARGO_ARGS} &&\
+    cargo test --release ${CARGO_ARGS}
 
 RUN mkdir /ssl &&\
     cd /ssl &&\
@@ -32,19 +19,27 @@ RUN mkdir /ssl &&\
         -subj "/C=CZ/ST=Prague/L=Prague/O=Ivan/CN=audioserve" &&\
     openssl pkcs12 -inkey key.pem -in certificate.pem -export  -passout pass:mypass -out audioserve.p12 
 
-FROM debian:stretch-slim
+FROM node:10-alpine as client
+
+COPY ./client /audioserve_client
+
+RUN cd audioserve_client &&\
+    npm install &&\
+    npm run build
+
+FROM alpine:edge
 
 VOLUME /audiobooks
-COPY --from=build /audioserve_src/target/release/audioserve /audioserve/audioserve
-COPY --from=build /audioserve_src/client/dist /audioserve/client/dist
+COPY --from=build /audioserve/target/release/audioserve /audioserve/audioserve
+COPY --from=client /audioserve_client/dist /audioserve/client/dist
 COPY --from=build /ssl/audioserve.p12 /audioserve/ssl/audioserve.p12
-COPY --from=build /ffmpeg-static/ffmpeg /usr/bin
 
-RUN adduser audioserve &&\
+RUN adduser -D -u 1000 audioserve &&\
     chown -R audioserve:audioserve /audioserve &&\
-    apt -o Acquire::https::No-Cache=True -o Acquire::http::No-Cache=True update &&\
-    apt-get install -y libssl1.1 libtag1v5 libtagc0 libbz2-1.0
-   
+    apk update &&\
+    apk add libssl1.1 taglib \
+    libbz2 zlib ffmpeg
+
 WORKDIR /audioserve
 USER audioserve
 
@@ -54,3 +49,9 @@ EXPOSE ${PORT}
 
 ENTRYPOINT [ "./audioserve" ] 
 CMD [ "--no-authentication", "/audiobooks" ]
+
+
+
+
+
+

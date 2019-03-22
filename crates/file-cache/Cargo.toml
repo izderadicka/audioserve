@@ -1,0 +1,27 @@
+[package]
+name = "simple-file-cache"
+version = "0.1.4"
+authors = ["Ivan <ivan.zderadicka@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+linked-hash-map = "0.5.1"
+#filetime = "0.2"
+rand = "0.6"
+data-encoding = "2.1.1"
+quick-error ="1.2"
+log = "0.4"
+byteorder = "1.2"
+
+tokio = { version="0.1", optional=true }
+tokio-threadpool = { version = "0.1", optional = true}
+
+[features]
+asynch = ["tokio", "tokio-threadpool"]
+
+[dev-dependencies]
+env_logger = "0.6"
+tempfile ="3.0"
+futures = "0.1.25"
+
+

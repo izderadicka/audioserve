@@ -1,6 +1,9 @@
 target
+**/target
 .vscode
 npm-debug.log
 **/node_modules
-Dockerfile
+Dockerfile*
 README.md
+_static_build
+.travis.yml

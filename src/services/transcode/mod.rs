@@ -597,13 +597,12 @@ mod tests {
         let meta = get_audio_properties(&out_file).expect("Cannot get audio file meta") ;
         let audio_len = if copy_file.is_some() {1} else {2};
         let dur = audio_len - seek.map(|s| s.round() as u32).unwrap_or(0);
-        if cfg!(feature="libavformat") {
+        
         match meta.get_audio_info() {
             Some(ai) => assert_eq!(ai.duration, dur ),
-            //for some reason libtag sometimes is not able to get info or is unreliable, but it looks like file is OK
             None =>  {panic!("Cannot get audio info")}
         }
-        }
+        
         
         
         if remove { 

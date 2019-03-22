@@ -163,7 +163,6 @@ pub struct Config {
     #[cfg(feature="transcoding-cache")]
     pub transcoding_cache: TranscodingCacheConfig,
     pub disable_folder_download: bool,
-    #[cfg(feature="chapters")]
     pub chapters: ChaptersSize
 }
 
@@ -266,17 +265,7 @@ fn create_parser<'a>() -> Parser<'a> {
         .arg(Arg::with_name("cors")
             .long("cors")
             .help("Enable CORS - enabled any origin of requests")
-        );
-
-    if cfg!(feature = "folder-download")   {
-        parser = parser.arg(Arg::with_name("disable-folder-download")
-                .long("disable-folder-download")
-                .help("Disables API point for downloading whole folder")
-        );
-    }
-
-    if cfg!(feature = "chapters") {
-        parser = parser
+        )
         .arg(Arg::with_name("chapters-from-duration")
             .long("chapters-from-duration")
             .takes_value(true)
@@ -286,7 +275,13 @@ fn create_parser<'a>() -> Parser<'a> {
             .long("chapters-duration")
             .takes_value(true)
             .help("If long files is presented as chapters, one chapter has x mins [default: 30]")
-        )
+        );
+
+    if cfg!(feature = "folder-download")   {
+        parser = parser.arg(Arg::with_name("disable-folder-download")
+                .long("disable-folder-download")
+                .help("Disables API point for downloading whole folder")
+        );
     }
 
     if cfg!(feature = "tls") {
@@ -544,7 +539,7 @@ pub fn parse_args() -> Result<(), Error> {
         true
     };
 
-    #[cfg(feature="chapters")]
+    
     let chapters = {
         let mut c = ChaptersSize::default();
         let from_duration = args.value_of("chapters-from-duration")
@@ -585,7 +580,6 @@ pub fn parse_args() -> Result<(), Error> {
         #[cfg(feature="transcoding-cache")]
         transcoding_cache: _transcoding_cache.unwrap(),
         disable_folder_download,
-        #[cfg(feature="chapters")]
         chapters
 
     };
@@ -625,7 +619,6 @@ pub fn init_default_config() {
         #[cfg(feature="transcoding-cache")]
         transcoding_cache: TranscodingCacheConfig::default(),
         disable_folder_download: false,
-        #[cfg(feature="chapters")]
         chapters: ChaptersSize::default()
     };
     unsafe {

@@ -28,9 +28,6 @@ extern crate dirs;
 extern crate tokio;
 extern crate tokio_process;
 extern crate tokio_threadpool;
-#[cfg(not(feature="libavformat"))]
-extern crate taglib;
-#[cfg(feature="libavformat")]
 extern crate media_info;
 
 // for TLS
@@ -232,10 +229,8 @@ fn main() {
     };
     pretty_env_logger::init();
     debug!("Started with following config {:?}", get_config());
-
-    #[cfg(feature="libavformat")] {
-        media_info::init()
-    }
+    
+    media_info::init();
     
     #[cfg(feature="transcoding-cache")]
     {

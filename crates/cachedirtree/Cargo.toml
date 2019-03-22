@@ -1,0 +1,24 @@
+[package]
+name = "cachedirtree"
+version = "0.1.1"
+authors = ["Ivan <ivan.zderadicka@gmail.com>"]
+#edition = "2018"
+
+[dependencies]
+ego-tree="0.5"
+bit-vec = "0.5"
+notify = "4.0"
+derive_builder = "0.7"
+
+
+[dependencies.log]
+version = "0.4"
+features=[ "max_level_trace", "release_max_level_warn"]
+
+
+[dev-dependencies]
+env_logger = "0.5"
+
+[features]
+default=["symlinks"]
+symlinks=[]

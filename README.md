@@ -32,10 +32,11 @@ You can have several libraries/ collections - just use several root directories 
 
 By default symbolic(soft) links are not followed in the collections directory (because if incorretly used it can have quite negative impact on search and browse), but they can be enabled by `--allow-soflinks` program argument.
 
-### Single file audiobooks - chapters
+### Single file audiobooks and chapters
 
 Recently better support for .m4b (one file with chapters metadata) and similar was added. Such file is presented as a folder, which contains chapters. Also long audiofile without chapters meta, can be split into equaly sized parts/chapters (this has a slight disadvantage as split can be in middle of word). To enable later use `--chapters-from-duration` to set a limit, from which it should be used, and `chapters-duration` to set a duration of a part.
 There are some small glitches with this approach - search still works on directories only and cover and description metadata are yet not working (plan is to extract them from the audio file metadata). Apart of that chapters behaves like other audio files - can be transcoded to lower bitrates, seeked within etc.
+Also beware that web client will often load same part of chapter again if you're seeking within it (especially Firefox with m4b), so it's definitelly not bandwidth optimal (similar issue appears when often seeking in trancoded file).
 
 Security
 --------
@@ -78,7 +79,7 @@ Optionally you can enable transcoding cache (by compiling audioserve with `trans
 Transcoding
 -----------
 
-Audioserve offers possibility to transcode audio files to opus format (opus codec, ogg or webm container) to save bandwidth and volume of transfered data. For transcoding to work `ffmpeg` program must be installed and available on system's PATH.
+Audioserve offers possibility to transcode audio files to opus format (opus codec, ogg or webm container) or few other formats to save bandwidth and volume of transfered data. For transcoding to work `ffmpeg` program must be installed and available on system's PATH.
 Transconding is provided in three variants and client can choose between then (using query parameter `trans` with value l,m or h):
 
 * low - (default 32 kbps opus with 12kHz cutoff mono)
@@ -109,7 +110,7 @@ high:
 
 In each key first you have specification of codec-container combination, currently it supports `opus-in-ogg`, `opus-in-webm`, `mp3`, `aac-in-adts` (but other containers or codecs can relatively easily be added, provided they are supported by ffmpeg and container creation does not require seekable output - like MP4 container).
 
-I have good experinces with `opus-in-ogg`, which is also default. `opus-in-webm` works well in browsers (and is supported  in browsers MSE API), but as it does not contain audio duration after trascoding, audio cannot be sought during playback in Android client, which is significant drawback. `mp3` is classical MPEG-2 Audio Layer III audio stream. It has three parametes. `aac-in-adts` AAC encoded audio in ADTS stream, similarly as `opus-in-webm` it has problems with seeking in Android client.
+I have good experinces with `opus-in-ogg`, which is also default. `opus-in-webm` works well in browsers (and is supported  in browsers MSE API), but as it does not contain audio duration after trascoding, audio cannot be sought during playback in Android client, which is significant drawback. `mp3` is classical MPEG-2 Audio Layer III audio stream. `aac-in-adts` is AAC encoded audio in ADTS stream, it also may have problems with seeking in Android client.
 
 For opus transcodings there are 3 other parameters, where `bitrate` is desired bitrate in kbps, `compression_level` is determining audio quality and speed of transcoding with values 1-10 ( 1 - worst quality, but fastest, 10 - best quality, but slowest ) and `cutoff` is determining audio freq. bandwidth (NarrowBand => 4kHz, MediumBand => 6kHz, WideBand => 8kHz, SuperWideBand => 12kHz, FullBand => 20kHz).
 
@@ -126,7 +127,7 @@ You can overide one two or all three defaults, depending on what sections you ha
 Command line
 ------------
 
-Check with `audioserve -h`. Only two required arguments are shared secrect and root of media library (as noted above you can have severals libraries).
+Check with `audioserve -h`. Only two required arguments are shared secrect (or option `--no-authentication` for public access) and root of media library (as noted above you can have severals libraries).
 `audioserve`  is server executable and it also needs web client files , which are `index.html` and `bundle.js`, which are defaultly in `./client/dist`, but their location can by specified by argument `-c`.
 
 Android client
@@ -177,19 +178,34 @@ In the above example, we are adding two different collections of audiobooks (col
 Both are made available to the container via `-v` option and then passed to audioserve on command line.
 We set the shared secret via `-s` argument and specify use of TLS via `--ssl-key` and `ssl-key-password` (the test key is already prebundled in the image). We also enable search cache with `--search-cache` argument.
 
+### Static build (Linux)
+Static build of audioserve is available (for rencent releases) at [github releases page](https://github.com/izderadicka/audioserve/releases). You can can just download and extract locally and run on any modern x86_64 linux.
+You can also create your own static build with script `build_static.sh` (Docker is required for this)
 
-### Local installation (Linux)
+
+### Local build (Linux)
+
+Now audioserve depends on ffmpeg's libavformat 4.1 (and it's dependent libavutil and libavcodec), which is a complex beast. If you are building locally you need this dependence (plus couple of others). If you have available right version on your system you can link against it (remember it has to be correct version). Other option is to use feature `partially-static`, which will download right version of ffmpeg, compile it and statically linked it into audioserve (but then it'll be indeed bigger).
 
 Install required dependencies (some dependecies are optional, depending on features chosen in build):
 
     # Ubuntu - for other distros look for equivalent packages
-    sudo apt-get install -y  openssl libssl-dev libtag1-dev libtagc0-dev ffmpeg yasm build-essential wget libbz2-dev
+    sudo apt-get install -y  openssl libssl-dev \
+        ffmpeg yasm build-essential wget libbz2-dev zlib1g-dev libavformat-dev
 
 Clone repo with:
 
     git clone https://github.com/izderadicka/audioserve
 
-To install locally you need recent [Rust](https://www.rust-lang.org/en-US/install.html) and [NodeJS](https://nodejs.org/en/download/package-manager/) installed - compile with `cargo build --release` (Rust code have optional system dependencies to openssl, taglib, zlib, bz2lib). Optionaly you can compile with/without features (see below for details).
+To install locally you need recent [Rust](https://www.rust-lang.org/en-US/install.html) and [NodeJS](https://nodejs.org/en/download/package-manager/) installed.  
+
+CompileRust code (it has optional system dependencies to openssl,zlib, bz2lib). Optionaly you can compile with/without features (see below for details).
+
+    cargo build --release
+
+or if do not have correct version of libavformat around:
+
+    cargo build --release --features partially-static
 
 Build client in its directory (`cd client`):
 
@@ -198,12 +214,12 @@ Build client in its directory (`cd client`):
 
 ### Other platforms
 
-Theoretically audioserve can work on Windows and MacOS (probably with few changes in the code), but I never tried to build it there. Any help in this area is welcomed.
+Theoretically audioserve can work on Windows and MacOS (probably with only  few changes in the code and building process (of libavformat)), but I never tried to build it there. Any help in this area is welcomed.
 
 ### Compiling without default features or with non-default features
 
-TLS support (feature `tls`), symbolic links (feature `symlinks`) and search cache (feature `search-cache`) are default features, but you can compile without them - just add `--no-default-features` option to `cargo build` command. And then evetually choose only features you need. 
-To add non-default features (like `transcoding-cache` or `libavformat`) compile with this option `--features transcoding-cache` in `cargo build` command. Or you can use option `--all-features` to enable all available features.
+TLS support (feature `tls`), symbolic links (feature `symlinks`) and search cache (feature `search-cache`) and folder download (feature `folder-download`) are default features, but you can compile without them - just add `--no-default-features` option to `cargo build` command. And then evetually choose only features you need.
+To add non-default features (like `transcoding-cache`) compile with this option `--features transcoding-cache` in `cargo build` command.
 
 **Available features:**
 

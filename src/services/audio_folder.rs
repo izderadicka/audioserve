@@ -46,12 +46,7 @@ enum DirType {
     Other,
 }
 
-#[cfg(not(feature="chapters"))]
-fn split_chapters(_dur: u32) -> Vec<Chapter> {
-    unimplemented!()
-}
 
-#[cfg(feature="chapters")]
 fn split_chapters(dur: u32) -> Vec<Chapter> {
 
     let chap_length = get_config().chapters.duration as u64 * 60 * 1000;
@@ -127,12 +122,7 @@ fn path_for_chapter(p: &Path, chap: &Chapter) -> PathBuf {
 lazy_static! {
     static ref CHAPTER_PSEUDO_RE: Regex = Regex::new(r"\$\$(\d+)-(\d*)\$\$").unwrap();
 }
-#[cfg(not(feature = "chapters"))]
-pub fn parse_chapter_path(p: &Path) -> (&Path, Option<TimeSpan>) {
-    (p, None)
-}
 
-#[cfg(feature = "chapters")]
 pub fn parse_chapter_path(p: &Path) -> (&Path, Option<TimeSpan>) {
     let fname = p.file_name().and_then(|s| s.to_str());
     if let Some(fname) = fname {
@@ -186,12 +176,6 @@ fn list_dir_file<P: AsRef<Path>>(
     })
 }
 
-#[cfg(not(feature="chapters"))]
-fn is_long_file(_meta: Option<&AudioMeta>) -> bool {
-    false
-}
-
-#[cfg(feature="chapters")]
 fn is_long_file(meta: Option<&AudioMeta>) -> bool {
     meta
     .map(|m| {
@@ -403,16 +387,13 @@ mod tests {
     #[test]
     fn test_list_dir() {
         init_default_config();
-        #[cfg(feature = "libavformat")]
-        {
-            media_info::init()
-        }
+        media_info::init();
         let res = list_dir("/non-existent", "folder");
         assert!(res.is_err());
         let res = list_dir("./", "test_data/");
         assert!(res.is_ok());
         let folder = res.unwrap();
-        let num_media_files = if cfg!(feature = "libavformat") { 3 } else { 2 };
+        let num_media_files =  3;
         assert_eq!(folder.files.len(), num_media_files);
         assert!(folder.cover.is_some());
         assert!(folder.description.is_some());
@@ -440,10 +421,8 @@ mod tests {
 
     #[test]
     fn test_meta() {
-        #[cfg(feature = "libavformat")]
-        {
-            media_info::init()
-        }
+        
+        media_info::init();
         let path = Path::new("./test_data/01-file.mp3");
         let res = get_audio_properties(path);
         assert!(res.is_ok());
@@ -453,7 +432,7 @@ mod tests {
         assert_eq!(meta.duration, 2);
     }
 
-    #[cfg(feature = "chapters")]
+    
     #[test]
     fn test_pseudo_file() {
         let fname = format!(
