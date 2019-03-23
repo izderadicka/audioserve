@@ -22,5 +22,5 @@ cp target/x86_64-alpine-linux-musl/release/audioserve $BUILD_DIR/$AS_DIR
 cp -r client/dist $BUILD_DIR/$AS_DIR/client
 
 cd $BUILD_DIR
-tar czvf $AS_DIR.tar.gz $AS_DIR
+tar czvf audioserve_static.tar.gz $AS_DIR
 
