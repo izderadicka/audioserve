@@ -30,7 +30,7 @@ extern crate tokio_process;
 extern crate tokio_threadpool;
 extern crate media_info;
 
-// for TLS
+// optional dependencies enabled by features
 #[cfg(feature = "search-cache")]
 extern crate cachedirtree;
 #[cfg(feature = "tls")]
