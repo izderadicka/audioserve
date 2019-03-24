@@ -29,6 +29,7 @@ extern crate tokio;
 extern crate tokio_process;
 extern crate tokio_threadpool;
 extern crate media_info;
+extern crate csv;
 
 // optional dependencies enabled by features
 #[cfg(feature = "search-cache")]

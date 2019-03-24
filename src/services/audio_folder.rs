@@ -46,9 +46,7 @@ enum DirType {
     Other,
 }
 
-
 fn split_chapters(dur: u32) -> Vec<Chapter> {
-
     let chap_length = get_config().chapters.duration as u64 * 60 * 1000;
     let mut count = 0;
     let mut start = 0u64;
@@ -57,21 +55,21 @@ fn split_chapters(dur: u32) -> Vec<Chapter> {
     while start < tot {
         let end = start + chap_length;
         let dif: i64 = tot as i64 - end as i64;
-        let end = if  dif < chap_length as i64 /3 { tot} else {end};
-        chaps.push(
-            Chapter{
-                title: format!("Part {}", count),
-                start,
-                end,
-                number: count
-
-            }
-        );
+        let end = if dif < chap_length as i64 / 3 {
+            tot
+        } else {
+            end
+        };
+        chaps.push(Chapter {
+            title: format!("Part {}", count),
+            start,
+            end,
+            number: count,
+        });
         count += 1;
         start = end;
     }
     chaps
-
 }
 
 fn get_dir_type<P: AsRef<Path>>(path: P) -> Result<DirType, io::Error> {
@@ -91,19 +89,100 @@ fn get_dir_type<P: AsRef<Path>>(path: P) -> Result<DirType, io::Error> {
                 chapters,
                 audio_meta,
             }),
-            (None, Some(audio_meta)) => {
-                if is_long_file(Some(&audio_meta)) {
-                    let chapters = split_chapters(audio_meta.duration);
-                    Ok(DirType::File{chapters, audio_meta})
-                } else {
-                    Ok(DirType::Other)
+            (None, Some(audio_meta)) => match chapters_from_csv(&path)? {
+                Some(chapters) => {
+                    if chapters.len() > 1 {
+                        Ok(DirType::File {
+                            chapters,
+                            audio_meta,
+                        })
+                    } else {
+                        error!("Chapter file for {:?} has less then two chapters!", &path);
+                        Ok(DirType::Other)
+                    }
                 }
-            }
+                None => {
+                    if is_long_file(Some(&audio_meta)) {
+                        let chapters = split_chapters(audio_meta.duration);
+                        Ok(DirType::File {
+                            chapters,
+                            audio_meta,
+                        })
+                    } else {
+                        Ok(DirType::Other)
+                    }
+                }
+            },
             _ => Ok(DirType::Other),
         }
     } else {
         Ok(DirType::Other)
     }
+}
+
+fn ms_from_time(t: &str) -> Option<u64> {
+    let data = t.split(':');
+    let res = data
+        .map(|n| n.parse::<f32>())
+        .try_rfold((0f32, 1f32), |acc, x| {
+            x.map(|y| (acc.0 + acc.1 * y, acc.1 * 60f32))
+        })
+        .map(|r| (r.0 * 1000f32).round() as u64)
+        .map_err(|e| error!("Invalid time specification: {} - {}", t, e));
+    res.ok()
+}
+
+
+fn chapters_file_path(path: &Path) -> Option<PathBuf> {
+    path.file_name().map(|n| {
+        let mut f = n.to_owned();
+        f.push(".chapters");
+        f
+    }).map(|f| {
+        path.with_file_name(f)
+    })
+}
+
+fn chapters_from_csv(path: &Path) -> Result<Option<Vec<Chapter>>, io::Error> {
+    
+    if let Some(chapters_file) = chapters_file_path(path) {
+
+        if chapters_file.is_file() {
+            let mut reader = csv::Reader::from_path(&chapters_file)
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+            let records = reader.records()
+                .filter_map(|r| {
+                    match r {
+                        Err(e) => {
+                            error!("Invalid line in chapters file {:?} -  {}", &chapters_file, e);
+                            None
+                        }
+                        Ok(r) => Some(r)
+                    }
+                })
+                .filter_map(|r| {
+                    match (r.get(0).map(|r| r.to_owned()), r.get(1).and_then(ms_from_time), 
+                        r.get(2).and_then(ms_from_time)) {
+                        (Some(title), Some(start), Some(end)) => {
+
+                            Some((title,start, end))
+
+                        }
+                        _ => {
+                            error!("Invalid line {:?} in chapters file {:?} - missing or invalid fields", r.position(), &chapters_file);
+                            None
+                        }
+                    }
+                })
+                .enumerate()
+                .map(|(number, (title, start, end))| Chapter{number: number as u32,title, start,end})
+                .collect();
+            return Ok(Some(records));
+        }
+    }
+
+    Ok(None)
 }
 
 fn path_for_chapter(p: &Path, chap: &Chapter) -> PathBuf {
@@ -177,11 +256,9 @@ fn list_dir_file<P: AsRef<Path>>(
 }
 
 fn is_long_file(meta: Option<&AudioMeta>) -> bool {
-    meta
-    .map(|m| {
+    meta.map(|m| {
         let max_dur = get_config().chapters.from_duration * 60;
-        max_dur > 60*10 && m.duration
-            > max_dur
+        max_dur > 60 * 10 && m.duration > max_dur
     })
     .unwrap_or(false)
 }
@@ -227,7 +304,10 @@ fn list_dir_dir<P: AsRef<Path>>(base_dir: P, full_path: PathBuf) -> Result<Audio
                                         })
                                     } else {
                                         let meta = meta.get_audio_info();
-                                        if is_long_file((&meta).as_ref())
+                                        if is_long_file((&meta).as_ref()) || 
+                                            chapters_file_path(&audio_file_path)
+                                            .and_then(|p| if p.is_file() {Some(())} else {None})
+                                            .is_some() 
                                         {
                                             // file is bigger then limit present as folder
                                             subfolders.push(AudioFolderShort {
@@ -393,7 +473,7 @@ mod tests {
         let res = list_dir("./", "test_data/");
         assert!(res.is_ok());
         let folder = res.unwrap();
-        let num_media_files =  3;
+        let num_media_files = 3;
         assert_eq!(folder.files.len(), num_media_files);
         assert!(folder.cover.is_some());
         assert!(folder.description.is_some());
@@ -421,7 +501,6 @@ mod tests {
 
     #[test]
     fn test_meta() {
-        
         media_info::init();
         let path = Path::new("./test_data/01-file.mp3");
         let res = get_audio_properties(path);
@@ -432,7 +511,6 @@ mod tests {
         assert_eq!(meta.duration, 2);
     }
 
-    
     #[test]
     fn test_pseudo_file() {
         let fname = format!(
@@ -444,6 +522,23 @@ mod tests {
         assert_eq!(Path::new("kniha"), p);
         assert_eq!(span.start, 1234);
         assert_eq!(span.duration, Some(5678u64 - 1234));
+    }
+
+    #[test]
+    fn test_chapters_file() {
+        pretty_env_logger::init();
+        let path = Path::new("./test_data/01-file.mp3");
+        let chapters = chapters_from_csv(path).unwrap().unwrap();
+        assert_eq!(3, chapters.len());
+        let ch3 = &chapters[2];
+        assert_eq!("Chapter 3", ch3.title);
+        assert_eq!(3000, ch3.end);
+    }
+
+    #[test]
+    fn test_time_parsing() {
+        assert_eq!(Some(1100), ms_from_time("1.1"));
+        assert_eq!(Some((1000f32* (2f32* 3600f32 + 35f32*60f32 + 1.1)) as u64), ms_from_time("02:35:01.1"));
     }
 
 }

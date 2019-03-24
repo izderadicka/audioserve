@@ -229,9 +229,9 @@ impl Transcoder {
             .args(&[
                 "-y",
                 "-map_metadata",
-                "0",
+                "-1", // removing metadata as we do not need them
                 "-map",
-                "a",
+                "a", // and we need only audio stream
             ]); 
      } 
 
@@ -287,20 +287,7 @@ impl Transcoder {
         )
     }
 
-    //TODO - keeping it for a while if we need to check clients
-    // #[allow(dead_code)]
-    // pub fn should_transcode(&self, bitrate: u32, mime: &Mime) -> bool {
-    //     if super::types::must_transcode(mime) {
-    //         return true;
-    //     }
-    //     trace!(
-    //         "Should transcode {} > {}",
-    //         bitrate,
-    //         self.quality.transcode_from()
-    //     );
-    //     bitrate > self.quality.transcode_from()
-    // }
-
+    
     pub fn transcoded_mime(&self) -> Mime {
         self.quality.mime()
     }
