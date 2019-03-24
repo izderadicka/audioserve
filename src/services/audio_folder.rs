@@ -473,10 +473,12 @@ mod tests {
         let res = list_dir("./", "test_data/");
         assert!(res.is_ok());
         let folder = res.unwrap();
-        let num_media_files = 3;
+        let num_media_files = 2;
+        let num_folders =2;
         assert_eq!(folder.files.len(), num_media_files);
         assert!(folder.cover.is_some());
         assert!(folder.description.is_some());
+        assert_eq!(num_folders, folder.subfolders.len());
     }
 
     #[cfg(feature = "folder-download")]
