@@ -409,7 +409,7 @@ export class AudioPlayer {
         let queryIndex = this._player.src.indexOf("&seek=");
         let baseUrl = queryIndex > 0 ? this._player.src.substr(0, queryIndex) : this._player.src;
         let wasPlaying = !this._player.paused;
-        let url = baseUrl + `&seek=${time}`;
+        let url = baseUrl + `&seek=${Math.round(time * 1000)/1000}`;
         this._timeOffset = time;
         this._player.src = url;
         this._player.currentTime = 0;
