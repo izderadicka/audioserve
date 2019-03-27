@@ -588,7 +588,7 @@ $(function () {
     transSelect.on("change", (evt) => {
         let val = transSelect.filter(":checked").val();
         setTranscoding(val);
-        document.location.reload();
+        reloadCurrentFolder(true);
 
     });
 
@@ -597,7 +597,7 @@ $(function () {
         let val = orderSelect.filter(":checked").val();
         window.localStorage.setItem("audioserver_ordering", val);
         ordering = val;
-        document.location.reload();
+        reloadCurrentFolder(true);
     });
 
     // Intial value of ordering
@@ -609,8 +609,11 @@ $(function () {
         evt.stopPropagation();
     });
 
+    const reloadCurrentFolder = (fromHistory) => loadFolder(window.localStorage.getItem("audioserve_folder") || 
+        "", fromHistory);
+
     loadCollections().then(() => {
-        loadFolder(window.localStorage.getItem("audioserve_folder") || "");
+        reloadCurrentFolder();
         $("#splash").hide().addClass("transparent");
     });
 });
