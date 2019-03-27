@@ -2,7 +2,7 @@ use self::auth::Authenticator;
 use self::search::Search;
 use self::subs::{
     collections_list, get_folder, search, send_file, send_file_simple, short_response_boxed,
-    transcodings_list, ResponseFuture, NOT_FOUND_MESSAGE, download_folder, recent
+    transcodings_list, ResponseFuture, NOT_FOUND_MESSAGE, download_folder, recent, FoldersOrdering
 };
 use self::transcode::QualityLevel;
 use config::get_config;
@@ -223,7 +223,11 @@ impl<C> FileSendService<C> {
                             transcoding_quality,
                         )
                     } else if path.starts_with("/folder/") {
-                        get_folder(base_dir, get_subpath(&path, "/folder/"))
+                        let ord = params.as_ref()
+                        .and_then(|p| p.get("ord")
+                        .map(|l| FoldersOrdering::from_letter(l)))
+                        .unwrap_or(FoldersOrdering::Alphabetical);
+                        get_folder(base_dir, get_subpath(&path, "/folder/"), ord)
                     } else if !get_config().disable_folder_download && path.starts_with("/download") {
                         download_folder(base_dir, get_subpath(&path, "/download/"))
                     } else if path == "/search" {

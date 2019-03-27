@@ -1,7 +1,7 @@
 use super::audio_folder::list_dir;
 #[cfg(feature = "folder-download")]
-use super::audio_folder::list_dir_files_only;
-use super::audio_folder::parse_chapter_path;
+use super::audio_folder::{list_dir_files_only, parse_chapter_path};
+pub use super::audio_folder::FoldersOrdering;
 use super::search::{Search, SearchTrait};
 use super::transcode::{guess_format, AudioFilePath, QualityLevel, TimeSpan};
 use super::types::*;
@@ -376,9 +376,9 @@ pub fn send_file<P: AsRef<Path>>(
     }
 }
 
-pub fn get_folder(base_path: &'static Path, folder_path: PathBuf) -> ResponseFuture {
+pub fn get_folder(base_path: &'static Path, folder_path: PathBuf, ordering: FoldersOrdering) -> ResponseFuture {
     Box::new(
-        poll_fn(move || blocking(|| list_dir(&base_path, &folder_path)))
+        poll_fn(move || blocking(|| list_dir(&base_path, &folder_path, ordering)))
             .map(|res| match res {
                 Ok(folder) => json_response(&folder),
                 Err(_) => short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE),

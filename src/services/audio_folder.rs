@@ -9,6 +9,21 @@ use super::types::*;
 use crate::config::get_config;
 use regex::Regex;
 
+#[derive(Clone, Copy)]
+pub enum FoldersOrdering {
+    Alphabetical,
+    RecentFirst
+}
+
+impl FoldersOrdering {
+    pub fn from_letter(l: &str) -> Self {
+        match l {
+            "m" => FoldersOrdering::RecentFirst,
+            _ => FoldersOrdering::Alphabetical
+        }
+    }
+}
+
 fn os_to_string(s: ::std::ffi::OsString) -> String {
     match s.into_string() {
         Ok(s) => s,
@@ -22,10 +37,11 @@ fn os_to_string(s: ::std::ffi::OsString) -> String {
 pub fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     base_dir: P,
     dir_path: P2,
+    ordering: FoldersOrdering
 ) -> Result<AudioFolder, io::Error> {
     let full_path = base_dir.as_ref().join(&dir_path);
     match get_dir_type(&full_path)? {
-        DirType::Dir => list_dir_dir(base_dir, full_path),
+        DirType::Dir => list_dir_dir(base_dir, full_path, ordering),
         DirType::File {
             chapters,
             audio_meta,
@@ -263,7 +279,41 @@ fn is_long_file(meta: Option<&AudioMeta>) -> bool {
     .unwrap_or(false)
 }
 
-fn list_dir_dir<P: AsRef<Path>>(base_dir: P, full_path: PathBuf) -> Result<AudioFolder, io::Error> {
+struct SubFolderEntry {
+    subfolder: AudioFolderShort,
+    mtime: Option<std::time::SystemTime>
+}
+
+fn create_subfolder_entry(
+    f: &std::fs::DirEntry,
+    path: PathBuf, 
+    ordering: FoldersOrdering,
+    is_file: bool,
+    ) -> Result<SubFolderEntry, io::Error>{
+
+        Ok(SubFolderEntry {
+            subfolder: AudioFolderShort {
+                                    path,
+                                    name: os_to_string(f.file_name()),
+                                    is_file,
+                                },
+            mtime: {
+                if let FoldersOrdering::RecentFirst = ordering {
+                    Some(f.metadata()?.modified()?)
+                } else {
+                    None
+                }
+            }
+        })
+
+}
+
+fn list_dir_dir<P: AsRef<Path>>(
+        base_dir: P, 
+        full_path: PathBuf,
+        ordering: FoldersOrdering
+        ) 
+        -> Result<AudioFolder, io::Error> {
     match fs::read_dir(&full_path) {
         Ok(dir_iter) => {
             let mut files = vec![];
@@ -278,11 +328,9 @@ fn list_dir_dir<P: AsRef<Path>>(base_dir: P, full_path: PathBuf) -> Result<Audio
                         Ok(ft) => {
                             let path = f.path().strip_prefix(&base_dir).unwrap().into();
                             if ft.is_dir() {
-                                subfolders.push(AudioFolderShort {
-                                    path,
-                                    name: os_to_string(f.file_name()),
-                                    is_file: false,
-                                })
+                                subfolders.push(
+                                    create_subfolder_entry(&f, path, ordering,false)?
+                                )
                             } else if ft.is_file() {
                                 if is_audio(&path) {
                                     let mime = ::mime_guess::guess_mime_type(&path);
@@ -297,11 +345,9 @@ fn list_dir_dir<P: AsRef<Path>>(base_dir: P, full_path: PathBuf) -> Result<Audio
 
                                     if let Some(_chapters) = meta.get_chapters() {
                                         // we do have chapters so let present this file as folder
-                                        subfolders.push(AudioFolderShort {
-                                            path,
-                                            name: os_to_string(f.file_name()),
-                                            is_file: true,
-                                        })
+                                        subfolders.push(
+                                            create_subfolder_entry(&f, path, ordering,true)?
+                                        )
                                     } else {
                                         let meta = meta.get_audio_info();
                                         if is_long_file((&meta).as_ref()) || 
@@ -310,11 +356,9 @@ fn list_dir_dir<P: AsRef<Path>>(base_dir: P, full_path: PathBuf) -> Result<Audio
                                             .is_some() 
                                         {
                                             // file is bigger then limit present as folder
-                                            subfolders.push(AudioFolderShort {
-                                                path,
-                                                name: os_to_string(f.file_name()),
-                                                is_file: true,
-                                            })
+                                            subfolders.push(
+                                                create_subfolder_entry(&f, path, ordering,true)?
+                                            )
                                         } else {
                                             files.push(AudioFile {
                                                 meta: meta,
@@ -343,7 +387,20 @@ fn list_dir_dir<P: AsRef<Path>>(base_dir: P, full_path: PathBuf) -> Result<Audio
                 }
             }
             files.sort_unstable_by_key(|e| e.name.to_uppercase());
-            subfolders.sort_unstable_by_key(|e| e.name.to_uppercase());;
+            let subfolders = match ordering {
+                FoldersOrdering::Alphabetical => {
+                    let mut subs: Vec<_> = subfolders.into_iter().map(|e| e.subfolder).collect();
+                    subs.sort_unstable_by_key(|e| e.name.to_uppercase());
+                    subs
+                },
+                FoldersOrdering::RecentFirst => {
+                    //                                            V this should be save as it's either Some or code failed already
+                    subfolders.sort_unstable_by_key(|e| e.mtime.unwrap());
+                    subfolders.into_iter().map(|e| e.subfolder).collect()
+                }
+
+            };
+            
             Ok(AudioFolder {
                 files,
                 subfolders,
@@ -468,9 +525,9 @@ mod tests {
     fn test_list_dir() {
         init_default_config();
         media_info::init();
-        let res = list_dir("/non-existent", "folder");
+        let res = list_dir("/non-existent", "folder", FoldersOrdering::Alphabetical);
         assert!(res.is_err());
-        let res = list_dir("./", "test_data/");
+        let res = list_dir("./", "test_data/", FoldersOrdering::Alphabetical);
         assert!(res.is_ok());
         let folder = res.unwrap();
         let num_media_files = 2;
@@ -496,7 +553,7 @@ mod tests {
     #[test]
     fn test_json() {
         init_default_config();
-        let folder = list_dir("./", "test_data/").unwrap();
+        let folder = list_dir("./", "test_data/", FoldersOrdering::Alphabetical).unwrap();
         let json = serde_json::to_string(&folder).unwrap();
         println!("JSON: {}", &json);
     }
