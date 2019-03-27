@@ -24,6 +24,7 @@ $(function () {
     let pendingSpinner = null;
     let transcodingLimit = 58;
     let transcoding = "m";
+    let ordering ="a";
     let transcodingLimits = { l: 38, m: 56, h: 76 };
 
     function isRecent(q) {
@@ -148,7 +149,7 @@ $(function () {
     function loadFolder(path, fromHistory, scrollTo) {
         $("#info-container").hide();
         ajax({
-            url: collectionUrl + "/folder/" + path,
+            url: collectionUrl + "/folder/" + path + (ordering != "a"?`?ord=${ordering}`:""),
         }
         )
             .fail(err => {
@@ -590,6 +591,19 @@ $(function () {
         document.location.reload();
 
     });
+
+    let orderSelect = $('input[name="ordering"]');
+    orderSelect.on("change", (evt) => {
+        let val = orderSelect.filter(":checked").val();
+        window.localStorage.setItem("audioserver_ordering", val);
+        ordering = val;
+        document.location.reload();
+    });
+
+    // Intial value of ordering
+    ordering = window.localStorage.getItem("audioserver_ordering") || "a";
+    orderSelect.filter(`[value="${ordering}"]`).prop("checked", true);
+    
 
     $("#folder-download-link").on('click', (evt) => {
         evt.stopPropagation();

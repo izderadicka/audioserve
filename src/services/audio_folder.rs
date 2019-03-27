@@ -395,7 +395,7 @@ fn list_dir_dir<P: AsRef<Path>>(
                 },
                 FoldersOrdering::RecentFirst => {
                     //                                            V this should be save as it's either Some or code failed already
-                    subfolders.sort_unstable_by_key(|e| e.mtime.unwrap());
+                    subfolders.sort_unstable_by(|a,b| b.mtime.unwrap().cmp(&a.mtime.unwrap()));
                     subfolders.into_iter().map(|e| e.subfolder).collect()
                 }
 
