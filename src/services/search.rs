@@ -240,7 +240,7 @@ mod cache {
 
     impl<S: AsRef<str>> SearchTrait<S> for CachedSearch {
         fn search(&self, collection: usize, query: S, ordering: FoldersOrdering) -> SearchResult {
-            self.caches[collection]
+            let mut res = self.caches[collection]
                 .search_collected(query, |iter| {
                     let mut res = SearchResult::new();
                     iter.for_each(|e| {
@@ -253,7 +253,26 @@ mod cache {
                     res
                 })
                 .map_err(|e| error!("Search failed {}", e))
-                .unwrap_or_else(|_| SearchResult::new())
+                .unwrap_or_else(|_| SearchResult::new());
+
+            // As search cache now does not contain modified times we need to add them here
+            // This is kind of hack, but as this is probably not common I guess it's easier 
+            // then adding mtime into search cache
+            if let FoldersOrdering::RecentFirst = ordering {
+                let base_path = &get_config().base_dirs[collection];
+                //need to update mtime 
+                res.subfolders.iter_mut().for_each(|s| {
+                    let full_path = base_path.join(&s.path);
+                    if let Ok(metadata) = fs::metadata(full_path) {
+                        if let Ok(modified) = metadata.modified() {
+                            s.modified = Some(modified)
+                        }
+                    }
+
+                });
+            };
+            res.subfolders.sort_unstable_by(|a,b| a.compare_as(ordering,b));
+            res
         }
 
         fn recent(&self, collection: usize) -> SearchResult {
