@@ -588,7 +588,7 @@ $(function () {
     transSelect.on("change", (evt) => {
         let val = transSelect.filter(":checked").val();
         setTranscoding(val);
-        reloadCurrentFolder(true);
+        reloadCurrentFolder(true,true);
 
     });
 
@@ -609,8 +609,11 @@ $(function () {
         evt.stopPropagation();
     });
 
-    const reloadCurrentFolder = (fromHistory) => loadFolder(window.localStorage.getItem("audioserve_folder") || 
+    const reloadCurrentFolder = (fromHistory, resetPlayer) => {
+       if (resetPlayer) clearPlayer();
+        loadFolder(window.localStorage.getItem("audioserve_folder") || 
         "", fromHistory);
+    };
 
     loadCollections().then(() => {
         reloadCurrentFolder();
