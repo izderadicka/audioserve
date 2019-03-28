@@ -229,7 +229,7 @@ fn list_dir_file<P: AsRef<Path>>(
             AudioFile {
                 meta: Some(new_meta),
                 path: path_for_chapter(path, &chap),
-                name: format!("{:03} - {}", chap.number, chap.title),
+                name: format!("{:03} - {}", chap.number, chap.title).into(),
                 section: Some(FileSection {
                     start: chap.start,
                     duration: Some(chap.end - chap.start),
@@ -311,7 +311,7 @@ fn list_dir_dir<P: AsRef<Path>>(
                                             files.push(AudioFile {
                                                 meta: meta,
                                                 path,
-                                                name: os_to_string(f.file_name()),
+                                                name: os_to_string(f.file_name()).into(),
                                                 section: None,
                                                 mime: mime.to_string(),
                                             });

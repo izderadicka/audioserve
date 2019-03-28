@@ -137,6 +137,7 @@ impl<C> FileSendService<C> {
             .uri()
             .query()
             .map(|query| form_urlencoded::parse(query.as_bytes()).collect::<HashMap<_, _>>());
+        
         match *req.method() {
             Method::GET => {
                 let mut path = percent_decode(req.uri().path().as_bytes())
@@ -173,6 +174,10 @@ impl<C> FileSendService<C> {
                         path = new_path.unwrap();
                     }
                     let base_dir = &get_config().base_dirs[colllection_index];
+                    let ord =  params.as_ref()
+                        .and_then(|p| p.get("ord")
+                        .map(|l| FoldersOrdering::from_letter(l)))
+                        .unwrap_or(FoldersOrdering::Alphabetical);
                     if path.starts_with("/audio/") {
                         debug!(
                             "Received request with following headers {:?}",
@@ -224,16 +229,12 @@ impl<C> FileSendService<C> {
                             transcoding_quality,
                         )
                     } else if path.starts_with("/folder/") {
-                        let ord = params.as_ref()
-                        .and_then(|p| p.get("ord")
-                        .map(|l| FoldersOrdering::from_letter(l)))
-                        .unwrap_or(FoldersOrdering::Alphabetical);
                         get_folder(base_dir, get_subpath(&path, "/folder/"), ord)
                     } else if !get_config().disable_folder_download && path.starts_with("/download") {
                         download_folder(base_dir, get_subpath(&path, "/download/"))
                     } else if path == "/search" {
                         if let Some(search_string) = params.and_then(|mut p| p.remove("q")) {
-                            search(colllection_index, searcher, search_string.into_owned())
+                            search(colllection_index, searcher, search_string.into_owned(),ord)
                         } else {
                             short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
                         }

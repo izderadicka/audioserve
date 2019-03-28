@@ -290,7 +290,7 @@ $(function () {
                 type: "GET"
             }
             :{
-                url: collectionUrl + "/search",
+                url: collectionUrl + "/search" + (ordering != "a"?`?ord=${ordering}`:""),
                 type: "GET",
                 data: { q: query }
             }

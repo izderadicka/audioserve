@@ -1,5 +1,5 @@
 use super::audio_folder::get_real_file_type;
-use super::types::{AudioFolderShort, SearchResult};
+use super::types::{AudioFolderShort, FoldersOrdering, SearchResult};
 use config::get_config;
 use std::collections::BinaryHeap;
 use std::fs;
@@ -10,7 +10,7 @@ use std::time::SystemTime;
 const RECENT_LIST_SIZE: usize = 64;
 
 pub trait SearchTrait<S: AsRef<str>> {
-    fn search(&self, collection: usize, query: S) -> SearchResult;
+    fn search(&self, collection: usize, query: S, ordering: FoldersOrdering) -> SearchResult;
     fn recent(&self, collection: usize) -> SearchResult;
 }
 
@@ -22,8 +22,8 @@ pub struct Search<S: AsRef<str>> {
 }
 
 impl<S: AsRef<str>> SearchTrait<S> for Search<S> {
-    fn search(&self, collection: usize, query: S) -> SearchResult {
-        self.inner.search(collection, query)
+    fn search(&self, collection: usize, query: S, ordering: FoldersOrdering) -> SearchResult {
+        self.inner.search(collection, query, ordering)
     }
     fn recent(&self, collection: usize) -> SearchResult {
         self.inner.recent(collection)
@@ -54,8 +54,8 @@ impl<S: AsRef<str>> Search<S> {
 }
 
 impl<S: AsRef<str>> SearchTrait<S> for FoldersSearch {
-    fn search(&self, collection: usize, query: S) -> SearchResult {
-        self.search_folder(&get_config().base_dirs[collection], query)
+    fn search(&self, collection: usize, query: S, ordering: FoldersOrdering) -> SearchResult {
+        self.search_folder(&get_config().base_dirs[collection], query, ordering)
     }
 
     fn recent(&self, collection: usize) -> SearchResult {
@@ -112,7 +112,10 @@ impl FoldersSearch {
                                         if res.len() >= limit {
                                             res.pop();
                                         }
-                                        res.push(DirEntry { path: p, created:changed })
+                                        res.push(DirEntry {
+                                            path: p,
+                                            created: changed,
+                                        })
                                     }
                                 }
                             }
@@ -132,14 +135,19 @@ impl FoldersSearch {
         res
     }
 
-    fn search_folder<P: AsRef<Path>, S: AsRef<str>>(&self, base_dir: P, query: S) -> SearchResult {
-
+    fn search_folder<P: AsRef<Path>, S: AsRef<str>>(
+        &self,
+        base_dir: P,
+        query: S,
+        ordering: FoldersOrdering,
+    ) -> SearchResult {
         fn search_recursive(
             base_path: &Path,
             path: &Path,
             results: &mut SearchResult,
             tokens: &[String],
             allow_symlinks: bool,
+            ordering: FoldersOrdering,
         ) {
             if let Ok(dir_iter) = fs::read_dir(path) {
                 for item in dir_iter {
@@ -154,9 +162,16 @@ impl FoldersSearch {
                                     let m = tokens.into_iter().all(|token| lc_s.contains(token));
                                     if m {
                                         debug!("Found {:?} in {}", tokens, lc_s);
-                                        results
-                                            .subfolders
-                                            .push(AudioFolderShort::from_path(base_path, &p))
+                                        let folder = AudioFolderShort::from_dir_entry(
+                                            &f, 
+                                            s.into(), 
+                                            ordering,
+                                            false);
+                                        if let Ok(folder) = folder {
+                                            results
+                                                .subfolders
+                                                .push(folder)
+                                        }
                                     } else {
                                         search_recursive(
                                             base_path,
@@ -164,6 +179,7 @@ impl FoldersSearch {
                                             results,
                                             tokens,
                                             allow_symlinks,
+                                            ordering
                                         )
                                     }
                                 }
@@ -187,7 +203,9 @@ impl FoldersSearch {
             &mut res,
             &tokens,
             get_config().allow_symlinks,
+            ordering
         );
+        res.subfolders.sort_unstable_by(|a,b| a.compare_as(ordering,b));
         res
     }
 }
@@ -221,12 +239,16 @@ mod cache {
     }
 
     impl<S: AsRef<str>> SearchTrait<S> for CachedSearch {
-        fn search(&self, collection: usize, query: S) -> SearchResult {
+        fn search(&self, collection: usize, query: S, ordering: FoldersOrdering) -> SearchResult {
             self.caches[collection]
                 .search_collected(query, |iter| {
                     let mut res = SearchResult::new();
                     iter.for_each(|e| {
-                        res.subfolders.push(AudioFolderShort::from_path_and_name(e.name(), e.path(), false))
+                        res.subfolders.push(AudioFolderShort::from_path_and_name(
+                            e.name(),
+                            e.path(),
+                            false,
+                        ))
                     });
                     res
                 })
@@ -235,14 +257,15 @@ mod cache {
         }
 
         fn recent(&self, collection: usize) -> SearchResult {
-           let mut res = SearchResult::new();
+            let mut res = SearchResult::new();
 
             self.caches[collection]
                 .recent()
                 .map(|v| {
-                    let subfolders = v.into_iter().map(|p| {
-                        AudioFolderShort::from_path(Path::new(""), p)
-                    }).collect();
+                    let subfolders = v
+                        .into_iter()
+                        .map(|p| AudioFolderShort::from_path(Path::new(""), p))
+                        .collect();
                     res.subfolders = subfolders;
                 })
                 .map_err(|e| error!("Recents failed {}", e))
@@ -264,13 +287,13 @@ mod tests {
     fn test_search_folders() {
         init_default_config();
         let search = FoldersSearch;
-        let res = search.search_folder(TEST_DATA_DIR, "usak kulisak");
+        let res = search.search_folder(TEST_DATA_DIR, "usak kulisak", FoldersOrdering::RecentFirst);
         assert_eq!(res.subfolders.len(), 1);
 
-        let res = search.search_folder(TEST_DATA_DIR, "usak nexistuje");
+        let res = search.search_folder(TEST_DATA_DIR, "usak nexistuje", FoldersOrdering::RecentFirst);
         assert_eq!(res.subfolders.len(), 0);
 
-        let res = search.search_folder(TEST_DATA_DIR, "t");
+        let res = search.search_folder(TEST_DATA_DIR, "t", FoldersOrdering::RecentFirst);
         assert_eq!(res.subfolders.len(), 0);
     }
 
@@ -280,11 +303,15 @@ mod tests {
         let search = FoldersSearch;
         let res = search.search_folder_for_recent(TEST_DATA_DIR, 100);
         assert_eq!(2, res.subfolders.len());
-        let times = res.subfolders.into_iter().map(|p| {
-            let path = Path::new(TEST_DATA_DIR).join(p.path);
-            let meta = path.metadata().unwrap();
-            meta.modified().unwrap()
-        }).collect::<Vec<_>>();
-        assert!(times[0]>= times[1]);
+        let times = res
+            .subfolders
+            .into_iter()
+            .map(|p| {
+                let path = Path::new(TEST_DATA_DIR).join(p.path);
+                let meta = path.metadata().unwrap();
+                meta.modified().unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert!(times[0] >= times[1]);
     }
 }

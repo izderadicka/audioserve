@@ -484,12 +484,12 @@ pub fn transcodings_list() -> ResponseFuture {
     Box::new(future::ok(json_response(&transcodings)))
 }
 
-pub fn search(collection: usize, searcher: Search<String>, query: String) -> ResponseFuture {
+pub fn search(collection: usize, searcher: Search<String>, query: String, ordering: FoldersOrdering) -> ResponseFuture {
     Box::new(
         poll_fn(move || {
             let query = query.clone();
             blocking(|| {
-                let res = searcher.search(collection, query);
+                let res = searcher.search(collection, query, ordering);
                 json_response(&res)
             })
         })
