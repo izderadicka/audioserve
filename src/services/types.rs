@@ -1,8 +1,12 @@
-use config::get_config;
+use crate::config::get_config;
+use crate::util::os_to_string;
 use mime::Mime;
 use mime_guess::guess_mime_type;
-use services::transcode::{TranscodingFormat, QualityLevel};
+use services::transcode::{QualityLevel, TranscodingFormat};
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
+use std::cmp::Ordering;
+use unicase::UniCase;
 
 #[derive(Debug, Serialize)]
 pub struct TypedFile {
@@ -23,13 +27,13 @@ impl TypedFile {
 
 pub struct AudioFormat {
     pub ffmpeg: &'static str,
-    pub mime: Mime
+    pub mime: Mime,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FileSection {
     pub start: u64,
-    pub duration: Option<u64>
+    pub duration: Option<u64>,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -38,8 +42,7 @@ pub struct AudioFile {
     pub path: PathBuf,
     pub meta: Option<AudioMeta>,
     pub mime: String,
-    pub section: Option<FileSection>
-
+    pub section: Option<FileSection>,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -50,18 +53,81 @@ pub struct AudioMeta {
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AudioFolderShort {
-    pub name: String,
+    #[serde(with = "unicase_serde::unicase")]
+    pub name: UniCase<String>,
     pub path: PathBuf,
-    pub is_file: bool
+    pub is_file: bool,
+    #[serde(skip)] // May make it visible in future
+    pub modified: Option<SystemTime>,
 }
 
 impl AudioFolderShort {
-    pub fn from_path<P:AsRef<Path>>(base_path: &Path, p: P) -> Self {
+    pub fn from_path<P: AsRef<Path>>(base_path: &Path, p: P) -> Self {
         let p = p.as_ref();
         AudioFolderShort {
             name: p.file_name().unwrap().to_str().unwrap().into(),
             path: p.strip_prefix(base_path).unwrap().into(),
-            is_file: false
+            is_file: false,
+            modified: None,
+        }
+    }
+
+    pub fn from_dir_entry(
+        f: &std::fs::DirEntry,
+        path: PathBuf,
+        ordering: FoldersOrdering,
+        is_file: bool,
+    ) -> Result<Self, std::io::Error> {
+        Ok(AudioFolderShort {
+            path,
+            name: os_to_string(f.file_name()).into(),
+            is_file,
+
+            modified: {
+                if let FoldersOrdering::RecentFirst = ordering {
+                    Some(f.metadata()?.modified()?)
+                } else {
+                    None
+                }
+            },
+        })
+    }
+
+    #[cfg(feature="search-cache")]
+    pub fn from_path_and_name(name: String, path: PathBuf, is_file: bool) -> Self {
+        AudioFolderShort{
+            name: name.into(),
+            path,
+            is_file,
+            modified: None
+        }
+    }
+
+    pub fn compare_as(&self, ord: FoldersOrdering, other: &Self) -> Ordering {
+        match ord {
+            FoldersOrdering::Alphabetical => self.name.cmp(&other.name),
+            FoldersOrdering::RecentFirst => match (self.modified, other.modified) {
+                (Some(ref a), Some(ref b)) => b.cmp(a),
+                (Some(_), None) => Ordering::Less,
+                (None, Some(_)) => Ordering::Greater,
+                (None, None) => Ordering::Equal
+            }
+        }
+
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum FoldersOrdering {
+    Alphabetical,
+    RecentFirst,
+}
+
+impl FoldersOrdering {
+    pub fn from_letter(l: &str) -> Self {
+        match l {
+            "m" => FoldersOrdering::RecentFirst,
+            _ => FoldersOrdering::Alphabetical,
         }
     }
 }
@@ -76,14 +142,14 @@ pub struct Collections {
 #[derive(Debug, Serialize)]
 pub struct TranscodingSummary {
     bitrate: u32,
-    name: &'static str
+    name: &'static str,
 }
 
 impl From<TranscodingFormat> for TranscodingSummary {
     fn from(f: TranscodingFormat) -> Self {
         TranscodingSummary {
             bitrate: f.bitrate(),
-            name: f.format_name()
+            name: f.format_name(),
         }
     }
 }

@@ -226,11 +226,7 @@ mod cache {
                 .search_collected(query, |iter| {
                     let mut res = SearchResult::new();
                     iter.for_each(|e| {
-                        res.subfolders.push(AudioFolderShort {
-                            name: e.name(),
-                            path: e.path(),
-                            is_file: false //TODO: this will require  improvement if to support file search
-                        })
+                        res.subfolders.push(AudioFolderShort::from_path_and_name(e.name(), e.path(), false))
                     });
                     res
                 })

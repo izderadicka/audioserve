@@ -2,9 +2,10 @@ use self::auth::Authenticator;
 use self::search::Search;
 use self::subs::{
     collections_list, get_folder, search, send_file, send_file_simple, short_response_boxed,
-    transcodings_list, ResponseFuture, NOT_FOUND_MESSAGE, download_folder, recent, FoldersOrdering
+    transcodings_list, ResponseFuture, NOT_FOUND_MESSAGE, download_folder, recent
 };
 use self::transcode::QualityLevel;
+use self::types::FoldersOrdering;
 use config::get_config;
 use futures::{future, Future};
 use hyper::header::{

@@ -30,6 +30,7 @@ extern crate tokio_process;
 extern crate tokio_threadpool;
 extern crate media_info;
 extern crate csv;
+extern crate unicase;
 
 // optional dependencies enabled by features
 #[cfg(feature = "search-cache")]
@@ -62,6 +63,7 @@ use std::sync::Arc;
 #[cfg(feature = "tls")]
 use native_tls::Identity;
 
+mod util;
 mod config;
 mod error;
 mod services;

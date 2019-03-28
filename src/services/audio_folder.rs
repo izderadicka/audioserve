@@ -7,32 +7,8 @@ use super::audio_meta::{get_audio_properties, Chapter, MediaInfo};
 use super::transcode::TimeSpan;
 use super::types::*;
 use crate::config::get_config;
+use crate::util::os_to_string;
 use regex::Regex;
-
-#[derive(Clone, Copy)]
-pub enum FoldersOrdering {
-    Alphabetical,
-    RecentFirst
-}
-
-impl FoldersOrdering {
-    pub fn from_letter(l: &str) -> Self {
-        match l {
-            "m" => FoldersOrdering::RecentFirst,
-            _ => FoldersOrdering::Alphabetical
-        }
-    }
-}
-
-fn os_to_string(s: ::std::ffi::OsString) -> String {
-    match s.into_string() {
-        Ok(s) => s,
-        Err(s) => {
-            warn!("Invalid file name - cannot covert to UTF8 : {:?}", s);
-            "INVALID_NAME".into()
-        }
-    }
-}
 
 pub fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     base_dir: P,
@@ -279,34 +255,6 @@ fn is_long_file(meta: Option<&AudioMeta>) -> bool {
     .unwrap_or(false)
 }
 
-struct SubFolderEntry {
-    subfolder: AudioFolderShort,
-    mtime: Option<std::time::SystemTime>
-}
-
-fn create_subfolder_entry(
-    f: &std::fs::DirEntry,
-    path: PathBuf, 
-    ordering: FoldersOrdering,
-    is_file: bool,
-    ) -> Result<SubFolderEntry, io::Error>{
-
-        Ok(SubFolderEntry {
-            subfolder: AudioFolderShort {
-                                    path,
-                                    name: os_to_string(f.file_name()),
-                                    is_file,
-                                },
-            mtime: {
-                if let FoldersOrdering::RecentFirst = ordering {
-                    Some(f.metadata()?.modified()?)
-                } else {
-                    None
-                }
-            }
-        })
-
-}
 
 fn list_dir_dir<P: AsRef<Path>>(
         base_dir: P, 
@@ -329,7 +277,7 @@ fn list_dir_dir<P: AsRef<Path>>(
                             let path = f.path().strip_prefix(&base_dir).unwrap().into();
                             if ft.is_dir() {
                                 subfolders.push(
-                                    create_subfolder_entry(&f, path, ordering,false)?
+                                    AudioFolderShort::from_dir_entry(&f, path, ordering,false)?
                                 )
                             } else if ft.is_file() {
                                 if is_audio(&path) {
@@ -346,7 +294,7 @@ fn list_dir_dir<P: AsRef<Path>>(
                                     if let Some(_chapters) = meta.get_chapters() {
                                         // we do have chapters so let present this file as folder
                                         subfolders.push(
-                                            create_subfolder_entry(&f, path, ordering,true)?
+                                            AudioFolderShort::from_dir_entry(&f, path, ordering,true)?
                                         )
                                     } else {
                                         let meta = meta.get_audio_info();
@@ -357,7 +305,7 @@ fn list_dir_dir<P: AsRef<Path>>(
                                         {
                                             // file is bigger then limit present as folder
                                             subfolders.push(
-                                                create_subfolder_entry(&f, path, ordering,true)?
+                                                AudioFolderShort::from_dir_entry(&f, path, ordering,true)?
                                             )
                                         } else {
                                             files.push(AudioFile {
@@ -386,20 +334,8 @@ fn list_dir_dir<P: AsRef<Path>>(
                     ),
                 }
             }
-            files.sort_unstable_by_key(|e| e.name.to_uppercase());
-            let subfolders = match ordering {
-                FoldersOrdering::Alphabetical => {
-                    let mut subs: Vec<_> = subfolders.into_iter().map(|e| e.subfolder).collect();
-                    subs.sort_unstable_by_key(|e| e.name.to_uppercase());
-                    subs
-                },
-                FoldersOrdering::RecentFirst => {
-                    //                                            V this should be save as it's either Some or code failed already
-                    subfolders.sort_unstable_by(|a,b| b.mtime.unwrap().cmp(&a.mtime.unwrap()));
-                    subfolders.into_iter().map(|e| e.subfolder).collect()
-                }
-
-            };
+            files.sort_unstable_by(|a,b| a.name.cmp(&b.name));
+            subfolders.sort_unstable_by(|a,b| a.compare_as(ordering, b));                    
             
             Ok(AudioFolder {
                 files,
