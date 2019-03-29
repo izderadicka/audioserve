@@ -464,7 +464,7 @@ export class AudioPlayer {
 
     togglePlay() {
         if (this._player.paused) {
-            this.play();
+            this.play(this.beforePlay);
         } else {
             this.pause();
         }
@@ -502,13 +502,19 @@ export class AudioPlayer {
         this._playPause.attributes.d.value = PLAY;
     }
 
-    play() {
-        return this._player.play()
+
+    
+    play(beforePlay) {
+        return (beforePlay?beforePlay():Promise.resolve())
+        .then((cont) => {
+        if (cont === false) return Promise.resolve();
+            return this._player.play()
             .catch((e) => {
                 this.pause();
                 console.log("Play error", e);
             }
             );
+        });
     }
 
     pause() {

@@ -138,12 +138,9 @@ $(function () {
         let bitrate = file.meta?parseInt(file.meta.bitrate):-1;
 
         if (mustTranscode || bitrate >= 0 && transcodingLimit >= 0 && bitrate > transcodingLimit) {
-            file.trans = true;
-            file.path = file.path + `?trans=${mustTranscode && 
-                (! transcoding ||transcoding=='0')?'h': transcoding}`;
+            file.trans = mustTranscode && (! transcoding ||transcoding=='0')?'h': transcoding;
         } else {
-            file.trans = false;
-            file.path = file.path + `?trans=0`;
+            file.trans = '0';
         }
     }
 
@@ -380,7 +377,17 @@ $(function () {
     }
 
     sync.open();
-    let player = new AudioPlayer(sync);
+    let player = new AudioPlayer();
+    player.beforePlay = () => {
+        const filePath = window.localStorage.getItem("audioserve_file");
+        const idx = filePath.lastIndexOf('/');
+        const folderPath = filePath.substr(0,idx);
+        return sync.queryPosition(folderPath)
+        .then((res) => {
+            console.log("Position: " + JSON.stringify(res))
+        })
+        .catch((e) => console.error(e));
+    };
 
     function playFile(target, paused, startTime) {
 
@@ -388,10 +395,11 @@ $(function () {
         target.addClass("active");
         let path = target.attr("href");
         window.localStorage.setItem("audioserve_file", path);
-        let fullUrl = collectionUrl + "/audio/" + path;
+        const trans = target.data("transcoded");
+        let fullUrl = collectionUrl + "/audio/" + path +`?trans=${trans}`;
         player.setUrl(fullUrl, {
             duration: target.data("duration"),
-            transcoded: target.data("transcoded")
+            transcoded: trans && trans != '0'
         });
         player.src = fullUrl;
         if (startTime) {
@@ -594,7 +602,7 @@ $(function () {
     transSelect.on("change", (evt) => {
         let val = transSelect.filter(":checked").val();
         setTranscoding(val);
-        reloadCurrentFolder(true,true);
+        reloadCurrentFolder(true);
 
     });
 
