@@ -87,11 +87,15 @@ There are 3 possible level of transcoding `low`, `medium`, `high`, each with nam
 
 Sample URL: https://your_server_name:3000/folder/  
 Sample URL: https://your_server_name:3000/folder/author_name/audio_book  
-Sample URL: https://your_server_name:3000/1/folder/author_name/audio_book  
+Sample URL: https://your_server_name:3000/1/folder/author_name/audio_book?ord=m  
 
 Lists available subfolders or audio files in the folder. Path starts either with `/collection number` + `/folder/` 
  (list of collections can be retrieved by API endpoint `collections`) or directly with `/folder/`, which uses then 
  collection 0 as default.
+ URL has optional query parameter `ord`, meaning ordering of subfolders, two values are now supported:
+
+* `a` alphabetical
+* `m` recent first (using folder mtime)
 
 Returns JSON:
 
@@ -163,10 +167,11 @@ This endpoint can be disabled, if audioserve is compiled without default feature
 **search**
 
 Sample URL: https://your_server_name:3000/search?q=holmes  
-Sample URL: https://your_server_name:3000/1/search?q=adams
+Sample URL: https://your_server_name:3000/1/search?q=adams&ord=m
 
 Searches collection - only one collection is searched - so it can be prefixed with with collection number to search right collection (`/x/search`).  Search term is in query string paramater `q`. It returns list of folders (and files,
 but search is not implemented for file names now), which can be used is same way as in folder listing.
+URL can contain optional `ord` query parameter, meaning ordering of results, same as in `folder` endpoint.
 
 ```json
 {
