@@ -92,6 +92,12 @@ body {
     margin-left: 5px;
 }
 
+#recent-area {
+    margin-top: 0;
+    margin-left: 0.2em;
+    float: right;
+}
+
 .duration, .bitrate {
   margin-left: 1em;
   font-size: 70%
@@ -140,7 +146,7 @@ span.transcoded {
 #collections {
     display:none;
     font-size: 0.5em;
-    width: 50%;
+    width: 48%;
     float: right;
     vertical-align: middle;
     margin-top: 0.4em;
@@ -195,6 +201,12 @@ span.subtitle {
     h1.top-header {
         font-size: 1.6rem;
     }
+
+    #recent-area {
+        margin-top: 5px;
+    }
+
+
 }
 
 @media (max-width: 770px) {
