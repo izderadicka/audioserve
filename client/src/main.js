@@ -4,9 +4,10 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./styles.css";
 import base64js from "base64-js";
 import { sha256 } from "js-sha256";
-import { AudioPlayer, formatTime } from "./player.js";
+import { AudioPlayer, formatTime } from "./player";
 import showdown from "showdown";
-import { debug } from "./debug.js";
+import { debug } from "./debug";
+import {sync} from "./sync";
 
 $(function () {
     const RECENT_QUERY = "__RECENT__";
@@ -378,7 +379,8 @@ $(function () {
         }
     }
 
-    let player = new AudioPlayer();
+    sync.open();
+    let player = new AudioPlayer(sync);
 
     function playFile(target, paused, startTime) {
 
@@ -455,6 +457,10 @@ $(function () {
 
     $("#player .audio-player").on("timeupdate", evt => {
         window.localStorage.setItem("audioserve_time", evt.detail.currentTime);
+        let currentFile = window.localStorage.getItem("audioserve_file");
+        if (currentFile) {
+            sync.sendPosition(currentFile,evt.detail.currentTime);
+        }
     });
 
     function login(secret) {
