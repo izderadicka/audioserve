@@ -384,7 +384,26 @@ $(function () {
         const folderPath = filePath.substr(0,idx);
         return sync.queryPosition(folderPath)
         .then((res) => {
-            console.log("Position: " + JSON.stringify(res))
+            console.log("Position: " + JSON.stringify(res));
+
+            const dialog = $("#position-dialog");
+            const dialogContent = $('#recent-positions');
+            dialogContent.empty();
+
+            const addToDialog = (item) => {
+                if (!item) return;
+                const li = $("<a>").addClass('list-group-item').addClass('list-group-item-action');
+                li.text(JSON.stringify(item));
+                dialogContent.append(li);
+            };
+            addToDialog(res.folder);
+            addToDialog(res.last);
+
+            dialog.modal();
+
+            return new Promise((resolve, reject) => {
+                dialog.one('hide.bs.modal', () => resolve());
+            });
         })
         .catch((e) => console.error(e));
     };
