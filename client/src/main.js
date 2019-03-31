@@ -7,13 +7,15 @@ import { sha256 } from "js-sha256";
 import { AudioPlayer, formatTime } from "./player";
 import showdown from "showdown";
 import { debug } from "./debug";
-import {sync} from "./sync";
+import { sync } from "./sync";
+import moment from "moment";
+import config from"./config";
 
 $(function () {
     const RECENT_QUERY = "__RECENT__";
     let baseUrl;
     if (AUDIOSERVE_DEVELOPMENT) {
-        baseUrl = `${window.location.protocol}//${window.location.hostname}:3000`;
+        baseUrl = `${window.location.protocol}//${window.location.hostname}:${config.DEVELOPMENT_PORT}`;
     } else {
         baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname.length > 1 ? window.location.pathname : ""}`;
     }
@@ -25,7 +27,7 @@ $(function () {
     let pendingSpinner = null;
     let transcodingLimit = 58;
     let transcoding = "m";
-    let ordering ="a";
+    let ordering = "a";
     let transcodingLimits = { l: 38, m: 56, h: 76 };
 
     function isRecent(q) {
@@ -96,12 +98,12 @@ $(function () {
             .then(() => {
                 return ajax({ url: baseUrl + "/transcodings" })
                     .then((t) => {
-                        let c = 1.2;
-                        $("#bitrate-trans-low").text( t.low.bitrate + "kbps");
+                        let c = config.TRANSCODING_MULTIPLIER;
+                        $("#bitrate-trans-low").text(t.low.bitrate + "kbps");
                         transcodingLimits.l = t.low.bitrate * c;
-                        $("#bitrate-trans-medium").text( t.medium.bitrate + "kbps");
+                        $("#bitrate-trans-medium").text(t.medium.bitrate + "kbps");
                         transcodingLimits.m = t.medium.bitrate * c;
-                        $("#bitrate-trans-high").text( t.high.bitrate + "kbps");
+                        $("#bitrate-trans-high").text(t.high.bitrate + "kbps");
                         transcodingLimits.h = t.high.bitrate * c;
 
                         if (window.localStorage.getItem("audioserver_transcoding")) {
@@ -128,26 +130,26 @@ $(function () {
 
     function forcedTranscode(file) {
         //FF does not support matroska
-        if(navigator.userAgent.indexOf("Firefox") != -1 && file.mime.indexOf("matroska")>0) return true;
+        if (navigator.userAgent.indexOf("Firefox") != -1 && file.mime.indexOf("matroska") > 0) return true;
 
         return false;
     }
 
     function calcTranscoding(file) {
         let mustTranscode = forcedTranscode(file);
-        let bitrate = file.meta?parseInt(file.meta.bitrate):-1;
+        let bitrate = file.meta ? parseInt(file.meta.bitrate) : -1;
 
         if (mustTranscode || bitrate >= 0 && transcodingLimit >= 0 && bitrate > transcodingLimit) {
-            file.trans = mustTranscode && (! transcoding ||transcoding=='0')?'h': transcoding;
+            file.trans = mustTranscode && (!transcoding || transcoding == '0') ? 'h' : transcoding;
         } else {
             file.trans = '0';
         }
     }
 
-    function loadFolder(path, fromHistory, scrollTo) {
+    function loadFolder(path, fromHistory=false, scrollTo=null, startPlay=false) {
         $("#info-container").hide();
         ajax({
-            url: collectionUrl + "/folder/" + path + (ordering != "a"?`?ord=${ordering}`:""),
+            url: collectionUrl + "/folder/" + path + (ordering != "a" ? `?ord=${ordering}` : ""),
         }
         )
             .fail(err => {
@@ -221,7 +223,7 @@ $(function () {
                     calcTranscoding(file);
                     let item = $('<a class="list-group-item list-group-item-action">')
                         .attr("href", file.path)
-                        .data("duration", file.meta?file.meta.duration:0)
+                        .data("duration", file.meta ? file.meta.duration : 0)
                         .data("transcoded", file.trans)
                         .text(file.name);
 
@@ -269,7 +271,7 @@ $(function () {
                     if (target.length) {
                         let time = window.localStorage.getItem("audioserve_time");
                         showInView(target);
-                        playFile(target, true, time);
+                        playFile(target, !startPlay, time);
                     }
                 }
             });
@@ -277,18 +279,18 @@ $(function () {
 
     function dirname(p) {
         let m = p.match(/(.*)\//);
-        return m?m[1]:m;
+        return m ? m[1] : m;
 
     }
 
     function search(query, fromHistory, scrollTo) {
-        ajax(isRecent(query)?
+        ajax(isRecent(query) ?
             {
-                url: collectionUrl +"/recent",
+                url: collectionUrl + "/recent",
                 type: "GET"
             }
-            :{
-                url: collectionUrl + "/search" + (ordering != "a"?`?ord=${ordering}`:""),
+            : {
+                url: collectionUrl + "/search" + (ordering != "a" ? `?ord=${ordering}` : ""),
                 type: "GET",
                 data: { q: query }
             }
@@ -310,14 +312,14 @@ $(function () {
                 for (let subfolder of data.subfolders) {
                     let item = $('<a class="list-group-item list-group-item-action">')
                         .attr("href", subfolder.path);
-                        
+
                     let title = $("<span>").addClass("title").text(subfolder.name);
                     item.append(title);
 
                     let dir = dirname(subfolder.path);
                     if (dir) {
-                    let path = $("<span>").addClass("subtitle").text(dir);
-                    item.append(path);
+                        let path = $("<span>").addClass("subtitle").text(dir);
+                        item.append(path);
                     }
                     subfolders.append(item);
                 }
@@ -366,7 +368,7 @@ $(function () {
     function updateBreadcrumbSearch(query) {
         let bc = $("#breadcrumb");
         let recent = isRecent(query);
-        let name = recent?"Recent":"Search";
+        let name = recent ? "Recent" : "Search";
         bc.empty();
         bc.append($('<li class="breadcrumb-item"><a href="">Home</a></li>'));
         bc.append($(`<li class="breadcrumb-item">${name}</li>`));
@@ -381,31 +383,77 @@ $(function () {
     player.beforePlay = () => {
         const filePath = window.localStorage.getItem("audioserve_file");
         const idx = filePath.lastIndexOf('/');
-        const folderPath = filePath.substr(0,idx);
+        const folderPath = filePath.substr(0, idx);
         return sync.queryPosition(folderPath)
-        .then((res) => {
-            console.log("Position: " + JSON.stringify(res));
+            .then((res) => {
+                console.log("Position: " + JSON.stringify(res));
+                const position = window.localStorage.getItem("audioserve_time");
 
-            const dialog = $("#position-dialog");
-            const dialogContent = $('#recent-positions');
-            dialogContent.empty();
+                const dialog = $("#position-dialog");
+                const dialogContent = $('#recent-positions');
+                dialogContent.empty();
+                let showDialog = false;
+                let dialogReturn = null;
 
-            const addToDialog = (item) => {
-                if (!item) return;
-                const li = $("<a>").addClass('list-group-item').addClass('list-group-item-action');
-                li.text(JSON.stringify(item));
-                dialogContent.append(li);
-            };
-            addToDialog(res.folder);
-            addToDialog(res.last);
+                const addToDialog = (item) => {
+                    if (!item) return;
+                    const itemPath = item.folder + '/' + item.file;
+                    if (itemPath == filePath && Math.abs(item.position - position) < 
+                        config.MIN_TIME_DIFFERENCE_FOR_POSITION_SHARING) return;
 
-            dialog.modal();
+                    const normName = (n) => {
+                        n =n.replace(/\$\$.*\$\$/, '');
+                        const extIndex = n.lastIndexOf('.');
+                        if (extIndex>0) {
+                            n = n.substr(0,extIndex);
+                        }
+                        return n;
+                    };
+                    const li = $("<a>").addClass('list-group-item').addClass('list-group-item-action');
+                    
+                    const content = `<h4 class="chapter">${normName(item.file)} at ${formatTime(item.position)}</h4>
+                    <div class="folder">${item.folder}</div>
+                    <div class="timestamp">${new moment(item.timeStamp).fromNow()}</div>`;
 
-            return new Promise((resolve, reject) => {
-                dialog.one('hide.bs.modal', () => resolve());
-            });
-        })
-        .catch((e) => console.error(e));
+                    li.html(content);
+                    dialogContent.append(li);
+
+                    li.one('click', (evt) => {
+                        debug(`Will jump to ${itemPath} at ${item.position}`);
+                        
+                        if (item.folder == window.localStorage.getItem("audioserve_folder")) {
+                            let target = $(`#files a[href="${itemPath}"]`);
+                            playFile(target,false,item.position);
+                        } else {
+                            window.localStorage.setItem("audioserve_folder", item.folder);
+                            window.localStorage.setItem("audioserve_file", itemPath);
+                            window.localStorage.setItem("audioserve_time", item.position);
+                            loadFolder(item.folder, false, null, true);
+                        }
+                        
+                        dialogReturn = false;
+                        dialog.modal("hide");
+                    });
+
+
+                    showDialog = true;
+                };
+
+                if (res.folder) addToDialog(res.folder);
+                const itemEq = (a,b) => b && a.file == b.file && a.folder == b.folder && a.position == b.position;
+                if (res.last && ! itemEq(res.last, res.folder)) addToDialog(res.last);
+
+                if (showDialog) {
+                    dialog.modal();
+
+                    return new Promise((resolve, reject) => {
+                        dialog.one('hide.bs.modal', () => resolve(dialogReturn));
+                    });
+                } else {
+                    return Promise.resolve();
+                }
+            })
+            .catch((e) => console.error(e));
     };
 
     function playFile(target, paused, startTime) {
@@ -415,7 +463,7 @@ $(function () {
         let path = target.attr("href");
         window.localStorage.setItem("audioserve_file", path);
         const trans = target.data("transcoded");
-        let fullUrl = collectionUrl + "/audio/" + path +`?trans=${trans}`;
+        let fullUrl = collectionUrl + "/audio/" + path + `?trans=${trans}`;
         player.setUrl(fullUrl, {
             duration: target.data("duration"),
             transcoded: trans && trans != '0'
@@ -486,7 +534,7 @@ $(function () {
         window.localStorage.setItem("audioserve_time", evt.detail.currentTime);
         let currentFile = window.localStorage.getItem("audioserve_file");
         if (currentFile) {
-            sync.sendPosition(currentFile,evt.detail.currentTime);
+            sync.sendPosition(currentFile, evt.detail.currentTime);
         }
     });
 
@@ -636,16 +684,16 @@ $(function () {
     // Intial value of ordering
     ordering = window.localStorage.getItem("audioserver_ordering") || "a";
     orderSelect.filter(`[value="${ordering}"]`).prop("checked", true);
-    
+
 
     $("#folder-download-link").on('click', (evt) => {
         evt.stopPropagation();
     });
 
     const reloadCurrentFolder = (fromHistory, resetPlayer) => {
-       if (resetPlayer) clearPlayer();
-        loadFolder(window.localStorage.getItem("audioserve_folder") || 
-        "", fromHistory);
+        if (resetPlayer) clearPlayer();
+        loadFolder(window.localStorage.getItem("audioserve_folder") ||
+            "", fromHistory);
     };
 
     loadCollections().then(() => {

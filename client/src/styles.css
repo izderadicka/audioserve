@@ -65,6 +65,10 @@ body {
     margin-bottom: 1em;
 }
 
+#recent-positions .folder {
+    font-style: italic;
+}
+
 @media (min-width: 740px) {
     #info-cover {
         float: left;
