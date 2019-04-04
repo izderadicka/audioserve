@@ -13,7 +13,7 @@ use hyper::header::{
 };
 use hyper::service::Service;
 use hyper::{Body, Method, Request, Response, StatusCode};
-use hyperx::header::{Header, Range};
+use headers::{Header, Range, HeaderMapExt};
 use percent_encoding::percent_decode;
 use regex::Regex;
 use std::collections::HashMap;
@@ -187,16 +187,18 @@ impl<C> FileSendService<C> {
 
                         let range = req
                             .headers()
-                            .get(RANGE)
-                            .and_then(|h| Range::parse_header(&h).ok());
-                        let bytes_range = match range {
-                            Some(Range::Bytes(bytes_ranges)) => {
+                            .typed_get::<Range>();
+
+                        let bytes_range = match range.map (|r| r.iter().collect::<Vec<_>>()) {
+                            Some(bytes_ranges) => {
                                 if bytes_ranges.is_empty() {
+                                    error!("Range without data");
                                     return short_response_boxed(
                                         StatusCode::BAD_REQUEST,
                                         "One range is required",
                                     );
                                 } else if bytes_ranges.len() > 1 {
+                                    error!("Range with multiple ranges is not supported");
                                     return short_response_boxed(
                                         StatusCode::NOT_IMPLEMENTED,
                                         "Do not support muptiple ranges",
@@ -205,12 +207,7 @@ impl<C> FileSendService<C> {
                                     Some(bytes_ranges[0].clone())
                                 }
                             }
-                            Some(_) => {
-                                return short_response_boxed(
-                                    StatusCode::NOT_IMPLEMENTED,
-                                    "Other then bytes ranges are not supported",
-                                )
-                            }
+                           
                             None => None,
                         };
                         let seek: Option<f32> = params

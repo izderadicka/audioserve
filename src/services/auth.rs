@@ -4,7 +4,8 @@ use crate::error::Error;
 use futures::{future, Future, Stream};
 use hyper::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, SET_COOKIE};
 use hyper::{Body, Method, Request, Response, StatusCode};
-use hyperx::header::{Authorization, Bearer, Cookie, Header};
+use headers::{Authorization, Cookie, Header, HeaderMapExt};
+use headers::{authorization::Bearer};
 use ring::digest::{digest, SHA256};
 use ring::hmac;
 use ring::rand::{SecureRandom, SystemRandom};
@@ -88,16 +89,13 @@ impl Authenticator for SharedSecretAuthenticator {
             );
         } else {
             // And in this part we check token
-            let mut token = req
-                .headers()
-                .get(AUTHORIZATION)
-                .and_then(|h| Authorization::<Bearer>::parse_header(&h).ok())
-                .map(|a| a.0.token.to_owned());
+            let mut token = 
+                req.headers().typed_get::<Authorization<Bearer>>()
+                .map(|a| a.0.token().to_owned());
             if token.is_none() {
                 token = req
                     .headers()
-                    .get(COOKIE)
-                    .and_then(|h| Cookie::parse_header(&h).ok())
+                    .typed_get::<Cookie>()
                     .and_then(|c| c.get(COOKIE_NAME).map(|v| v.to_owned()));
             }
 

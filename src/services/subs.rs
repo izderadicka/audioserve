@@ -17,9 +17,9 @@ use hyper::header::{
     LAST_MODIFIED,
 };
 use hyper::{Body, Response as HyperResponse, StatusCode};
-use hyperx::header::{CacheControl, CacheDirective, ContentRange, ContentRangeSpec, LastModified};
+use headers::{CacheControl, ContentRange, LastModified};
 #[cfg(feature = "folder-download")]
-use hyperx::header::{Charset, ContentDisposition, DispositionParam, DispositionType};
+use headers::{ContentDisposition};
 use mime;
 use mime_guess::guess_mime_type;
 use serde_json;
@@ -28,6 +28,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use tokio::io::AsyncRead;
 use tokio_threadpool::blocking;
+use std::collections::Bound;
+
+pub type ByteRangeSpec = (Bound<u64>, Bound<u64>);
 
 pub const NOT_FOUND_MESSAGE: &str = "Not Found";
 const SEVER_ERROR_TRANSCODING: &str = "Server error during transcoding process";
@@ -53,7 +56,7 @@ fn serve_file_cached_or_transcoded(
     full_path: PathBuf,
     seek: Option<f32>,
     span: Option<TimeSpan>,
-    _range: Option<::hyperx::header::ByteRangeSpec>,
+    _range: Option<ByteRangeSpec>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: QualityLevel,
 ) -> ResponseFuture {
@@ -245,7 +248,7 @@ impl<T: AsyncRead> ChunkStream<T> {
 
 fn serve_opened_file(
     file: tokio::fs::File,
-    range: Option<::hyperx::header::ByteRangeSpec>,
+    range: Option<ByteRangeSpec>,
     caching: Option<u32>,
     mime: mime::Mime,
 ) -> impl Future<Item = Response, Error = io::Error> {
@@ -258,8 +261,8 @@ fn serve_opened_file(
         let mut resp = HyperResponse::builder();
         resp.header(CONTENT_TYPE, mime.as_ref());
         if let Some(age) = caching {
-            let cache = CacheControl(vec![CacheDirective::Public, CacheDirective::MaxAge(age)]);
-            resp.header(CACHE_CONTROL, cache.to_string().as_bytes());
+            let cache = CacheControl::new().with_public().with_max_age(std::time::Duration::from_secs(age as u64));
+            resp.header(CACHE_CONTROL, cache.to_bytes());
             if let Some(last_modified) = last_modified {
                 let lm = LastModified(last_modified.into());
                 resp.header(LAST_MODIFIED, lm.to_string().as_bytes());
