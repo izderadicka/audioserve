@@ -1,9 +1,9 @@
-use config::get_config;
-use error::Error;
+use crate::config::get_config;
+use crate::error::Error;
 use futures::future::{Either};
 use futures::Future;
 use mime::Mime;
-use services::subs::ChunkStream;
+use super::subs::ChunkStream;
 use std::ffi::OsStr;
 use std::process::{Command, Stdio};
 use std::sync::atomic::Ordering;
@@ -422,7 +422,7 @@ impl Transcoder {
                 if child.stdout().is_some() {
                     counter.fetch_add(1, Ordering::SeqCst);
                     let start = Instant::now();
-                    let mut out = child.stdout().take().unwrap();
+                    let out = child.stdout().take().unwrap();
                     let stream = ChunkStream::new(out);
                     let pid = child.id();
                     debug!("waiting for transcode process to end");

@@ -6,7 +6,7 @@ use self::subs::{
 };
 use self::transcode::QualityLevel;
 use self::types::FoldersOrdering;
-use config::get_config;
+use crate::config::get_config;
 use futures::{future, Future};
 use hyper::header::{
     HeaderValue, ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN, RANGE,
@@ -29,6 +29,7 @@ pub mod transcode;
 mod types;
 pub mod audio_meta;
 pub mod audio_folder;
+mod position;
 
 const APP_STATIC_FILES_CACHE_AGE: u32 = 30 * 24 * 3600;
 const FOLDER_INFO_FILES_CACHE_AGE: u32 = 24 * 3600;
@@ -84,7 +85,7 @@ fn add_cors_headers<T: AsRef<str>>(
 impl<C: 'static> Service for FileSendService<C> {
     type ReqBody = Body;
     type ResBody = Body;
-    type Error = ::error::Error;
+    type Error = crate::error::Error;
     type Future = Box<Future<Item = Response<Self::ResBody>, Error = Self::Error> + Send>;
     fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
         //static files

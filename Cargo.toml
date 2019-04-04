@@ -2,6 +2,7 @@
 name = "audioserve"
 version = "0.10.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 pretty_env_logger = "0.3.0"
@@ -51,6 +52,9 @@ optional=true
 [dependencies.async-tar]
 path="crates/async-tar"
 optional=true
+
+[dependencies.websock]
+path="crates/websock"
 
 [features]
 default = ["tls", "symlinks", "search-cache", "folder-download"]

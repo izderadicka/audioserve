@@ -454,7 +454,7 @@ pub fn get_real_file_type<P: AsRef<Path>>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use config::init_default_config;
+    use crate::config::init_default_config;
     use serde_json;
 
     #[test]

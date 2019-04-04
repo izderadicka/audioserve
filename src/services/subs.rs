@@ -6,8 +6,8 @@ use super::search::{Search, SearchTrait};
 use super::transcode::{guess_format, AudioFilePath, QualityLevel, TimeSpan};
 use super::types::*;
 use super::Counter;
-use config::get_config;
-use error::Error;
+use crate::config::get_config;
+use crate::error::Error;
 use futures::future::{self, poll_fn, Future};
 use futures::{Async, Stream};
 #[cfg(feature = "folder-download")]

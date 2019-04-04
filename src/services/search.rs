@@ -1,6 +1,6 @@
 use super::audio_folder::get_real_file_type;
 use super::types::{AudioFolderShort, FoldersOrdering, SearchResult};
-use config::get_config;
+use crate::config::get_config;
 use std::collections::BinaryHeap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -298,7 +298,7 @@ mod cache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use config::init_default_config;
+    use crate::config::init_default_config;
 
     const TEST_DATA_DIR: &str = "./test_data";
 

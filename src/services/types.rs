@@ -2,7 +2,7 @@ use crate::config::get_config;
 use crate::util::os_to_string;
 use mime::Mime;
 use mime_guess::guess_mime_type;
-use services::transcode::{QualityLevel, TranscodingFormat};
+use super::transcode::{QualityLevel, TranscodingFormat};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use std::cmp::Ordering;

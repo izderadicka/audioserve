@@ -1,6 +1,6 @@
 use super::subs::short_response;
 use data_encoding::BASE64;
-use error::Error;
+use crate::error::Error;
 use futures::{future, Future, Stream};
 use hyper::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, SET_COOKIE};
 use hyper::{Body, Method, Request, Response, StatusCode};
