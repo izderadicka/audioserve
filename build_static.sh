@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -e -x
 OPTS_ARGS=""
 if [[ -n "$FEATURES" ]]; then 
     OPTS_ARGS=$OPTS_ARGS" -e FEATURES=$FEATURES" 

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -e -x
 BUILD_DIR="_static_build"
 
 cargo build --target x86_64-alpine-linux-musl --release ${CARGO_ARGS} --features static,${FEATURES}
