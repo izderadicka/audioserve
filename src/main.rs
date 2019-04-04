@@ -1,50 +1,11 @@
 #[macro_use]
-extern crate clap;
-extern crate data_encoding;
-#[macro_use]
-extern crate futures;
-extern crate hyper;
-extern crate hyperx;
-#[macro_use]
 extern crate log;
-extern crate mime;
-extern crate mime_guess;
-extern crate num_cpus;
-extern crate percent_encoding;
-extern crate pretty_env_logger;
 #[macro_use]
 extern crate quick_error;
-extern crate ring;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate regex;
-extern crate serde_json;
-extern crate serde_yaml;
-extern crate url;
 #[macro_use]
 extern crate lazy_static;
-extern crate dirs;
-extern crate tokio;
-extern crate tokio_process;
-extern crate tokio_threadpool;
-extern crate media_info;
-extern crate csv;
-extern crate unicase;
-
-// optional dependencies enabled by features
-#[cfg(feature = "search-cache")]
-extern crate cachedirtree;
-#[cfg(feature = "tls")]
-extern crate native_tls;
-#[cfg(feature = "tls")]
-extern crate tokio_tls;
-#[cfg(feature = "transcoding-cache")]
-extern crate simple_file_cache;
-#[cfg(feature = "transcoding-cache")]
-extern crate bytes;
-#[cfg(feature = "folder-download")]
-extern crate async_tar;
 
 use config::{get_config, parse_args};
 use hyper::rt::Future;

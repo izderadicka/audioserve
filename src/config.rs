@@ -1,5 +1,5 @@
 use super::services::transcode::{TranscodingFormat, QualityLevel, Transcoder};
-use clap::{App, Arg};
+use clap::{App, Arg, crate_name, crate_authors, crate_version};
 use num_cpus;
 use serde_yaml;
 use std::collections::BTreeMap;

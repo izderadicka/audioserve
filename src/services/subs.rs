@@ -9,7 +9,7 @@ use super::Counter;
 use crate::config::get_config;
 use crate::error::Error;
 use futures::future::{self, poll_fn, Future};
-use futures::{Async, Stream};
+use futures::{Async, Stream, try_ready};
 #[cfg(feature = "folder-download")]
 use hyper::header::CONTENT_DISPOSITION;
 use hyper::header::{
