@@ -2,9 +2,10 @@ use super::subs::short_response;
 use data_encoding::BASE64;
 use crate::error::Error;
 use futures::{future, Future, Stream};
-use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE,SET_COOKIE};
+use hyper::header::{SET_COOKIE};
 use hyper::{Body, Method, Request, Response, StatusCode};
-use headers::{Authorization, Cookie, HeaderMapExt};
+use headers::{Authorization, Cookie, HeaderMapExt, ContentType, ContentLength};
+use crate::util::ResponseBuilderExt;
 use headers::{authorization::Bearer};
 use ring::digest::{digest, SHA256};
 use ring::hmac;
@@ -65,8 +66,8 @@ impl Authenticator for SharedSecretAuthenticator {
                                 debug!("Authentication success");
                                 let token = auth.new_auth_token();
                                 Err(Response::builder()
-                                    .header(CONTENT_TYPE, "text/plain")
-                                    .header(CONTENT_LENGTH, token.len())
+                                    .typed_header(ContentType::text())
+                                    .typed_header(ContentLength(token.len() as u64))
                                     .header(
                                         SET_COOKIE,
                                         format!(

@@ -50,6 +50,13 @@ pub fn into_range_bounds(i: (u64,u64)) -> (Bound<u64>, Bound<u64>) {
     (Bound::Included(i.0), Bound::Included(i.1))
 }
 
+
+pub fn header2header<H1:Header, H2:Header>(i:H1) -> Result<impl Header, headers::Error> {
+    let mut v = vec![];
+    i.encode(&mut v) ;
+    H2::decode(&mut v.iter())
+}
+
 struct HeadersExtender<'a, 'b> {
     builder: &'a mut Builder,
     name: &'b HeaderName

@@ -14,9 +14,8 @@ use futures::future::{self, poll_fn, Future};
 use futures::{Async, Stream, try_ready};
 #[cfg(feature = "folder-download")]
 use hyper::header::CONTENT_DISPOSITION;
-use hyper::header::{ACCEPT_RANGES, CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::{Body, Response as HyperResponse, StatusCode};
-use headers::{CacheControl, ContentRange, LastModified};
+use headers::{CacheControl, ContentRange, LastModified, AcceptRanges, ContentLength, ContentType};
 use mime;
 use mime_guess::guess_mime_type;
 use serde_json;
@@ -39,7 +38,7 @@ pub type ResponseFuture = Box<Future<Item = Response, Error = Error> + Send>;
 pub fn short_response(status: StatusCode, msg: &'static str) -> Response {
     HyperResponse::builder()
         .status(status)
-        .header(CONTENT_LENGTH, msg.len())
+        .typed_header(ContentLength(msg.len() as u64))
         .body(msg.into())
         .unwrap()
 }
@@ -179,7 +178,7 @@ fn serve_file_transcoded(
         .then(move |res| match res {
             Ok(stream) => {
                 let resp = HyperResponse::builder()
-                    .header(CONTENT_TYPE, mime.as_ref())
+                    .typed_header(ContentType::from(mime))
                     .header("X-Transcode", params.as_bytes())
                     .body(Body::wrap_stream(stream.map_err(Error::new_with_cause)))
                     .unwrap();
@@ -256,7 +255,7 @@ fn serve_opened_file(
         }
         let last_modified = meta.modified().ok();
         let mut resp = HyperResponse::builder();
-        resp.header(CONTENT_TYPE, mime.as_ref());
+        resp.typed_header(ContentType::from(mime));
         if let Some(age) = caching {
             let cache = CacheControl::new().with_public().with_max_age(std::time::Duration::from_secs(age as u64));
             resp.typed_header(cache);
@@ -280,13 +279,13 @@ fn serve_opened_file(
             },
             None => {
                 resp.status(StatusCode::OK);
-                resp.header(ACCEPT_RANGES, "bytes");
+                resp.typed_header(AcceptRanges::bytes());
                 (0, checked_dec(file_len))
             }
         };
         file.seek(SeekFrom::Start(start)).map(move |(file, _pos)| {
             let stream = ChunkStream::new_with_limit(file, end - start + 1);
-            resp.header(CONTENT_LENGTH, end - start + 1)
+            resp.typed_header(ContentLength(end - start + 1))
                 .body(Body::wrap_stream(stream))
                 .unwrap()
         })
@@ -407,8 +406,8 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
                             let files = folder.into_iter().map(|i| i.0);
                             let tar_stream = async_tar::TarStream::tar_iter_rel(files, base_path);
                             let mut resp = HyperResponse::builder();
-                            resp.header(CONTENT_TYPE, "application/x-tar");
-                            resp.header(CONTENT_LENGTH, total_len);
+                            resp.typed_header(ContentType::from("application/x-tar".parse::<mime::Mime>().unwrap()));
+                            resp.typed_header(ContentLength(total_len));
                             // let disposition = ContentDisposition {
                             //     disposition: DispositionType::Attachment,
                             //     parameters: vec![DispositionParam::Filename(
@@ -440,8 +439,8 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
 fn json_response<T: serde::Serialize>(data: &T) -> Response {
     let json = serde_json::to_string(data).expect("Serialization error");
     HyperResponse::builder()
-        .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(CONTENT_LENGTH, json.len())
+        .typed_header(ContentType::json())
+        .typed_header(ContentLength(json.len() as u64))
         .body(json.into())
         .unwrap()
 }

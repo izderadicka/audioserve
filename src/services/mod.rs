@@ -8,11 +8,10 @@ use self::transcode::QualityLevel;
 use self::types::FoldersOrdering;
 use crate::config::get_config;
 use futures::{future, Future};
-use hyper::header::{
-    HeaderValue, ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN};
+use crate::util::header2header;
 use hyper::service::Service;
 use hyper::{Body, Method, Request, Response, StatusCode};
-use headers::{Range, HeaderMapExt, AccessControlAllowCredentials};
+use headers::{Range, HeaderMapExt, AccessControlAllowCredentials, Origin, AccessControlAllowOrigin};
 use percent_encoding::percent_decode;
 use regex::Regex;
 use std::collections::HashMap;
@@ -57,9 +56,9 @@ fn get_subpath(path: &str, prefix: &str) -> PathBuf {
     Path::new(&path).strip_prefix(prefix).unwrap().to_path_buf()
 }
 
-fn add_cors_headers<T: AsRef<str>>(
+fn add_cors_headers(
     mut resp: Response<Body>,
-    origin: Option<T>,
+    origin: Option<Origin>,
     enabled: bool,
 ) -> Response<Body> {
     if !enabled {
@@ -67,9 +66,9 @@ fn add_cors_headers<T: AsRef<str>>(
     }
     match origin {
         Some(o) => {
-            if let Ok(origin_value) = HeaderValue::from_str(o.as_ref()) {
+            if let Ok(allowed_origin) = header2header::<_, AccessControlAllowOrigin>(o) {
                 let headers = resp.headers_mut();
-                headers.append(ACCESS_CONTROL_ALLOW_ORIGIN, origin_value);
+                headers.typed_insert(allowed_origin);
                 headers.typed_insert(AccessControlAllowCredentials);
             }
             resp
@@ -105,9 +104,8 @@ impl<C: 'static> Service for FileSendService<C> {
         let cors = get_config().cors;
         let origin = req
             .headers()
-            .get(ORIGIN)
-            .and_then(|v| v.to_str().ok())
-            .map(|v| v.to_owned());
+            .typed_get::<Origin>();
+            
 
         let resp = match self.authenticator {
             Some(ref auth) => {
