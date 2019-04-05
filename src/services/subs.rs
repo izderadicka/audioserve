@@ -26,7 +26,7 @@ use tokio::io::AsyncRead;
 use tokio_threadpool::blocking;
 use std::collections::Bound;
 
-pub type ByteRangeSpec = (Bound<u64>, Bound<u64>);
+pub type ByteRenge = (Bound<u64>, Bound<u64>);
 
 pub const NOT_FOUND_MESSAGE: &str = "Not Found";
 const SEVER_ERROR_TRANSCODING: &str = "Server error during transcoding process";
@@ -52,7 +52,7 @@ fn serve_file_cached_or_transcoded(
     full_path: PathBuf,
     seek: Option<f32>,
     span: Option<TimeSpan>,
-    _range: Option<ByteRangeSpec>,
+    _range: Option<ByteRenge>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: QualityLevel,
 ) -> ResponseFuture {
@@ -70,7 +70,7 @@ fn serve_file_cached_or_transcoded(
     full_path: PathBuf,
     seek: Option<f32>,
     span: Option<TimeSpan>,
-    range: Option<::hyperx::header::ByteRangeSpec>,
+    range: Option<ByteRenge>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: QualityLevel,
 ) -> ResponseFuture {
@@ -244,7 +244,7 @@ impl<T: AsyncRead> ChunkStream<T> {
 
 fn serve_opened_file(
     file: tokio::fs::File,
-    range: Option<ByteRangeSpec>,
+    range: Option<ByteRenge>,
     caching: Option<u32>,
     mime: mime::Mime,
 ) -> impl Future<Item = Response, Error = io::Error> {
@@ -294,7 +294,7 @@ fn serve_opened_file(
 
 fn serve_file_from_fs(
     full_path: &Path,
-    range: Option<ByteRangeSpec>,
+    range: Option<ByteRenge>,
     caching: Option<u32>,
 ) -> ResponseFuture {
     let filename: PathBuf = full_path.into(); // we need to copy for lifetime issues as File::open and closures require 'static lifetime
@@ -325,7 +325,7 @@ pub fn send_file_simple<P: AsRef<Path>>(
 pub fn send_file<P: AsRef<Path>>(
     base_path: &'static Path,
     file_path: P,
-    range: Option<ByteRangeSpec>,
+    range: Option<ByteRenge>,
     seek: Option<f32>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: Option<QualityLevel>,
