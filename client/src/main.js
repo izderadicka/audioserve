@@ -236,7 +236,7 @@ $(function () {
                         item.append(" ");
                         item.append($(`<span class="bitrate">${file.meta.bitrate} kbps</span>`));
                     }
-                    if (file.trans) {
+                    if (file.trans != '0') {
                         item.append($("<span>").addClass("transcoded"));
                     }
                 }
