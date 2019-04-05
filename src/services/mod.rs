@@ -9,10 +9,10 @@ use self::types::FoldersOrdering;
 use crate::config::get_config;
 use futures::{future, Future};
 use hyper::header::{
-    HeaderValue, ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN};
+    HeaderValue, ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN};
 use hyper::service::Service;
 use hyper::{Body, Method, Request, Response, StatusCode};
-use headers::{Range, HeaderMapExt};
+use headers::{Range, HeaderMapExt, AccessControlAllowCredentials};
 use percent_encoding::percent_decode;
 use regex::Regex;
 use std::collections::HashMap;
@@ -70,10 +70,7 @@ fn add_cors_headers<T: AsRef<str>>(
             if let Ok(origin_value) = HeaderValue::from_str(o.as_ref()) {
                 let headers = resp.headers_mut();
                 headers.append(ACCESS_CONTROL_ALLOW_ORIGIN, origin_value);
-                headers.append(
-                    ACCESS_CONTROL_ALLOW_CREDENTIALS,
-                    HeaderValue::from_static("true"),
-                );
+                headers.typed_insert(AccessControlAllowCredentials);
             }
             resp
         }
