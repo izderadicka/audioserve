@@ -1,4 +1,4 @@
-use headers::Header;
+use headers::{HeaderValue, HeaderName, Header};
 use hyper::http::response::Builder;
 use std::ops::{Bound,RangeBounds};
 use std::cmp::{min, max};
@@ -50,18 +50,28 @@ pub fn into_range_bounds(i: (u64,u64)) -> (Bound<u64>, Bound<u64>) {
     (Bound::Included(i.0), Bound::Included(i.1))
 }
 
+struct HeadersExtender<'a, 'b> {
+    builder: &'a mut Builder,
+    name: &'b HeaderName
+
+}
+
+impl <'a, 'b> Extend<HeaderValue> for HeadersExtender<'a, 'b> {
+    fn extend<I:IntoIterator<Item=HeaderValue>>(&mut self, iter:I) {
+        for v in iter.into_iter() {
+            self.builder.header(self.name,v);
+        }
+    }
+}
+
 pub trait ResponseBuilderExt {
     fn typed_header<H: Header>(&mut self, header: H) -> &mut Builder;
 }
 
 impl ResponseBuilderExt for Builder {
     fn typed_header<H: Header>(&mut self, header: H) -> &mut Builder {
-        let k = H::name();
-        let mut values = vec![];
-        header.encode(&mut values);
-        for v in values.into_iter() {
-            self.header(k, v);
-        }
+        let mut extender = HeadersExtender{builder:self,name:H::name()};
+        header.encode(&mut extender);
         self
     }
 }
