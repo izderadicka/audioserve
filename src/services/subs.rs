@@ -8,18 +8,15 @@ use super::types::*;
 use super::Counter;
 use crate::config::get_config;
 use crate::error::Error;
+use crate::util::{ResponseBuilderExt,checked_dec, to_satisfiable_range, into_range_bounds};
+
 use futures::future::{self, poll_fn, Future};
 use futures::{Async, Stream, try_ready};
 #[cfg(feature = "folder-download")]
 use hyper::header::CONTENT_DISPOSITION;
-use hyper::header::{
-    HeaderValue, ACCEPT_RANGES, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE,
-    LAST_MODIFIED,
-};
+use hyper::header::{ACCEPT_RANGES, CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::{Body, Response as HyperResponse, StatusCode};
 use headers::{CacheControl, ContentRange, LastModified};
-#[cfg(feature = "folder-download")]
-use headers::{ContentDisposition};
 use mime;
 use mime_guess::guess_mime_type;
 use serde_json;
@@ -262,37 +259,22 @@ fn serve_opened_file(
         resp.header(CONTENT_TYPE, mime.as_ref());
         if let Some(age) = caching {
             let cache = CacheControl::new().with_public().with_max_age(std::time::Duration::from_secs(age as u64));
-            resp.header(CACHE_CONTROL, cache.to_bytes());
+            resp.typed_header(cache);
             if let Some(last_modified) = last_modified {
-                let lm = LastModified(last_modified.into());
-                resp.header(LAST_MODIFIED, lm.to_string().as_bytes());
-            }
-        }
-
-        fn checked_dec(x: u64) -> u64 {
-            if x > 0 {
-                x - 1
-            } else {
-                x
+                resp.typed_header(LastModified::from(last_modified));
             }
         }
 
         let (start, end) = match range {
-            Some(range) => match range.to_satisfiable_range(file_len) {
+            Some(range) => match to_satisfiable_range(range,file_len) {
                 Some(l) => {
                     resp.status(StatusCode::PARTIAL_CONTENT);
-                    let h = ContentRange(ContentRangeSpec::Bytes {
-                        range: Some((l.0, l.1)),
-                        instance_length: Some(file_len),
-                    });
-                    resp.header(
-                        CONTENT_RANGE,
-                        HeaderValue::from_str(&h.to_string()).unwrap(),
-                    );
+                    let h = ContentRange::bytes(into_range_bounds(l), Some(file_len)).unwrap();
+                    resp.typed_header(h);
                     l
                 }
                 None => {
-                    error!("Wrong range {}", range);
+                    error!("Wrong range {:?}", range);
                     (0, checked_dec(file_len))
                 }
             },
@@ -313,7 +295,7 @@ fn serve_opened_file(
 
 fn serve_file_from_fs(
     full_path: &Path,
-    range: Option<::hyperx::header::ByteRangeSpec>,
+    range: Option<ByteRangeSpec>,
     caching: Option<u32>,
 ) -> ResponseFuture {
     let filename: PathBuf = full_path.into(); // we need to copy for lifetime issues as File::open and closures require 'static lifetime
@@ -344,7 +326,7 @@ pub fn send_file_simple<P: AsRef<Path>>(
 pub fn send_file<P: AsRef<Path>>(
     base_path: &'static Path,
     file_path: P,
-    range: Option<::hyperx::header::ByteRangeSpec>,
+    range: Option<ByteRangeSpec>,
     seek: Option<f32>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: Option<QualityLevel>,
@@ -427,15 +409,16 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
                             let mut resp = HyperResponse::builder();
                             resp.header(CONTENT_TYPE, "application/x-tar");
                             resp.header(CONTENT_LENGTH, total_len);
-                            let disposition = ContentDisposition {
-                                disposition: DispositionType::Attachment,
-                                parameters: vec![DispositionParam::Filename(
-                                    Charset::Ext("UTF-8".into()),
-                                    None,
-                                    download_name.into(),
-                                )],
-                            };
-                            resp.header(CONTENT_DISPOSITION, disposition.to_string().as_bytes());
+                            // let disposition = ContentDisposition {
+                            //     disposition: DispositionType::Attachment,
+                            //     parameters: vec![DispositionParam::Filename(
+                            //         Charset::Ext("UTF-8".into()),
+                            //         None,
+                            //         download_name.into(),
+                            //     )],
+                            // };
+                            let disposition=format!("attachment; filename=\"{}\"", download_name);
+                            resp.header(CONTENT_DISPOSITION, disposition.as_bytes());
                             resp.body(Body::wrap_stream(tar_stream)).unwrap()
                         }
                         Err(e) => {

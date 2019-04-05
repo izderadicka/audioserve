@@ -9,11 +9,10 @@ use self::types::FoldersOrdering;
 use crate::config::get_config;
 use futures::{future, Future};
 use hyper::header::{
-    HeaderValue, ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN, RANGE,
-};
+    HeaderValue, ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN};
 use hyper::service::Service;
 use hyper::{Body, Method, Request, Response, StatusCode};
-use headers::{Header, Range, HeaderMapExt};
+use headers::{Range, HeaderMapExt};
 use percent_encoding::percent_decode;
 use regex::Regex;
 use std::collections::HashMap;
