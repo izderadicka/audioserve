@@ -31,6 +31,8 @@ extern crate tokio_threadpool;
 extern crate media_info;
 extern crate csv;
 extern crate unicase;
+#[cfg(unix)]
+extern crate nix;
 
 // optional dependencies enabled by features
 #[cfg(feature = "search-cache")]
@@ -106,7 +108,7 @@ fn gen_my_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error> {
     }
 }
 
-fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
+fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::error::Error>> {
     let cfg = get_config();
     let svc = FileSendService {
         authenticator: get_config().shared_secret.as_ref().map(
@@ -217,9 +219,9 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
         .unwrap();
 
     rt.spawn(server);
-    rt.shutdown_on_idle().wait().unwrap();
+    //rt.shutdown_on_idle().wait().unwrap();
 
-    Ok(())
+    Ok(rt)
 }
 
 fn main() {
@@ -253,12 +255,33 @@ fn main() {
         }
     };
 
-    match start_server(my_secret) {
-        Ok(_) => (),
+    let runtime = match start_server(my_secret) {
+        Ok(rt) => rt,
         Err(e) => {
             error!("Error starting server: {}", e);
             process::exit(3)
         }
+    };
+
+    #[cfg(unix)]
+    {
+        use nix::sys::signal;
+        let mut sigs = signal::SigSet::empty();
+        sigs.add(signal::Signal::SIGINT);
+        sigs.add(signal::Signal::SIGQUIT);
+        sigs.add(signal::Signal::SIGTERM);
+        sigs.thread_block().ok();
+        match sigs.wait() {
+            Ok(sig) => info!("Terminating by signal {}", sig),
+            Err(e) => error!("Signal wait error: {}",e)
+        }
+        runtime.shutdown_now();
+
+    }
+
+    #[cfg(not(unix))] 
+    {
+        runtime.shutdown_on_idle().wait().unwrap();
     }
 
     info!("Server finished");

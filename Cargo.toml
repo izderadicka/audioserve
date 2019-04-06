@@ -32,7 +32,6 @@ csv = "1.0"
 unicase = "2.3"
 unicase_serde = "0.1.0"
 
-
 # for ssl
 tokio-tls = {version="0.2", optional=true}
 native-tls = {version="0.2", optional=true}
@@ -51,6 +50,9 @@ optional=true
 [dependencies.async-tar]
 path="crates/async-tar"
 optional=true
+
+[target.'cfg(unix)'.dependencies]
+nix = "0.13"
 
 [features]
 default = ["tls", "symlinks", "search-cache", "folder-download"]
