@@ -84,7 +84,7 @@ fn serve_file_cached_or_transcoded(
         ));
     }
 
-    use crate::cache::{cache_key, get_cache};
+    use super::transcode::cache::{cache_key, get_cache};
     let cache = get_cache();
     let cache_key = cache_key(&full_path, transcoding_quality, span);
     let fut = cache

@@ -52,14 +52,17 @@ pub enum Error {
 }
 }
 
+#[cfg(feature="transcoding-cache")]
 #[derive(Debug, Clone)]
 pub struct TranscodingCacheConfig {
     pub root_dir: PathBuf,
     pub max_size: u64,
     pub max_files: u64,
-    pub disabled: bool
+    pub disabled: bool,
+    pub save_often: bool,
 }
 
+#[cfg(feature="transcoding-cache")]
 impl Default for TranscodingCacheConfig {
 
     fn default() -> Self {
@@ -68,7 +71,8 @@ impl Default for TranscodingCacheConfig {
             root_dir,
             max_size: 1024*1024*1024,
             max_files: 1024,
-            disabled: false
+            disabled: false,
+            save_often: false
         }
     }
 }
@@ -336,6 +340,11 @@ fn create_parser<'a>() -> Parser<'a> {
             .long("t-cache-disable")
             .help("Transaction cache is disabled. If you want to completely get rid of it, compile without 'transcoding-cache'")
             )
+        .arg(
+            Arg::with_name("t-cache-save-often")
+            .long("t-cache-save-often")
+            .help("Save additions to cache often, after each addition, this is normaly not necessary")
+        )
     }
 
     parser
@@ -502,7 +511,8 @@ pub fn parse_args() -> Result<(), Error> {
         false
     };
 
-    let _transcoding_cache = if cfg!(feature="transcoding-cache") {
+    #[cfg(feature="transcoding-cache")]
+    let _transcoding_cache =  {
         let mut c = TranscodingCacheConfig::default();
         if let Some(d) = args.value_of("t-cache-dir") {
             c.root_dir = d.into()
@@ -528,9 +538,11 @@ pub fn parse_args() -> Result<(), Error> {
             c.disabled = true;
         }
 
-        Some(c)
-    } else {
-        None
+        if args.is_present("t-cache-save-often") {
+            c.save_often = true;
+        }
+
+        c
     };
 
     let disable_folder_download =  if cfg!(feature = "folder-download")   {
@@ -578,7 +590,7 @@ pub fn parse_args() -> Result<(), Error> {
         transcoding_deadline,
         search_cache,
         #[cfg(feature="transcoding-cache")]
-        transcoding_cache: _transcoding_cache.unwrap(),
+        transcoding_cache: _transcoding_cache,
         disable_folder_download,
         chapters
 

@@ -1,26 +1,41 @@
+import { debug } from "./debug";
+import config from"./config";
+
+function mapProtocol(p) {
+    if (p == "http:") {
+        return "ws:";
+    } else if (p== "https:") {
+        return "wss:";
+    }
+}
+
 class PlaybackSync {
     constructor() {
-        this.socketUrl = "ws://localhost:3001/myws";
+        const baseUrl = AUDIOSERVE_DEVELOPMENT?
+            `${mapProtocol(window.location.protocol)}//${window.location.hostname}:${config.DEVELOPMENT_PORT}`:
+            `${mapProtocol(window.location.protocol)}//${window.location.host}${window.location.pathname.length > 1 ? window.location.pathname : ""}`;
+        
+        this.socketUrl = baseUrl+"/position";
         this.hold = false;
     }
 
     open() {
-
+        debug("Opening ws on url "+this.socketUrl);
         const webSocket = new WebSocket(this.socketUrl);
         webSocket.addEventListener("error", err => {
-            console.log("WS Error", err);
+            console.error("WS Error", err);
         });
         webSocket.addEventListener("close", err => {
-            console.log("WS Close", err);
+            debug("WS Close", err);
             // reopen
             window.setTimeout(() => this.open(), 1000);
 
         });
         webSocket.addEventListener("open", ev => {
-            console.log("WS is ready");
+            debug("WS is ready");
         });
         webSocket.addEventListener("message", evt => {
-            console.log("Got message " + evt.data);
+            debug("Got message " + evt.data);
             const data = JSON.parse(evt.data);
             if (this.pendingAnswer) {
                 if (this.pendingTimeout) clearInterval(this.pendingTimeout);

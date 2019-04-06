@@ -24,12 +24,10 @@ use std::sync::Arc;
 #[cfg(feature = "tls")]
 use native_tls::Identity;
 
-mod util;
 mod config;
 mod error;
 mod services;
-#[cfg(feature = "transcoding-cache")]
-mod cache;
+mod util;
 
 #[cfg(feature = "tls")]
 fn load_private_key<P>(file: P, pass: Option<&String>) -> Result<Identity, io::Error>
@@ -67,7 +65,7 @@ fn gen_my_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error> {
     }
 }
 
-fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
+fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::error::Error>> {
     let cfg = get_config();
     let svc = FileSendService {
         authenticator: get_config().shared_secret.as_ref().map(
@@ -178,9 +176,9 @@ fn start_server(my_secret: Vec<u8>) -> Result<(), Box<std::error::Error>> {
         .unwrap();
 
     rt.spawn(server);
-    rt.shutdown_on_idle().wait().unwrap();
+    //rt.shutdown_on_idle().wait().unwrap();
 
-    Ok(())
+    Ok(rt)
 }
 
 fn main() {
@@ -193,17 +191,20 @@ fn main() {
     };
     pretty_env_logger::init();
     debug!("Started with following config {:?}", get_config());
-    
+
     media_info::init();
-    
-    #[cfg(feature="transcoding-cache")]
+
+    #[cfg(feature = "transcoding-cache")]
     {
-        use cache::get_cache;
+        use crate::services::transcode::cache::get_cache;
         if get_config().transcoding_cache.disabled {
             info!("Trascoding cache is disabled")
         } else {
             let c = get_cache();
-            info!("Using transcoding cache, remaining capacity (files,size) : {:?}", c.free_capacity())
+            info!(
+                "Using transcoding cache, remaining capacity (files,size) : {:?}",
+                c.free_capacity()
+            )
         }
     }
     let my_secret = match gen_my_secret(&get_config().secret_file) {
@@ -214,12 +215,40 @@ fn main() {
         }
     };
 
-    match start_server(my_secret) {
-        Ok(_) => (),
+    let runtime = match start_server(my_secret) {
+        Ok(rt) => rt,
         Err(e) => {
             error!("Error starting server: {}", e);
             process::exit(3)
         }
+    };
+
+    #[cfg(unix)]
+    {
+        use nix::sys::signal;
+        let mut sigs = signal::SigSet::empty();
+        sigs.add(signal::Signal::SIGINT);
+        sigs.add(signal::Signal::SIGQUIT);
+        sigs.add(signal::Signal::SIGTERM);
+        sigs.thread_block().ok();
+        match sigs.wait() {
+            Ok(sig) => info!("Terminating by signal {}", sig),
+            Err(e) => error!("Signal wait error: {}", e),
+        }
+        runtime.shutdown_now();
+
+        #[cfg(feature = "transcoding-cache")]
+        {
+            use crate::services::transcode::cache::get_cache;
+            if let Err(e) = get_cache().save_index() {
+                error!("Error saving transcoding cache index {}", e);
+            }
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        runtime.shutdown_on_idle().wait().unwrap();
     }
 
     info!("Server finished");

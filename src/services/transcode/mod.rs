@@ -15,6 +15,8 @@ use self::codecs::*;
 use super::types::AudioFormat;
 
 pub mod codecs;
+#[cfg(feature = "transcoding-cache")]
+pub mod cache;
 
 pub trait AudioCodec {
     fn quality_args(&self) -> Vec<String>;
@@ -319,7 +321,7 @@ impl Transcoder {
         quality: QualityLevel
     ) -> TranscodedFuture {
 
-        use crate::cache::{cache_key, get_cache};
+        use self::cache::{cache_key, get_cache};
         use futures::future;
         use futures::sync::mpsc;
         use futures::{Stream,Sink};
@@ -366,8 +368,13 @@ impl Transcoder {
                                     .map_err(|e| error!("Error in cache: {}", e))
                                     .and_then(|_| {
                                         debug!("Added to cache"); 
-                                        get_cache().save_index_async()
-                                        .map_err(|e| error!("Error when saving cache index: {}", e))
+                                        if false  {
+                                            box_me(
+                                            get_cache().save_index_async()
+                                            .map_err(|e| error!("Error when saving cache index: {}", e)))
+                                        } else {
+                                            box_me(future::ok(()))
+                                        }
                                         })),
                                 Err(()) => box_me(cache_finish.roll_back()
                                     .map_err(|e| error!("Error in cache: {}", e))),

@@ -35,7 +35,6 @@ unicase = "2.3"
 unicase_serde = "0.1.0"
 linked-hash-map = {git="https://github.com/izderadicka/linked-hash-map.git"}
 
-
 # for ssl
 tokio-tls = {version="0.2", optional=true}
 native-tls = {version="0.2", optional=true}
@@ -57,6 +56,9 @@ optional=true
 
 [dependencies.websock]
 path="crates/websock"
+
+[target.'cfg(unix)'.dependencies]
+nix = "0.13"
 
 [features]
 default = ["tls", "symlinks", "search-cache", "folder-download"]
