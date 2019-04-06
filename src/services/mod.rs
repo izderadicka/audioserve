@@ -9,6 +9,7 @@ use self::types::FoldersOrdering;
 use crate::config::get_config;
 use futures::{future, Future};
 use crate::util::header2header;
+use self::position::position_service;
 use hyper::service::Service;
 use hyper::{Body, Method, Request, Response, StatusCode};
 use headers::{Range, HeaderMapExt, AccessControlAllowCredentials, Origin, AccessControlAllowOrigin};
@@ -111,20 +112,20 @@ impl<C: 'static> Service for FileSendService<C> {
             Some(ref auth) => {
                 Box::new(auth.authenticate(req).and_then(move |result| match result {
                     Ok((req, _creds)) => {
-                        FileSendService::<C>::process_checked(&req, searcher, transcoding)
+                        FileSendService::<C>::process_checked(req, searcher, transcoding)
                     }
                     Err(resp) => Box::new(future::ok(resp)),
                 }))
             }
-            None => FileSendService::<C>::process_checked(&req, searcher, transcoding),
+            None => FileSendService::<C>::process_checked(req, searcher, transcoding),
         };
         Box::new(resp.map(move |r| add_cors_headers(r, origin, cors)))
     }
 }
 
 impl<C> FileSendService<C> {
-    fn process_checked<T>(
-        req: &Request<T>,
+    fn process_checked(
+        req: Request<Body>,
         searcher: Search<String>,
         transcoding: TranscodingDetails,
     ) -> ResponseFuture {
@@ -143,7 +144,10 @@ impl<C> FileSendService<C> {
                     collections_list()
                 } else if path.starts_with("/transcodings") {
                     transcodings_list()
-                } else {
+                } else if path.starts_with("/position") {
+                    position_service(req)
+                    }
+                else {
                     // TODO -  select correct base dir
                     let mut colllection_index = 0;
                     let mut new_path: Option<String> = None;
