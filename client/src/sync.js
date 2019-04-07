@@ -28,6 +28,7 @@ class PlaybackSync {
             console.error("WS Error", err);
         });
         webSocket.addEventListener("close", err => {
+            this.resetOnClose();
             debug("WS Close", err);
             // reopen
             if (! this.closed) window.setTimeout(() => this.open(), 1000);
@@ -54,8 +55,13 @@ class PlaybackSync {
     close() {
         this.closed = true;
         this.socket.close();
+        this.resetOnClose();
+    }
+
+    resetOnClose() {
         this.socket = null;
         this.filePath = null;
+        this.lastSend = null;
     }
 
     enqueuePosition(filePath, position, force=false) {

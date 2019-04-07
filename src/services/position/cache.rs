@@ -16,7 +16,7 @@ pub struct PositionRecord {
 
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, PartialEq)]
 pub struct Position {
     file: String,
     folder: String,

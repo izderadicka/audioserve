@@ -88,6 +88,8 @@ pub fn position_service(req: Request<Body>) -> ResponseFuture {
 
                                 if ! prev.is_empty() {
                                     CACHE.insert(prev, position)
+                                } else {
+                                    error!("Client sent short position, but there is no context");
                                 }
                             }
                         };
@@ -116,8 +118,8 @@ pub fn position_service(req: Request<Body>) -> ResponseFuture {
                         let last = CACHE.get_last();
                         let folder = CACHE.get(&folder_path);
                         let res = Reply {
-                            folder,
-                            last
+                            last: if last != folder {last} else {None},
+                            folder
                         };
 
                         Box::new(
