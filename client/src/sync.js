@@ -16,10 +16,12 @@ class PlaybackSync {
             `${mapProtocol(window.location.protocol)}//${window.location.host}${window.location.pathname.length > 1 ? window.location.pathname : ""}`;
         
         this.socketUrl = baseUrl+"/position";
-        this.hold = false;
+        this.closed = false;
+        this.filePath = null;
     }
 
     open() {
+        this.closed = false;
         debug("Opening ws on url "+this.socketUrl);
         const webSocket = new WebSocket(this.socketUrl);
         webSocket.addEventListener("error", err => {
@@ -28,7 +30,7 @@ class PlaybackSync {
         webSocket.addEventListener("close", err => {
             debug("WS Close", err);
             // reopen
-            window.setTimeout(() => this.open(), 1000);
+            if (! this.closed) window.setTimeout(() => this.open(), 1000);
 
         });
         webSocket.addEventListener("open", ev => {
@@ -50,18 +52,39 @@ class PlaybackSync {
     }
 
     close() {
+        this.closed = true;
         this.socket.close();
         this.socket = null;
+        this.filePath = null;
     }
 
-    sendPosition(filePath, position) {
-        if (this.active && !this.hold) {
-            if (this.socket.filePath && filePath == this.socket.filePath) {
-                this.socket.send(`${position}|`);
+    enqueuePosition(filePath, position, force=false) {
+        if (this.pendingMessage) window.clearTimeout(this.pendingMessage);
+        position = Math.round(position*1000)/1000;
+        if (this.filePath && this.lastSend && filePath == this.filePath) {
+
+            if (force || Date.now() - this.lastSend > config.POSITION_REPORTING_PERIOD) {
+                this.sendMessage(`${position}|`);
             } else {
-                this.socket.filePath = filePath;
-                this.socket.send(`${position}|${filePath}`);
+                this.pendingMessage = window.setTimeout(() => {
+                    this.sendMessage(`${position}|`);
+                    this.pendingMessage = null;
+                },
+                config.POSITION_REPORTING_PERIOD
+                );
             }
+        } else {
+            this.filePath = filePath;
+            this.sendMessage(`${position}|${filePath}`);
+        }
+    }
+
+    sendMessage(msg) {
+        if (this.active) {
+            this.socket.send(msg);
+            this.lastSend = Date.now();
+        } else {
+            console.error("Cannot send message, socket not ready");
         }
 
     }
@@ -90,15 +113,7 @@ class PlaybackSync {
     }
 
     get active() {
-        return this.socket && this.socket.readyState == WebSocket.OPEN;
-    }
-
-    pause() {
-        this.hold = true;
-    }
-
-    unPause() {
-        this.hold = false;
+        return !this.closed && this.socket && this.socket.readyState == WebSocket.OPEN;
     }
 
 }

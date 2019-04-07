@@ -3,6 +3,9 @@ export default {
     // as an alternavive for continuation
     MIN_TIME_DIFFERENCE_FOR_POSITION_SHARING: 20,
 
+    // During playback report current position every x ms
+    POSITION_REPORTING_PERIOD: 3000,
+
     // API port to use in development mode
     DEVELOPMENT_PORT: 3000,
 

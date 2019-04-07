@@ -534,7 +534,7 @@ $(function () {
         window.localStorage.setItem("audioserve_time", evt.detail.currentTime);
         let currentFile = window.localStorage.getItem("audioserve_file");
         if (currentFile) {
-            sync.sendPosition(currentFile, evt.detail.currentTime);
+            sync.enqueuePosition(currentFile, evt.detail.currentTime);
         }
     });
 
