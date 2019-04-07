@@ -7,6 +7,7 @@ use std::time::UNIX_EPOCH;
 use std::sync::{Arc,RwLock};
 
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PositionRecord {
     file: String,
     timestamp: SystemTime,
@@ -72,7 +73,7 @@ impl Cache {
 
 }
 
-
+#[derive(Serialize,Deserialize)]
 struct CacheInner {
     table: LinkedHashMap<String, PositionRecord>,
     max_size: usize
@@ -152,9 +153,7 @@ mod test {
 
     use super::*;
 
-    #[test]
-    fn test_positions_cache() {
-
+    fn make_cache() -> CacheInner {
         let mut c = CacheInner::new(5);
         let p = c.get_last();
         assert!(p.is_none());
@@ -167,6 +166,10 @@ mod test {
         c.insert("book6/chap6", 6.1);
         c.insert("book4/chap7", 7.1);
 
+        c
+    }
+
+    fn check_cache(c: &CacheInner)  {
         assert_eq!(5,c.len());
 
         let p_last = c.get_last().unwrap();
@@ -179,6 +182,12 @@ mod test {
         let p = c.get("book1");
         assert!(p.is_none());
 
+    }
+
+    #[test]
+    fn test_positions_cache() {
+        let mut c = make_cache();
+        check_cache(&c);
         c.clear();
 
 
@@ -191,6 +200,15 @@ mod test {
         let p = c.get("book1").unwrap();
         let s = serde_json::to_string_pretty(&p).unwrap();
         println!("{}",s);
+
+    }
+
+    #[test]
+    fn positions_map_serialization() {
+        let c = make_cache();
+        let serc = serde_json::to_string(&c).unwrap();
+        let c2: CacheInner = serde_json::from_str(&serc).unwrap();
+        check_cache(&c2)
 
     }
 

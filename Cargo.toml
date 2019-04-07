@@ -33,7 +33,7 @@ dirs = "1.0"
 csv = "1.0"
 unicase = "2.3"
 unicase_serde = "0.1.0"
-linked-hash-map = {git="https://github.com/izderadicka/linked-hash-map.git"}
+linked-hash-map = {git="https://github.com/izderadicka/linked-hash-map.git", features=["serde_impl"]}
 
 # for ssl
 tokio-tls = {version="0.2", optional=true}
