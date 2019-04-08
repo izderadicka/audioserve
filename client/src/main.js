@@ -82,7 +82,6 @@ $(function () {
                     let collIndex = storedIndex < data.names.length ? storedIndex : 0;
                     cselect.val(collIndex);
                     setCollection(collIndex);
-                    window.localStorage.setItem("audioserve_collection", collIndex);
 
                 } else {
                     $("#collections").hide();
@@ -380,7 +379,8 @@ $(function () {
 
     sync.open();
     let player = new AudioPlayer();
-    player.beforePlay = () => {
+
+    const checkRecent = function() {
         const filePath = window.localStorage.getItem("audioserve_file");
         const idx = filePath.lastIndexOf('/');
         const folderPath = filePath.substr(0, idx);
@@ -428,6 +428,10 @@ $(function () {
                             window.localStorage.setItem("audioserve_folder", item.folder);
                             window.localStorage.setItem("audioserve_file", itemPath);
                             window.localStorage.setItem("audioserve_time", item.position);
+                            if (item.collection != currentCollection()) {
+                                setCollection(item.collection);
+                                $("#collections select").val(item.collection);
+                            }
                             loadFolder(item.folder, false, null, true);
                         }
                         
@@ -455,6 +459,8 @@ $(function () {
             })
             .catch((e) => console.error(e));
     };
+
+    player.beforePlay = checkRecent;
 
     function playFile(target, paused, startTime) {
 
@@ -585,6 +591,10 @@ $(function () {
         } else {
             collectionUrl = baseUrl;
         }
+        const group = window.localStorage.getItem("audioserve_group") || 'group';
+        sync.groupPrefix = `${group}/${collIndex}/`;
+        window.localStorage.setItem("audioserve_collection", collIndex);
+        
 
     }
 
@@ -621,7 +631,6 @@ $(function () {
                 let collIndex = parseInt(evt.state.audioserve_collection);
                 setCollection(collIndex);
                 $("#collections select").val(collIndex);
-                window.localStorage.setItem("audioserve_collection", collIndex);
             }
             if ("audioserve_folder" in evt.state) {
                 debug("Going back to folder ", evt.state.audioserve_folder);
@@ -636,7 +645,6 @@ $(function () {
     $("#collections select").on("change", (evt) => {
         let collIndex = $("#collections select").val();
         setCollection(collIndex);
-        window.localStorage.setItem("audioserve_collection", collIndex);
         loadFolder("");
     });
 

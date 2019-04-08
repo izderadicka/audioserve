@@ -18,6 +18,7 @@ class PlaybackSync {
         this.socketUrl = baseUrl+"/position";
         this.closed = false;
         this.filePath = null;
+        this.groupPrefix = null;
     }
 
     open() {
@@ -40,6 +41,15 @@ class PlaybackSync {
         webSocket.addEventListener("message", evt => {
             debug("Got message " + evt.data);
             const data = JSON.parse(evt.data);
+            const parseGroup  = (item) => {
+                if (item && item.folder) {
+                    const [prefix, collection] = /^\w+\/(\d+)\//.exec(item.folder);
+                    item.folder = item.folder.substr(prefix.length);
+                    item.collection = parseInt(collection);
+                }
+            };
+            parseGroup(data.folder);
+            parseGroup(data.last);
             if (this.pendingAnswer) {
                 if (this.pendingTimeout) clearInterval(this.pendingTimeout);
                 this.pendingTimeout = null;
@@ -67,6 +77,7 @@ class PlaybackSync {
     enqueuePosition(filePath, position, force=false) {
         if (this.pendingMessage) window.clearTimeout(this.pendingMessage);
         position = Math.round(position*1000)/1000;
+        filePath = this.groupPrefix+filePath;
         if (this.filePath && this.lastSend && filePath == this.filePath) {
 
             if (force || Date.now() - this.lastSend > config.POSITION_REPORTING_PERIOD) {
@@ -109,7 +120,7 @@ class PlaybackSync {
                     reject(new Error("Timeout"));
                 }, 3000);
             });
-            this.socket.send(filePath?filePath:"?");
+            this.socket.send(filePath?this.groupPrefix+filePath:"?");
             return p;
 
         } else {
