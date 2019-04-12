@@ -11,6 +11,12 @@ lazy_static! {
     static ref CACHE: Cache = Cache::new(100);
 }
 
+pub fn save_positions() {
+    if let Err(e) =  CACHE.save() {
+        error!("Cannot save positions to file: {}", e);
+    }
+}
+
 #[derive(Clone,PartialEq, Debug)]
 enum Msg {
     Position {

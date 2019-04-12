@@ -167,7 +167,8 @@ pub struct Config {
     #[cfg(feature="transcoding-cache")]
     pub transcoding_cache: TranscodingCacheConfig,
     pub disable_folder_download: bool,
-    pub chapters: ChaptersSize
+    pub chapters: ChaptersSize,
+    pub positions_file: PathBuf
 }
 
 
@@ -301,6 +302,12 @@ fn create_parser<'a>() -> Parser<'a> {
                 .help("Password for TLS/SSL private key")
             );
     }
+
+    parser = parser.arg(Arg::with_name("positions-dir")
+        .long("positions-dir")
+        .takes_value(true)
+        .help("Directory to save last listened positions")
+    );
 
     if cfg!(feature = "symlinks") {
         parser = parser.arg(
@@ -572,6 +579,13 @@ pub fn parse_args() -> Result<(), Error> {
         c
     };
 
+    let positions_file = {
+        match dirs::home_dir() {
+            Some(home) => home.join(".audioserve-positions"),
+            None => "./audioserve-positions".into()
+        }
+    };
+
     let config = Config {
         base_dirs,
         local_addr,
@@ -592,7 +606,8 @@ pub fn parse_args() -> Result<(), Error> {
         #[cfg(feature="transcoding-cache")]
         transcoding_cache: _transcoding_cache,
         disable_folder_download,
-        chapters
+        chapters,
+        positions_file
 
     };
     unsafe {
@@ -631,7 +646,8 @@ pub fn init_default_config() {
         #[cfg(feature="transcoding-cache")]
         transcoding_cache: TranscodingCacheConfig::default(),
         disable_folder_download: false,
-        chapters: ChaptersSize::default()
+        chapters: ChaptersSize::default(),
+        positions_file: "./positions".into()
     };
     unsafe {
         CONFIG = Some(config);

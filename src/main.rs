@@ -162,26 +162,26 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
         }
     };
 
-    // let mut builder = tokio_threadpool::Builder::new();
-    // builder.keep_alive(
-    //     cfg.thread_keep_alive
-    //         .map(|secs| std::time::Duration::from_secs(u64::from(secs))),
-    // );
     let mut rt = tokio::runtime::Builder::new()
         .blocking_threads(cfg.pool_size.queue_size)
         .core_threads(cfg.pool_size.num_threads)
         .name_prefix("tokio-pool-")
-        //.keep_alive()
         .build()
         .unwrap();
 
     rt.spawn(server);
-    //rt.shutdown_on_idle().wait().unwrap();
 
     Ok(rt)
 }
 
 fn main() {
+    #[cfg(unix)]
+    {
+        if nix::unistd::getuid().is_root() {
+            warn!("Audioserve is running as root! Not recommended.")
+        }
+        
+    }
     match parse_args() {
         Err(e) => {
             writeln!(&mut io::stderr(), "Arguments error: {}", e).unwrap();
@@ -244,12 +244,13 @@ fn main() {
                 error!("Error saving transcoding cache index {}", e);
             }
         }
+
+        crate::services::position::save_positions();
     }
 
     #[cfg(not(unix))]
     {
         runtime.shutdown_on_idle().wait().unwrap();
     }
-
     info!("Server finished");
 }

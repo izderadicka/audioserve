@@ -5,6 +5,9 @@ use std::hash::Hash;
 use serde::Serializer;
 use std::time::UNIX_EPOCH;
 use std::sync::{Arc,RwLock};
+use std::fs;
+use std::io;
+use crate::config::get_config;
 
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -26,7 +29,6 @@ pub struct Position {
 }
 
 fn serialize_ts<S:Serializer>(ts:&SystemTime, ser:S) -> Result<S::Ok, S::Error> {
-    //unimplemented!();
     let dur = ts.duration_since(UNIX_EPOCH).map_err(serde::ser::Error::custom)?;
     let num = dur.as_millis();
     ser.serialize_u64(num as u64)
@@ -41,9 +43,39 @@ impl Cache {
 
     pub fn new(sz:usize) -> Self {
 
+        let fname = &get_config().positions_file;
+        if let Ok(f) = fs::File::open(fname) {
+            if let Ok(mut inner) = serde_json::from_reader::<_, CacheInner>(f) {
+                inner.shrink(sz);
+                inner.max_size = sz;
+                return Cache{
+                    inner: Arc::new(RwLock::new(inner))
+                }
+            }
+        }
+
         Cache {
             inner: Arc::new(RwLock::new(CacheInner::new(sz)))
         }
+    }
+
+    pub fn save(&self) -> io::Result<()> {
+        
+        let dir = get_config().positions_file.parent();
+        if let Some(d) = dir {
+            if ! d.exists() {
+                fs::create_dir_all(&d)?;
+            }
+        };
+
+        let fname = &get_config().positions_file;
+        let f = fs::File::create(fname)?;
+        {
+        let c = self.inner.read().unwrap();
+        serde_json::to_writer::<_, CacheInner>(f, &c)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        }
+        
     }
 
     pub fn insert<S: Into<String>>(&self, file_path: S, position: f32) {
@@ -136,6 +168,12 @@ impl CacheInner {
 
     fn len(&self) -> usize {
         self.table.len()
+    }
+
+    fn shrink(&mut self, sz: usize) {
+        while self.len() > sz {
+            self.table.pop_front();
+        }
     }
 }
 
