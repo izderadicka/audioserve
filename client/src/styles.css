@@ -102,6 +102,10 @@ body {
     float: right;
 }
 
+#recent-positions {
+    margin-bottom: 0.5em;
+}
+
 .duration, .bitrate {
   margin-left: 1em;
   font-size: 70%

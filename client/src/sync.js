@@ -106,7 +106,7 @@ class PlaybackSync {
 
     }
 
-    queryPosition(filePath) {
+    queryPosition(folderPath) {
         if (this.pendingQuery) {
             if (this.pendingTimeout) clearInterval(this.pendingTimeout);
             pendingQuery(new Error("Canceled by next query"));
@@ -120,7 +120,7 @@ class PlaybackSync {
                     reject(new Error("Timeout"));
                 }, 3000);
             });
-            this.socket.send(filePath?this.groupPrefix+filePath:"?");
+            this.socket.send(folderPath?this.groupPrefix+folderPath:"?");
             return p;
 
         } else {

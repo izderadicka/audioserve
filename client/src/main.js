@@ -29,6 +29,7 @@ $(function () {
     let transcoding = "m";
     let ordering = "a";
     let transcodingLimits = { l: 38, m: 56, h: 76 };
+    let restoredPosition = false;
 
     function isRecent(q) {
         return q == RECENT_QUERY;
@@ -113,7 +114,7 @@ $(function () {
             })
             .catch(err => {
                 if (err.status == 401) {
-                    $("#login-dialog").modal();
+                    showLoginDialog();
                     throw new Error("Unauthorised");
                 } else {
                     console.log("Cannot load collections", err);
@@ -156,7 +157,7 @@ $(function () {
                 if (err.status == 404 && path.length) {
                     loadFolder("");
                 } else if (err.status == 401) {
-                    $("#login-dialog").modal();
+                    showLoginDialog();
                 } else {
                     alert("Cannot contact server");
                 }
@@ -265,13 +266,20 @@ $(function () {
                     clearPlayer();
                 }
                 let lastFile = window.localStorage.getItem("audioserve_file");
+                restoredPosition = false;
                 if (lastFile) {
                     let target = $(`#files a[href="${lastFile}"]`);
                     if (target.length) {
+                        restoredPosition = true;
                         let time = window.localStorage.getItem("audioserve_time");
                         showInView(target);
                         playFile(target, !startPlay, time);
-                    }
+                    } 
+                } else {
+                    // TODO: At some right momemts check if user want to continue at last positions
+                    // something after lost of whole window focus for longer time and after whole app
+                    // reload
+                    // checkRecent();
                 }
             });
     }
@@ -297,7 +305,7 @@ $(function () {
             .fail(err => {
                 console.log("Search error", err);
                 if (err.status == 401) {
-                    $("#login-dialog").modal();
+                    showLoginDialog();
                 } else {
                     alert("Server error");
                 }
@@ -382,8 +390,7 @@ $(function () {
 
     const checkRecent = function() {
         const filePath = window.localStorage.getItem("audioserve_file");
-        const idx = filePath.lastIndexOf('/');
-        const folderPath = filePath.substr(0, idx);
+        const folderPath = window.localStorage.getItem("audioserve_folder");
         return sync.queryPosition(folderPath)
             .then((res) => {
                 console.log("Position: " + JSON.stringify(res));
@@ -460,7 +467,10 @@ $(function () {
             .catch((e) => console.error(e));
     };
 
-    player.beforePlay = checkRecent;
+    player.beforePlay = () => { 
+        restoredPosition = false; 
+        return checkRecent(); 
+    };
 
     function playFile(target, paused, startTime) {
 
@@ -521,6 +531,7 @@ $(function () {
     $("#files").on("click", "a.list-group-item-action", evt => {
         let target = $(evt.target).closest("a");
         debug("Click to play:", target);
+        restoredPosition = false;
         playFile(target);
         evt.preventDefault();
     });
@@ -539,10 +550,15 @@ $(function () {
     $("#player .audio-player").on("timeupdate", evt => {
         window.localStorage.setItem("audioserve_time", evt.detail.currentTime);
         let currentFile = window.localStorage.getItem("audioserve_file");
-        if (currentFile) {
+        if (currentFile && !restoredPosition) {
             sync.enqueuePosition(currentFile, evt.detail.currentTime);
         }
     });
+
+    function showLoginDialog() {
+        $("#group-input").val(window.localStorage.getItem("audioserve_group"));
+        $("#login-dialog").modal();
+    }
 
     function login(secret) {
         let secretBytes = new (TextEncoder)("utf-8").encode(secret);
@@ -572,6 +588,8 @@ $(function () {
     $("#login-form").on("submit", evt => {
         evt.preventDefault();
         let secret = $("#secret-input").val();
+        let group = $("#group-input").val();
+        window.localStorage.setItem("audioserve_group", group);
         login(secret)
             .then(data => {
                 loadCollections().then(() => {
