@@ -9,7 +9,7 @@ import showdown from "showdown";
 import { debug } from "./debug";
 import { sync } from "./sync";
 import moment from "moment";
-import config from"./config";
+import config from "./config";
 
 $(function () {
     const RECENT_QUERY = "__RECENT__";
@@ -146,7 +146,7 @@ $(function () {
         }
     }
 
-    function loadFolder(path, fromHistory=false, scrollTo=null, startPlay=false) {
+    function loadFolder(path, fromHistory = false, scrollTo = null, startPlay = false) {
         $("#info-container").hide();
         ajax({
             url: collectionUrl + "/folder/" + path + (ordering != "a" ? `?ord=${ordering}` : ""),
@@ -274,7 +274,7 @@ $(function () {
                         let time = window.localStorage.getItem("audioserve_time");
                         showInView(target);
                         playFile(target, !startPlay, time);
-                    } 
+                    }
                 } else {
                     // TODO: At some right momemts check if user want to continue at last positions
                     // something after lost of whole window focus for longer time and after whole app
@@ -343,7 +343,7 @@ $(function () {
                 $("#files-container").hide();
                 updateBreadcrumbSearch(query);
                 scrollMain(scrollTo);
-                clearPlayer();
+                clearPlayer(true);
                 if (!fromHistory) {
                     window.history.pushState({
                         "audioserve_search": query,
@@ -388,7 +388,7 @@ $(function () {
     sync.open();
     let player = new AudioPlayer();
 
-    const checkRecent = function() {
+    const checkRecent = function () {
         const filePath = window.localStorage.getItem("audioserve_file");
         const folderPath = window.localStorage.getItem("audioserve_folder");
         return sync.queryPosition(folderPath)
@@ -405,19 +405,19 @@ $(function () {
                 const addToDialog = (item) => {
                     if (!item) return;
                     const itemPath = item.folder + '/' + item.file;
-                    if (itemPath == filePath && Math.abs(item.position - position) < 
+                    if (itemPath == filePath && Math.abs(item.position - position) <
                         config.MIN_TIME_DIFFERENCE_FOR_POSITION_SHARING) return;
 
                     const normName = (n) => {
-                        n =n.replace(/\$\$.*\$\$/, '');
+                        n = n.replace(/\$\$.*\$\$/, '');
                         const extIndex = n.lastIndexOf('.');
-                        if (extIndex>0) {
-                            n = n.substr(0,extIndex);
+                        if (extIndex > 0) {
+                            n = n.substr(0, extIndex);
                         }
                         return n;
                     };
                     const li = $("<a>").addClass('list-group-item').addClass('list-group-item-action');
-                    
+
                     const content = `<h4 class="chapter">${normName(item.file)} at ${formatTime(item.position)}</h4>
                     <div class="folder">${item.folder}</div>
                     <div class="timestamp">${new moment(item.timeStamp).fromNow()}</div>`;
@@ -427,10 +427,10 @@ $(function () {
 
                     li.one('click', (evt) => {
                         debug(`Will jump to ${itemPath} at ${item.position}`);
-                        
+
                         if (item.folder == window.localStorage.getItem("audioserve_folder")) {
                             let target = $(`#files a[href="${itemPath}"]`);
-                            playFile(target,false,item.position);
+                            playFile(target, false, item.position);
                         } else {
                             window.localStorage.setItem("audioserve_folder", item.folder);
                             window.localStorage.setItem("audioserve_file", itemPath);
@@ -441,7 +441,7 @@ $(function () {
                             }
                             loadFolder(item.folder, false, null, true);
                         }
-                        
+
                         dialogReturn = false;
                         dialog.modal("hide");
                     });
@@ -451,8 +451,8 @@ $(function () {
                 };
 
                 if (res.folder) addToDialog(res.folder);
-                const itemEq = (a,b) => b && a.file == b.file && a.folder == b.folder && a.position == b.position;
-                if (res.last && ! itemEq(res.last, res.folder)) addToDialog(res.last);
+                const itemEq = (a, b) => b && a.file == b.file && a.folder == b.folder && a.position == b.position;
+                if (res.last && !itemEq(res.last, res.folder)) addToDialog(res.last);
 
                 if (showDialog) {
                     dialog.modal();
@@ -467,9 +467,9 @@ $(function () {
             .catch((e) => console.error(e));
     };
 
-    player.beforePlay = () => { 
-        restoredPosition = false; 
-        return checkRecent(); 
+    player.beforePlay = () => {
+        restoredPosition = false;
+        return checkRecent();
     };
 
     function playFile(target, paused, startTime) {
@@ -496,10 +496,11 @@ $(function () {
         }
     }
 
-    function clearPlayer() {
-        window.localStorage.removeItem("audioserve_file");
-        window.localStorage.removeItem("audioserve_time");
-
+    function clearPlayer(keepPosition = false) {
+        if (!keepPosition) {
+            window.localStorage.removeItem("audioserve_file");
+            window.localStorage.removeItem("audioserve_time");
+        }
         player.pause();
         player.setUrl("");
         $("#files a").removeClass("active");
@@ -612,7 +613,7 @@ $(function () {
         const group = window.localStorage.getItem("audioserve_group") || 'group';
         sync.groupPrefix = `${group}/${collIndex}/`;
         window.localStorage.setItem("audioserve_collection", collIndex);
-        
+
 
     }
 
@@ -714,6 +715,11 @@ $(function () {
 
     $("#folder-download-link").on('click', (evt) => {
         evt.stopPropagation();
+    });
+
+    $("#position-sync-btn").on('click', (evt) => {
+        evt.stopPropagation();
+        checkRecent();
     });
 
     const reloadCurrentFolder = (fromHistory, resetPlayer) => {

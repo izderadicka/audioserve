@@ -42,9 +42,21 @@ body {
     display: block;
     width: 1.1em;
     height: 1.2em;
-    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 91.852 100'%3E%3Cpath d='M78.281 2.444H57.887v34.393h15.04L45.595 61.521 19.116 36.837h14.648V2.444H13.762S.189 2.444.189 16.017v70.409S.189 100 13.762 100h64.519s13.572 0 13.572-13.574V16.017s0-13.573-13.572-13.573zm1.385 80.494H13.213V56.426h8.682v17.83h49.087v-17.83h8.684v26.512z' stroke='%23007bff' fill='%23007bff'/%3E%3C/svg%3E"); 
+    margin-right: 6px;
+    background-image: url("data:image/svg+xml;charset=utf8,%3C?xml version='1.0' encoding='utf-8'?%3E%3C!-- Svg Vector Icons : http://www.onlinewebfonts.com/icon --%3E%3C!DOCTYPE svg PUBLIC '-//W3C//DTD SVG 1.1//EN' 'http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd'%3E%3Csvg version='1.1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' x='0px' y='0px' viewBox='0 0 1000 1000' enable-background='new 0 0 1000 1000' xml:space='preserve'%3E%3Cmetadata%3E Svg Vector Icons : http://www.onlinewebfonts.com/icon %3C/metadata%3E%3Cg%3E%3Cg%3E%3Cpath fill='%23007bff' d='M924.3,700.4v222.3c0,37.3-30.2,67.4-67.4,67.4H143c-37.2,0-67.4-30.1-67.4-67.4V700.4c0-37.2,30.2-67.4,67.4-67.4c37.2,0,67.4,30.2,67.4,67.4v154.9h579.2V700.4c0-37.2,30.2-67.4,67.4-67.4C894.2,633,924.3,663.2,924.3,700.4z M452.4,758.1c13.2,13.2,30.4,19.7,47.6,19.7c17.3,0,34.5-6.6,47.7-19.7l202-202c26.4-26.3,26.4-68.9,0-95.2c-26.3-26.3-69-26.3-95.2,0l-87,87.1V77.4c0-37.2-30.1-67.4-67.4-67.4c-37.2,0-67.4,30.2-67.4,67.4v470.6l-87.1-87.1c-26.3-26.3-69-26.3-95.2,0c-26.3,26.3-26.3,69,0,95.2L452.4,758.1z'/%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3Cg%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
     background-size: cover;
   }
+  
+
+.position-sync {
+    float: right;
+    width: 1.3em;
+    height: 1.5em;
+    background-size: contain;
+    background-repeat: no-repeat;
+    margin-right: 0.5em;
+    background-image: url("data:image/svg+xml;charset=utf8,%3C?xml version='1.0' encoding='UTF-8'?%3E%3Csvg version='1.1' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg' xmlns:cc='http://creativecommons.org/ns%23' xmlns:dc='http://purl.org/dc/elements/1.1/' xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns%23'%3E%3Cmetadata%3E%3Crdf:RDF%3E%3Ccc:Work rdf:about=''%3E%3Cdc:format%3Eimage/svg+xml%3C/dc:format%3E%3Cdc:type rdf:resource='http://purl.org/dc/dcmitype/StillImage'/%3E%3Cdc:title/%3E%3C/cc:Work%3E%3C/rdf:RDF%3E%3C/metadata%3E%3Cpath d='m0 19' fill='%23006fd1' fill-rule='evenodd'/%3E%3Cg transform='matrix(.77724 0 0 .8063 -2.1985 -1.3898)' fill='%23007bff' fill-rule='evenodd'%3E%3Cpath d='m16 26c2.419 0 4.4367-1.7178 4.9-4h2.0291c-0.48523 3.3923-3.4026 6-6.9291 6-2.4445 0-4.5963-1.253-5.8482-3.1518l-1.1518 1.1518v-1-2-1h0.070889 2.0291 1.9l-1.3919 1.3919c0.8481 1.5539 2.4969 2.6081 4.3919 2.6081z'/%3E%3Cpath d='m20.9 20h-0.89998-1l1.3919-1.3918c-0.84807-1.5539-2.4969-2.6082-4.3919-2.6082-2.419 0-4.4367 1.7178-4.9 4h-2.0291c0.48523-3.3923 3.4026-6 6.9291-6 2.4445 0 4.5963 1.253 5.8483 3.1518l1.1517-1.1517v3.9999h-0.07089z'/%3E%3C/g%3E%3Cpath d='m2.3051 2.1695v27.661l24.407-14.102c-8.157-4.3764-15.103-8.9507-24.407-13.559z' fill='none' stroke='%23007bff' stroke-width='2'/%3E%3C/svg%3E");
+}
 
 .folder-download {
     display: block;
