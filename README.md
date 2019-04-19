@@ -183,7 +183,6 @@ We set the shared secret via `-s` argument and specify use of TLS via `--ssl-key
 Static build of audioserve is available (for rencent releases) at [github releases page](https://github.com/izderadicka/audioserve/releases). You can can just download and extract locally and run on any modern x86_64 linux.
 You can also create your own static build with script `build_static.sh` (Docker is required for this)
 
-
 ### Local build (Linux)
 
 Now audioserve depends on ffmpeg's libavformat 4.1 (and it's dependent libavutil and libavcodec), which is a complex beast. If you are building locally you need this dependence (plus couple of others). If you have available right version on your system you can link against it (remember it has to be correct version). Other option is to use feature `partially-static`, which will download right version of ffmpeg, compile it and statically linked it into audioserve (but then it'll be indeed bigger).
@@ -224,16 +223,15 @@ To add non-default features (like `transcoding-cache`) compile with this option 
 
 **Available features:**
 
-Feature | Desc |Default |Program options
+Feature | Description | Default | Program options
 --------|------|:------:|---------------
 | tls | Enables TLS support (e.g https) (requires openssl and libssl-dev) | Yes | --ssl-key --ssl-key-password to define server key
-| symlinks | Enables to use symbolic link in media folders | Yes | Use --allow-symlinks to follow symbolic links
+| symlinks | Enables to use symbolic links in media folders | Yes | Use --allow-symlinks to follow symbolic links
 | search-cache | Caches structure of media directories for fast search | Yes | Use --search-cache to enable this cache
 | folder-download | Enables API endpoint to download content of a folder in tar archive | Yes | Can be disabled with argument --disable-folder-download
-| chapters | m4b and large files are presented as folders with chapters as their content| Yes | Use --chapters-from-duration to enable split (virtual) of long audio files without chapters metadata
-| libavformat | Uses libavformat to extract media info instead of libtag (which does not support matroska/webm container) | Yes | Defaulted because feature chapters depends on it
 | transcoding-cache | Cache to save transcoded files for fast next use | No | Can be disabled by --t-cache-disable and modified by --t-cache-dir --t-cache-size --t-cache-max-files
-
+| static | Enables fully static build of audioserve. Check above notes for static build | No |
+| partially-static | Statically links libavformat (and related).Enables to run audioserve on systems, which do not have required version of libavformat| No |
 
 License
 -------
