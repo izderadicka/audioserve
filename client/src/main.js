@@ -94,6 +94,15 @@ $(function () {
                 if (!data.folder_download) {
                     $("#folder-download-link").hide();
                 }
+
+                // opens websocket if group is defined
+                if (sync.groupPrefix && ! sync.active) {
+                    sync.open();
+                    $('#position-sync-btn').show();
+                } else if (!sync.groupPrefix && sync.active) {
+                    sync.close();
+                    $('#position-sync-btn').hide();
+                }
             })
             .then(() => {
                 return ajax({ url: baseUrl + "/transcodings" })
@@ -117,7 +126,7 @@ $(function () {
                     showLoginDialog();
                     throw new Error("Unauthorised");
                 } else {
-                    console.log("Cannot load collections", err);
+                    console.error("Cannot load collections", err);
                     alert("Server error when loading collections");
                     throw new Error("Server Error");
                 }
@@ -153,7 +162,7 @@ $(function () {
         }
         )
             .fail(err => {
-                console.log("Server error", err);
+                console.error("Server error", err);
                 if (err.status == 404 && path.length) {
                     loadFolder("");
                 } else if (err.status == 401) {
@@ -197,7 +206,7 @@ $(function () {
                             }
                             $("#info-container").show();
                         })
-                        .catch((e) => console.log("Cannot load description", e));
+                        .catch((e) => console.error("Cannot load description", e));
                 }
 
                 let subfolders = $('#subfolders');
@@ -303,7 +312,7 @@ $(function () {
             }
         )
             .fail(err => {
-                console.log("Search error", err);
+                console.error("Search error", err);
                 if (err.status == 401) {
                     showLoginDialog();
                 } else {
@@ -385,7 +394,6 @@ $(function () {
         }
     }
 
-    sync.open();
     let player = new AudioPlayer();
 
     const checkRecent = function () {
@@ -393,7 +401,7 @@ $(function () {
         const folderPath = window.localStorage.getItem("audioserve_folder");
         return sync.queryPosition(folderPath)
             .then((res) => {
-                console.log("Position: " + JSON.stringify(res));
+                debug("Position: " + JSON.stringify(res));
                 const position = window.localStorage.getItem("audioserve_time");
 
                 const dialog = $("#position-dialog");
@@ -450,9 +458,9 @@ $(function () {
                     showDialog = true;
                 };
 
-                if (res.folder) addToDialog(res.folder);
+                if (res && res.folder) addToDialog(res.folder);
                 const itemEq = (a, b) => b && a.file == b.file && a.folder == b.folder && a.position == b.position;
-                if (res.last && !itemEq(res.last, res.folder)) addToDialog(res.last);
+                if (res && res.last && !itemEq(res.last, res.folder)) addToDialog(res.last);
 
                 if (showDialog) {
                     dialog.modal();
@@ -491,7 +499,7 @@ $(function () {
         if (!paused) {
             let res = player.play();
             if (res.catch) {
-                res.catch(e => console.log("Play failed", e));
+                res.catch(e => console.error("Play failed", e));
             }
         }
     }
@@ -598,7 +606,7 @@ $(function () {
                     $("#login-dialog").modal("hide");
                 });
             })
-            .catch(err => console.log("Login failed", err));
+            .catch(err => console.error("Login failed", err));
 
     });
 
@@ -610,8 +618,8 @@ $(function () {
         } else {
             collectionUrl = baseUrl;
         }
-        const group = window.localStorage.getItem("audioserve_group") || 'group';
-        sync.groupPrefix = `${group}/${collIndex}/`;
+        const group = window.localStorage.getItem("audioserve_group");
+        if (group) sync.groupPrefix = `${group}/${collIndex}/`;
         window.localStorage.setItem("audioserve_collection", collIndex);
 
 
@@ -634,7 +642,6 @@ $(function () {
     });
 
     $("#main").on("scroll", (evt) => {
-        //console.log(`Scroll ${$("#main").scrollTop()}`, evt.detail);
         if (window.history.state) {
             let s = window.history.state;
             s.audioserve_scroll = $("#main").scrollTop();

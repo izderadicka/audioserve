@@ -76,6 +76,7 @@ class PlaybackSync {
 
     enqueuePosition(filePath, position, force=false) {
         if (this.pendingMessage) window.clearTimeout(this.pendingMessage);
+        if (!this.active) return;
         position = Math.round(position*1000)/1000;
         filePath = this.groupPrefix+filePath;
         if (this.filePath && this.lastSend && filePath == this.filePath) {
@@ -123,8 +124,10 @@ class PlaybackSync {
             this.socket.send(folderPath?this.groupPrefix+folderPath:"?");
             return p;
 
+        } else if (this.groupPrefix){
+            return Promise.reject(new Error("No websocket connection "));
         } else {
-            return Promise.reject(new Error("No connection"));
+            return Promise.resolve(null);
         }
 
     }
