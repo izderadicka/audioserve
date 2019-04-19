@@ -180,6 +180,7 @@ Both are made available to the container via `-v` option and then passed to audi
 We set the shared secret via `-s` argument and specify use of TLS via `--ssl-key` and `ssl-key-password` (the test key is already prebundled in the image). We also enable search cache with `--search-cache` argument.
 
 ### Static build (Linux)
+
 Static build of audioserve is available (for rencent releases) at [github releases page](https://github.com/izderadicka/audioserve/releases). You can can just download and extract locally and run on any modern x86_64 linux.
 You can also create your own static build with script `build_static.sh` (Docker is required for this)
 
