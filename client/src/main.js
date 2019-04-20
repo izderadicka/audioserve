@@ -428,7 +428,7 @@ $(function () {
 
                     const content = `<h4 class="chapter">${normName(item.file)} at ${formatTime(item.position)}</h4>
                     <div class="folder">${item.folder}</div>
-                    <div class="timestamp">${new moment(item.timeStamp).fromNow()}</div>`;
+                    <div class="timestamp">${new moment(item.timestamp).fromNow()}</div>`;
 
                     li.html(content);
                     dialogContent.append(li);
