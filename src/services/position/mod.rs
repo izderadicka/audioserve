@@ -26,7 +26,9 @@ enum Msg {
     FolderQuery {
         folder_path: String
     },
-    GenericQuery
+    GenericQuery{
+        group: String
+    }
 }
 
 #[derive(Serialize)]
@@ -50,11 +52,14 @@ impl FromStr for Msg {
             }
 
         } else if parts.len() == 1 {
-            if parts[0].is_empty() || parts[0] == "?" {
-                Ok(Msg::GenericQuery)
-            } else {
+            if parts[0].find('/').is_some() {
                 Ok(Msg::FolderQuery{folder_path:parts[0].into()})
-            }
+            } else {
+           
+                Ok(Msg::GenericQuery{group: parts[0].into()})
+            } 
+    
+                
         } else {
             Err("Too many |")
         }
@@ -103,8 +108,8 @@ pub fn position_service(req: Request<Body>) -> ResponseFuture {
                         Box::new(future::ok(None))
 
                     }
-                    Msg::GenericQuery => {
-                        let last = CACHE.get_last();
+                    Msg::GenericQuery{group} => {
+                        let last = CACHE.get_last(group);
                         let res = Reply {
                             folder: None,
                             last
@@ -120,8 +125,9 @@ pub fn position_service(req: Request<Body>) -> ResponseFuture {
                     }
 
                     Msg::FolderQuery{folder_path} => {
-
-                        let last = CACHE.get_last();
+                        let group = Some(folder_path.splitn(2, "/"))
+                                    .and_then(|mut p| p.next());
+                        let last = CACHE.get_last(group.unwrap());
                         let folder = CACHE.get(&folder_path);
                         let res = Reply {
                             last: if last != folder {last} else {None},
@@ -156,16 +162,15 @@ mod test {
     #[test]
     fn test_position_msg() {
 
-        let m1:Msg = "123.1|book1/chap1".parse().unwrap();
-        assert_eq!(Msg::Position{position:123.1, file_path: Some("book1/chap1".into())}, m1);
+        let m1:Msg = "123.1|group/book1/chap1".parse().unwrap();
+        assert_eq!(Msg::Position{position:123.1, file_path: Some("group/book1/chap1".into())}, m1);
         let m2:Msg = "123.1|".parse().unwrap();
         assert_eq!(Msg::Position{position:123.1, file_path:None}, m2);
-        let m3:Msg = "".parse().unwrap();
-        assert_eq!(Msg::GenericQuery, m3);
-        let m4:Msg = "?".parse().unwrap();
-        assert_eq!(Msg::GenericQuery, m4);
-        let m5:Msg = "book1".parse().unwrap();
-        assert_eq!(Msg::FolderQuery{folder_path:"book1".into()}, m5);
+        let m3:Msg = "group".parse().unwrap();
+        assert_eq!(Msg::GenericQuery{group:"group".into()}, m3);
+        
+        let m5:Msg = "group/book1".parse().unwrap();
+        assert_eq!(Msg::FolderQuery{folder_path:"group/book1".into()}, m5);
 
         let m6 = "aaa|bbb".parse::<Msg>();
         let m7 = "||".parse::<Msg>();
