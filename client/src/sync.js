@@ -43,7 +43,7 @@ class PlaybackSync {
             const data = JSON.parse(evt.data);
             const parseGroup  = (item) => {
                 if (item && item.folder) {
-                    const [prefix, collection] = /^\w+\/(\d+)\//.exec(item.folder);
+                    const [prefix, collection] = /^(\d+)\//.exec(item.folder);
                     item.folder = item.folder.substr(prefix.length);
                     item.collection = parseInt(collection);
                 }
