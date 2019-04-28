@@ -1,11 +1,11 @@
+use super::transcode::{QualityLevel, TranscodingFormat};
 use crate::config::get_config;
 use crate::util::os_to_string;
 use mime::Mime;
 use mime_guess::guess_mime_type;
-use super::transcode::{QualityLevel, TranscodingFormat};
+use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-use std::cmp::Ordering;
 use unicase::UniCase;
 
 #[derive(Debug, Serialize)]
@@ -94,13 +94,13 @@ impl AudioFolderShort {
         })
     }
 
-    #[cfg(feature="search-cache")]
+    #[cfg(feature = "search-cache")]
     pub fn from_path_and_name(name: String, path: PathBuf, is_file: bool) -> Self {
-        AudioFolderShort{
+        AudioFolderShort {
             name: name.into(),
             path,
             is_file,
-            modified: None
+            modified: None,
         }
     }
 
@@ -111,10 +111,9 @@ impl AudioFolderShort {
                 (Some(ref a), Some(ref b)) => b.cmp(a),
                 (Some(_), None) => Ordering::Less,
                 (None, Some(_)) => Ordering::Greater,
-                (None, None) => Ordering::Equal
-            }
+                (None, None) => Ordering::Equal,
+            },
         }
-
     }
 }
 

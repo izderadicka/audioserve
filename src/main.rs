@@ -178,7 +178,6 @@ fn main() {
         if nix::unistd::getuid().is_root() {
             warn!("Audioserve is running as root! Not recommended.")
         }
-        
     }
     match parse_args() {
         Err(e) => {

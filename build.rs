@@ -1,8 +1,7 @@
 fn main() {
-    #[cfg(feature="static")]
+    #[cfg(feature = "static")]
     {
-    println!("cargo:rustc-link-lib=static=ssl");
-    println!("cargo:rustc-link-lib=static=crypto");
-
+        println!("cargo:rustc-link-lib=static=ssl");
+        println!("cargo:rustc-link-lib=static=crypto");
     }
 }

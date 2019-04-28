@@ -163,14 +163,13 @@ impl FoldersSearch {
                                     if m {
                                         debug!("Found {:?} in {}", tokens, lc_s);
                                         let folder = AudioFolderShort::from_dir_entry(
-                                            &f, 
-                                            s.into(), 
+                                            &f,
+                                            s.into(),
                                             ordering,
-                                            false);
+                                            false,
+                                        );
                                         if let Ok(folder) = folder {
-                                            results
-                                                .subfolders
-                                                .push(folder)
+                                            results.subfolders.push(folder)
                                         }
                                     } else {
                                         search_recursive(
@@ -179,7 +178,7 @@ impl FoldersSearch {
                                             results,
                                             tokens,
                                             allow_symlinks,
-                                            ordering
+                                            ordering,
                                         )
                                     }
                                 }
@@ -203,9 +202,10 @@ impl FoldersSearch {
             &mut res,
             &tokens,
             get_config().allow_symlinks,
-            ordering
+            ordering,
         );
-        res.subfolders.sort_unstable_by(|a,b| a.compare_as(ordering,b));
+        res.subfolders
+            .sort_unstable_by(|a, b| a.compare_as(ordering, b));
         res
     }
 }
@@ -256,11 +256,11 @@ mod cache {
                 .unwrap_or_else(|_| SearchResult::new());
 
             // As search cache now does not contain modified times we need to add them here
-            // This is kind of hack, but as this is probably not common I guess it's easier 
+            // This is kind of hack, but as this is probably not common I guess it's easier
             // then adding mtime into search cache
             if let FoldersOrdering::RecentFirst = ordering {
                 let base_path = &get_config().base_dirs[collection];
-                //need to update mtime 
+                //need to update mtime
                 res.subfolders.iter_mut().for_each(|s| {
                     let full_path = base_path.join(&s.path);
                     if let Ok(metadata) = fs::metadata(full_path) {
@@ -268,10 +268,10 @@ mod cache {
                             s.modified = Some(modified)
                         }
                     }
-
                 });
             };
-            res.subfolders.sort_unstable_by(|a,b| a.compare_as(ordering,b));
+            res.subfolders
+                .sort_unstable_by(|a, b| a.compare_as(ordering, b));
             res
         }
 
@@ -309,7 +309,11 @@ mod tests {
         let res = search.search_folder(TEST_DATA_DIR, "usak kulisak", FoldersOrdering::RecentFirst);
         assert_eq!(res.subfolders.len(), 1);
 
-        let res = search.search_folder(TEST_DATA_DIR, "usak nexistuje", FoldersOrdering::RecentFirst);
+        let res = search.search_folder(
+            TEST_DATA_DIR,
+            "usak nexistuje",
+            FoldersOrdering::RecentFirst,
+        );
         assert_eq!(res.subfolders.len(), 0);
 
         let res = search.search_folder(TEST_DATA_DIR, "t", FoldersOrdering::RecentFirst);

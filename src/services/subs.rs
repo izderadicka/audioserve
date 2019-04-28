@@ -8,25 +8,25 @@ use super::types::*;
 use super::Counter;
 use crate::config::get_config;
 use crate::error::Error;
-use crate::util::{ResponseBuilderExt,checked_dec, to_satisfiable_range, into_range_bounds};
+use crate::util::{checked_dec, into_range_bounds, to_satisfiable_range, ResponseBuilderExt};
 
 use futures::future::{self, poll_fn, Future};
-use futures::{Async, Stream, try_ready};
+use futures::{try_ready, Async, Stream};
+use headers::{AcceptRanges, CacheControl, ContentLength, ContentRange, ContentType, LastModified};
 #[cfg(feature = "folder-download")]
 use hyper::header::CONTENT_DISPOSITION;
 use hyper::{Body, Response as HyperResponse, StatusCode};
-use headers::{CacheControl, ContentRange, LastModified, AcceptRanges, ContentLength, ContentType};
 use mime;
 use mime_guess::guess_mime_type;
 use serde_json;
+use std::borrow;
+use std::collections::Bound;
+use std::ffi::OsStr;
 use std::io::{self, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use tokio::io::AsyncRead;
 use tokio_threadpool::blocking;
-use std::collections::Bound;
-use std::ffi::OsStr;
-use std::borrow;
 
 pub type ByteRenge = (Bound<u64>, Bound<u64>);
 
@@ -108,8 +108,10 @@ fn serve_file_cached_or_transcoded(
             ),
             Some((f, path)) => {
                 if seek.is_some() {
-                    debug!("File is in cache and seek is needed -  will send remuxed from {:?} {:?}",
-                        path, span);
+                    debug!(
+                        "File is in cache and seek is needed -  will send remuxed from {:?} {:?}",
+                        path, span
+                    );
                     serve_file_transcoded_checked(
                         AudioFilePath::Transcoded(path),
                         seek,
@@ -259,8 +261,9 @@ fn serve_opened_file(
         let mut resp = HyperResponse::builder();
         resp.typed_header(ContentType::from(mime));
         if let Some(age) = caching {
-            let cache = CacheControl::new().with_public()
-            .with_max_age(std::time::Duration::from_secs(u64::from(age)));
+            let cache = CacheControl::new()
+                .with_public()
+                .with_max_age(std::time::Duration::from_secs(u64::from(age)));
             resp.typed_header(cache);
             if let Some(last_modified) = last_modified {
                 resp.typed_header(LastModified::from(last_modified));
@@ -268,7 +271,7 @@ fn serve_opened_file(
         }
 
         let (start, end) = match range {
-            Some(range) => match to_satisfiable_range(range,file_len) {
+            Some(range) => match to_satisfiable_range(range, file_len) {
                 Some(l) => {
                     resp.status(StatusCode::PARTIAL_CONTENT);
                     let h = ContentRange::bytes(into_range_bounds(l), Some(file_len)).unwrap();
@@ -363,7 +366,11 @@ pub fn send_file<P: AsRef<Path>>(
     }
 }
 
-pub fn get_folder(base_path: &'static Path, folder_path: PathBuf, ordering: FoldersOrdering) -> ResponseFuture {
+pub fn get_folder(
+    base_path: &'static Path,
+    folder_path: PathBuf,
+    ordering: FoldersOrdering,
+) -> ResponseFuture {
     Box::new(
         poll_fn(move || blocking(|| list_dir(&base_path, &folder_path, ordering)))
             .map(|res| match res {
@@ -409,7 +416,9 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
                             let files = folder.into_iter().map(|i| i.0);
                             let tar_stream = async_tar::TarStream::tar_iter_rel(files, base_path);
                             let mut resp = HyperResponse::builder();
-                            resp.typed_header(ContentType::from("application/x-tar".parse::<mime::Mime>().unwrap()));
+                            resp.typed_header(ContentType::from(
+                                "application/x-tar".parse::<mime::Mime>().unwrap(),
+                            ));
                             resp.typed_header(ContentLength(total_len));
                             // let disposition = ContentDisposition {
                             //     disposition: DispositionType::Attachment,
@@ -419,7 +428,7 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
                             //         download_name.into(),
                             //     )],
                             // };
-                            let disposition=format!("attachment; filename=\"{}\"", download_name);
+                            let disposition = format!("attachment; filename=\"{}\"", download_name);
                             resp.header(CONTENT_DISPOSITION, disposition.as_bytes());
                             resp.body(Body::wrap_stream(tar_stream)).unwrap()
                         }
@@ -457,11 +466,7 @@ pub fn collections_list() -> ResponseFuture {
         names: get_config()
             .base_dirs
             .iter()
-            .map(|p| {
-                p.file_name()
-                    .and_then(OsStr::to_str)
-                    .unwrap_or(UKNOWN_NAME)
-            })
+            .map(|p| p.file_name().and_then(OsStr::to_str).unwrap_or(UKNOWN_NAME))
             .collect(),
     };
     Box::new(future::ok(json_response(&collections)))
@@ -472,7 +477,12 @@ pub fn transcodings_list() -> ResponseFuture {
     Box::new(future::ok(json_response(&transcodings)))
 }
 
-pub fn search(collection: usize, searcher: Search<String>, query: String, ordering: FoldersOrdering) -> ResponseFuture {
+pub fn search(
+    collection: usize,
+    searcher: Search<String>,
+    query: String,
+    ordering: FoldersOrdering,
+) -> ResponseFuture {
     Box::new(
         poll_fn(move || {
             let query = query.clone();

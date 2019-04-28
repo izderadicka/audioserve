@@ -1,7 +1,7 @@
-use headers::{HeaderValue, HeaderName, Header};
+use headers::{Header, HeaderName, HeaderValue};
 use hyper::http::response::Builder;
-use std::ops::{Bound,RangeBounds};
-use std::cmp::{min, max};
+use std::cmp::{max, min};
+use std::ops::{Bound, RangeBounds};
 
 pub fn os_to_string(s: ::std::ffi::OsString) -> String {
     match s.into_string() {
@@ -21,52 +21,54 @@ pub fn checked_dec(x: u64) -> u64 {
     }
 }
 
-pub fn to_satisfiable_range<T:RangeBounds<u64>>(r:T, len: u64) -> Option<(u64,u64)> {
-
+pub fn to_satisfiable_range<T: RangeBounds<u64>>(r: T, len: u64) -> Option<(u64, u64)> {
     match (r.start_bound(), r.end_bound()) {
-        (Bound::Included(&start), Bound::Included(&end)) => if start <= end && start < len {
-            Some((start, min(end, len-1)))
-        } else {
-            None
+        (Bound::Included(&start), Bound::Included(&end)) => {
+            if start <= end && start < len {
+                Some((start, min(end, len - 1)))
+            } else {
+                None
+            }
         }
 
-        (Bound::Included(&start), Bound::Unbounded) => if start < len {
-            Some((start, len-1))
-        } else {
-            None
+        (Bound::Included(&start), Bound::Unbounded) => {
+            if start < len {
+                Some((start, len - 1))
+            } else {
+                None
+            }
         }
 
-        (Bound::Unbounded, Bound::Included(&offset)) => if  offset > 0 {
-            Some((max(len-offset, 0), len-1))
-        } else {
-            None
+        (Bound::Unbounded, Bound::Included(&offset)) => {
+            if offset > 0 {
+                Some((max(len - offset, 0), len - 1))
+            } else {
+                None
+            }
         }
-        _ => None
+        _ => None,
     }
-
 }
 
-pub fn into_range_bounds(i: (u64,u64)) -> (Bound<u64>, Bound<u64>) {
+pub fn into_range_bounds(i: (u64, u64)) -> (Bound<u64>, Bound<u64>) {
     (Bound::Included(i.0), Bound::Included(i.1))
 }
 
-
-pub fn header2header<H1:Header, H2:Header>(i:H1) -> Result<impl Header, headers::Error> {
+pub fn header2header<H1: Header, H2: Header>(i: H1) -> Result<impl Header, headers::Error> {
     let mut v = vec![];
-    i.encode(&mut v) ;
+    i.encode(&mut v);
     H2::decode(&mut v.iter())
 }
 
 struct HeadersExtender<'a, 'b> {
     builder: &'a mut Builder,
-    name: &'b HeaderName
-
+    name: &'b HeaderName,
 }
 
-impl <'a, 'b> Extend<HeaderValue> for HeadersExtender<'a, 'b> {
-    fn extend<I:IntoIterator<Item=HeaderValue>>(&mut self, iter:I) {
+impl<'a, 'b> Extend<HeaderValue> for HeadersExtender<'a, 'b> {
+    fn extend<I: IntoIterator<Item = HeaderValue>>(&mut self, iter: I) {
         for v in iter.into_iter() {
-            self.builder.header(self.name,v);
+            self.builder.header(self.name, v);
         }
     }
 }
@@ -77,7 +79,10 @@ pub trait ResponseBuilderExt {
 
 impl ResponseBuilderExt for Builder {
     fn typed_header<H: Header>(&mut self, header: H) -> &mut Builder {
-        let mut extender = HeadersExtender{builder:self,name:H::name()};
+        let mut extender = HeadersExtender {
+            builder: self,
+            name: H::name(),
+        };
         header.encode(&mut extender);
         self
     }

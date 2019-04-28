@@ -78,7 +78,7 @@ impl Cache {
 
     pub fn get<K>(&self, folder: &K) -> Option<Position>
     where
-        K: AsRef<str> +?Sized
+        K: AsRef<str> + ?Sized,
     {
         self.inner.read().unwrap().get(folder)
     }
@@ -131,16 +131,14 @@ impl CacheInner {
                 timestamp: SystemTime::now(),
             };
 
-            let table = self.table.entry(group.into())
-                .or_insert_with(|| {
-                LinkedHashMap::new()
-            });
+            let table = self
+                .table
+                .entry(group.into())
+                .or_insert_with(|| LinkedHashMap::new());
             table.insert(folder_path, rec);
             if table.len() > self.max_size {
                 table.pop_front();
             }
-            
-            
         } else {
             error!("Invalid path, ignoring");
         }
@@ -148,23 +146,21 @@ impl CacheInner {
 
     fn get<K>(&self, group_folder: &K) -> Option<Position>
     where
-        K: AsRef<str>+?Sized
+        K: AsRef<str> + ?Sized,
     {
-        split_group(group_folder)
-        .and_then(|(group,folder)| {
+        split_group(group_folder).and_then(|(group, folder)| {
             self.table
-            .get(group)
-            .and_then(|table| 
-            table.get(folder).map(|p| to_position(folder, p)))
+                .get(group)
+                .and_then(|table| table.get(folder).map(|p| to_position(folder, p)))
         })
-        
     }
 
     fn get_last<G: AsRef<str>>(&self, group: G) -> Option<Position> {
-            self.table
-            .get(group.as_ref())
-            .and_then(|table| 
-            table.back().map(|(folder,p)| to_position(folder.as_ref(), p)))
+        self.table.get(group.as_ref()).and_then(|table| {
+            table
+                .back()
+                .map(|(folder, p)| to_position(folder.as_ref(), p))
+        })
     }
 
     fn clear(&mut self) {
@@ -181,9 +177,9 @@ impl CacheInner {
 
     fn shrink(&mut self, sz: usize) {
         for table in self.table.values_mut() {
-        while table.len() > sz {
-            table.pop_front();
-        }
+            while table.len() > sz {
+                table.pop_front();
+            }
         }
     }
 }
@@ -277,7 +273,6 @@ mod test {
         assert_eq!(15.1, pos.position);
         let pos = c2.get_last("other").unwrap();
         assert_eq!(15.1, pos.position);
-
     }
 
     #[test]

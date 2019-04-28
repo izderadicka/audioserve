@@ -1,9 +1,9 @@
+use std::borrow;
+use std::ffi::OsStr;
 use std::fs;
 use std::fs::DirEntry;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::ffi::OsStr;
-use std::borrow;
 
 use super::audio_meta::{get_audio_properties, Chapter, MediaInfo};
 use super::transcode::TimeSpan;
@@ -15,7 +15,7 @@ use regex::Regex;
 pub fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
     base_dir: P,
     dir_path: P2,
-    ordering: FoldersOrdering
+    ordering: FoldersOrdering,
 ) -> Result<AudioFolder, io::Error> {
     let full_path = base_dir.as_ref().join(&dir_path);
     match get_dir_type(&full_path)? {
@@ -126,21 +126,18 @@ fn ms_from_time(t: &str) -> Option<u64> {
     res.ok()
 }
 
-
 fn chapters_file_path(path: &Path) -> Option<PathBuf> {
-    path.file_name().map(|n| {
-        let mut f = n.to_owned();
-        f.push(".chapters");
-        f
-    }).map(|f| {
-        path.with_file_name(f)
-    })
+    path.file_name()
+        .map(|n| {
+            let mut f = n.to_owned();
+            f.push(".chapters");
+            f
+        })
+        .map(|f| path.with_file_name(f))
 }
 
 fn chapters_from_csv(path: &Path) -> Result<Option<Vec<Chapter>>, io::Error> {
-    
     if let Some(chapters_file) = chapters_file_path(path) {
-
         if chapters_file.is_file() {
             let mut reader = csv::Reader::from_path(&chapters_file)
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
@@ -156,12 +153,10 @@ fn chapters_from_csv(path: &Path) -> Result<Option<Vec<Chapter>>, io::Error> {
                     }
                 })
                 .filter_map(|r| {
-                    match (r.get(0).map(borrow::ToOwned::to_owned), r.get(1).and_then(ms_from_time), 
+                    match (r.get(0).map(borrow::ToOwned::to_owned), r.get(1).and_then(ms_from_time),
                         r.get(2).and_then(ms_from_time)) {
                         (Some(title), Some(start), Some(end)) => {
-
                             Some((title,start, end))
-
                         }
                         _ => {
                             error!("Invalid line {:?} in chapters file {:?} - missing or invalid fields", r.position(), &chapters_file);
@@ -257,13 +252,11 @@ fn is_long_file(meta: Option<&AudioMeta>) -> bool {
     .unwrap_or(false)
 }
 
-
 fn list_dir_dir<P: AsRef<Path>>(
-        base_dir: P, 
-        full_path: PathBuf,
-        ordering: FoldersOrdering
-        ) 
-        -> Result<AudioFolder, io::Error> {
+    base_dir: P,
+    full_path: PathBuf,
+    ordering: FoldersOrdering,
+) -> Result<AudioFolder, io::Error> {
     match fs::read_dir(&full_path) {
         Ok(dir_iter) => {
             let mut files = vec![];
@@ -278,9 +271,9 @@ fn list_dir_dir<P: AsRef<Path>>(
                         Ok(ft) => {
                             let path = f.path().strip_prefix(&base_dir).unwrap().into();
                             if ft.is_dir() {
-                                subfolders.push(
-                                    AudioFolderShort::from_dir_entry(&f, path, ordering,false)?
-                                )
+                                subfolders.push(AudioFolderShort::from_dir_entry(
+                                    &f, path, ordering, false,
+                                )?)
                             } else if ft.is_file() {
                                 if is_audio(&path) {
                                     let mime = ::mime_guess::guess_mime_type(&path);
@@ -295,20 +288,22 @@ fn list_dir_dir<P: AsRef<Path>>(
 
                                     if let Some(_chapters) = meta.get_chapters() {
                                         // we do have chapters so let present this file as folder
-                                        subfolders.push(
-                                            AudioFolderShort::from_dir_entry(&f, path, ordering,true)?
-                                        )
+                                        subfolders.push(AudioFolderShort::from_dir_entry(
+                                            &f, path, ordering, true,
+                                        )?)
                                     } else {
                                         let meta = meta.get_audio_info();
-                                        if is_long_file((&meta).as_ref()) || 
-                                            chapters_file_path(&audio_file_path)
-                                            .and_then(|p| if p.is_file() {Some(())} else {None})
-                                            .is_some() 
+                                        if is_long_file((&meta).as_ref())
+                                            || chapters_file_path(&audio_file_path)
+                                                .and_then(
+                                                    |p| if p.is_file() { Some(()) } else { None },
+                                                )
+                                                .is_some()
                                         {
                                             // file is bigger then limit present as folder
-                                            subfolders.push(
-                                                AudioFolderShort::from_dir_entry(&f, path, ordering,true)?
-                                            )
+                                            subfolders.push(AudioFolderShort::from_dir_entry(
+                                                &f, path, ordering, true,
+                                            )?)
                                         } else {
                                             files.push(AudioFile {
                                                 meta,
@@ -336,9 +331,9 @@ fn list_dir_dir<P: AsRef<Path>>(
                     ),
                 }
             }
-            files.sort_unstable_by(|a,b| a.name.cmp(&b.name));
-            subfolders.sort_unstable_by(|a,b| a.compare_as(ordering, b));                    
-            
+            files.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+            subfolders.sort_unstable_by(|a, b| a.compare_as(ordering, b));
+
             Ok(AudioFolder {
                 files,
                 subfolders,
@@ -469,7 +464,7 @@ mod tests {
         assert!(res.is_ok());
         let folder = res.unwrap();
         let num_media_files = 2;
-        let num_folders =2;
+        let num_folders = 2;
         assert_eq!(folder.files.len(), num_media_files);
         assert!(folder.cover.is_some());
         assert!(folder.description.is_some());
@@ -535,7 +530,10 @@ mod tests {
     #[test]
     fn test_time_parsing() {
         assert_eq!(Some(1100), ms_from_time("1.1"));
-        assert_eq!(Some((1000f32* (2f32* 3600f32 + 35f32*60f32 + 1.1)) as u64), ms_from_time("02:35:01.1"));
+        assert_eq!(
+            Some((1000f32 * (2f32 * 3600f32 + 35f32 * 60f32 + 1.1)) as u64),
+            ms_from_time("02:35:01.1")
+        );
     }
 
 }

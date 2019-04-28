@@ -1,19 +1,19 @@
 use super::subs::short_response;
-use data_encoding::BASE64;
 use crate::error::Error;
-use futures::{future, Future, Stream};
-use hyper::header::{SET_COOKIE};
-use hyper::{Body, Method, Request, Response, StatusCode};
-use headers::{Authorization, Cookie, HeaderMapExt, ContentType, ContentLength};
 use crate::util::ResponseBuilderExt;
-use headers::{authorization::Bearer};
+use data_encoding::BASE64;
+use futures::{future, Future, Stream};
+use headers::authorization::Bearer;
+use headers::{Authorization, ContentLength, ContentType, Cookie, HeaderMapExt};
+use hyper::header::SET_COOKIE;
+use hyper::{Body, Method, Request, Response, StatusCode};
 use ring::digest::{digest, SHA256};
 use ring::hmac;
 use ring::rand::{SecureRandom, SystemRandom};
+use std::borrow;
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use url::form_urlencoded;
-use std::borrow;
 
 type AuthResult<T> = Result<(Request<Body>, T), Response<Body>>;
 type AuthFuture<T> = Box<Future<Item = AuthResult<T>, Error = Error> + Send>;
@@ -91,8 +91,9 @@ impl Authenticator for SharedSecretAuthenticator {
             );
         } else {
             // And in this part we check token
-            let mut token = 
-                req.headers().typed_get::<Authorization<Bearer>>()
+            let mut token = req
+                .headers()
+                .typed_get::<Authorization<Bearer>>()
                 .map(|a| a.0.token().to_owned());
             if token.is_none() {
                 token = req

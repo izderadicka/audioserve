@@ -64,7 +64,6 @@ pub struct TranscodingCacheConfig {
 
 #[cfg(feature = "transcoding-cache")]
 impl Default for TranscodingCacheConfig {
-
     fn default() -> Self {
         let root_dir = env::temp_dir().join("audioserve-cache");
         TranscodingCacheConfig {
@@ -94,9 +93,7 @@ impl Default for TranscodingConfig {
     }
 }
 
-
 impl TranscodingConfig {
-
     pub fn get(&self, quality: QualityLevel) -> TranscodingFormat {
         match quality {
             l @ QualityLevel::Low => self
@@ -170,7 +167,6 @@ pub struct Config {
     pub chapters: ChaptersSize,
     pub positions_file: PathBuf,
 }
-
 
 impl Config {
     pub fn transcoder(&self, transcoding_quality: QualityLevel) -> Transcoder {
@@ -328,7 +324,6 @@ fn create_parser<'a>() -> Parser<'a> {
     }
 
     if cfg!(feature = "transcoding-cache") {
-
         parser=parser.arg(
             Arg::with_name("t-cache-dir")
             .long("t-cache-dir")
@@ -559,7 +554,6 @@ pub fn parse_args() -> Result<(), Error> {
     } else {
         true
     };
-
 
     let chapters = {
         let mut c = ChaptersSize::default();

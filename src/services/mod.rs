@@ -1,18 +1,20 @@
 use self::auth::Authenticator;
+use self::position::position_service;
 use self::search::Search;
 use self::subs::{
-    collections_list, get_folder, search, send_file, send_file_simple, short_response_boxed,
-    transcodings_list, ResponseFuture, NOT_FOUND_MESSAGE, download_folder, recent
+    collections_list, download_folder, get_folder, recent, search, send_file, send_file_simple,
+    short_response_boxed, transcodings_list, ResponseFuture, NOT_FOUND_MESSAGE,
 };
 use self::transcode::QualityLevel;
 use self::types::FoldersOrdering;
 use crate::config::get_config;
-use futures::{future, Future};
 use crate::util::header2header;
-use self::position::position_service;
+use futures::{future, Future};
+use headers::{
+    AccessControlAllowCredentials, AccessControlAllowOrigin, HeaderMapExt, Origin, Range,
+};
 use hyper::service::Service;
 use hyper::{Body, Method, Request, Response, StatusCode};
-use headers::{Range, HeaderMapExt, AccessControlAllowCredentials, Origin, AccessControlAllowOrigin};
 use percent_encoding::percent_decode;
 use regex::Regex;
 use std::collections::HashMap;
@@ -21,14 +23,14 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use url::form_urlencoded;
 
+pub mod audio_folder;
+pub mod audio_meta;
 pub mod auth;
+pub mod position;
 pub mod search;
 mod subs;
 pub mod transcode;
 mod types;
-pub mod audio_meta;
-pub mod audio_folder;
-pub mod position;
 
 const APP_STATIC_FILES_CACHE_AGE: u32 = 30 * 24 * 3600;
 const FOLDER_INFO_FILES_CACHE_AGE: u32 = 24 * 3600;
@@ -103,10 +105,7 @@ impl<C: 'static> Service for FileSendService<C> {
         let searcher = self.search.clone();
         let transcoding = self.transcoding.clone();
         let cors = get_config().cors;
-        let origin = req
-            .headers()
-            .typed_get::<Origin>();
-            
+        let origin = req.headers().typed_get::<Origin>();
 
         let resp = match self.authenticator {
             Some(ref auth) => {
@@ -133,7 +132,7 @@ impl<C> FileSendService<C> {
             .uri()
             .query()
             .map(|query| form_urlencoded::parse(query.as_bytes()).collect::<HashMap<_, _>>());
-        
+
         match *req.method() {
             Method::GET => {
                 let mut path = percent_decode(req.uri().path().as_bytes())
@@ -146,8 +145,7 @@ impl<C> FileSendService<C> {
                     transcodings_list()
                 } else if path.starts_with("/position") {
                     position_service(req)
-                    }
-                else {
+                } else {
                     // TODO -  select correct base dir
                     let mut colllection_index = 0;
                     let mut new_path: Option<String> = None;
@@ -173,9 +171,9 @@ impl<C> FileSendService<C> {
                         path = new_path.unwrap();
                     }
                     let base_dir = &get_config().base_dirs[colllection_index];
-                    let ord =  params.as_ref()
-                        .and_then(|p| p.get("ord")
-                        .map(|l| FoldersOrdering::from_letter(l)))
+                    let ord = params
+                        .as_ref()
+                        .and_then(|p| p.get("ord").map(|l| FoldersOrdering::from_letter(l)))
                         .unwrap_or(FoldersOrdering::Alphabetical);
                     if path.starts_with("/audio/") {
                         debug!(
@@ -183,11 +181,9 @@ impl<C> FileSendService<C> {
                             req.headers()
                         );
 
-                        let range = req
-                            .headers()
-                            .typed_get::<Range>();
+                        let range = req.headers().typed_get::<Range>();
 
-                        let bytes_range = match range.map (|r| r.iter().collect::<Vec<_>>()) {
+                        let bytes_range = match range.map(|r| r.iter().collect::<Vec<_>>()) {
                             Some(bytes_ranges) => {
                                 if bytes_ranges.is_empty() {
                                     error!("Range without data");
@@ -205,7 +201,7 @@ impl<C> FileSendService<C> {
                                     Some(bytes_ranges[0])
                                 }
                             }
-                           
+
                             None => None,
                         };
                         let seek: Option<f32> = params
@@ -226,17 +222,18 @@ impl<C> FileSendService<C> {
                         )
                     } else if path.starts_with("/folder/") {
                         get_folder(base_dir, get_subpath(&path, "/folder/"), ord)
-                    } else if !get_config().disable_folder_download && path.starts_with("/download") {
+                    } else if !get_config().disable_folder_download && path.starts_with("/download")
+                    {
                         download_folder(base_dir, get_subpath(&path, "/download/"))
                     } else if path == "/search" {
                         if let Some(search_string) = params.and_then(|mut p| p.remove("q")) {
-                            search(colllection_index, searcher, search_string.into_owned(),ord)
+                            search(colllection_index, searcher, search_string.into_owned(), ord)
                         } else {
                             short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
                         }
                     } else if path.starts_with("/recent") {
                         recent(colllection_index, searcher)
-                    }else if path.starts_with("/cover/") {
+                    } else if path.starts_with("/cover/") {
                         send_file_simple(
                             base_dir,
                             get_subpath(&path, "/cover"),
@@ -258,5 +255,3 @@ impl<C> FileSendService<C> {
         }
     }
 }
-
-

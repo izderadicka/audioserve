@@ -10,7 +10,7 @@ pub enum Bandwidth {
     WideBand,
     SuperWideBand,
     FullBand,
-    Unlimited
+    Unlimited,
 }
 
 impl Bandwidth {
@@ -21,7 +21,7 @@ impl Bandwidth {
             Bandwidth::WideBand => 8000,
             Bandwidth::SuperWideBand => 12000,
             Bandwidth::FullBand => 20000,
-            Bandwidth::Unlimited => 0
+            Bandwidth::Unlimited => 0,
         }
     }
 }
@@ -32,7 +32,7 @@ pub struct Opus {
     compression_level: u8,
     cutoff: Bandwidth,
     #[serde(default)]
-    mono: bool
+    mono: bool,
 }
 
 impl Opus {
@@ -41,7 +41,7 @@ impl Opus {
             bitrate,
             compression_level,
             cutoff,
-            mono
+            mono,
         }
     }
 }
@@ -62,18 +62,13 @@ impl AudioCodec for Opus {
         v
     }
 
-    fn codec_args(&self) -> &'static[&'static str]  {
-        &["-acodec",
-        "libopus",
-        "-vbr",
-        "on",]
-    }   
+    fn codec_args(&self) -> &'static [&'static str] {
+        &["-acodec", "libopus", "-vbr", "on"]
+    }
 
     fn bitrate(&self) -> u32 {
         u32::from(self.bitrate)
     }
-
-    
 }
 
 // MP3 codec
@@ -86,7 +81,7 @@ pub struct Mp3 {
     #[serde(default)]
     abr: bool,
     #[serde(default)]
-    mono: bool
+    mono: bool,
 }
 
 impl AudioCodec for Mp3 {
@@ -104,53 +99,49 @@ impl AudioCodec for Mp3 {
         v.push(format!("{}k", self.bitrate));
         v.push("-compression_level".into());
         v.push(format!("{}", self.compression_level));
-        
+
         v
     }
 
-    fn codec_args(&self) -> &'static[&'static str]  {
-        &["-acodec",
-        "libmp3lame"]
-    }   
+    fn codec_args(&self) -> &'static [&'static str] {
+        &["-acodec", "libmp3lame"]
+    }
 
     fn bitrate(&self) -> u32 {
         self.bitrate as u32
     }
-
-    
 }
 
 // AAC codec
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum SampleRate {
-     #[serde(rename = "8kHz")]
+    #[serde(rename = "8kHz")]
     _8kHz,
-     #[serde(rename = "12kHz")]
+    #[serde(rename = "12kHz")]
     _12kHz,
-     #[serde(rename = "16kHz")]
+    #[serde(rename = "16kHz")]
     _16kHz,
-     #[serde(rename = "24kHz")]
+    #[serde(rename = "24kHz")]
     _24kHz,
-     #[serde(rename = "32kHz")]
+    #[serde(rename = "32kHz")]
     _32kHz,
-     #[serde(rename = "48kHz")]
+    #[serde(rename = "48kHz")]
     _48kHz,
-     #[serde(rename = "unlimited")]
-    Unlimited
+    #[serde(rename = "unlimited")]
+    Unlimited,
 }
 
 impl SampleRate {
     fn to_sr(&self) -> u32 {
         use self::SampleRate::*;
         match self {
-           
             _8kHz => 8_000,
             _12kHz => 12_000,
             _16kHz => 16_000,
             _24kHz => 24_000,
             _32kHz => 32_000,
             _48kHz => 48_000,
-            SampleRate::Unlimited => 0
+            SampleRate::Unlimited => 0,
         }
     }
 }
@@ -169,9 +160,8 @@ pub struct Aac {
     #[serde(default)]
     ltp: bool,
     #[serde(default)]
-    mono: bool
+    mono: bool,
 }
-
 
 impl AudioCodec for Aac {
     fn quality_args(&self) -> Vec<String> {
@@ -195,18 +185,11 @@ impl AudioCodec for Aac {
         v
     }
 
-    fn codec_args(&self) -> &'static[&'static str]  {
-        &["-strict", "-2",  "-acodec", "aac"]
-    }   
+    fn codec_args(&self) -> &'static [&'static str] {
+        &["-strict", "-2", "-acodec", "aac"]
+    }
 
     fn bitrate(&self) -> u32 {
         self.bitrate as u32
     }
-
 }
-
-
-
-
-
-
