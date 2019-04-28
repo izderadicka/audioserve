@@ -101,9 +101,7 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
             {
                 use futures::Stream;
                 use hyper::server::conn::Http;
-                use native_tls;
                 use tokio::net::TcpListener;
-                use tokio_tls;
 
                 let private_key =
                     match load_private_key(file, get_config().ssl_key_password.as_ref()) {

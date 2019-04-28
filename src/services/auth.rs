@@ -13,6 +13,7 @@ use ring::rand::{SecureRandom, SystemRandom};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use url::form_urlencoded;
+use std::borrow;
 
 type AuthResult<T> = Result<(Request<Body>, T), Response<Body>>;
 type AuthFuture<T> = Box<Future<Item = AuthResult<T>, Error = Error> + Send>;
@@ -97,7 +98,7 @@ impl Authenticator for SharedSecretAuthenticator {
                 token = req
                     .headers()
                     .typed_get::<Cookie>()
-                    .and_then(|c| c.get(COOKIE_NAME).map(|v| v.to_owned()));
+                    .and_then(|c| c.get(COOKIE_NAME).map(borrow::ToOwned::to_owned));
             }
 
             if token.is_none() || !self.token_ok(&token.unwrap()) {
@@ -114,7 +115,7 @@ impl SharedSecretAuthenticator {
         let parts = token
             .split('|')
             .map(|s| BASE64.decode(s.as_bytes()))
-            .filter_map(|r| r.ok())
+            .filter_map(Result::ok)
             .collect::<Vec<_>>();
         if parts.len() == 2 {
             let mut hash2 = self.shared_secret.clone().into_bytes();

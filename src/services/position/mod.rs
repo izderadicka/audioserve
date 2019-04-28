@@ -45,7 +45,7 @@ impl FromStr for Msg {
         let parts:Vec<_> = s.split('|').collect();
         if parts.len() == 2 {
             let position: f32 = parts[0].parse().map_err(|_| "Position is not a number")?;
-            if parts[1].len() == 0 {
+            if parts[1].is_empty() {
                 Ok(Msg::Position{position, file_path:None})
             } else {
                 Ok(Msg::Position{position, file_path: Some(parts[1].into())})
@@ -75,7 +75,7 @@ pub fn position_service(req: Request<Body>) -> ResponseFuture {
         debug!("Got message {:?}", m);
         let message = m.to_str()
         .map_err(|_| "Invalid ws message")
-        .and_then(|s| s.parse::<Msg>());
+        .and_then(str::parse);
 
         match message {
             Ok(message) => {
@@ -125,7 +125,7 @@ pub fn position_service(req: Request<Body>) -> ResponseFuture {
                     }
 
                     Msg::FolderQuery{folder_path} => {
-                        let group = Some(folder_path.splitn(2, "/"))
+                        let group = Some(folder_path.splitn(2, '/'))
                                     .and_then(|mut p| p.next());
                         let last = CACHE.get_last(group.unwrap());
                         let folder = CACHE.get(&folder_path);

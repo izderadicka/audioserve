@@ -135,9 +135,9 @@ impl QualityLevel {
     }
 
     #[allow(dead_code)]
-    pub fn to_letter(&self) -> &'static str {
+    pub fn to_letter(self) -> &'static str {
         use self::QualityLevel::*;
-        match *self {
+        match self {
             Low => "l",
             Medium => "m",
             High => "h",
@@ -500,7 +500,7 @@ impl Transcoder {
 }
 
 pub fn guess_format<P:AsRef<std::path::Path>>(p:P) -> AudioFormat {
-    const DEFAULT_FORMAT: (&'static str, &'static str) = ("matroska", "audio/x-matroska"); // matroska is fairly universal, so it's good chance that audio stream will fit in
+    const DEFAULT_FORMAT: (&str, &str) = ("matroska", "audio/x-matroska"); // matroska is fairly universal, so it's good chance that audio stream will fit in
         let t = match p.as_ref().extension() {
             Some(e) => {
                 let e = e.to_string_lossy().to_lowercase();

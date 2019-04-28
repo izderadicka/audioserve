@@ -52,7 +52,7 @@ where
         + Send
         + 'static,
 {
-    let res = match upgrade_connection::<T>(req) {
+    match upgrade_connection::<T>(req) {
         Err(r) => r,
         Ok((r, ws_future)) => {
             let ws_process = ws_future
@@ -76,8 +76,7 @@ where
             rt::spawn(ws_process);
             r
         }
-    };
-    res
+    }
 }
 
 /// This function does basic websocket handshake, 
@@ -229,8 +228,9 @@ impl<T> Sink for WebSocket<T> {
     type SinkError = Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        match item.inner {
-            protocol::Message::Ping(..) => {
+        if let protocol::Message::Ping(..) =  item.inner {
+                // TODO :: check possibility for server sending ping messages periodically
+                // and close connection if pong is not received in given timeout
                 // warp doesn't yet expose a way to construct a `Ping` message,
                 // so the only way this could is if the user is forwarding the
                 // received `Ping`s straight back.
@@ -238,9 +238,7 @@ impl<T> Sink for WebSocket<T> {
                 // tungstenite already auto-reponds to `Ping`s with a `Pong`,
                 // so this just prevents accidentally sending extra pings.
                 return Ok(AsyncSink::Ready);
-            }
-            _ => (),
-        }
+            };
 
         match self.inner.write_message(item.inner) {
             Ok(()) => Ok(AsyncSink::Ready),
@@ -284,7 +282,7 @@ impl<T> Sink for WebSocket<T> {
             }
             Err(::tungstenite::Error::ConnectionClosed(frame)) => {
                 trace!("websocket closed: {:?}", frame);
-                return Ok(Async::Ready(()));
+                Ok(Async::Ready(()))
             }
             Err(err) => {
                 debug!("websocket close error: {}", err);

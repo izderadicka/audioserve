@@ -144,7 +144,7 @@ impl<'a> Iterator for SearchResult<'a> {
             }
 
             self.truncate_this_branch = false;
-            if self.is_match() {
+            if self.has_match() {
                 // we already got match - we did not need to dive deaper
                 trace!("returning match {:?}", self.current_node.value().name);
                 self.truncate_this_branch = true;
@@ -155,7 +155,7 @@ impl<'a> Iterator for SearchResult<'a> {
 }
 
 impl<'a> SearchResult<'a> {
-    fn is_match(&mut self) -> bool {
+    fn has_match(&mut self) -> bool {
         let mut matched = vec![];
         let mut res = true;
         let matched_terms = self.matched_terms_stack.last().unwrap();
@@ -201,7 +201,7 @@ impl DirTree {
 
     pub fn new_with_options<P: AsRef<Path>>(root_dir: P, opts: Options) -> Result<Self, io::Error> {
         let p: &Path = root_dir.as_ref();
-        let root_name = p.to_str().ok_or(io::Error::new(
+        let root_name = p.to_str().ok_or_else(|| io::Error::new(
             io::ErrorKind::Other,
             "root directory is not utf8",
         ))?;
@@ -264,7 +264,7 @@ impl DirTree {
             add_entries(&mut root, p, p, &opts, recents.as_mut())?;
         }
 
-        Ok(DirTree { tree: cached, recent: recents.map(|h| h.into_sorted_vec()) })
+        Ok(DirTree { tree: cached, recent: recents.map(BinaryHeap::into_sorted_vec) })
     }
 
     pub fn iter(&self) -> Skip<Descendants<DirEntry>> {

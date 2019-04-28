@@ -25,6 +25,8 @@ use std::sync::atomic::Ordering;
 use tokio::io::AsyncRead;
 use tokio_threadpool::blocking;
 use std::collections::Bound;
+use std::ffi::OsStr;
+use std::borrow;
 
 pub type ByteRenge = (Bound<u64>, Bound<u64>);
 
@@ -257,7 +259,8 @@ fn serve_opened_file(
         let mut resp = HyperResponse::builder();
         resp.typed_header(ContentType::from(mime));
         if let Some(age) = caching {
-            let cache = CacheControl::new().with_public().with_max_age(std::time::Duration::from_secs(age as u64));
+            let cache = CacheControl::new().with_public()
+            .with_max_age(std::time::Duration::from_secs(u64::from(age)));
             resp.typed_header(cache);
             if let Some(last_modified) = last_modified {
                 resp.typed_header(LastModified::from(last_modified));
@@ -390,8 +393,8 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
             } else {
                 let mut download_name = folder_path
                     .file_name()
-                    .and_then(|fname| fname.to_str())
-                    .map(|fname| fname.to_owned())
+                    .and_then(OsStr::to_str)
+                    .map(borrow::ToOwned::to_owned)
                     .unwrap_or_else(|| "audio".into());
                 download_name.push_str(".tar");
                 let f = poll_fn(move || blocking(|| list_dir_files_only(&base_path, &folder_path)))
@@ -456,7 +459,7 @@ pub fn collections_list() -> ResponseFuture {
             .iter()
             .map(|p| {
                 p.file_name()
-                    .and_then(|n| n.to_str())
+                    .and_then(OsStr::to_str)
                     .unwrap_or(UKNOWN_NAME)
             })
             .collect(),

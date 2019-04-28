@@ -202,7 +202,7 @@ impl<C> FileSendService<C> {
                                         "Do not support muptiple ranges",
                                     );
                                 } else {
-                                    Some(bytes_ranges[0].clone())
+                                    Some(bytes_ranges[0])
                                 }
                             }
                            

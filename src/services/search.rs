@@ -156,10 +156,10 @@ impl FoldersSearch {
                             if ft.is_dir() {
                                 let p = f.path();
                                 if let Some(s) =
-                                    p.strip_prefix(base_path).ok().and_then(|p| p.to_str())
+                                    p.strip_prefix(base_path).ok().and_then(Path::to_str)
                                 {
                                     let lc_s = s.to_lowercase();
-                                    let m = tokens.into_iter().all(|token| lc_s.contains(token));
+                                    let m = tokens.iter().all(|token| lc_s.contains(token));
                                     if m {
                                         debug!("Found {:?} in {}", tokens, lc_s);
                                         let folder = AudioFolderShort::from_dir_entry(
@@ -194,7 +194,7 @@ impl FoldersSearch {
             .as_ref()
             .split(' ')
             .filter(|s| !s.is_empty())
-            .map(|s| s.to_lowercase())
+            .map(str::to_lowercase)
             .collect();
         let mut res = SearchResult::new();
         search_recursive(

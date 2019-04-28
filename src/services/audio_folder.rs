@@ -2,6 +2,8 @@ use std::fs;
 use std::fs::DirEntry;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::ffi::OsStr;
+use std::borrow;
 
 use super::audio_meta::{get_audio_properties, Chapter, MediaInfo};
 use super::transcode::TimeSpan;
@@ -39,10 +41,10 @@ enum DirType {
 }
 
 fn split_chapters(dur: u32) -> Vec<Chapter> {
-    let chap_length = get_config().chapters.duration as u64 * 60 * 1000;
+    let chap_length = u64::from(get_config().chapters.duration) * 60 * 1000;
     let mut count = 0;
     let mut start = 0u64;
-    let tot = dur as u64 * 1000;
+    let tot = u64::from(dur) * 1000;
     let mut chaps = vec![];
     while start < tot {
         let end = start + chap_length;
@@ -115,7 +117,7 @@ fn get_dir_type<P: AsRef<Path>>(path: P) -> Result<DirType, io::Error> {
 fn ms_from_time(t: &str) -> Option<u64> {
     let data = t.split(':');
     let res = data
-        .map(|n| n.parse::<f32>())
+        .map(str::parse::<f32>)
         .try_rfold((0f32, 1f32), |acc, x| {
             x.map(|y| (acc.0 + acc.1 * y, acc.1 * 60f32))
         })
@@ -154,7 +156,7 @@ fn chapters_from_csv(path: &Path) -> Result<Option<Vec<Chapter>>, io::Error> {
                     }
                 })
                 .filter_map(|r| {
-                    match (r.get(0).map(|r| r.to_owned()), r.get(1).and_then(ms_from_time), 
+                    match (r.get(0).map(borrow::ToOwned::to_owned), r.get(1).and_then(ms_from_time), 
                         r.get(2).and_then(ms_from_time)) {
                         (Some(title), Some(start), Some(end)) => {
 
@@ -180,7 +182,7 @@ fn chapters_from_csv(path: &Path) -> Result<Option<Vec<Chapter>>, io::Error> {
 fn path_for_chapter(p: &Path, chap: &Chapter) -> PathBuf {
     let ext = p
         .extension()
-        .and_then(|s| s.to_str())
+        .and_then(OsStr::to_str)
         .map(|e| ".".to_owned() + e)
         .unwrap_or_else(|| "".to_owned());
     let pseudo_file = format!(
@@ -195,7 +197,7 @@ lazy_static! {
 }
 
 pub fn parse_chapter_path(p: &Path) -> (&Path, Option<TimeSpan>) {
-    let fname = p.file_name().and_then(|s| s.to_str());
+    let fname = p.file_name().and_then(OsStr::to_str);
     if let Some(fname) = fname {
         if let Some(cap) = CHAPTER_PSEUDO_RE.captures(fname) {
             let start: u64 = cap.get(1).unwrap().as_str().parse().unwrap();
@@ -309,7 +311,7 @@ fn list_dir_dir<P: AsRef<Path>>(
                                             )
                                         } else {
                                             files.push(AudioFile {
-                                                meta: meta,
+                                                meta,
                                                 path,
                                                 name: os_to_string(f.file_name()).into(),
                                                 section: None,

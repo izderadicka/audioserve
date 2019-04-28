@@ -70,7 +70,7 @@ impl AudioCodec for Opus {
     }   
 
     fn bitrate(&self) -> u32 {
-        self.bitrate as u32
+        u32::from(self.bitrate)
     }
 
     

@@ -67,6 +67,6 @@ mod libavformat {
 }
 
 
-pub fn get_audio_properties<'a>(audio_file_name: &'a Path) -> Result<impl MediaInfo<'a>, Error> {
+pub fn get_audio_properties(audio_file_name: & Path) -> Result<impl MediaInfo, Error> {
     libavformat::Info::from_file(audio_file_name)
 }

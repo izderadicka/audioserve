@@ -1,5 +1,5 @@
-use super::services::transcode::{TranscodingFormat, QualityLevel, Transcoder};
-use clap::{App, Arg, crate_name, crate_authors, crate_version};
+use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
+use clap::{crate_authors, crate_name, crate_version, App, Arg};
 use num_cpus;
 use serde_yaml;
 use std::collections::BTreeMap;
@@ -7,7 +7,7 @@ use std::env;
 use std::fs::File;
 use std::io::{self, Read};
 use std::net::SocketAddr;
-use std::path::{PathBuf,Path};
+use std::path::{Path, PathBuf};
 
 static mut CONFIG: Option<Config> = None;
 
@@ -52,7 +52,7 @@ pub enum Error {
 }
 }
 
-#[cfg(feature="transcoding-cache")]
+#[cfg(feature = "transcoding-cache")]
 #[derive(Debug, Clone)]
 pub struct TranscodingCacheConfig {
     pub root_dir: PathBuf,
@@ -62,17 +62,17 @@ pub struct TranscodingCacheConfig {
     pub save_often: bool,
 }
 
-#[cfg(feature="transcoding-cache")]
+#[cfg(feature = "transcoding-cache")]
 impl Default for TranscodingCacheConfig {
 
     fn default() -> Self {
         let root_dir = env::temp_dir().join("audioserve-cache");
         TranscodingCacheConfig {
             root_dir,
-            max_size: 1024*1024*1024,
+            max_size: 1024 * 1024 * 1024,
             max_files: 1024,
             disabled: false,
-            save_often: false
+            save_often: false,
         }
     }
 }
@@ -96,22 +96,22 @@ impl Default for TranscodingConfig {
 
 
 impl TranscodingConfig {
-    
+
     pub fn get(&self, quality: QualityLevel) -> TranscodingFormat {
         match quality {
             l @ QualityLevel::Low => self
                 .low
                 .as_ref()
-                .map_or(TranscodingFormat::default_level(l), |c| c.clone()),
+                .map_or(TranscodingFormat::default_level(l), Clone::clone),
             l @ QualityLevel::Medium => self
                 .medium
                 .as_ref()
-                .map_or(TranscodingFormat::default_level(l), |c| c.clone()),
+                .map_or(TranscodingFormat::default_level(l), Clone::clone),
             l @ QualityLevel::High => self
                 .high
                 .as_ref()
-                .map_or(TranscodingFormat::default_level(l), |c| c.clone()),
-            QualityLevel::Passthrough => TranscodingFormat::Remux
+                .map_or(TranscodingFormat::default_level(l), Clone::clone),
+            QualityLevel::Passthrough => TranscodingFormat::Remux,
         }
     }
 }
@@ -134,14 +134,14 @@ impl Default for ThreadPoolSize {
 #[derive(Clone, Debug)]
 pub struct ChaptersSize {
     pub from_duration: u32,
-    pub duration: u32
+    pub duration: u32,
 }
 
 impl Default for ChaptersSize {
     fn default() -> Self {
         ChaptersSize {
             from_duration: 0,
-            duration: 30
+            duration: 30,
         }
     }
 }
@@ -164,16 +164,16 @@ pub struct Config {
     pub thread_keep_alive: Option<u32>,
     pub transcoding_deadline: u32,
     pub search_cache: bool,
-    #[cfg(feature="transcoding-cache")]
+    #[cfg(feature = "transcoding-cache")]
     pub transcoding_cache: TranscodingCacheConfig,
     pub disable_folder_download: bool,
     pub chapters: ChaptersSize,
-    pub positions_file: PathBuf
+    pub positions_file: PathBuf,
 }
 
 
 impl Config {
-    pub fn transcoder(&self, transcoding_quality: QualityLevel) -> Transcoder{
+    pub fn transcoder(&self, transcoding_quality: QualityLevel) -> Transcoder {
         Transcoder::new(get_config().transcoding.get(transcoding_quality))
     }
 }
@@ -282,10 +282,11 @@ fn create_parser<'a>() -> Parser<'a> {
             .help("If long files is presented as chapters, one chapter has x mins [default: 30]")
         );
 
-    if cfg!(feature = "folder-download")   {
-        parser = parser.arg(Arg::with_name("disable-folder-download")
+    if cfg!(feature = "folder-download") {
+        parser = parser.arg(
+            Arg::with_name("disable-folder-download")
                 .long("disable-folder-download")
-                .help("Disables API point for downloading whole folder")
+                .help("Disables API point for downloading whole folder"),
         );
     }
 
@@ -303,10 +304,11 @@ fn create_parser<'a>() -> Parser<'a> {
             );
     }
 
-    parser = parser.arg(Arg::with_name("positions-dir")
-        .long("positions-dir")
-        .takes_value(true)
-        .help("Directory to save last listened positions")
+    parser = parser.arg(
+        Arg::with_name("positions-dir")
+            .long("positions-dir")
+            .takes_value(true)
+            .help("Directory to save last listened positions"),
     );
 
     if cfg!(feature = "symlinks") {
@@ -385,13 +387,15 @@ pub fn parse_args() -> Result<(), Error> {
     }
 
     let local_addr = if args.is_present("local_addr") {
-        args.value_of("local_addr").unwrap().parse()? 
+        args.value_of("local_addr").unwrap().parse()?
     } else {
-        SocketAddr::from(([0,0,0,0], 
-        env::var("PORT")
-            .map_err(|_| ())
-            .and_then(|v| v.parse().map_err(|_| error!("Invalid value in $PORT")))
-            .unwrap_or(3000u16)))
+        SocketAddr::from((
+            [0, 0, 0, 0],
+            env::var("PORT")
+                .map_err(|_| ())
+                .and_then(|v| v.parse().map_err(|_| error!("Invalid value in $PORT")))
+                .unwrap_or(3000u16),
+        ))
     };
 
     let pool_size = if args.is_present("large-thread-pool") {
@@ -405,29 +409,27 @@ pub fn parse_args() -> Result<(), Error> {
 
     let shared_secret = if args.is_present("no-authentication") {
         None
-    } else {
-        if args.is_present("shared-secret") {
-            Some(args.value_of("shared-secret").unwrap().into())
-        } else if args.is_present("shared-secret-file") {
-            let p = Path::new(args.value_of_os("shared-secret-file").unwrap());
-         match File::open(p) {
-             Ok(mut f) => {
-                 let mut secret = String::new();
-                 f.read_to_string(&mut secret)
-                 .map_err(|e| format!("Error reading from shared secret file: {}",e))?;
-                 Some(secret)
-             }
-             Err(e) => {
-                 return Err(format!("Shared secret file does not exists or is not readable: {}", e).into())
-             }
-         }
-            
-            
-            
-        
-        } else {
-            None
+    } else if args.is_present("shared-secret") {
+        Some(args.value_of("shared-secret").unwrap().into())
+    } else if args.is_present("shared-secret-file") {
+        let p = Path::new(args.value_of_os("shared-secret-file").unwrap());
+        match File::open(p) {
+            Ok(mut f) => {
+                let mut secret = String::new();
+                f.read_to_string(&mut secret)
+                    .map_err(|e| format!("Error reading from shared secret file: {}", e))?;
+                Some(secret)
+            }
+            Err(e) => {
+                return Err(format!(
+                    "Shared secret file does not exists or is not readable: {}",
+                    e
+                )
+                .into())
+            }
         }
+    } else {
+        unreachable!("One of authentcation options must be always present")
     };
 
     let transcoding = match args.value_of("transcoding-config") {
@@ -455,14 +457,14 @@ pub fn parse_args() -> Result<(), Error> {
         );
     }
 
-    let transcoding_deadline = match args.value_of("transcoding-deadline").map(|x| x.parse()) {
+    let transcoding_deadline = match args.value_of("transcoding-deadline").map(str::parse) {
         Some(Ok(0)) => return Err("transcoding-deadline must be positive".into()),
         Some(Err(_)) => return Err("invalid value for transcoding-deadline".into()),
         Some(Ok(x)) => x,
         None => 24,
     };
 
-    let thread_keep_alive = match args.value_of("thread-keep-alive").map(|x| x.parse()) {
+    let thread_keep_alive = match args.value_of("thread-keep-alive").map(str::parse) {
         Some(Ok(0)) => return Err("thread-keep-alive must be positive".into()),
         Some(Err(_)) => return Err("invalid value for thread-keep-alive".into()),
         Some(Ok(x)) => Some(x),
@@ -518,8 +520,8 @@ pub fn parse_args() -> Result<(), Error> {
         false
     };
 
-    #[cfg(feature="transcoding-cache")]
-    let _transcoding_cache =  {
+    #[cfg(feature = "transcoding-cache")]
+    let _transcoding_cache = {
         let mut c = TranscodingCacheConfig::default();
         if let Some(d) = args.value_of("t-cache-dir") {
             c.root_dir = d.into()
@@ -528,15 +530,15 @@ pub fn parse_args() -> Result<(), Error> {
         if let Some(n) = args.value_of("t-cache-size") {
             let size: u64 = n.parse()?;
             if size < 50 {
-                return Err("Cache smaller then 50Mbi does not make much sense".into())
+                return Err("Cache smaller then 50Mbi does not make much sense".into());
             }
-            c.max_size = 1024*1024 * size;
+            c.max_size = 1024 * 1024 * size;
         }
 
         if let Some(n) = args.value_of("t-cache-max-files") {
             let num: u64 = n.parse()?;
             if num < 10 {
-                return Err("Cache smaller then 10 files does not make much sense".into())
+                return Err("Cache smaller then 10 files does not make much sense".into());
             }
             c.max_files = num;
         }
@@ -552,26 +554,30 @@ pub fn parse_args() -> Result<(), Error> {
         c
     };
 
-    let disable_folder_download =  if cfg!(feature = "folder-download")   {
+    let disable_folder_download = if cfg!(feature = "folder-download") {
         args.is_present("disable-folder-download")
     } else {
         true
     };
 
-    
+
     let chapters = {
         let mut c = ChaptersSize::default();
-        let from_duration = args.value_of("chapters-from-duration")
+        let from_duration = args
+            .value_of("chapters-from-duration")
             .and_then(|v| v.parse().ok());
         if let Some(from_duration) = from_duration {
             c.from_duration = from_duration
         }
 
-        let duration = args.value_of("chapters-duration")
+        let duration = args
+            .value_of("chapters-duration")
             .and_then(|v| v.parse().ok());
         if let Some(duration) = duration {
             if duration < 10 {
-                return Err(Error::InvalidLimitValue("chapter should have at least 10 mins"))
+                return Err(Error::InvalidLimitValue(
+                    "chapter should have at least 10 mins",
+                ));
             }
             c.duration = duration;
         }
@@ -582,7 +588,7 @@ pub fn parse_args() -> Result<(), Error> {
     let positions_file = {
         match dirs::home_dir() {
             Some(home) => home.join(".audioserve-positions"),
-            None => "./audioserve-positions".into()
+            None => "./audioserve-positions".into(),
         }
     };
 
@@ -603,12 +609,11 @@ pub fn parse_args() -> Result<(), Error> {
         thread_keep_alive,
         transcoding_deadline,
         search_cache,
-        #[cfg(feature="transcoding-cache")]
+        #[cfg(feature = "transcoding-cache")]
         transcoding_cache: _transcoding_cache,
         disable_folder_download,
         chapters,
-        positions_file
-
+        positions_file,
     };
     unsafe {
         CONFIG = Some(config);
@@ -643,11 +648,11 @@ pub fn init_default_config() {
         thread_keep_alive: None,
         transcoding_deadline: 24,
         search_cache: false,
-        #[cfg(feature="transcoding-cache")]
+        #[cfg(feature = "transcoding-cache")]
         transcoding_cache: TranscodingCacheConfig::default(),
         disable_folder_download: false,
         chapters: ChaptersSize::default(),
-        positions_file: "./positions".into()
+        positions_file: "./positions".into(),
     };
     unsafe {
         CONFIG = Some(config);
@@ -662,7 +667,10 @@ mod tests {
     fn test_yaml_serialize() {
         let mut qualities = BTreeMap::new();
         qualities.insert("low", TranscodingFormat::default_level(QualityLevel::Low));
-        qualities.insert("medium", TranscodingFormat::default_level(QualityLevel::Medium));
+        qualities.insert(
+            "medium",
+            TranscodingFormat::default_level(QualityLevel::Medium),
+        );
         qualities.insert("high", TranscodingFormat::default_level(QualityLevel::High));
         let s = serde_yaml::to_string(&qualities).unwrap();
         assert!(s.len() > 20);
@@ -674,10 +682,10 @@ mod tests {
     #[test]
     fn test_yaml_deserialize() {
         fn load_file(fname: &str) {
-           let f = File::open(fname).unwrap();
+            let f = File::open(fname).unwrap();
             let des: BTreeMap<String, TranscodingFormat> = serde_yaml::from_reader(f).unwrap();
             assert_eq!(3, des.len());
-            assert!(des.get("high").is_some()); 
+            assert!(des.get("high").is_some());
         }
         load_file("./test_data/transcodings.yaml");
         load_file("./test_data/transcodings.1.yaml");

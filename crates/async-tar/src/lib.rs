@@ -19,7 +19,7 @@ fn cut_path<P: AsRef<OsStr>>(p:P, max_len: usize) -> OsString {
  let s: OsString = p.as_ref().into();
  if s.len() > max_len {
      let path = Path::new(&s);
-     let ext = path.extension().and_then(|e| e.to_str());
+     let ext = path.extension().and_then(OsStr::to_str);
      let ext_len = ext.map(|e| e.len()+1).unwrap_or(0);
      let base = path.file_stem().unwrap().to_string_lossy();
      let mut name: String = base.chars().take(max_len-ext_len).collect();
@@ -112,7 +112,7 @@ impl TarStream<PathBuf> {
             })
             .collect();
 
-        let ts = files.map(|paths| {
+        files.map(|paths| {
             let iter = paths.into_iter();
             let state = Some(TarState::BeforeNext);
             TarStream {
@@ -122,9 +122,7 @@ impl TarStream<PathBuf> {
                 buf: [0; BUFFER_LENGTH],
                 base_dir: None
             }
-        });
-
-        ts
+        })
     }
 }
 
@@ -260,8 +258,8 @@ impl <P: AsRef<Path> + Send> Stream for TarStream<P> {
                                                 if rem > 0 { 512 - rem } else { 0 };
                                             let new_position = self.position + padding_length;
                                             // zeroing padding
-                                            &mut self.buf[self.position..new_position]
-                                                .copy_from_slice(&mut EMPTY_BLOCK[..padding_length]);
+                                            self.buf[self.position..new_position]
+                                                .copy_from_slice(&EMPTY_BLOCK[..padding_length]);
                                             return Ok(Async::Ready(Some(
                                                 self.buf[..new_position].to_vec(),
                                             )));

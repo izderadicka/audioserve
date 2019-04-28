@@ -13,7 +13,7 @@ use std::sync::mpsc::channel;
 use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::thread;
 use std::time::Duration;
-
+use std::borrow;
 use self::utils::Cond;
 pub use self::tree::{SearchResult, DirTree};
 
@@ -153,7 +153,7 @@ impl DirCacheInner {
         DirCacheInner {
             root: root.as_ref().into(),
             cache: RwLock::new(None),
-            options: options,
+            options,
             ready_flag: Mutex::new(false),
             ready_cond: Condvar::new(),
         }
@@ -218,7 +218,7 @@ impl DirCacheInner {
         }
         let recent = cache.as_ref().unwrap().recent();
         match recent {
-            Some(iter) => Ok(iter.map(|p| p.to_owned()).collect()), 
+            Some(iter) => Ok(iter.map(borrow::ToOwned::to_owned).collect()), 
             None => Err(io::Error::new(io::ErrorKind::Other, "recent not supported"))
         }
     }

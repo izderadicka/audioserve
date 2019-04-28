@@ -115,7 +115,7 @@ impl CacheInner {
     fn insert<S: Into<String>>(&mut self, group_path: S, position: f32) {
         let group_path = group_path.into();
         if let Some((group, file_path)) = split_group(&group_path) {
-            let last_slash = file_path.rfind("/");
+            let last_slash = file_path.rfind('/');
             let (folder_path, file) = match last_slash {
                 Some(idx) => {
                     let (folder, file) = file_path.split_at(idx);
@@ -155,7 +155,7 @@ impl CacheInner {
             self.table
             .get(group)
             .and_then(|table| 
-            table.get(folder).map(|p| to_position(folder.as_ref(), p)))
+            table.get(folder).map(|p| to_position(folder, p)))
         })
         
     }
@@ -187,9 +187,9 @@ impl CacheInner {
         }
     }
 }
-fn split_group<'a, S: AsRef<str> + ?Sized>(group_path: &'a S) -> Option<(&'a str, &'a str)> {
+fn split_group<S: AsRef<str> + ?Sized>(group_path: &S) -> Option<(&str, &str)> {
     let parts = Some(group_path.as_ref().splitn(2, '/'));
-    return parts.and_then(|mut p| Some((p.next()?, p.next()?)));
+    parts.and_then(|mut p| Some((p.next()?, p.next()?)))
 }
 
 fn to_position(folder: &str, r: &PositionRecord) -> Position {
