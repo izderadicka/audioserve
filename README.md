@@ -39,6 +39,15 @@ Recently better support for .m4b (one file with chapters metadata) and similar w
 There are some small glitches with this approach - search still works on directories only and cover and description metadata are yet not working (plan is to extract them from the audio file metadata). Apart of that chapters behaves like other audio files - can be transcoded to lower bitrates, seeked within etc.
 Also beware that web client will often load same part of chapter again if you're seeking within it (especially Firefox with m4b), so it's definitelly not bandwidth optimal (similar issue appears when often seeking in trancoded file).
 
+Sharing playback positions between clients
+-----------------------------------------
+
+Recently (from version 0.10) audioserve supports sharing playback positions between clients. This is basically used to continue listening on next client, from where you left on previous one. It's supported in the included web client and in the recent Android client (from version 0.8). In order to enable position sharing you'll need to define 'device group' in the client (on login dialog in web client and in settings in Android client) - group is just an arbitrary name and devices within same group will share playback position. 
+
+After you have several active devices with same group name, you'll be notified when you click play and there is more recent playback position in the group and you can choose if jump to this latest position or continue with current position. There is also option to check latest position directly (in web client it's icon in the folder header, in Android client it's in options menu).
+
+*This function is kind of experimental now, it works, but not ideally, so definitelly interested in feedback, as I'm not using it much, I'm mostly listening on just one device - my mobile.*
+
 Security
 --------
 

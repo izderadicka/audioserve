@@ -1,7 +1,7 @@
 audioserve API
 ==============
 
-audioserve API is simple HTTP API with mostly JSON loads.
+audioserve API is simple HTTP API with mostly JSON loads. For updating/quering recent playback positions WebSocket connection is used with simple text based messages.
 
 Authetication
 -------------
@@ -234,12 +234,67 @@ Sample URL: https://your_server_name:3000/2/desc/author_name/series_name/audiobo
 
 If text information in the folder, this endpoint can load the text.
 
+Recent playback position
+------------------------
 
+Clients can share and query recent playback positions. In order to determine, which clients share positions, there is a concept of clients group. Group is just arbitrary name and clients using same group name will share recent playback positions between them.
 
+Playback positions are reported and queried via websocket connection to audioserve server on path `/position` - so sample websocket url can look like `wss://you_server_name:3000/position`. Clients send two types of text messages (and there is no specific websocket subprotocol):
 
+- **current playback position** - when client is playing audiofile, it can send current playback position in regular intervals (provided clients use 10 secs interval), group name and audio file path
+- **query for last positions** - when user wants to continue playback on client, it can check what where latest positions within the group.
 
+### Current playback position message ###
+Client sends simple text message:
 
+    playback_time_secs|group_name/collection_number/audio_file_path
 
+Example of such message is (group here is name of group, can be anything):
 
+    480.383|group/0/Adams Douglas/Douglas Adams - Stoparuv pruvodce galaxii (2008)/01.kapitola.mp3
 
+Such message can be send also in short form, without  `group_name/collection_number/audio_file_path`, if we are continuing to report position in same audio file. So next position update could be just:
 
+    486.859|
+
+Notice the trailing pipe - it's essential (to distinguish from other message type). Also this short type can be used only if long form was first sent on same websocket connection (e.g. currently reported file is in context of websocket connection from client).
+
+### Querying last positions messages ###
+
+Client can also query last playback position in the group, websocket message should look like:
+
+    group_name/collection_number/audio_folder_path
+
+So basically same path like string, but without last component - the audio file. audio_folder_path is current folder opened in the client, used to get also latest position in this folder (if there is any). Example of such query:
+
+    group/0/Adams Douglas/Douglas Adams - Stoparuv pruvodce galaxii (2008)
+
+If client is not showing any specific folder, it can send generic query, just to get very last position in any folder, in that case it can send just empty string or `?` string.
+
+Response to this query is again websocket text message, this time containing JSON object:
+
+    {
+        folder: {position_object or null},
+        last: {position_object or null}
+    }
+
+`folder` key is last position in queried folder and `last` key is latest position in all collections (in given clients group, each group is separate). If both positions are same, only one is send back, other is null. If query is generic (not specific to folder) or there is not any known last position in the folder, only `last` is returned, `folder` is null. Both can be null only if there are no positions reported yet in this group. Position object looks like this:
+
+    {
+        "file": "audio_file_name",
+        "folder": "audio_folder_path_without_collection_and_group",
+        "timestamp": miliseconds_from_epoch,
+        "position": playback_position_in_secs,
+        "collection": collection_number
+    }
+
+Example of position query response:
+
+    {
+        "folder":{
+            "file":"01.kapitola.mp3",
+            "folder":"Adams Douglas/Douglas Adams - Stoparuv pruvodce galaxii (2008)","timestamp":1558016643841,
+            "position":486.859,
+            "collection":0},
+        "last":null
+    }
