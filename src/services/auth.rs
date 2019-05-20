@@ -27,11 +27,11 @@ pub trait Authenticator: Send + Sync {
 pub struct SharedSecretAuthenticator {
     shared_secret: String,
     my_secret: Vec<u8>,
-    token_validity_hours: u64,
+    token_validity_hours: u32,
 }
 
 impl SharedSecretAuthenticator {
-    pub fn new(shared_secret: String, my_secret: Vec<u8>, token_validity_hours: u64) -> Self {
+    pub fn new(shared_secret: String, my_secret: Vec<u8>, token_validity_hours: u32) -> Self {
         SharedSecretAuthenticator {
             shared_secret,
             my_secret,
@@ -167,12 +167,12 @@ fn now() -> u64 {
 }
 
 impl Token {
-    fn new(token_validity_hours: u64, secret: &[u8]) -> Self {
+    fn new(token_validity_hours: u32, secret: &[u8]) -> Self {
         let mut random = [0u8; 32];
         let rng = SystemRandom::new();
         rng.fill(&mut random)
             .expect("Cannot generate random number");
-        let validity: u64 = now() + token_validity_hours * 3600;
+        let validity: u64 = now() + (token_validity_hours as u64) * 3600;
         let validity: [u8; 8] = unsafe { ::std::mem::transmute(validity.to_be()) };
         let to_sign = prepare_data(&random, validity);
         let key = hmac::SigningKey::new(&SHA256, secret);

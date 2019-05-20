@@ -7,7 +7,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
 
-use config::{get_config, parse_args};
+use config::{get_config, init_config};
 use hyper::rt::Future;
 use hyper::Server as HttpServer;
 use ring::rand::{SecureRandom, SystemRandom};
@@ -30,14 +30,14 @@ mod services;
 mod util;
 
 #[cfg(feature = "tls")]
-fn load_private_key<P>(file: P, pass: Option<&String>) -> Result<Identity, io::Error>
+fn load_private_key<P>(file: P, pass: &String) -> Result<Identity, io::Error>
 where
     P: AsRef<Path>,
 {
     let mut bytes = vec![];
     let mut f = File::open(file)?;
     f.read_to_end(&mut bytes)?;
-    let key = Identity::from_pkcs12(&bytes, pass.unwrap_or(&String::new()))
+    let key = Identity::from_pkcs12(&bytes, pass)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     Ok(key)
 }
@@ -84,7 +84,7 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
         },
     };
 
-    let server: Box<Future<Item = (), Error = ()> + Send> = match get_config().ssl_key_file.as_ref()
+    let server: Box<Future<Item = (), Error = ()> + Send> = match get_config().ssl.as_ref()
     {
         None => {
             let server = HttpServer::bind(&get_config().local_addr)
@@ -96,7 +96,7 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
             info!("Server listening on {}", &get_config().local_addr);
             Box::new(server)
         }
-        Some(file) => {
+        Some(ssl) => {
             #[cfg(feature = "tls")]
             {
                 use futures::Stream;
@@ -104,7 +104,7 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
                 use tokio::net::TcpListener;
 
                 let private_key =
-                    match load_private_key(file, get_config().ssl_key_password.as_ref()) {
+                    match load_private_key(&ssl.key_file, &ssl.key_password) {
                         Ok(s) => s,
                         Err(e) => {
                             error!("Error loading SSL/TLS private key: {}", e);
@@ -161,8 +161,9 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
     };
 
     let mut rt = tokio::runtime::Builder::new()
-        .blocking_threads(cfg.pool_size.queue_size)
-        .core_threads(cfg.pool_size.num_threads)
+        .blocking_threads(cfg.thread_pool.queue_size as usize)
+        .core_threads(cfg.thread_pool.num_threads as usize)
+        .keep_alive(cfg.thread_pool.keep_alive)
         .name_prefix("tokio-pool-")
         .build()
         .unwrap();
@@ -179,9 +180,9 @@ fn main() {
             warn!("Audioserve is running as root! Not recommended.")
         }
     }
-    match parse_args() {
+    match init_config() {
         Err(e) => {
-            writeln!(&mut io::stderr(), "Arguments error: {}", e).unwrap();
+            writeln!(&mut io::stderr(), "Config/Arguments error: {}", e).unwrap();
             process::exit(1)
         }
         Ok(c) => c,
