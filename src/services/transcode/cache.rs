@@ -18,7 +18,7 @@ lazy_static! {
                 Cache::new(
                     cache_dir,
                     cfg.transcoding_cache.max_size,
-                    cfg.transcoding_cache.max_files,
+                    cfg.transcoding_cache.max_files.into(),
                 )
                 .expect("Cannot create cache"),
             )

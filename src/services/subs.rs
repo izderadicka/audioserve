@@ -144,7 +144,7 @@ fn serve_file_transcoded_checked(
 ) -> ResponseFuture {
     let counter = transcoding.transcodings;
 
-    let running_transcodings = counter.load(Ordering::SeqCst);
+    let running_transcodings: u32 = counter.load(Ordering::SeqCst) as u32;
     if running_transcodings >= transcoding.max_transcodings {
         warn!("Max transcodings reached {}", transcoding.max_transcodings);
         Box::new(future::ok(short_response(

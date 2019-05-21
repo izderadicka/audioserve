@@ -37,8 +37,8 @@ where
     let mut bytes = vec![];
     let mut f = File::open(file)?;
     f.read_to_end(&mut bytes)?;
-    let key = Identity::from_pkcs12(&bytes, pass)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    let key =
+        Identity::from_pkcs12(&bytes, pass).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     Ok(key)
 }
 
@@ -80,12 +80,11 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
         search: Search::new(),
         transcoding: TranscodingDetails {
             transcodings: Arc::new(AtomicUsize::new(0)),
-            max_transcodings: cfg.max_transcodings,
+            max_transcodings: cfg.transcoding.max_parallel_processes,
         },
     };
 
-    let server: Box<Future<Item = (), Error = ()> + Send> = match get_config().ssl.as_ref()
-    {
+    let server: Box<Future<Item = (), Error = ()> + Send> = match get_config().ssl.as_ref() {
         None => {
             let server = HttpServer::bind(&get_config().local_addr)
                 .serve(move || {
@@ -103,14 +102,13 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
                 use hyper::server::conn::Http;
                 use tokio::net::TcpListener;
 
-                let private_key =
-                    match load_private_key(&ssl.key_file, &ssl.key_password) {
-                        Ok(s) => s,
-                        Err(e) => {
-                            error!("Error loading SSL/TLS private key: {}", e);
-                            return Err(Box::new(e));
-                        }
-                    };
+                let private_key = match load_private_key(&ssl.key_file, &ssl.key_password) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        error!("Error loading SSL/TLS private key: {}", e);
+                        return Err(Box::new(e));
+                    }
+                };
                 let tls_cx = native_tls::TlsAcceptor::builder(private_key).build()?;
                 let tls_cx = tokio_tls::TlsAcceptor::from(tls_cx);
 

@@ -156,7 +156,7 @@ impl From<TranscodingFormat> for TranscodingSummary {
 
 #[derive(Debug, Serialize)]
 pub struct Transcodings {
-    pub max_transcodings: usize,
+    pub max_transcodings: u32,
     pub low: TranscodingSummary,
     pub medium: TranscodingSummary,
     pub high: TranscodingSummary,
@@ -166,7 +166,7 @@ impl Transcodings {
     pub fn new() -> Self {
         let cfg = get_config();
         Transcodings {
-            max_transcodings: cfg.max_transcodings,
+            max_transcodings: cfg.transcoding.max_parallel_processes,
             low: cfg.transcoding.get(QualityLevel::Low).into(),
             medium: cfg.transcoding.get(QualityLevel::Medium).into(),
             high: cfg.transcoding.get(QualityLevel::High).into(),

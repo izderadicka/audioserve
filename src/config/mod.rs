@@ -5,16 +5,17 @@ use serde_yaml;
 use std::collections::BTreeMap;
 use std::env;
 use std::fs::File;
-use std::io::{self, Read};
+use std::io::Read;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::fmt::{self,Display};
-use std::borrow::Cow;
 use std::time::Duration;
 
+pub use self::error::{Error, Result};
 
 mod cli;
 mod validators;
+#[macro_use]
+mod error;
 
 static mut CONFIG: Option<Config> = None;
 
@@ -23,73 +24,12 @@ pub fn get_config() -> &'static Config {
     unsafe { CONFIG.as_ref().expect("Config is not initialized") }
 }
 
-#[derive(Debug)]
-pub enum ErrorKind {
-    Argument{argument:&'static str, message: Cow<'static, str>},
-    ConfigValue{name:&'static str, message: Cow<'static, str>}
-}
-
-#[derive(Debug)]
-pub struct Error(ErrorKind);
-
-impl Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.0 {
-            ErrorKind::Argument{argument, ref message} => {
-                write!(f, "Error in argument {}: {}", argument, message)
-            }
-            ErrorKind::ConfigValue{name, ref message} => {
-                write!(f, "Error in config value {}: {}", name, message)
-            }
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-type Result<T> =  std::result::Result<T,Error>;
-
-impl Error {
-    fn in_argument<T,S>(argument: &'static str, msg: S) -> std::result::Result<T,Self>
-    where S: Into<Cow<'static, str>> {
-        Err(Error(
-            ErrorKind::Argument {
-                argument,
-                message: msg.into()
-            }
-        ))
-    }
-
-    fn in_value<T,S>(name: &'static str, msg: S) -> std::result::Result<T,Self>
-    where S: Into<Cow<'static, str>> {
-        Err(Error(
-            ErrorKind::ConfigValue {
-                name,
-                message: msg.into()
-            }
-        ))
-    }
-}
-
-macro_rules!  value_error {
-    ($arg:expr, $msg:expr) => {
-        Error::in_value($arg, $msg)
-    };
-
-    ($arg:expr, $msg:expr, $($param:expr),+) => {
-        Error::in_value($arg, 
-        format!($msg, $($param),+))
-    };
-
-}
-
-
 #[cfg(feature = "transcoding-cache")]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TranscodingCacheConfig {
     pub root_dir: PathBuf,
     pub max_size: u64,
-    pub max_files: u64,
+    pub max_files: u32,
     pub disabled: bool,
     pub save_often: bool,
 }
@@ -108,8 +48,45 @@ impl Default for TranscodingCacheConfig {
     }
 }
 
+#[cfg(feature = "transcoding-cache")]
+impl TranscodingCacheConfig {
+    pub fn set_root_dir<P: Into<PathBuf>>(&mut self, root_dir: P) -> Result<()> {
+        let d = root_dir.into();
+        if let Some(true) = d.parent().map(Path::is_dir) {
+            self.root_dir = d;
+            Ok(())
+        } else {
+            value_error!("root_dir", "Parent directory does not exists for {:?}", d)
+        }
+    }
+
+    pub fn set_max_size_mb(&mut self, sz: u32) -> Result<()> {
+        if sz < 50 {
+            return value_error!(
+                "max_size",
+                "Transcoding cache small then 50 MB does not make sense"
+            );
+        }
+        self.max_size = sz as u64 * 1024 * 1024;
+        Ok(())
+    }
+
+    pub fn set_max_files(&mut self, sz: u32) -> Result<()> {
+        if sz < 10 {
+            return value_error!(
+                "max_size",
+                "Transcoding cache with less the 10 files does not make sense"
+            );
+        }
+        self.max_files = sz;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TranscodingConfig {
+    pub max_parallel_processes: u32,
+    pub max_runtime_hours: u32,
     low: TranscodingFormat,
     medium: TranscodingFormat,
     high: TranscodingFormat,
@@ -118,6 +95,8 @@ pub struct TranscodingConfig {
 impl Default for TranscodingConfig {
     fn default() -> Self {
         TranscodingConfig {
+            max_parallel_processes: (2 * num_cpus::get()) as u32,
+            max_runtime_hours: 24,
             low: TranscodingFormat::default_level(QualityLevel::Low),
             medium: TranscodingFormat::default_level(QualityLevel::Medium),
             high: TranscodingFormat::default_level(QualityLevel::High),
@@ -134,13 +113,32 @@ impl TranscodingConfig {
             QualityLevel::Passthrough => TranscodingFormat::Remux,
         }
     }
+
+    pub fn set_max_parallel_processes(&mut self, n:u32) -> Result<()> {
+        if n < 2 {
+            return value_error!("max_parallel_processes", "With less then 2 transcoding processes audioserve will not work properly")
+        } else if n > 100 {
+             return value_error!("max_parallel_processes", "As transcodings are resource intesive, having more then 100 is not wise")
+        }
+        self.max_parallel_processes = n;
+        Ok(())
+
+    }
+
+    pub fn set_max_runtime_hours(&mut self, n:u32) -> Result<()> {
+        if n<1 {
+            return value_error!("max_runtime_hours", "Minimum time is 1 hour")
+        }
+        self.max_runtime_hours = n;
+        Ok(())   
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ThreadPoolConfig {
     pub num_threads: u16,
     pub queue_size: u16,
-    pub keep_alive: Option<Duration>
+    pub keep_alive: Option<Duration>,
 }
 
 impl Default for ThreadPoolConfig {
@@ -148,29 +146,39 @@ impl Default for ThreadPoolConfig {
         ThreadPoolConfig {
             num_threads: 8,
             queue_size: 100,
-            keep_alive: None
+            keep_alive: None,
         }
     }
 }
 
 impl ThreadPoolConfig {
     pub fn set_num_threads(&mut self, n: u16) -> Result<()> {
-         if n<1 {
-            return value_error!("num_threads", "At least one thread is required")
+        if n < 1 {
+            return value_error!("num_threads", "At least one thread is required");
         }
         if n > 32_768 {
-            return value_error!("num_threads", "{} is just too many threads, max is 32768", n)
+            return value_error!(
+                "num_threads",
+                "{} is just too many threads, max is 32768",
+                n
+            );
         }
         self.num_threads = n;
         Ok(())
     }
     pub fn set_queue_size(&mut self, n: u16) -> Result<()> {
-
         if n < 10 {
-            return value_error!("queue_size", "Queue for blocking threads should be at least 10 ")
+            return value_error!(
+                "queue_size",
+                "Queue for blocking threads should be at least 10 "
+            );
         }
         if n > 32_768 {
-            return value_error!("queue_size", "{} is just too long for queue of blocking threads, max is 32768",n)
+            return value_error!(
+                "queue_size",
+                "{} is just too long for queue of blocking threads, max is 32768",
+                n
+            );
         }
         self.queue_size = n;
         Ok(())
@@ -201,12 +209,31 @@ impl Default for ChaptersSize {
     }
 }
 
+impl ChaptersSize {
+    pub fn set_from_duration(&mut self, d:u32) -> Result<()> {
+        if d > 0 && d < 10 {
+            return value_error!("from_duration", "File shorter then 10 mins should not be split to chapters")
+        }
+
+        self.from_duration = d;
+        Ok(())
+    }
+
+    pub fn set_duration(&mut self, d: u32) -> Result<()> {
+        if d < 10 {
+            return value_error!("duration", "Minimal chapter duration is 10 minutes")
+        }
+
+        self.duration = d;
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SslConfig {
     pub key_file: PathBuf,
     pub key_password: String,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -215,14 +242,12 @@ pub struct Config {
     pub base_dirs: Vec<PathBuf>,
     pub shared_secret: Option<String>,
     pub transcoding: TranscodingConfig,
-    pub max_transcodings: usize,
     pub token_validity_hours: u32,
     pub secret_file: PathBuf,
     pub client_dir: PathBuf,
     pub cors: bool,
     pub ssl: Option<SslConfig>,
     pub allow_symlinks: bool,
-    pub transcoding_deadline: u32,
     pub search_cache: bool,
     #[cfg(feature = "transcoding-cache")]
     pub transcoding_cache: TranscodingCacheConfig,
@@ -231,13 +256,12 @@ pub struct Config {
     pub positions_file: PathBuf,
 }
 
-
 impl Config {
     pub fn transcoder(&self, transcoding_quality: QualityLevel) -> Transcoder {
         Transcoder::new(get_config().transcoding.get(transcoding_quality))
     }
 
-    pub fn add_base_dir<P:Into<PathBuf>>(&mut self, p:P) -> Result<()> {
+    pub fn add_base_dir<P: Into<PathBuf>>(&mut self, p: P) -> Result<()> {
         let base_dir = p.into();
         if !base_dir.is_dir() {
             return value_error!("base_dir", "{:?} is not direcrory", base_dir);
@@ -253,101 +277,122 @@ impl Config {
     }
 
     pub fn set_shared_secret(&mut self, secret: String) -> Result<()> {
-        if secret.len()<3 {
-            return value_error!("shared_secret", "Shared secret must be at least 3 bytes")
+        if secret.len() < 3 {
+            return value_error!("shared_secret", "Shared secret must be at least 3 bytes");
         }
         self.shared_secret = Some(secret);
         Ok(())
     }
 
-    pub fn set_shared_secret_from_file< P:AsRef<Path>+std::fmt::Debug>(&mut self, file: P) -> Result<()> {
+    pub fn set_shared_secret_from_file<P: AsRef<Path> + std::fmt::Debug>(
+        &mut self,
+        file: P,
+    ) -> Result<()> {
         match File::open(&file) {
             Ok(mut f) => {
                 let mut secret = String::new();
-                f.read_to_string(&mut secret)
-                    .or_else(|e| value_error!("shared_secret", "Error reading from shared secret file {:?}: {}", file, e))?;
+                f.read_to_string(&mut secret).or_else(|e| {
+                    value_error!(
+                        "shared_secret",
+                        "Error reading from shared secret file {:?}: {}",
+                        file,
+                        e
+                    )
+                })?;
                 self.set_shared_secret(secret)
             }
-            Err(e) => {
-                value_error!(
-                    "shared-secret",
-                    "Shared secret file {:?} does not exists or is not readable: {}",
-                    file,
-                    e
-                )
-            }
+            Err(e) => value_error!(
+                "shared-secret",
+                "Shared secret file {:?} does not exists or is not readable: {}",
+                file,
+                e
+            ),
         }
-
     }
 
     pub fn set_token_validity_days(&mut self, validity: u32) -> Result<()> {
-        if validity < 10 { 
-            return value_error!("token-validity-days",
-            "Token must be valid for at least 10 days")
+        if validity < 10 {
+            return value_error!(
+                "token-validity-days",
+                "Token must be valid for at least 10 days"
+            );
         }
         self.token_validity_hours = validity * 24;
         Ok(())
     }
 
-    pub fn set_client_dir<P:Into<PathBuf>>(&mut self, dir: P) -> Result<()> {
+    pub fn set_client_dir<P: Into<PathBuf>>(&mut self, dir: P) -> Result<()> {
         let p = dir.into();
         if !p.is_dir() {
-            return value_error!("client_dir", "Directory with web client files {:?} does not exists or is not directory", p);
+            return value_error!(
+                "client_dir",
+                "Directory with web client files {:?} does not exists or is not directory",
+                p
+            );
         }
         self.client_dir = p;
         Ok(())
     }
 
-    pub fn set_secret_file<P:Into<PathBuf>>(&mut self, secret_file:P) -> Result<()> {
+    pub fn set_secret_file<P: Into<PathBuf>>(&mut self, secret_file: P) -> Result<()> {
         let f = secret_file.into();
         if let Some(true) = f.parent().map(Path::is_dir) {
             self.secret_file = f;
             Ok(())
         } else {
-            value_error!("secret_file", "Parent directory for does not exists for {:?}", f)
+            value_error!(
+                "secret_file",
+                "Parent directory for does not exists for {:?}",
+                f
+            )
         }
     }
 
     pub fn set_ssl_config(&mut self, ssl: SslConfig) -> Result<()> {
         if !ssl.key_file.is_file() {
-            return value_error!("ssl", "SSL key file {:?} doesn't exist", ssl.key_file)
+            return value_error!("ssl", "SSL key file {:?} doesn't exist", ssl.key_file);
         }
         self.ssl = Some(ssl);
         Ok(())
     }
 
-
-
-
+    pub fn set_positions_file<P: Into<PathBuf>>(&mut self, file:P) -> Result<()> {
+        let f = file.into();
+        if let Some(true) = f.parent().map(Path::is_dir) {
+            self.positions_file = f;
+            Ok(())
+        } else {
+            value_error!(
+                "positions_file",
+                "Parent directory for does not exists for {:?}",
+                f
+            )
+        }
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
+        let home = dirs::home_dir().unwrap_or_else(|| ".".into());
         Config {
-        base_dirs: vec![],
-        local_addr: ([0,0,0,0], 3000u16).into(),
-        thread_pool: ThreadPoolConfig::default(),
-        shared_secret: None,
-        transcoding: TranscodingConfig::default(),
-        max_transcodings: 2 * num_cpus::get(),
-        transcoding_deadline: 24,
-        token_validity_hours: 365 * 24,
-        client_dir: "client/dist".into(),
-        secret_file: match dirs::home_dir() {
-            Some(home) => home.join(".audioserve.secret"),
-            None => "./.audioserve.secret".into()
-            },
-        cors: false,
-        ssl: None,
-        allow_symlinks: false,
-        search_cache: false,
-        #[cfg(feature = "transcoding-cache")]
-        transcoding_cache: TranscodingCacheConfig::default(),
-        disable_folder_download: false,
-        chapters: ChaptersSize::default(),
-        positions_file: "./positions".into(),
-    }
-
+            base_dirs: vec![],
+            local_addr: ([0, 0, 0, 0], 3000u16).into(),
+            thread_pool: ThreadPoolConfig::default(),
+            shared_secret: None,
+            transcoding: TranscodingConfig::default(),
+            token_validity_hours: 365 * 24,
+            client_dir: "client/dist".into(),
+            secret_file: home.join(".audioserve.secret"),
+            cors: false,
+            ssl: None,
+            allow_symlinks: false,
+            search_cache: false,
+            #[cfg(feature = "transcoding-cache")]
+            transcoding_cache: TranscodingCacheConfig::default(),
+            disable_folder_download: false,
+            chapters: ChaptersSize::default(),
+            positions_file: home.join(".audioserve-positions"),
+        }
     }
 }
 
@@ -366,7 +411,6 @@ pub fn init_config() -> Result<()> {
 
     Ok(())
 }
-
 
 //this default config is used only for testing
 #[allow(dead_code)]

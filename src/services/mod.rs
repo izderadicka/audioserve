@@ -44,7 +44,7 @@ type Counter = Arc<AtomicUsize>;
 #[derive(Clone)]
 pub struct TranscodingDetails {
     pub transcodings: Counter,
-    pub max_transcodings: usize,
+    pub max_transcodings: u32,
 }
 
 #[derive(Clone)]

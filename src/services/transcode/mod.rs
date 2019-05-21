@@ -447,7 +447,7 @@ impl Transcoder {
                         .select2(Delay::new(
                             Instant::now()
                                 + Duration::from_secs(
-                                    u64::from(get_config().transcoding_deadline * 3600),
+                                    u64::from(get_config().transcoding.max_runtime_hours * 3600),
                                 ),
                         ))
                         .then(move |res| {
