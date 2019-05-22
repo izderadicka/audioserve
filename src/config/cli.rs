@@ -23,11 +23,11 @@ fn create_parser<'a>(_config: &Config) -> Parser<'a> {
         )
         .arg(Arg::with_name("thread-pool-large")
             .long("thread-pool-large")
-            .help("Use larger thread pool (usually will not be needed)") 
-            .env("AUDIOSERVE_THREAD_POOL_LARGE")        
+            .help("Use larger thread pool (usually will not be needed)")
+                   
         )
-        .arg(Arg::with_name("thread-pool-keep-alive")
-            .long("thread-pool-keep-alive")
+        .arg(Arg::with_name("thread-pool-keep-alive-secs")
+            .long("thread-pool-keep-alive-secs")
             .takes_value(true)
             .help("Threads in pool will shutdown after given seconds, if there is no work. Default is to keep threads forever.")
             .env("AUDIOSERVE_THREAD_POOL_KEEP_ALIVE")
@@ -48,23 +48,22 @@ fn create_parser<'a>(_config: &Config) -> Parser<'a> {
         )
         .arg(Arg::with_name("no-authentication")
             .long("no-authentication")
-            .env("AUDIOSERVE_NO_AUTHENTICATION")
             .help("no authentication required - mainly for testing purposes")
         )
         .arg(Arg::with_name("shared-secret")
             .short("s")
             .long("shared-secret")
             .takes_value(true)
-            .conflicts_with("no-authentication")
-            .required_unless_one(&["no-authentication", "shared-secret-file"])
+            // .conflicts_with("no-authentication")
+            // .required_unless_one(&["no-authentication", "shared-secret-file"])
             .env("AUDIOSERVE_SHARED_SECRET")
             .help("Shared secret for client authentication")
         )
         .arg(Arg::with_name("shared-secret-file")
             .long("shared-secret-file")
             .takes_value(true)
-            .conflicts_with("no-authentication")
-            .required_unless("shared-secret")
+            // .conflicts_with("no-authentication")
+            // .required_unless_one(&["no-authentication", "shared-secret"])
             .env("AUDIOSERVE_SHARED_SECRET_FILE")
             .help("File containing shared secret, it's slightly safer to read it from file, then provide as command argument")
         )
@@ -109,7 +108,6 @@ fn create_parser<'a>(_config: &Config) -> Parser<'a> {
         )
         .arg(Arg::with_name("cors")
             .long("cors")
-            .env("AUDIOSERVE_CORS")
             .help("Enable CORS - enabled any origin of requests")
         )
         .arg(Arg::with_name("chapters-from-duration")
@@ -131,7 +129,6 @@ fn create_parser<'a>(_config: &Config) -> Parser<'a> {
         parser = parser.arg(
             Arg::with_name("disable-folder-download")
                 .long("disable-folder-download")
-                .env("AUDIOSERVE_DISABLE_FOLDER_DOWNLOAD")
                 .help("Disables API point for downloading whole folder"),
         );
     }
@@ -167,7 +164,6 @@ fn create_parser<'a>(_config: &Config) -> Parser<'a> {
         parser = parser.arg(
             Arg::with_name("allow-symlinks")
                 .long("allow-symlinks")
-                .env("AUDIOSERVE_ALLOW_SYMLINKS")
                 .help("Will follow symbolic/soft links in collections directories"),
         );
     }
@@ -176,7 +172,6 @@ fn create_parser<'a>(_config: &Config) -> Parser<'a> {
         parser=parser.arg(
             Arg::with_name("search-cache")
             .long("search-cache")
-            .env("AUDIOSERVE_SEARCH_CACHE")
             .help("Caches collections directory structure for quick search, monitors directories for changes")
         );
     }
@@ -206,13 +201,11 @@ fn create_parser<'a>(_config: &Config) -> Parser<'a> {
         ).arg(
             Arg::with_name("t-cache-disable")
             .long("t-cache-disable")
-            .env("AUDIOSERVE_T_CACHE_DISABLE")
             .help("Transaction cache is disabled. If you want to completely get rid of it, compile without 'transcoding-cache'")
             )
         .arg(
             Arg::with_name("t-cache-save-often")
             .long("t-cache-save-often")
-            .env("AUDIOSERVE_T_CACHE_SAVE_OFTEN")
             .help("Save additions to cache often, after each addition, this is normaly not necessary")
         )
     }
@@ -232,9 +225,16 @@ macro_rules!  arg_error {
 
 }
 
+
+
 pub fn parse_args(mut config: Config) -> Result<Config> {
     let p = create_parser(&config);
     let args = p.get_matches();
+
+    let is_present_or_env = |name: &str, env_name: &str| {
+        args.is_present(name) || env::var(env_name).map(|s| s.len()>0).unwrap_or(false)
+        
+    };
 
     if args.is_present("debug") {
         let name = "RUST_LOG";
@@ -244,6 +244,7 @@ pub fn parse_args(mut config: Config) -> Result<Config> {
     }
 
     for dir in args.values_of_os("base-dir").unwrap() {
+        
         config.add_base_dir(dir)?;
     }
 
@@ -259,18 +260,18 @@ pub fn parse_args(mut config: Config) -> Result<Config> {
         }
     }
 
-    if args.is_present("thread-pool-large") {
-        config.set_pool_size(ThreadPoolConfig {
+    if is_present_or_env("thread-pool-large", "AUDIOSERVE_THREAD_POOL_LARGE") {
+        config.thread_pool = ThreadPoolConfig {
             num_threads: 16,
             queue_size: 1000,
             keep_alive: None,
-        })?;
+        };
     }
 
     if args.is_present("no-authentication") {
         config.shared_secret = None
     } else if let Some(secret) = args.value_of("shared-secret") {
-        config.set_shared_secret(secret.into())?
+        config.shared_secret = Some(secret.into())
     } else if let Some(file) = args.value_of_os("shared-secret-file") {
         config.set_shared_secret_from_file(file)?
     } else {
@@ -278,33 +279,33 @@ pub fn parse_args(mut config: Config) -> Result<Config> {
     };
 
     if let Some(n) = args.value_of("transcoding-max-parallel-processes") {
-        config.transcoding.set_max_parallel_processes(n.parse().unwrap())?
+        config.transcoding.max_parallel_processes = n.parse().unwrap()
     }
 
     if let Some(n) = args.value_of("transcoding-max-runtime") {
-        config.transcoding.set_max_runtime_hours(n.parse().unwrap())?
+        config.transcoding.max_runtime_hours = n.parse().unwrap()
     }
 
-    if let Some(v) = args.value_of("thread-pool-keep-alive") {
-        config.thread_pool.set_keep_alive_secs(v.parse().unwrap())?
+    if let Some(v) = args.value_of("thread-pool-keep-alive-secs") {
+        config.thread_pool.keep_alive = Some(Duration::from_secs(v.parse().unwrap()))
     }
 
     if let Some(validity) = args.value_of("token-validity-days") {
-        config.set_token_validity_days(validity.parse().unwrap())?
+        config.token_validity_hours = validity.parse::<u32>().unwrap() 
     }
 
     if let Some(client_dir) = args.value_of_os("client-dir") {
-        config.set_client_dir(client_dir)?
+        config.client_dir = client_dir.into()
     }
     if let Some(secret_file) = args.value_of_os("secret-file") {
-        config.set_secret_file(secret_file)?
+        config.secret_file = secret_file.into()
     }
 
-    if args.is_present("cors") {
+    if is_present_or_env("cors", "AUDIOSERVE_CORS") {
         config.cors = true;
     }
 
-    if cfg!(feature = "symlinks") && args.is_present("allow-symlinks") {
+    if cfg!(feature = "symlinks") && is_present_or_env("allow-symlinks", "AUDIOSERVE_ALLOW_SYMLINKS") {
         config.allow_symlinks = true
     }
     #[cfg(feature = "tls")]
@@ -312,80 +313,56 @@ pub fn parse_args(mut config: Config) -> Result<Config> {
         if let Some(key) = args.value_of("ssl-key") {
             let key_file = key.into();
             let key_password = args.value_of("ssl-key-password").unwrap().into();
-            config.set_ssl_config(SslConfig {
+            config.ssl = Some(SslConfig {
                 key_file,
                 key_password,
-            })?
+            });
         }
     }
 
-    if cfg!(feature = "search-cache") && args.is_present("search-cache") {
+    if cfg!(feature = "search-cache") && is_present_or_env("search-cache", "AUDIOSERVE_SEARCH_CACHE") {
         config.search_cache = true
     };
 
     #[cfg(feature = "transcoding-cache")]
     {
-        if let Some(d) = args.value_of("t-cache-dir") {
-            config.transcoding_cache.set_root_dir(d)?
+        if let Some(d) = args.value_of_os("t-cache-dir") {
+            config.transcoding.cache.root_dir=d.into()
         }
 
         if let Some(n) = args.value_of("t-cache-size") {
             config
-                .transcoding_cache
-                .set_max_size_mb(n.parse().unwrap())?
+                .transcoding.cache 
+                .max_size = n.parse().unwrap()
         }
 
         if let Some(n) = args.value_of("t-cache-max-files") {
-            config.transcoding_cache.set_max_files(n.parse().unwrap())?
+            config.transcoding.cache.max_files = n.parse().unwrap()
         }
 
-        if args.is_present("t-cache-disable") {
-            config.transcoding_cache.disabled = true;
+        if is_present_or_env("t-cache-disable", "AUDIOSERVE_T_CACHE_DISABLE") {
+            config.transcoding.cache.disabled = true;
         }
 
-        if args.is_present("t-cache-save-often") {
-            config.transcoding_cache.save_often = true;
+        if is_present_or_env("t-cache-save-often", "AUDIOSERVE_T_CACHE_SAVE_OFTEN") {
+            config.transcoding.cache.save_often = true;
         }
     };
-    if cfg!(feature = "folder-download") && args.is_present("disable-folder-download") {
+    if cfg!(feature = "folder-download") && is_present_or_env("disable-folder-download", "AUDIOSERVE_DISABLE_FOLDER_DOWNLOAD") {
         config.disable_folder_download = true
     };
 
     if let Some(d) = args.value_of("chapters-from-duration") {
-        config.chapters.set_from_duration(d.parse().unwrap())?
+        config.chapters.from_duration = d.parse().unwrap()
     }
       
     if let Some(d) = args.value_of("chapters-duration") {
-           config.chapters.set_duration(d.parse().unwrap())?
+           config.chapters.duration = d.parse().unwrap()
     }
 
     if let Some(positions_file) = args.value_of_os("positions-file") {
-        config.set_positions_file(positions_file)?
+        config.positions_file = positions_file.into();
     }
-
-    // let config = Config {
-    //     base_dirs,
-    //     local_addr,
-    //     pool_size,
-    //     shared_secret,
-    //     transcoding,
-    //     max_transcodings,
-    //     token_validity_hours: token_validity_days * 24,
-    //     client_dir,
-    //     secret_file,
-    //     cors,
-    //     ssl_key_file,
-    //     ssl_key_password,
-    //     allow_symlinks,
-    //     thread_keep_alive,
-    //     transcoding_deadline,
-    //     search_cache,
-    //     #[cfg(feature = "transcoding-cache")]
-    //     transcoding_cache: _transcoding_cache,
-    //     disable_folder_download,
-    //     chapters,
-    //     positions_file,
-    // };
 
     Ok(config)
 }

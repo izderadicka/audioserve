@@ -332,7 +332,7 @@ impl Transcoder {
         } else {
             false
         };
-        if is_transcoded || seek.is_some() || get_config().transcoding_cache.disabled {
+        if is_transcoded || seek.is_some() || get_config().transcoding.cache.disabled {
             debug!("Shoud not add to cache as is already transcoded, seeking or cache is disabled");
             return Box::new(future::result(
                 self.transcode_inner(file, seek, span, counter)

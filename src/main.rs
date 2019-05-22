@@ -193,7 +193,7 @@ fn main() {
     #[cfg(feature = "transcoding-cache")]
     {
         use crate::services::transcode::cache::get_cache;
-        if get_config().transcoding_cache.disabled {
+        if get_config().transcoding.cache.disabled {
             info!("Trascoding cache is disabled")
         } else {
             let c = get_cache();

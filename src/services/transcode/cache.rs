@@ -7,18 +7,18 @@ use std::path::Path;
 lazy_static! {
     pub static ref CACHE: Option<Cache> = {
         let cfg = get_config();
-        if cfg.transcoding_cache.disabled {
+        if cfg.transcoding.cache.disabled {
             None
         } else {
-            let cache_dir = &cfg.transcoding_cache.root_dir;
+            let cache_dir = &cfg.transcoding.cache.root_dir;
             if !cache_dir.exists() {
                 fs::create_dir(&cache_dir).expect("Cannot create directory for cache")
             }
             Some(
                 Cache::new(
                     cache_dir,
-                    cfg.transcoding_cache.max_size,
-                    cfg.transcoding_cache.max_files.into(),
+                    u64::from(cfg.transcoding.cache.max_size) * 1024 * 1024,
+                    cfg.transcoding.cache.max_files.into(),
                 )
                 .expect("Cannot create cache"),
             )
