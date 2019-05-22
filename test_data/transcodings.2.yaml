@@ -1,15 +1,16 @@
-low:
-  aac-in-adts:
-    bitrate: 32
-    sr: 16kHz
-    ltp: true
-medium:
-  aac-in-adts:
-    bitrate: 48
-    sr: 24kHz
-    ltp: false
-high:
-  aac-in-adts:
-    bitrate: 96
+transcoding:
+  low:
+    aac-in-adts:
+      bitrate: 32
+      sr: 16kHz
+      ltp: true
+  medium:
+    aac-in-adts:
+      bitrate: 48
+      sr: 24kHz
+      ltp: false
+  high:
+    aac-in-adts:
+      bitrate: 96
     
   

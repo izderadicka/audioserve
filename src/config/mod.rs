@@ -2,7 +2,6 @@ use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
 
 use num_cpus;
 use serde_yaml;
-use std::collections::BTreeMap;
 use std::env;
 use std::fs::File;
 use std::io::Read;
@@ -26,6 +25,7 @@ pub fn get_config() -> &'static Config {
 
 #[cfg(feature = "transcoding-cache")]
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct TranscodingCacheConfig {
     pub root_dir: PathBuf,
     pub max_size: u32,
@@ -76,6 +76,7 @@ impl TranscodingCacheConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct TranscodingConfig {
     pub max_parallel_processes: u32,
     pub max_runtime_hours: u32,
@@ -127,6 +128,7 @@ impl TranscodingConfig {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub struct ThreadPoolConfig {
     pub num_threads: u16,
     pub queue_size: u16,
@@ -176,6 +178,7 @@ impl ThreadPoolConfig {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub struct ChaptersSize {
     pub from_duration: u32,
     pub duration: u32,
@@ -219,7 +222,8 @@ impl SslConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Config {
     pub local_addr: SocketAddr,
     pub thread_pool: ThreadPoolConfig,
@@ -391,32 +395,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_yaml_serialize() {
-        let mut qualities = BTreeMap::new();
-        qualities.insert("low", TranscodingFormat::default_level(QualityLevel::Low));
-        qualities.insert(
-            "medium",
-            TranscodingFormat::default_level(QualityLevel::Medium),
-        );
-        qualities.insert("high", TranscodingFormat::default_level(QualityLevel::High));
-        let s = serde_yaml::to_string(&qualities).unwrap();
-        assert!(s.len() > 20);
+    fn test_default_serialize() {
+        let config = Config::default();
+        let s = serde_yaml::to_string(&config).unwrap();
+        assert!(s.len() > 100);
         println!("{}", s);
 
-        let des: BTreeMap<String, TranscodingFormat> = serde_yaml::from_str(&s).unwrap();
-        assert_eq!(des.get("medium"), qualities.get("medium"));
+        let des: Config = serde_yaml::from_str(&s).unwrap();
+        assert_eq!(config.transcoding.medium, des.transcoding.medium);
     }
+
+    use crate::services::transcode::QualityLevel;
     #[test]
-    fn test_yaml_deserialize() {
-        fn load_file(fname: &str) {
+    fn test_transcoding_profile_deserialize()  {
+        fn load_file(fname: &str) -> Config{
             let f = File::open(fname).unwrap();
-            let des: BTreeMap<String, TranscodingFormat> = serde_yaml::from_reader(f).unwrap();
-            assert_eq!(3, des.len());
-            assert!(des.get("high").is_some());
+            serde_yaml::from_reader(f).unwrap()
         }
-        load_file("./test_data/transcodings.yaml");
-        load_file("./test_data/transcodings.1.yaml");
-        load_file("./test_data/transcodings.2.yaml");
+        let c1 = load_file("./test_data/transcodings.yaml");
+        assert_eq!(c1.transcoding.get(QualityLevel::Medium).bitrate(), 24);
+        let c2 = load_file("./test_data/transcodings.1.yaml");
+        assert_eq!(c2.transcoding.get(QualityLevel::Medium).format_name(), "mp3");
+        let c3 = load_file("./test_data/transcodings.2.yaml");
+        assert_eq!(c3.transcoding.get(QualityLevel::High).bitrate(), 96);
     }
 
 }

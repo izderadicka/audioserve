@@ -1,18 +1,15 @@
-low:
-  opus-in-webm:
-    bitrate: 16
-    compression_level: 3
-    cutoff: WideBand
-    mono: true
-medium:
-  opus-in-webm:
-    bitrate: 24
-    compression_level: 6
-    cutoff: SuperWideBand
-    mono: true
-high:
-  opus-in-webm:
-    bitrate: 32
-    compression_level: 9
-    cutoff: SuperWideBand
+transcoding:
+  low:
+    opus-in-webm:
+      bitrate: 16
+      compression_level: 3
+      cutoff: WideBand
+      mono: true
+  medium:
+    opus-in-webm:
+      bitrate: 24
+      compression_level: 6
+      cutoff: SuperWideBand
+      mono: true
+  
   
