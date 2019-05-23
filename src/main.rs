@@ -152,7 +152,7 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
             {
                 panic!(
                     "TLS is not compiled - build with default features {:?}",
-                    file
+                    ssl
                 )
             }
         }
