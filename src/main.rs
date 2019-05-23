@@ -86,13 +86,13 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
 
     let server: Box<Future<Item = (), Error = ()> + Send> = match get_config().ssl.as_ref() {
         None => {
-            let server = HttpServer::bind(&get_config().local_addr)
+            let server = HttpServer::bind(&get_config().listen)
                 .serve(move || {
                     let s: Result<_, error::Error> = Ok(svc.clone());
                     s
                 })
                 .map_err(|e| error!("Cannot start HTTP server due to error {}", e));
-            info!("Server listening on {}", &get_config().local_addr);
+            info!("Server listening on {}", &get_config().listen);
             Box::new(server)
         }
         Some(ssl) => {
@@ -112,7 +112,7 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
                 let tls_cx = native_tls::TlsAcceptor::builder(private_key).build()?;
                 let tls_cx = tokio_tls::TlsAcceptor::from(tls_cx);
 
-                let addr = cfg.local_addr;
+                let addr = cfg.listen;
                 let srv = TcpListener::bind(&addr)?;
                 let http_proto = Http::new();
                 let http_server = http_proto

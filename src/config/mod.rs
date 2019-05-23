@@ -23,6 +23,16 @@ pub fn get_config() -> &'static Config {
     unsafe { CONFIG.as_ref().expect("Config is not initialized") }
 }
 
+static mut BASE_DATA_DIR: Option<PathBuf> = None;
+
+fn base_data_dir() -> &'static PathBuf {
+    unsafe {
+        BASE_DATA_DIR
+            .as_ref()
+            .expect("Base data dir is not initialized")
+    }
+}
+
 #[cfg(feature = "transcoding-cache")]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
@@ -37,7 +47,8 @@ pub struct TranscodingCacheConfig {
 #[cfg(feature = "transcoding-cache")]
 impl Default for TranscodingCacheConfig {
     fn default() -> Self {
-        let root_dir = env::temp_dir().join("audioserve-cache");
+        let data_base_dir = base_data_dir();
+        let root_dir = data_base_dir.join("audioserve-cache");
         TranscodingCacheConfig {
             root_dir,
             max_size: 1024,
@@ -52,18 +63,22 @@ impl Default for TranscodingCacheConfig {
 impl TranscodingCacheConfig {
     pub fn check(&self) -> Result<()> {
         if let Some(true) = self.root_dir.parent().map(Path::is_dir) {
-           
+
         } else {
-            return value_error!("root_dir", "Parent directory does not exists for {:?}", self.root_dir)
+            return value_error!(
+                "root_dir",
+                "Parent directory does not exists for {:?}",
+                self.root_dir
+            );
         };
-    
+
         if self.max_size < 50 {
             return value_error!(
                 "max_size",
                 "Transcoding cache small then 50 MB does not make sense"
             );
         }
-        
+
         if self.max_files < 10 {
             return value_error!(
                 "max_size",
@@ -113,17 +128,23 @@ impl TranscodingConfig {
 
     pub fn check(&self) -> Result<()> {
         if self.max_parallel_processes < 2 {
-            return value_error!("max_parallel_processes", "With less then 2 transcoding processes audioserve will not work properly")
+            return value_error!(
+                "max_parallel_processes",
+                "With less then 2 transcoding processes audioserve will not work properly"
+            );
         } else if self.max_parallel_processes > 100 {
-             return value_error!("max_parallel_processes", "As transcodings are resource intesive, having more then 100 is not wise")
+            return value_error!(
+                "max_parallel_processes",
+                "As transcodings are resource intesive, having more then 100 is not wise"
+            );
         }
-       
-        if self.max_runtime_hours <1 {
-            return value_error!("max_runtime_hours", "Minimum time is 1 hour")
+
+        if self.max_runtime_hours < 1 {
+            return value_error!("max_runtime_hours", "Minimum time is 1 hour");
         }
         #[cfg(feature = "transcoding-cache")]
         self.cache.check()?;
-        Ok(())   
+        Ok(())
     }
 }
 
@@ -157,7 +178,7 @@ impl ThreadPoolConfig {
                 self.num_threads
             );
         }
-       
+
         if self.queue_size < 10 {
             return value_error!(
                 "queue_size",
@@ -174,7 +195,6 @@ impl ThreadPoolConfig {
 
         Ok(())
     }
-
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -194,13 +214,16 @@ impl Default for ChaptersSize {
 }
 
 impl ChaptersSize {
-    pub fn check(& self) -> Result<()> {
+    pub fn check(&self) -> Result<()> {
         if self.from_duration > 0 && self.from_duration < 10 {
-            return value_error!("from_duration", "File shorter then 10 mins should not be split to chapters")
+            return value_error!(
+                "from_duration",
+                "File shorter then 10 mins should not be split to chapters"
+            );
         }
 
         if self.duration < 10 {
-            return value_error!("duration", "Minimal chapter duration is 10 minutes")
+            return value_error!("duration", "Minimal chapter duration is 10 minutes");
         }
 
         Ok(())
@@ -225,7 +248,7 @@ impl SslConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
-    pub local_addr: SocketAddr,
+    pub listen: SocketAddr,
     pub thread_pool: ThreadPoolConfig,
     pub base_dirs: Vec<PathBuf>,
     pub shared_secret: Option<String>,
@@ -294,7 +317,7 @@ impl Config {
                 "Token must be valid for at least 10 days"
             );
         }
-        
+
         if !self.client_dir.is_dir() {
             return value_error!(
                 "client_dir",
@@ -302,25 +325,25 @@ impl Config {
                 self.client_dir
             );
         }
-       
+
         if let Some(true) = self.secret_file.parent().map(Path::is_dir) {
-           
+
         } else {
             return value_error!(
                 "secret_file",
                 "Parent directory for does not exists for {:?}",
                 self.secret_file
-            )
+            );
         };
-    
+
         if let Some(true) = self.positions_file.parent().map(Path::is_dir) {
-            
+
         } else {
             return value_error!(
                 "positions_file",
                 "Parent directory for does not exists for {:?}",
                 self.positions_file
-            )
+            );
         };
 
         if self.ssl.is_some() {
@@ -331,29 +354,42 @@ impl Config {
         self.thread_pool.check()?;
         self.chapters.check()?;
 
+        if self.base_dirs.len() == 0 {
+            return value_error!(
+                "base_dirs",
+                "At least one directory with audio files must be provided"
+            );
+        }
+
+        for d in &self.base_dirs {
+            if !d.is_dir() {
+                return value_error!("base_dir", "{:?} is not direcrory", d);
+            }
+        }
+
         Ok(())
     }
 }
 
 impl Default for Config {
     fn default() -> Self {
-        let home = dirs::home_dir().unwrap_or_else(|| ".".into());
+        let data_base_dir = base_data_dir();
         Config {
             base_dirs: vec![],
-            local_addr: ([0, 0, 0, 0], 3000u16).into(),
+            listen: ([0, 0, 0, 0], 3000u16).into(),
             thread_pool: ThreadPoolConfig::default(),
             shared_secret: None,
             transcoding: TranscodingConfig::default(),
             token_validity_hours: 365 * 24,
             client_dir: "client/dist".into(),
-            secret_file: home.join(".audioserve.secret"),
+            secret_file: data_base_dir.join("audioserve.secret"),
             cors: false,
             ssl: None,
             allow_symlinks: false,
             search_cache: false,
             disable_folder_download: false,
             chapters: ChaptersSize::default(),
-            positions_file: home.join(".audioserve-positions"),
+            positions_file: data_base_dir.join("audioserve.positions"),
         }
     }
 }
@@ -363,11 +399,11 @@ pub fn init_config() -> Result<()> {
         if CONFIG.is_some() {
             panic!("Config is already initialied")
         }
+
+        BASE_DATA_DIR = Some(dirs::home_dir().unwrap_or_default().join(".audioserve"));
     }
-    warn!("START reading config");
-    let config = Config::default();
-    let config = cli::parse_args(config)?;
-    config.check()?;
+
+    let config = cli::parse_args()?;
 
     unsafe {
         CONFIG = Some(config);
@@ -383,6 +419,8 @@ pub fn init_default_config() {
         if CONFIG.is_some() {
             return;
         }
+
+        BASE_DATA_DIR = Some(dirs::home_dir().unwrap_or_default().join(".audioserve"));
     }
     let config = Config::default();
     unsafe {
@@ -396,6 +434,7 @@ mod tests {
 
     #[test]
     fn test_default_serialize() {
+        init_default_config();
         let config = Config::default();
         let s = serde_yaml::to_string(&config).unwrap();
         assert!(s.len() > 100);
@@ -407,15 +446,19 @@ mod tests {
 
     use crate::services::transcode::QualityLevel;
     #[test]
-    fn test_transcoding_profile_deserialize()  {
-        fn load_file(fname: &str) -> Config{
+    fn test_transcoding_profile_deserialize() {
+        fn load_file(fname: &str) -> Config {
             let f = File::open(fname).unwrap();
             serde_yaml::from_reader(f).unwrap()
         }
+        init_default_config();
         let c1 = load_file("./test_data/transcodings.yaml");
         assert_eq!(c1.transcoding.get(QualityLevel::Medium).bitrate(), 24);
         let c2 = load_file("./test_data/transcodings.1.yaml");
-        assert_eq!(c2.transcoding.get(QualityLevel::Medium).format_name(), "mp3");
+        assert_eq!(
+            c2.transcoding.get(QualityLevel::Medium).format_name(),
+            "mp3"
+        );
         let c3 = load_file("./test_data/transcodings.2.yaml");
         assert_eq!(c3.transcoding.get(QualityLevel::High).bitrate(), 96);
     }

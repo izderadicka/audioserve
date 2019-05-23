@@ -4,16 +4,35 @@ use clap::{crate_authors, crate_name, crate_version, App, Arg};
 
 type Parser<'a> = App<'a, 'a>;
 
-fn create_parser<'a>(_config: &Config) -> Parser<'a> {
+fn create_parser<'a>() -> Parser<'a> {
     let mut parser = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
+        .arg(Arg::with_name("config")
+            .short("g")
+            .long("config")
+            .takes_value(true)
+            .env("AUDIOSERVE_CONFIG")
+            .validator_os(is_existing_file)
+            .help("Configuration file in YAML format")
+            )
+        .arg(Arg::with_name("print-config")
+            .long("print-config")
+            .help("Will print current config, with all other options to stdout, usefull for creating config file")
+        )
+        .arg(Arg::with_name("data-dir")
+            .long("data-dir")
+            .takes_value(true)
+            .validator_os(parent_dir_exists)
+            .env("AUDIOSERVE_DATA_DIR")
+            .help("Base directory for data created by audioserve (caches, state, ...) [default is $HOME/.audioserve]")
+        )
         .arg(Arg::with_name("debug")
             .short("d")
             .long("debug")
             .help("Enable debug logging (detailed logging config can be done via RUST_LOG env. variable)")
         )
-        .arg(Arg::with_name("local-addr")
+        .arg(Arg::with_name("listen")
             .short("l")
             .long("listen")
             .help("Address and port server is listening on as address:port (by default listen on port 3000 on all interfaces)")
@@ -23,8 +42,7 @@ fn create_parser<'a>(_config: &Config) -> Parser<'a> {
         )
         .arg(Arg::with_name("thread-pool-large")
             .long("thread-pool-large")
-            .help("Use larger thread pool (usually will not be needed)")
-                   
+            .help("Use larger thread pool (usually will not be needed)")       
         )
         .arg(Arg::with_name("thread-pool-keep-alive-secs")
             .long("thread-pool-keep-alive-secs")
@@ -35,7 +53,6 @@ fn create_parser<'a>(_config: &Config) -> Parser<'a> {
         )
         .arg(Arg::with_name("base-dir")
             .value_name("BASE_DIR")
-            .required(true)
             .multiple(true)
             .min_values(1)
             .max_values(100)
@@ -225,15 +242,52 @@ macro_rules!  arg_error {
 
 }
 
-
-
-pub fn parse_args(mut config: Config) -> Result<Config> {
-    let p = create_parser(&config);
+pub fn parse_args() -> Result<Config> {
+    let p = create_parser();
     let args = p.get_matches();
 
+    if let Some(dir) = args.value_of_os("data-dir") {
+        unsafe {
+            BASE_DATA_DIR.take();
+            BASE_DATA_DIR = Some(dir.into());
+        }
+    }
+
+    //Assure that BASE_DATA_DIR exists
+    {
+        let d = base_data_dir();
+        if !d.is_dir() {
+            std::fs::create_dir(d).or_else(|e| arg_error!("data-dir", 
+            "Audioserve data directory {:?} cannot be created due to error {}", d, e))?
+        }
+    }
+
+    let mut no_authentication_confirmed = false;
+
+    let mut config: Config = if let Some(config_file) = args.value_of_os("config") {
+        let f = File::open(config_file).or_else(|e| {
+            arg_error!(
+                "config",
+                "Cannot open config file {:?}, error: {}",
+                config_file,
+                e
+            )
+        })?;
+
+        serde_yaml::from_reader(f).or_else(|e| {
+            arg_error!(
+                "config",
+                "Invalid config file {:?}, error: {}",
+                config_file,
+                e
+            )
+        })?
+    } else {
+        Config::default()
+    };
+
     let is_present_or_env = |name: &str, env_name: &str| {
-        args.is_present(name) || env::var(env_name).map(|s| s.len()>0).unwrap_or(false)
-        
+        args.is_present(name) || env::var(env_name).map(|s| s.len() > 0).unwrap_or(false)
     };
 
     if args.is_present("debug") {
@@ -243,20 +297,21 @@ pub fn parse_args(mut config: Config) -> Result<Config> {
         }
     }
 
-    for dir in args.values_of_os("base-dir").unwrap() {
-        
-        config.add_base_dir(dir)?;
+    if let Some(base_dirs) = args.values_of_os("base-dir") {
+        for dir in base_dirs {
+            config.add_base_dir(dir)?;
+        }
     }
 
     if let Ok(port) = env::var("PORT") {
         // this is hack for heroku, which requires program to use env. variable PORT
         let port: u16 = port
             .parse()
-            .or_else(|_| arg_error!("local-addr", "Invalid value in $PORT"))?;
-        config.local_addr = SocketAddr::from(([0, 0, 0, 0], port));
+            .or_else(|_| arg_error!("listen", "Invalid value in $PORT"))?;
+        config.listen = SocketAddr::from(([0, 0, 0, 0], port));
     } else {
-        if let Some(addr) = args.value_of("local-addr") {
-            config.local_addr = addr.parse().unwrap();
+        if let Some(addr) = args.value_of("listen") {
+            config.listen = addr.parse().unwrap();
         }
     }
 
@@ -269,13 +324,12 @@ pub fn parse_args(mut config: Config) -> Result<Config> {
     }
 
     if args.is_present("no-authentication") {
-        config.shared_secret = None
+        config.shared_secret = None;
+        no_authentication_confirmed = true
     } else if let Some(secret) = args.value_of("shared-secret") {
         config.shared_secret = Some(secret.into())
     } else if let Some(file) = args.value_of_os("shared-secret-file") {
         config.set_shared_secret_from_file(file)?
-    } else {
-        unreachable!("One of authentcation options must be always present")
     };
 
     if let Some(n) = args.value_of("transcoding-max-parallel-processes") {
@@ -291,7 +345,7 @@ pub fn parse_args(mut config: Config) -> Result<Config> {
     }
 
     if let Some(validity) = args.value_of("token-validity-days") {
-        config.token_validity_hours = validity.parse::<u32>().unwrap() 
+        config.token_validity_hours = validity.parse::<u32>().unwrap()
     }
 
     if let Some(client_dir) = args.value_of_os("client-dir") {
@@ -305,7 +359,9 @@ pub fn parse_args(mut config: Config) -> Result<Config> {
         config.cors = true;
     }
 
-    if cfg!(feature = "symlinks") && is_present_or_env("allow-symlinks", "AUDIOSERVE_ALLOW_SYMLINKS") {
+    if cfg!(feature = "symlinks")
+        && is_present_or_env("allow-symlinks", "AUDIOSERVE_ALLOW_SYMLINKS")
+    {
         config.allow_symlinks = true
     }
     #[cfg(feature = "tls")]
@@ -320,20 +376,20 @@ pub fn parse_args(mut config: Config) -> Result<Config> {
         }
     }
 
-    if cfg!(feature = "search-cache") && is_present_or_env("search-cache", "AUDIOSERVE_SEARCH_CACHE") {
+    if cfg!(feature = "search-cache")
+        && is_present_or_env("search-cache", "AUDIOSERVE_SEARCH_CACHE")
+    {
         config.search_cache = true
     };
 
     #[cfg(feature = "transcoding-cache")]
     {
         if let Some(d) = args.value_of_os("t-cache-dir") {
-            config.transcoding.cache.root_dir=d.into()
+            config.transcoding.cache.root_dir = d.into()
         }
 
         if let Some(n) = args.value_of("t-cache-size") {
-            config
-                .transcoding.cache 
-                .max_size = n.parse().unwrap()
+            config.transcoding.cache.max_size = n.parse().unwrap()
         }
 
         if let Some(n) = args.value_of("t-cache-max-files") {
@@ -348,20 +404,38 @@ pub fn parse_args(mut config: Config) -> Result<Config> {
             config.transcoding.cache.save_often = true;
         }
     };
-    if cfg!(feature = "folder-download") && is_present_or_env("disable-folder-download", "AUDIOSERVE_DISABLE_FOLDER_DOWNLOAD") {
+    if cfg!(feature = "folder-download")
+        && is_present_or_env(
+            "disable-folder-download",
+            "AUDIOSERVE_DISABLE_FOLDER_DOWNLOAD",
+        )
+    {
         config.disable_folder_download = true
     };
 
     if let Some(d) = args.value_of("chapters-from-duration") {
         config.chapters.from_duration = d.parse().unwrap()
     }
-      
+
     if let Some(d) = args.value_of("chapters-duration") {
-           config.chapters.duration = d.parse().unwrap()
+        config.chapters.duration = d.parse().unwrap()
     }
 
     if let Some(positions_file) = args.value_of_os("positions-file") {
         config.positions_file = positions_file.into();
+    }
+
+    if !no_authentication_confirmed && config.shared_secret.is_none() {
+        return arg_error!(
+            "shared-secret",
+            "Shared secret is None, but no authentication is not confirmed"
+        );
+    }
+
+    config.check()?;
+    if args.is_present("print-config") {
+        println!("{}", serde_yaml::to_string(&config).unwrap());
+        std::process::exit(0);
     }
 
     Ok(config)
