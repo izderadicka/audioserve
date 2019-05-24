@@ -415,7 +415,7 @@ pub fn init_default_config() {
             return;
         }
 
-        BASE_DATA_DIR = Some(dirs::home_dir().unwrap_or_default().join(".audioserve"));
+        BASE_DATA_DIR = Some(dirs::home_dir().unwrap_or_default());
     }
     let config = Config::default();
     unsafe {
