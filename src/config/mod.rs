@@ -8,6 +8,7 @@ use std::io::Read;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use crate::util;
 
 pub use self::error::{Error, Result};
 
@@ -62,9 +63,7 @@ impl Default for TranscodingCacheConfig {
 #[cfg(feature = "transcoding-cache")]
 impl TranscodingCacheConfig {
     pub fn check(&self) -> Result<()> {
-        if let Some(true) = self.root_dir.parent().map(Path::is_dir) {
-
-        } else {
+        if ! util::parent_dir_exists(&self.root_dir) {
             return value_error!(
                 "root_dir",
                 "Parent directory does not exists for {:?}",
@@ -307,7 +306,7 @@ impl Config {
     }
 
     pub fn check(&self) -> Result<()> {
-        if self.shared_secret.as_ref().map(String::len).unwrap_or(0) < 3 {
+        if self.shared_secret.as_ref().map(String::len).unwrap_or(std::usize::MAX) < 3 {
             return value_error!("shared_secret", "Shared secret must be at least 3 bytes");
         }
 
@@ -326,9 +325,7 @@ impl Config {
             );
         }
 
-        if let Some(true) = self.secret_file.parent().map(Path::is_dir) {
-
-        } else {
+        if !util::parent_dir_exists(&self.secret_file) {
             return value_error!(
                 "secret_file",
                 "Parent directory for does not exists for {:?}",
@@ -336,9 +333,7 @@ impl Config {
             );
         };
 
-        if let Some(true) = self.positions_file.parent().map(Path::is_dir) {
-
-        } else {
+        if !util::parent_dir_exists(&self.positions_file) {
             return value_error!(
                 "positions_file",
                 "Parent directory for does not exists for {:?}",

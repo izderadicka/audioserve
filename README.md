@@ -42,7 +42,7 @@ Also beware that web client will often load same part of chapter again if you're
 Sharing playback positions between clients
 -----------------------------------------
 
-Recently (from version 0.10) audioserve supports sharing playback positions between clients. This is basically used to continue listening on next client, from where you left on previous one. It's supported in the included web client and in the recent Android client (from version 0.8). In order to enable position sharing you'll need to define 'device group' in the client (on login dialog in web client and in settings in Android client) - group is just an arbitrary name and devices within same group will share playback position. 
+Recently (from version 0.10) audioserve supports sharing playback positions between clients. This is basically used to continue listening on next client, from where you left on previous one. It's supported in the included web client and in the recent Android client (from version 0.8). In order to enable position sharing you'll need to define 'device group' in the client (on login dialog in web client and in settings in Android client) - group is just an arbitrary name and devices within same group will share playback position.
 
 After you have several active devices with same group name, you'll be notified when you click play and there is more recent playback position in the group and you can choose if jump to this latest position or continue with current position. There is also option to check latest position directly (in web client it's icon in the folder header, in Android client it's in options menu).
 
@@ -51,7 +51,7 @@ After you have several active devices with same group name, you'll be notified w
 Security
 --------
 
-Audioserve is not writing anything to your media library, so read only access is OK.  The only file where it needs to write is a file were it keeps its secret key for authentication (by default in `~/.audioserve.secret`, but it can be specified by command line argument). And optionaly it writes files to transcoding cache ([see below](#transcoding-cache)).
+Audioserve is not writing anything to your media library, so read only access is OK.  The only file where it needs to write is a file were it keeps its secret key for authentication (by default in `~/.audioserve/audioserve.secret`, but it can be specified by command line argument). And optionaly it writes files to transcoding cache ([see below](#transcoding-cache)) and positions file.
 
 Authentication is done by shared secret phrase (supplied to server on command line - either directly or as a file that contains the phrase, former is covenient, but less secure, because often one can see process arguments for other users), which clients must know.
 Shared secret phrase is never sent in plain (it's sent as salted hash). If correct shared secret hash is provided by client, sever generates a token, using its secret key, which is then used for individual requests authentication.  Token then can be used in cookie or HTTP Authorization header (Bearer method).
@@ -90,32 +90,33 @@ Transcoding
 -----------
 
 Audioserve offers possibility to transcode audio files to opus format (opus codec, ogg or webm container) or few other formats to save bandwidth and volume of transfered data. For transcoding to work `ffmpeg` program must be installed and available on system's PATH.
-Transconding is provided in three variants and client can choose between then (using query parameter `trans` with value l,m or h):
+Transconding is provided in three variants and client can choose between them (using query parameter `trans` with value l,m or h):
 
 * low - (default 32 kbps opus with 12kHz cutoff mono)
 * medium - (default 48 kbps opus with 12kHz cutoff)
 * high - (default 64 kbps opus with 20kHz cutoff)
 
-As already noted audioserve is intended primarily for audiobooks and believe me opus codec is excellent there even in low bitrates. However if you want to change parameters of these three trancodings you can easily do so by providing yaml confing file to argument `--transcoding-config`. Here is sample file:
+As already noted audioserve is intended primarily for audiobooks and believe me opus codec is excellent there even in low bitrates. However if you want to change parameters of these three trancodings you can easily do so by providing yaml confing file to argument `--config`. Here is sample file:
 
 ```yaml
-low:
-  opus-in-ogg:
-    bitrate: 16
-    compression_level: 3
-    cutoff: WideBand
-    mono: true
-medium:
-  opus-in-ogg:
-    bitrate: 24
-    compression_level: 6
-    cutoff: SuperWideBand
-    mono: true
-high:
-  opus-in-ogg:
-    bitrate: 32
-    compression_level: 9
-    cutoff: SuperWideBand
+transcoding:
+    low:
+    opus-in-ogg:
+        bitrate: 16
+        compression_level: 3
+        cutoff: WideBand
+        mono: true
+    medium:
+    opus-in-ogg:
+        bitrate: 24
+        compression_level: 6
+        cutoff: SuperWideBand
+        mono: true
+    high:
+    opus-in-ogg:
+        bitrate: 32
+        compression_level: 9
+        cutoff: SuperWideBand
 ```
 
 In each key first you have specification of codec-container combination, currently it supports `opus-in-ogg`, `opus-in-webm`, `mp3`, `aac-in-adts` (but other containers or codecs can relatively easily be added, provided they are supported by ffmpeg and container creation does not require seekable output - like MP4 container).
@@ -137,8 +138,13 @@ You can overide one two or all three defaults, depending on what sections you ha
 Command line
 ------------
 
-Check with `audioserve -h`. Only two required arguments are shared secrect (or option `--no-authentication` for public access) and root of media library (as noted above you can have severals libraries).
+Audioserve can take parameters from command line, environment variables and config file. For command line arguments check them with `audioserve -h`. Generally you need to provide shared secrect (or option `--no-authentication` for public access) and root of media library (as noted above you can have severals libraries).
+
 `audioserve`  is server executable and it also needs web client files , which are `index.html` and `bundle.js`, which are defaultly in `./client/dist`, but their location can by specified by argument `-c`.
+
+For majority of command line arguments there is also appropriate environment variable, which starts with prefix `AUDIOSERVE_` and then command line argument name (without leading dashes) transcribed from kebab-case to SCREAMING_SNAKE_CASE, so for instance argument `--shared-secret` has coresponding env. variable `AUDIOSERVE_SHARED_SECRET`.
+
+All audioserve parameters can be also provided in configuration file via `--config` argument. Configuration file is in YAML format and somehow coresponds to command line arguments, but not exactly. Easiest way how to create config file is to use argument `--print-config`, which prints current configuration, including all used arguments to standard output.
 
 Android client
 --------------

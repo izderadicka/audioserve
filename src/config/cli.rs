@@ -243,8 +243,16 @@ macro_rules!  arg_error {
 }
 
 pub fn parse_args() -> Result<Config> {
+    parse_args_from(env::args_os())
+}
+
+pub fn parse_args_from<I,T>(args: I) -> Result<Config> 
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<std::ffi::OsString> + Clone
+{
     let p = create_parser();
-    let args = p.get_matches();
+    let args = p.get_matches_from(args);
 
     if let Some(dir) = args.value_of_os("data-dir") {
         unsafe {
@@ -345,7 +353,7 @@ pub fn parse_args() -> Result<Config> {
     }
 
     if let Some(validity) = args.value_of("token-validity-days") {
-        config.token_validity_hours = validity.parse::<u32>().unwrap()
+        config.token_validity_hours = validity.parse::<u32>().unwrap() * 24
     }
 
     if let Some(client_dir) = args.value_of_os("client-dir") {
@@ -439,4 +447,109 @@ pub fn parse_args() -> Result<Config> {
     }
 
     Ok(config)
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_basic_args() {
+        init_default_config();
+        let c = parse_args_from(&["audioserve", "--no-authentication", "test_data"]).unwrap();
+        assert_eq!(1, c.base_dirs.len());
+
+
+        let c = parse_args_from(&["audioserve", 
+        "--listen", "127.0.0.1:4444",
+        "--thread-pool-large",
+        "--thread-pool-keep-alive-secs", "60",
+        "--shared-secret", "usak",
+        "--transcoding-max-parallel-processes", "99",
+        "--transcoding-max-runtime", "99",
+        "--token-validity-days", "99",
+        "--client-dir", "test_data",
+        "--secret-file", "test_data/some_secret",
+        "--chapters-from-duration", "99",
+        "--chapters-duration", "99",
+        "--cors",
+        "test_data", "client"]).unwrap();
+        assert_eq!(2, c.base_dirs.len());
+        assert_eq!("127.0.0.1:4444".parse::<SocketAddr>().unwrap(), c.listen);
+        assert_eq!(16,c.thread_pool.num_threads);
+        assert_eq!(1000, c.thread_pool.queue_size);
+        assert_eq!(Some(Duration::from_secs(60)), c.thread_pool.keep_alive);
+        assert_eq!(Some("usak".into()), c.shared_secret);
+        assert_eq!(99, c.transcoding.max_parallel_processes);
+        assert_eq!(99, c.transcoding.max_runtime_hours);
+        assert_eq!(99*24, c.token_validity_hours);
+        assert_eq!(PathBuf::from("test_data"), c.client_dir);
+        assert_eq!(PathBuf::from("test_data/some_secret"), c.secret_file);
+        assert_eq!(99, c.chapters.from_duration);
+        assert_eq!(99, c.chapters.duration);
+        assert!(c.cors);
+
+    }
+
+    #[test]
+    #[cfg(feature="transcoding-cache")]
+    fn test_t_cache() {
+        init_default_config();
+        let c = parse_args_from(&["audioserve", 
+        "--no-authentication", 
+        "--t-cache-dir", "test_data",
+        "--t-cache-size", "999",
+        "--t-cache-max-files", "999",
+        "--t-cache-disable",
+        "--t-cache-save-often",
+        "test_data"]).unwrap();
+
+        assert_eq!(PathBuf::from("test_data"), c.transcoding.cache.root_dir);
+        assert_eq!(999, c.transcoding.cache.max_size);
+        assert_eq!(999, c.transcoding.cache.max_files);
+        assert!(c.transcoding.cache.disabled);
+        assert!(c.transcoding.cache.save_often);
+    }
+
+    #[test]
+    #[cfg(feature="tls")]
+    fn test_tls() {
+        init_default_config();
+        let c = parse_args_from(&["audioserve", 
+        "--no-authentication", 
+        "--ssl-key", "test_data/desc.txt",
+        "--ssl-key-password", "neco",
+        "test_data"]).unwrap();
+
+        assert!(c.ssl.is_some());
+        let ssl = c.ssl.unwrap();
+        assert_eq!(PathBuf::from("test_data/desc.txt"), ssl.key_file);
+        assert_eq!("neco", ssl.key_password);
+
+    }
+
+    #[test]
+    #[cfg(feature="symlinks")]
+    fn test_symlinks_in_env() {
+        init_default_config();
+        env::set_var("AUDIOSERVE_ALLOW_SYMLINKS", "1");
+        let c = parse_args_from(&["audioserve", 
+        "--no-authentication", 
+        "test_data"]).unwrap();
+
+        assert!(c.allow_symlinks);
+        env::remove_var("AUDIOSERVE_ALLOW_SYMLINKS");
+    }
+
+    #[test]
+    fn test_from_config() {
+        init_default_config();
+        let c = parse_args_from(&["audioserve", 
+        "--config", 
+        "test_data/sample-config.yaml"]).unwrap();
+
+        assert_eq!("neco", c.ssl.unwrap().key_password);
+       
+    }
 }

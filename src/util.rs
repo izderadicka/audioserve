@@ -2,6 +2,7 @@ use headers::{Header, HeaderName, HeaderValue};
 use hyper::http::response::Builder;
 use std::cmp::{max, min};
 use std::ops::{Bound, RangeBounds};
+use std::path::Path;
 
 pub fn os_to_string(s: ::std::ffi::OsString) -> String {
     match s.into_string() {
@@ -10,6 +11,17 @@ pub fn os_to_string(s: ::std::ffi::OsString) -> String {
             warn!("Invalid file name - cannot covert to UTF8 : {:?}", s);
             "INVALID_NAME".into()
         }
+    }
+}
+
+pub fn parent_dir_exists<P:AsRef<Path>>(p:&P) -> bool {
+     match p.as_ref().parent() {
+        Some(parent) => if parent.as_os_str().len() > 0 && ! parent.is_dir() {
+            false
+        } else {
+            true
+        },
+        None => true,
     }
 }
 

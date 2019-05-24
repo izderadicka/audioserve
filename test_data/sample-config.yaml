@@ -3,16 +3,17 @@ listen: "0.0.0.0:3000"
 thread_pool:
   num_threads: 8
   queue_size: 100
-  keep_alive: ~
+  keep_alive:
+    secs: 60
+    nanos: 0
 base_dirs:
-  - /home/ivan/tmp/test_audiobooks/
-  - /home/ivan/tmp/audioserve-demo/test_audiobooks_en/
-shared_secret: usak
+  - test_data
+shared_secret: asecret
 transcoding:
   max_parallel_processes: 8
   max_runtime_hours: 24
   cache:
-    root_dir: /tmp/audioserve-cache
+    root_dir: test_data/audioserve-cache
     max_size: 1024
     max_files: 1024
     disabled: false
@@ -36,14 +37,16 @@ transcoding:
       cutoff: FullBand
       mono: false
 token_validity_hours: 8760
-secret_file: /home/ivan/.audioserve.secret
-client_dir: client/dist
+secret_file: test_data/.audioserve.secret
+client_dir: test_data
 cors: true
-ssl: ~
-allow_symlinks: false
+ssl:
+  key_file: test_data/desc.txt
+  key_password: neco
+allow_symlinks: true
 search_cache: true
 disable_folder_download: false
 chapters:
-  from_duration: 0
+  from_duration: 30
   duration: 30
-positions_file: /home/ivan/.audioserve-positions
+positions_file: test_data/.audioserve-positions

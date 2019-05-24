@@ -1,5 +1,6 @@
 use std::ffi::{OsStr, OsString};
 use std::path::Path;
+use crate::util;
 
 type ValidatorResult = Result<(), String>;
 
@@ -38,8 +39,9 @@ pub fn is_existing_file(p: &OsStr) -> Result<(), OsString> {
 }
 
 pub fn parent_dir_exists(p: &OsStr) -> Result<(), OsString> {
-    match Path::new(p).parent() {
-        Some(p) => is_existing_dir(p.as_ref()),
-        None => Ok(()),
-    }
+   if !util::parent_dir_exists(&p) {
+            Err(format!("parent dir for {:?} does not exists", p).into())
+        } else {
+            Ok(())
+        }
 }
