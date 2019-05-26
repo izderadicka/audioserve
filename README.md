@@ -53,14 +53,14 @@ Security
 
 Audioserve is not writing anything to your media library, so read only access is OK.  The only file where it needs to write is a file were it keeps its secret key for authentication (by default in `~/.audioserve/audioserve.secret`, but it can be specified by command line argument). And optionaly it writes files to transcoding cache ([see below](#transcoding-cache)) and positions file.
 
-Authentication is done by shared secret phrase (supplied to server on command line - either directly or as a file that contains the phrase, former is covenient, but less secure, because often one can see process arguments for other users), which clients must know.
+Authentication is done by shared secret phrase (supplied to server on command line or more securely via environment variable), which clients must know.
 Shared secret phrase is never sent in plain (it's sent as salted hash). If correct shared secret hash is provided by client, sever generates a token, using its secret key, which is then used for individual requests authentication.  Token then can be used in cookie or HTTP Authorization header (Bearer method).
 Token validity period is one year by default, but can be set with command line argument, but system generally expects token validity to be at least 10 days.
 As the token can be used to steal the session, https is recommended (TLS support is build in).
 
 ### TLS/SSL
 
-Audioserve supports TLS/SSL - to enable it you need to provide your private server key as PKCS#12 file (in `--ssl-key` argument). Here is quick tip how to create private key with self-signed certificate:
+Audioserve supports TLS/SSL - to enable it you need to provide your private server key as PKCS#12 file (in `--ssl-key` argument). Here is quick tip how to create private key with self-signed certificate (for testing purposed only):
 
     openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out certificate.pem \
         -subj "/C=CZ/ST=Prague/L=Prague/O=Ivan/CN=audioserve"
@@ -164,35 +164,35 @@ Installation
 
 Easiest way how to test audioserve is to run it as docker container with prebuild [Docker image](https://cloud.docker.com/u/izderadicka/repository/docker/izderadicka/audioserve) (from Docker Hub):
 
-    docker run -d --init --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve  
+    docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve  
 
-Then open <http://localhost:3000> - and browse your collection.  This is indeed the very minimal configuration of audioserve. For real deployment you'd like provide provide more parameters - see more complex example below.
+Then open <http://localhost:3000> - and browse your collection.  This is indeed the very minimal configuration of audioserve. For real deployment you'd like provide provide more parameters (or environment variables or your custom config file) - see more complex example below.
 
 Of course you can build your own image very easily with provided `Dockerfile`, just run:
 
     docker build --tag audioserve .
 
-Currently size of Docker image is rather big (~200MB) - it's due to fact that it contains basic Debian files (and around 60MB is static ffmpeg executable). For space saving use locally in Linux (see below instructions for how to compile). We are also looking at possibility of completely static build of audioserve (check on github).
+When building docker image you can use `--build-arg CARGO_ARGS=` to modify cargo build command and to add/or remove features (see below for details). For instance this command will build audioserve with transcoding cache `docker build --tag audioserve --build-arg CARGO_ARGS="--features transcoding-cache" .`
 
-When building docker image you can use `--build-arg FEATURES=` to modify cargo build command and to add/or remove features (see below for details). For instance this command will build audioserve with all available features `docker build --tag audioserve --build-arg FEATURES=--all-features .`
-
-The following environment variable can be used to customise how audioserve runs:
-    PORT - TCP port on which audioserve serves http(s) requests (defaults to: 3000) - this is useful for services like Heroku, where container must accept PORT variable from the service
+There is also one additional env. variable `PORT` - TCP port on which audioserve serves http(s) requests (defaults to: 3000) - this is useful for services like Heroku, where container must accept PORT variable from the service.
 
 A more detailed example (audioserve is an entry point to this container, so you can use all command line arguments of the program):
 
-    docker run -d --init --name audioserve -p 3000:3000 \
+    docker run -d --name audioserve -p 3000:3000 \
         -v /path/to/your/audiobooks1:/collection1 \
         -v /path/to/your/audiobooks2:/collection2 \
+        -v /path/for/audioserve-data:/home/audioserve/.audioserve \
+        -e AUDIOSERVE_SHARED_SECRET=mypass \
         audioserve \
-        -s mypass \
         --ssl-key /audioserve/ssl/audioserve.p12 --ssl-key-password mypass \
         --search-cache \
         /collection1 /collection2
 
 In the above example, we are adding two different collections of audiobooks (collection1 and collection2).
 Both are made available to the container via `-v` option and then passed to audioserve on command line.
-We set the shared secret via `-s` argument and specify use of TLS via `--ssl-key` and `ssl-key-password` (the test key is already prebundled in the image). We also enable search cache with `--search-cache` argument.
+Also we have maped with `-v` some folder to `/home/audioserve/.audioserve`, where runtime data of audioserve are stored (server secret, caches ...)
+
+We set the shared secret via `AUDIOSERVE_SHARED_SECRET` env.variable and specify use of TLS via `--ssl-key` and `ssl-key-password` (the tests only self-signed key is already prebundled in the image, for real use you'll need to generate your own key, or use reverse proxy that terminates TLS). We also enable search cache with `--search-cache` argument.
 
 ### Static build (Linux)
 

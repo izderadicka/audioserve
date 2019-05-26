@@ -56,7 +56,6 @@ where
         Err(r) => r,
         Ok((r, ws_future)) => {
             let ws_process = ws_future
-                .map_err(|err| error!("Cannot create websocket: {} ", err))
                 .and_then(move |ws| {
                     let (tx, rc) = ws.split();
                     rc.and_then(move |m| match m.inner {
@@ -91,7 +90,7 @@ pub fn upgrade_connection<T: Default>(
 ) -> Result<
     (
         Response<Body>,
-        impl Future<Item = WebSocket<T>, Error = hyper::Error> + Send,
+        impl Future<Item = WebSocket<T>, Error = ()> + Send,
     ),
     Response<Body>,
 > {
@@ -136,7 +135,9 @@ pub fn upgrade_connection<T: Default>(
     h.typed_insert(headers::Upgrade::websocket());
     h.typed_insert(headers::SecWebsocketAccept::from(key.unwrap()));
     h.typed_insert(headers::Connection::upgrade());
-    let upgraded = req.into_body().on_upgrade().map(|upgraded| {
+    let upgraded = req.into_body().on_upgrade()
+    .map_err(|err| error!("Cannot create websocket: {} ", err))
+    .map(|upgraded| {
         debug!("Connection upgraded to websocket");
         WebSocket::new(upgraded)
     });

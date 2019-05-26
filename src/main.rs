@@ -10,6 +10,8 @@ extern crate lazy_static;
 use config::{get_config, init_config};
 use hyper::rt::Future;
 use hyper::Server as HttpServer;
+use futures::Stream;
+use hyper::server::conn::AddrIncoming;
 use ring::rand::{SecureRandom, SystemRandom};
 use services::auth::SharedSecretAuthenticator;
 use services::search::Search;
@@ -59,7 +61,22 @@ fn gen_my_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error> {
         let rng = SystemRandom::new();
         rng.fill(&mut random)
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-        let mut f = File::create(file)?;
+        let mut f;
+        #[cfg(unix)]
+        {
+            use std::fs::OpenOptions;
+            use std::os::unix::fs::OpenOptionsExt;
+            f = OpenOptions::new()
+                .mode(0o600)
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(file)?
+        }
+        #[cfg(not(unix))]
+        {
+            f = File::create(file)?
+        }
         f.write_all(&random)?;
         Ok(random.iter().cloned().collect())
     }
@@ -83,25 +100,24 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
             max_transcodings: cfg.transcoding.max_parallel_processes,
         },
     };
+    let addr = cfg.listen;
+    let incomming_connections = AddrIncoming::bind(&addr)?;
+    
 
-    let server: Box<Future<Item = (), Error = ()> + Send> = match get_config().ssl.as_ref() {
+    let server: Box<dyn Future<Item=(), Error=hyper::Error> +Send> = match get_config().ssl.as_ref() {
         None => {
-            let server = HttpServer::bind(&get_config().listen)
-                .serve(move || {
+            let server = HttpServer::builder(incomming_connections)
+            .serve(move || {
                     let s: Result<_, error::Error> = Ok(svc.clone());
                     s
-                })
-                .map_err(|e| error!("Cannot start HTTP server due to error {}", e));
-            info!("Server listening on {}", &get_config().listen);
+                });
+            info!("Server listening on {}", &addr);
             Box::new(server)
+            
         }
         Some(ssl) => {
             #[cfg(feature = "tls")]
             {
-                use futures::Stream;
-                use hyper::server::conn::Http;
-                use tokio::net::TcpListener;
-
                 let private_key = match load_private_key(&ssl.key_file, &ssl.key_password) {
                     Ok(s) => s,
                     Err(e) => {
@@ -112,40 +128,31 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
                 let tls_cx = native_tls::TlsAcceptor::builder(private_key).build()?;
                 let tls_cx = tokio_tls::TlsAcceptor::from(tls_cx);
 
-                let addr = cfg.listen;
-                let srv = TcpListener::bind(&addr)?;
-                let http_proto = Http::new();
-                let http_server = http_proto
-                    .serve_incoming(
-                        srv.incoming().and_then(move |socket| {
+                let incoming = incomming_connections
+                .and_then(move |socket| {
                             tls_cx
                                 .accept(socket)
                                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
-                        }),
-                        move || {
-                            let s: Result<_, error::Error> = Ok(svc.clone());
-                            s
-                        },
-                    )
+                        })
+                    // we need to skip TLS errors, so we can accept next connection, otherwise
+                    // stream will end and server will stop listening
                     .then(|res| match res {
-                        Ok(conn) => Ok(Some(conn)),
+                        Ok(conn) => Ok::<_, io::Error>(Some(conn)),
                         Err(e) => {
                             error!("TLS error: {}", e);
                             Ok(None)
                         }
                     })
-                    .for_each(|conn_opt| {
-                        if let Some(conn) = conn_opt {
-                            tokio::spawn(
-                                conn.and_then(|c| c.map_err(error::Error::new_with_cause))
-                                    .map_err(|e| error!("Connection error {}", e)),
-                            );
-                        }
+                    .filter_map(|x| x);
 
-                        Ok(())
+                    let server = HttpServer::builder(incoming).serve(move || {
+                    let s: Result<_, error::Error> = Ok(svc.clone());
+                    s
                     });
-                info!("Server Listening on {} with TLS", addr);
-                Box::new(http_server)
+                    info!("Server Listening on {} with TLS", &addr);
+                    Box::new(server)
+                    
+                
             }
 
             #[cfg(not(feature = "tls"))]
@@ -157,6 +164,9 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
             }
         }
     };
+
+    let server = server
+                .map_err(|e| error!("Cannot start HTTP server due to error {}", e));
 
     let mut rt = tokio::runtime::Builder::new()
         .blocking_threads(cfg.thread_pool.queue_size as usize)
