@@ -19,7 +19,6 @@ use hyper::{Body, Response as HyperResponse, StatusCode};
 use mime;
 use mime_guess::guess_mime_type;
 use serde_json;
-use std::borrow;
 use std::collections::Bound;
 use std::ffi::OsStr;
 use std::io::{self, SeekFrom};
@@ -401,7 +400,7 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
                 let mut download_name = folder_path
                     .file_name()
                     .and_then(OsStr::to_str)
-                    .map(borrow::ToOwned::to_owned)
+                    .map(std::borrow::ToOwned::to_owned)
                     .unwrap_or_else(|| "audio".into());
                 download_name.push_str(".tar");
                 let f = poll_fn(move || blocking(|| list_dir_files_only(&base_path, &folder_path)))

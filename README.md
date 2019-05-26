@@ -245,6 +245,7 @@ Feature | Description | Default | Program options
 | symlinks | Enables to use symbolic links in media folders | Yes | Use --allow-symlinks to follow symbolic links
 | search-cache | Caches structure of media directories for fast search | Yes | Use --search-cache to enable this cache
 | folder-download | Enables API endpoint to download content of a folder in tar archive | Yes | Can be disabled with argument --disable-folder-download
+| shared-positions | Clients can share recent playback positions via simple websocket API | Yes |
 | transcoding-cache | Cache to save transcoded files for fast next use | No | Can be disabled by --t-cache-disable and modified by --t-cache-dir --t-cache-size --t-cache-max-files
 | static | Enables fully static build of audioserve. Check above notes for static build | No |
 | partially-static | Statically links libavformat (and related).Enables to run audioserve on systems, which do not have required version of libavformat| No |

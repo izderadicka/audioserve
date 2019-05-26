@@ -1,5 +1,6 @@
 use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
 
+use crate::util;
 use num_cpus;
 use serde_yaml;
 use std::env;
@@ -8,7 +9,6 @@ use std::io::Read;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use crate::util;
 
 pub use self::error::{Error, Result};
 
@@ -63,7 +63,7 @@ impl Default for TranscodingCacheConfig {
 #[cfg(feature = "transcoding-cache")]
 impl TranscodingCacheConfig {
     pub fn check(&self) -> Result<()> {
-        if ! util::parent_dir_exists(&self.root_dir) {
+        if !util::parent_dir_exists(&self.root_dir) {
             return value_error!(
                 "root_dir",
                 "Parent directory does not exists for {:?}",
@@ -306,7 +306,13 @@ impl Config {
     }
 
     pub fn check(&self) -> Result<()> {
-        if self.shared_secret.as_ref().map(String::len).unwrap_or(std::usize::MAX) < 3 {
+        if self
+            .shared_secret
+            .as_ref()
+            .map(String::len)
+            .unwrap_or(std::usize::MAX)
+            < 3
+        {
             return value_error!("shared_secret", "Shared secret must be at least 3 bytes");
         }
 
@@ -349,7 +355,7 @@ impl Config {
         self.thread_pool.check()?;
         self.chapters.check()?;
 
-        if self.base_dirs.len() == 0 {
+        if self.base_dirs.is_empty() {
             return value_error!(
                 "base_dirs",
                 "At least one directory with audio files must be provided"

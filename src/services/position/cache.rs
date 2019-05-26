@@ -134,7 +134,7 @@ impl CacheInner {
             let table = self
                 .table
                 .entry(group.into())
-                .or_insert_with(|| LinkedHashMap::new());
+                .or_insert_with(LinkedHashMap::new);
             table.insert(folder_path, rec);
             if table.len() > self.max_size {
                 table.pop_front();

@@ -14,13 +14,9 @@ pub fn os_to_string(s: ::std::ffi::OsString) -> String {
     }
 }
 
-pub fn parent_dir_exists<P:AsRef<Path>>(p:&P) -> bool {
-     match p.as_ref().parent() {
-        Some(parent) => if parent.as_os_str().len() > 0 && ! parent.is_dir() {
-            false
-        } else {
-            true
-        },
+pub fn parent_dir_exists<P: AsRef<Path>>(p: &P) -> bool {
+    match p.as_ref().parent() {
+        Some(parent) => !(!parent.as_os_str().is_empty() && !parent.is_dir()),
         None => true,
     }
 }

@@ -9,9 +9,8 @@ extern crate lazy_static;
 
 use config::{get_config, init_config};
 use hyper::rt::Future;
-use hyper::Server as HttpServer;
-use futures::Stream;
 use hyper::server::conn::AddrIncoming;
+use hyper::Server as HttpServer;
 use ring::rand::{SecureRandom, SystemRandom};
 use services::auth::SharedSecretAuthenticator;
 use services::search::Search;
@@ -32,7 +31,7 @@ mod services;
 mod util;
 
 #[cfg(feature = "tls")]
-fn load_private_key<P>(file: P, pass: &String) -> Result<Identity, io::Error>
+fn load_private_key<P>(file: P, pass: &str) -> Result<Identity, io::Error>
 where
     P: AsRef<Path>,
 {
@@ -102,71 +101,67 @@ fn start_server(my_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Box<std::
     };
     let addr = cfg.listen;
     let incomming_connections = AddrIncoming::bind(&addr)?;
-    
 
-    let server: Box<dyn Future<Item=(), Error=hyper::Error> +Send> = match get_config().ssl.as_ref() {
-        None => {
-            let server = HttpServer::builder(incomming_connections)
-            .serve(move || {
+    let server: Box<dyn Future<Item = (), Error = hyper::Error> + Send> =
+        match get_config().ssl.as_ref() {
+            None => {
+                let server = HttpServer::builder(incomming_connections).serve(move || {
                     let s: Result<_, error::Error> = Ok(svc.clone());
                     s
                 });
-            info!("Server listening on {}", &addr);
-            Box::new(server)
-            
-        }
-        Some(ssl) => {
-            #[cfg(feature = "tls")]
-            {
-                let private_key = match load_private_key(&ssl.key_file, &ssl.key_password) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        error!("Error loading SSL/TLS private key: {}", e);
-                        return Err(Box::new(e));
-                    }
-                };
-                let tls_cx = native_tls::TlsAcceptor::builder(private_key).build()?;
-                let tls_cx = tokio_tls::TlsAcceptor::from(tls_cx);
+                info!("Server listening on {}", &addr);
+                Box::new(server)
+            }
+            Some(ssl) => {
+                #[cfg(feature = "tls")]
+                {
+                    use futures::Stream;
+                    let private_key = match load_private_key(&ssl.key_file, &ssl.key_password) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            error!("Error loading SSL/TLS private key: {}", e);
+                            return Err(Box::new(e));
+                        }
+                    };
+                    let tls_cx = native_tls::TlsAcceptor::builder(private_key).build()?;
+                    let tls_cx = tokio_tls::TlsAcceptor::from(tls_cx);
 
-                let incoming = incomming_connections
-                .and_then(move |socket| {
+                    let incoming = incomming_connections
+                        .and_then(move |socket| {
                             tls_cx
                                 .accept(socket)
                                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
                         })
-                    // we need to skip TLS errors, so we can accept next connection, otherwise
-                    // stream will end and server will stop listening
-                    .then(|res| match res {
-                        Ok(conn) => Ok::<_, io::Error>(Some(conn)),
-                        Err(e) => {
-                            error!("TLS error: {}", e);
-                            Ok(None)
-                        }
-                    })
-                    .filter_map(|x| x);
+                        // we need to skip TLS errors, so we can accept next connection, otherwise
+                        // stream will end and server will stop listening
+                        .then(|res| match res {
+                            Ok(conn) => Ok::<_, io::Error>(Some(conn)),
+                            Err(e) => {
+                                error!("TLS error: {}", e);
+                                Ok(None)
+                            }
+                        })
+                        .filter_map(|x| x);
 
                     let server = HttpServer::builder(incoming).serve(move || {
-                    let s: Result<_, error::Error> = Ok(svc.clone());
-                    s
+                        let s: Result<_, error::Error> = Ok(svc.clone());
+                        s
                     });
                     info!("Server Listening on {} with TLS", &addr);
                     Box::new(server)
-                    
-                
-            }
+                }
 
-            #[cfg(not(feature = "tls"))]
-            {
-                panic!(
-                    "TLS is not compiled - build with default features {:?}",
-                    ssl
-                )
+                #[cfg(not(feature = "tls"))]
+                {
+                    panic!(
+                        "TLS is not compiled - build with default features {:?}",
+                        ssl
+                    )
+                }
             }
-        }
-    };
+        };
 
-    let server = server
-                .map_err(|e| error!("Cannot start HTTP server due to error {}", e));
+    let server = server.map_err(|e| error!("Cannot start HTTP server due to error {}", e));
 
     let mut rt = tokio::runtime::Builder::new()
         .blocking_threads(cfg.thread_pool.queue_size as usize)
@@ -250,7 +245,7 @@ fn main() {
                 error!("Error saving transcoding cache index {}", e);
             }
         }
-
+        #[cfg(feature = "shared-positions")]
         crate::services::position::save_positions();
     }
 

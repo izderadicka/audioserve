@@ -1,5 +1,4 @@
 use self::auth::Authenticator;
-use self::position::position_service;
 use self::search::Search;
 use self::subs::{
     collections_list, download_folder, get_folder, recent, search, send_file, send_file_simple,
@@ -26,6 +25,7 @@ use url::form_urlencoded;
 pub mod audio_folder;
 pub mod audio_meta;
 pub mod auth;
+#[cfg(feature = "shared-positions")]
 pub mod position;
 pub mod search;
 mod subs;
@@ -143,8 +143,11 @@ impl<C> FileSendService<C> {
                     collections_list()
                 } else if path.starts_with("/transcodings") {
                     transcodings_list()
-                } else if path.starts_with("/position") {
-                    position_service(req)
+                } else if cfg!(feature = "shared-positions") && path.starts_with("/position") {
+                    #[cfg(not(feature = "shared-positions"))]
+                    unimplemented!();
+                    #[cfg(feature = "shared-positions")]
+                    self::position::position_service(req)
                 } else {
                     // TODO -  select correct base dir
                     let mut colllection_index = 0;

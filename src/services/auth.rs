@@ -172,7 +172,7 @@ impl Token {
         let rng = SystemRandom::new();
         rng.fill(&mut random)
             .expect("Cannot generate random number");
-        let validity: u64 = now() + (token_validity_hours as u64) * 3600;
+        let validity: u64 = now() + u64::from(token_validity_hours) * 3600;
         let validity: [u8; 8] = unsafe { ::std::mem::transmute(validity.to_be()) };
         let to_sign = prepare_data(&random, validity);
         let key = hmac::SigningKey::new(&SHA256, secret);
