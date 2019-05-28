@@ -265,7 +265,7 @@ where
     {
         let d = base_data_dir();
         if !d.is_dir() {
-            std::fs::create_dir(d).or_else(|e| {
+            std::fs::create_dir(&d).or_else(|e| {
                 arg_error!(
                     "data-dir",
                     "Audioserve data directory {:?} cannot be created due to error {}",
@@ -456,7 +456,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-
+    use crate::config::init::init_default_config;
     #[test]
     fn test_basic_args() {
         init_default_config();

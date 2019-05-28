@@ -451,7 +451,7 @@ pub fn get_real_file_type<P: AsRef<Path>>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::init_default_config;
+    use crate::config::init::init_default_config;
     use serde_json;
 
     #[test]
@@ -518,7 +518,7 @@ mod tests {
 
     #[test]
     fn test_chapters_file() {
-        pretty_env_logger::init();
+        //pretty_env_logger::init();
         let path = Path::new("./test_data/01-file.mp3");
         let chapters = chapters_from_csv(path).unwrap().unwrap();
         assert_eq!(3, chapters.len());

@@ -413,26 +413,39 @@ pub fn init_config() -> Result<()> {
     Ok(())
 }
 
-//this default config is used only for testing
-#[allow(dead_code)]
-pub fn init_default_config() {
-    unsafe {
-        if CONFIG.is_some() {
-            return;
-        }
+#[cfg(test)]
+pub mod init {
+    /// Static config initialization for tests
+    /// as tests are run concurrently it requires also some synchronication
+    use super::{BASE_DATA_DIR, CONFIG, Config};
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+    lazy_static!{
+    static ref GUARD:Mutex<bool> = Mutex::new(false); 
+    }
+    /// this default config is used only for testing
+    pub fn init_default_config() {
+        let mut l = GUARD.lock().unwrap();
+            unsafe {
+                if BASE_DATA_DIR.is_some() { return }
+                let base_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                BASE_DATA_DIR = Some(base_dir);
+            }
+            
+            let config = Config::default();
+            unsafe {
+                CONFIG = Some(config);
+            }
+            *l = true
+    }
 
-        BASE_DATA_DIR = Some(dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")));
-    }
-    let config = Config::default();
-    unsafe {
-        CONFIG = Some(config);
-    }
 }
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use crate::config::init::init_default_config;
     #[test]
     fn test_default_serialize() {
         init_default_config();

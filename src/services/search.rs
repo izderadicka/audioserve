@@ -298,7 +298,7 @@ mod cache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::init_default_config;
+    use crate::config::init::init_default_config;
 
     const TEST_DATA_DIR: &str = "./test_data";
 
