@@ -27,7 +27,7 @@ matrix:
       - npm install
       - npm run build
     - language: minimal
-      if: branch=master && tag IS present
+      if: tag IS present
       services:
         - docker
       deploy:
@@ -35,7 +35,7 @@ matrix:
           script: 
             - bash docker_push.sh
     - language: minimal
-      if: branch=master && tag IS present
+      if: tag IS present
       services:
         - docker
       script: 
