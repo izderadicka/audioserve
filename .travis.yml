@@ -28,6 +28,8 @@ matrix:
       - npm run build
     - language: minimal
       if: tag IS present
+      install: true
+      script: true
       services:
         - docker
       deploy:
@@ -36,10 +38,11 @@ matrix:
             - bash docker_push.sh
     - language: minimal
       if: tag IS present
+      install: true
       services:
         - docker
       script: 
-        - build_static.sh
+        - ./build_static.sh
       deploy:
         - provider: releases
           api_key:
