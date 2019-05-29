@@ -1,6 +1,4 @@
 language: rust
-services:
-  - docker
 rust:
   - stable
   - beta
@@ -28,26 +26,29 @@ matrix:
       - cd client
       - npm install
       - npm run build
-
-before_deploy:
-      - if [[ ! -d _static_build ]]; then bash build_static.sh; fi
-
-deploy:
-  - provider: script
-    script: 
-      - bash docker_push.sh
-    on:
-      branch: master
-      tags: true
-      rust: stable
-  - provider: releases
-    api_key:
-      secure: NlP+bkwDihtgjWUG0GYT2Ywebon6X1uA6T1ddY/JhmkQ8uoF7+XXQ23jIsu1MOCXHMhzyRlZ2HO5AetNkc6tlBa5qUF3eQNkpYz0CuxQnhjGVqt4UrUBNweqKomavcYxumeiXYtVazpCoSLcRlLAgzaCf1H4KVZSIJTvEIeo1D4+zrFbsG4Fr46M9IRsaQkaVrkYijeaYw3qd5Q1KhdCyeIv5sqQEo7UCDdM+aLryaq7K0FhTAeM84PmYQCYLxWx2zEQ4vl4uHeWkWLeA3kHss/dmhdnZhTVThGLVjtPfzyFIcssy9Buf5B635o05hl2OaETi7AJoG8izD/+gNsd451asTGvuYgn30uKIzy7zrVHXM1D67+rTZoAM48aqC4g99QwIrkiNITI8qlwp7OTjnsgWvyZZgMqGVfdFVvYDAmPggRDrjBFIbApXYDJ6koJvxGb4Vb4qcObNRgxhGeIT78CrX4fsfAoQWHRCj592V3U4hU6xnbRBrf2brfbA+nLKAjJ5cXYQLDciB8EeA7GmSvASJLPBwtsDWiq3IsJQK8RAUiaWoE934YphwPY/WUk0oVRCOgBuh/4YyjGyxUQtknKhXj6+G9D1Tja1z/fiGHnrx32C+CxXAxnZ94LS1AWDX+KE/D3mw4fHbWJVF4jtVxNdskxs6BZMtcxAVDYweY=
-    file: _static_build/audioserve_static.tar.gz
-    skip_cleanup: true
-    on:
-      branch: master
-      tags: true
-      rust: stable
+    - language: minimal
+      if:
+        branch: master
+        tags: true
+      services:
+        - docker
+      deploy:
+        - provider: script
+          script: 
+            - bash docker_push.sh
+    - language: minimal
+      if:
+        branch: master
+        tags: true
+      services:
+        - docker
+      script: 
+        - build_static.sh
+      deploy:
+        - provider: releases
+          api_key:
+            secure: NlP+bkwDihtgjWUG0GYT2Ywebon6X1uA6T1ddY/JhmkQ8uoF7+XXQ23jIsu1MOCXHMhzyRlZ2HO5AetNkc6tlBa5qUF3eQNkpYz0CuxQnhjGVqt4UrUBNweqKomavcYxumeiXYtVazpCoSLcRlLAgzaCf1H4KVZSIJTvEIeo1D4+zrFbsG4Fr46M9IRsaQkaVrkYijeaYw3qd5Q1KhdCyeIv5sqQEo7UCDdM+aLryaq7K0FhTAeM84PmYQCYLxWx2zEQ4vl4uHeWkWLeA3kHss/dmhdnZhTVThGLVjtPfzyFIcssy9Buf5B635o05hl2OaETi7AJoG8izD/+gNsd451asTGvuYgn30uKIzy7zrVHXM1D67+rTZoAM48aqC4g99QwIrkiNITI8qlwp7OTjnsgWvyZZgMqGVfdFVvYDAmPggRDrjBFIbApXYDJ6koJvxGb4Vb4qcObNRgxhGeIT78CrX4fsfAoQWHRCj592V3U4hU6xnbRBrf2brfbA+nLKAjJ5cXYQLDciB8EeA7GmSvASJLPBwtsDWiq3IsJQK8RAUiaWoE934YphwPY/WUk0oVRCOgBuh/4YyjGyxUQtknKhXj6+G9D1Tja1z/fiGHnrx32C+CxXAxnZ94LS1AWDX+KE/D3mw4fHbWJVF4jtVxNdskxs6BZMtcxAVDYweY=
+          file: _static_build/audioserve_static.tar.gz
+          skip_cleanup: true
 
 
