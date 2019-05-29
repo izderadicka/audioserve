@@ -28,7 +28,7 @@ matrix:
       - npm run build
     - language: minimal
       if: tag IS present
-      install: true
+      before_install: true
       script: true
       services:
         - docker
@@ -38,7 +38,7 @@ matrix:
             - bash docker_push.sh
     - language: minimal
       if: tag IS present
-      install: true
+      before_install: true
       services:
         - docker
       script: 
