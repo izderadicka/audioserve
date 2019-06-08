@@ -413,7 +413,7 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
                             }
                             debug!("Total len of folder is {}", total_len);
                             let files = folder.into_iter().map(|i| i.0);
-                            let tar_stream = async_tar::TarStream::tar_iter_rel(files, base_path);
+                            let tar_stream = async_tar::TarStream::tar_iter(files);
                             let mut resp = HyperResponse::builder();
                             resp.typed_header(ContentType::from(
                                 "application/x-tar".parse::<mime::Mime>().unwrap(),
