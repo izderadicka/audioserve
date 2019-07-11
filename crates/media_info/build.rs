@@ -2,16 +2,14 @@
 
 fn main() {
 
-    use std::env;
-    let out_dir = env::var("OUT_DIR").unwrap();
-    //eprintln!("Outdir {}", out_dir);
-
     #[cfg(any(feature="static", feature="partially-static"))]
     {
 
+        use std::env;
         use std::process;
         use std::path;
         
+        let out_dir = env::var("OUT_DIR").unwrap();
         let ffmpeg_dir = path::Path::new(&out_dir).join("ffmpeg-4.1");
         if ! ffmpeg_dir.exists() {
             use std::fs::File;

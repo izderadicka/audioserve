@@ -48,10 +48,3 @@ ENV PORT=3000
 EXPOSE ${PORT}
 
 ENTRYPOINT [ "./audioserve" ] 
-CMD [ "--no-authentication", "/audiobooks" ]
-
-
-
-
-
-

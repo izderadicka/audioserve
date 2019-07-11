@@ -149,7 +149,6 @@ impl<C> FileSendService<C> {
                     #[cfg(feature = "shared-positions")]
                     self::position::position_service(req)
                 } else {
-                    // TODO -  select correct base dir
                     let mut colllection_index = 0;
                     let mut new_path: Option<String> = None;
 
@@ -157,7 +156,7 @@ impl<C> FileSendService<C> {
                         let matches = COLLECTION_NUMBER_RE.captures(&path);
                         if matches.is_some() {
                             let cnum = matches.unwrap().get(1).unwrap();
-                            // match gives us char position is it's safe to slice
+                            // match gives us char position it's safe to slice
                             new_path = Some((&path[cnum.end()..]).to_string());
                             // and cnum is guarateed to contain digits only
                             let cnum: usize = cnum.as_str().parse().unwrap();

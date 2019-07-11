@@ -164,9 +164,9 @@ Installation
 
 Easiest way how to test audioserve is to run it as docker container with prebuild [Docker image](https://cloud.docker.com/u/izderadicka/repository/docker/izderadicka/audioserve) (from Docker Hub):
 
-    docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve  
+    docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve --no-authentication /audiobooks
 
-Then open <http://localhost:3000> - and browse your collection.  This is indeed the very minimal configuration of audioserve. For real deployment you'd like provide provide more parameters (or environment variables or your custom config file) - see more complex example below.
+Then open <http://localhost:3000> - and browse your collection.  This is indeed the very minimal configuration of audioserve. For real deployment you'd like provide provide more command line parameters (or environment variables or your custom config file) - see more complex example below.
 
 Of course you can build your own image very easily with provided `Dockerfile`, just run:
 
@@ -176,14 +176,14 @@ When building docker image you can use `--build-arg CARGO_ARGS=` to modify cargo
 
 There is also one additional env. variable `PORT` - TCP port on which audioserve serves http(s) requests (defaults to: 3000) - this is useful for services like Heroku, where container must accept PORT variable from the service.
 
-A more detailed example (audioserve is an entry point to this container, so you can use all command line arguments of the program):
+A more detailed example (audioserve is an entry point to this container, so you can use all command line arguments of the program, to get help for the program run this command `docker run -it --rm  izderadicka/audioserve --help`):
 
     docker run -d --name audioserve -p 3000:3000 \
         -v /path/to/your/audiobooks1:/collection1 \
         -v /path/to/your/audiobooks2:/collection2 \
         -v /path/for/audioserve-data:/home/audioserve/.audioserve \
         -e AUDIOSERVE_SHARED_SECRET=mypass \
-        audioserve \
+        izderadicka/audioserve \
         --ssl-key /audioserve/ssl/audioserve.p12 --ssl-key-password mypass \
         --search-cache \
         /collection1 /collection2
@@ -201,7 +201,7 @@ You can also create your own static build with script `build_static.sh` (Docker 
 
 ### Local build (Linux)
 
-Now audioserve depends on ffmpeg's libavformat 4.1 (and it's dependent libavutil and libavcodec), which is a complex beast. If you are building locally you need this dependence (plus couple of others). If you have available right version on your system you can link against it (remember it has to be correct version). Other option is to use feature `partially-static`, which will download right version of ffmpeg, compile it and statically linked it into audioserve (but then it'll be indeed bigger).
+Now audioserve depends on ffmpeg's libavformat 4.1 (and its dependent libavutil and libavcodec libs), which is a complex beast. If you are building locally you need this dependence (plus couple of others). If you have available right version on your system you can dynamically link against it (remember it has to be correct version). Other option is to use feature `partially-static`, which will download right version of ffmpeg, compile it and statically link it into audioserve (but then binary will be indeed bigger).
 
 Install required dependencies (some dependecies are optional, depending on features chosen in build):
 

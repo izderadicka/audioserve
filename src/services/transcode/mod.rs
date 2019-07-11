@@ -469,17 +469,17 @@ impl Transcoder {
                                     }
                                 }
                                 Ok(Either::B((_d, mut child))) => {
-                                    eprintln!(
+                                    error!(
                                         "Transcoding of file {:?} took longer then deadline",
                                         file.as_ref()
                                     );
                                     child.kill().unwrap_or_else(|e| {
-                                        eprintln!("Failed to kill process pid {} error {}", pid, e)
+                                        error!("Failed to kill process pid {} error {}", pid, e)
                                     });
                                     Err(())
                                 }
                                 Err(Either::A((e, _))) => {
-                                    eprintln!(
+                                    error!(
                                         "Error running transcoding process for file {:?} error {}",
                                         file.as_ref(),
                                         e
@@ -487,7 +487,7 @@ impl Transcoder {
                                     Err(())
                                 }
                                 Err(Either::B((e, _))) => {
-                                    eprintln!("Timer error on process pid {} error {}", pid, e);
+                                    error!("Timer error on process pid {} error {}", pid, e);
                                     Err(())
                                 }
                             }
