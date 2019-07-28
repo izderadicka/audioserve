@@ -1,5 +1,5 @@
 FROM alpine:edge AS build
-MAINTAINER Ivan <ivan@zderadicka.eu>
+LABEL maintainer="Ivan <ivan@zderadicka.eu>"
 
 ARG CARGO_ARGS
 
@@ -44,6 +44,7 @@ WORKDIR /audioserve
 USER audioserve
 
 ENV PORT=3000
+ENV RUST_LOG=audioserve=info
 
 EXPOSE ${PORT}
 
