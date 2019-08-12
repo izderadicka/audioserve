@@ -146,11 +146,20 @@ For majority of command line arguments there is also appropriate environment var
 
 All audioserve parameters can be also provided in configuration file via `--config` argument. Configuration file is in YAML format and somehow coresponds to command line arguments, but not exactly. Easiest way how to create config file is to use argument `--print-config`, which prints current configuration, including all used arguments to standard output.
 
+Web client
+----------
+
+Web client is bundled with server. It provides simple interface (using bootstrap 4 CSS framework). Web client will remember your last playback position in a folder, so you can easily continue listening, even after page reload. Otherwise it's rather minimalistic (following KISS principle).
+
+It's tested on Firefox and Chrome (on Linux and Android, should work on Windows, on OSX too on these browsers).
+On iOS default transcoding (opus+ogg) is not working - so switch transconding off or try custom transcoding profile.
+
+Web client is not working on MS Edge(this might be fixed in future) and IE (which will never be supported).
+
 Android client
 --------------
 
-Android client code is [available on github](https://github.com/izderadicka/audioserve-android)
-Client is in beta stage (I'm using it now to listen to my audiobooks for more then half year).
+Android client code is [available on github](https://github.com/izderadicka/audioserve-android).
 
 API
 ---
