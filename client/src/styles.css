@@ -218,6 +218,10 @@ span.subtitle {
     font-style: italic;
 }
 
+#menu-btn {
+    cursor: pointer;
+}
+
 @media (max-width: 1024px) {
     h1.top-header {
         font-size: 1.6rem;
