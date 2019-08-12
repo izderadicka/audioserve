@@ -149,7 +149,8 @@ All audioserve parameters can be also provided in configuration file via `--conf
 Web client
 ----------
 
-Web client is bundled with server. It provides simple interface (using bootstrap 4 CSS framework). Web client will remember your last playback position in a folder, so you can easily continue listening, even after page reload. Otherwise it's rather minimalistic (following KISS principle).
+Web client is bundled with server. It provides simple interface (using bootstrap 4 CSS framework and JQuery JS library). Web client will remember your last playback position in a folder, so you can easily continue listening, even after page reload. Use three vertical dots in top right corner to choose required transcoding and subfolder items ordering.
+Otherwise it's rather minimalistic (following KISS principle).
 
 It's tested on Firefox and Chrome (on Linux and Android, should work on Windows, on OSX too on these browsers).
 On iOS default transcoding (opus+ogg) is not working - so switch transconding off or try custom transcoding profile.
