@@ -216,7 +216,7 @@ Now audioserve depends on ffmpeg's libavformat 4.1 (and its dependent libavutil 
 Install required dependencies (some dependecies are optional, depending on features chosen in build):
 
     # Ubuntu - for other distros look for equivalent packages
-    sudo apt-get install -y  openssl libssl-dev \
+    sudo apt-get install -y  openssl libssl-dev pkg-config\
         ffmpeg yasm build-essential wget libbz2-dev zlib1g-dev libavformat-dev
 
 Clone repo with:
@@ -225,13 +225,11 @@ Clone repo with:
 
 To install locally you need recent [Rust](https://www.rust-lang.org/en-US/install.html) and [NodeJS](https://nodejs.org/en/download/package-manager/) installed.  
 
-CompileRust code (it has optional system dependencies to openssl,zlib, bz2lib). Optionaly you can compile with/without features (see below for details).
-
-    cargo build --release
-
-or if do not have correct version of libavformat around:
+Compile Rust code (it has optional system dependencies to openssl,zlib, bz2lib, and  libavformat, as you'll not have exact correct version of libavformat around, it's better to build required version statically into binary with `partially-static` feature, beacause otherwise you might see problems like segfaults):
 
     cargo build --release --features partially-static
+
+Optionaly you can compile with/without other features (see below for details).
 
 Build client in its directory (`cd client`):
 
