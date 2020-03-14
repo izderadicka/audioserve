@@ -5,10 +5,10 @@ if [[ -n "$1" ]]; then
 fi
 
 set -e
-wget https://www.ffmpeg.org/releases/ffmpeg-4.1.tar.xz
-tar xvf ffmpeg-4.1.tar.xz 
-rm ffmpeg-4.1.tar.xz
-cd ffmpeg-4.1/
+wget https://www.ffmpeg.org/releases/ffmpeg-4.1.5.tar.xz
+tar xvf ffmpeg-4.1.5.tar.xz 
+rm ffmpeg-4.1.5.tar.xz
+cd ffmpeg-4.1.5/
 ./configure \
  --disable-programs \
  --disable-swresample \

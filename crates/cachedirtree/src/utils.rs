@@ -1,6 +1,27 @@
-use std::sync::{Arc, Condvar, Mutex};
-use std::fs::{DirEntry, read_link};
+use std::fs::{read_link, DirEntry};
 use std::io;
+use std::sync::{Arc, Condvar, Mutex};
+
+#[derive(Clone)]
+pub(crate) struct CondAll(Arc<(Mutex<bool>, Condvar)>);
+impl CondAll {
+    pub fn new() -> Self {
+        CondAll(Arc::new((Mutex::new(false), Condvar::new())))
+    }
+
+    pub fn notify_all(&self) {
+        let mut x = (self.0).0.lock().unwrap();
+        *x = true;
+        (self.0).1.notify_all();
+    }
+
+    pub fn wait(&self) {
+        let mut x = (self.0).0.lock().unwrap();
+        while !*x {
+            x = (self.0).1.wait(x).unwrap();
+        }
+    }
+}
 
 #[derive(Clone)]
 pub(crate) struct Cond(Arc<(Mutex<bool>, Condvar)>);
@@ -8,13 +29,13 @@ impl Cond {
     pub fn new() -> Self {
         Cond(Arc::new((Mutex::new(false), Condvar::new())))
     }
-    
+
     pub fn notify(&self) {
         let mut x = (self.0).0.lock().unwrap();
         *x = true;
         (self.0).1.notify_one();
     }
-    
+
     pub fn wait(&self) {
         let mut x = (self.0).0.lock().unwrap();
         while !*x {

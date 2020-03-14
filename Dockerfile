@@ -3,8 +3,9 @@ LABEL maintainer="Ivan <ivan@zderadicka.eu>"
 
 ARG CARGO_ARGS
 
+
 RUN apk update &&\
-    apk add git bash openssl openssl-dev taglib taglib-dev curl yasm build-base \
+    apk add git bash openssl openssl-dev curl yasm build-base \
     wget libbz2 bzip2-dev  zlib zlib-dev rust cargo ffmpeg-dev ffmpeg
 
 COPY . /audioserve 

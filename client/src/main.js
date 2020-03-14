@@ -192,7 +192,7 @@ $(function () {
                             let mime = response.getResponseHeader("Content-Type");
                             if (mime == "text/html") {
                                 $("#info-desc").html(text);
-                            } else if (mime == "text/x-markdown") {
+                            } else if (mime == "text/x-markdown" || mime == "text/markdown") {
                                 let converter = new showdown.Converter();
                                 $("#info-desc").html(converter.makeHtml(text));
                             } else if (mime == "text/plain") {

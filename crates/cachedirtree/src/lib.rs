@@ -6,19 +6,19 @@ extern crate log;
 #[macro_use]
 extern crate derive_builder;
 
+pub use self::tree::{DirTree, SearchResult};
+use self::utils::{Cond, CondAll};
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+use std::borrow;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
-use std::sync::{Arc, Condvar, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
-use std::borrow;
-use self::utils::Cond;
-pub use self::tree::{SearchResult, DirTree};
 
-mod utils;
 mod tree;
+mod utils;
 
 #[derive(Clone, Copy, Builder)]
 #[builder(default)]
@@ -28,7 +28,7 @@ pub struct Options {
     watch_recursively: bool,
     watch_delay: u64,
     follow_symlinks: bool,
-    recent_list_size: usize
+    recent_list_size: usize,
 }
 
 impl Default for Options {
@@ -39,11 +39,10 @@ impl Default for Options {
             watch_recursively: true,
             watch_delay: 10,
             follow_symlinks: false,
-            recent_list_size: 0
+            recent_list_size: 0,
         }
     }
 }
-
 
 #[derive(Clone)]
 pub struct DirCache {
@@ -70,14 +69,18 @@ impl DirCache {
             let _watcher = thread::spawn(move || match dc.load() {
                 Ok(_) => {
                     let (tx, rx) = channel();
-                    let mut watcher = watcher(tx, 
-                    Duration::from_secs(options.watch_delay)).unwrap();
-                    watcher.watch(root, 
-                    if options.watch_recursively {
-                        RecursiveMode::Recursive}
-                    else {
-                        RecursiveMode::NonRecursive
-                    }).unwrap();
+                    let mut watcher =
+                        watcher(tx, Duration::from_secs(options.watch_delay)).unwrap();
+                    watcher
+                        .watch(
+                            root,
+                            if options.watch_recursively {
+                                RecursiveMode::Recursive
+                            } else {
+                                RecursiveMode::NonRecursive
+                            },
+                        )
+                        .unwrap();
 
                     loop {
                         match rx.recv() {
@@ -98,15 +101,11 @@ impl DirCache {
                 Err(e) => error!("cannot start watching directory due to error: {}", e),
             });
 
-            let _updater = thread::spawn( move || {
-                loop {
-                    cond2.wait();
-                    match dc2.load() {
-                                        Ok(_) => debug!("Directory cache updated"),
-                                        Err(e) => {
-                                            error!("Failed to update directory cache: error {}", e)
-                                        }
-                    }
+            let _updater = thread::spawn(move || loop {
+                cond2.wait();
+                match dc2.load() {
+                    Ok(_) => debug!("Directory cache updated"),
+                    Err(e) => error!("Failed to update directory cache: error {}", e),
                 }
             });
         }
@@ -125,9 +124,10 @@ impl DirCache {
         self.inner.search(query)
     }
 
-    pub fn search_collected<S,F,T>(&self, query:S, collector:F) -> Result<T, io::Error> 
-    where S:AsRef<str>,
-          F: FnOnce(SearchResult) -> T
+    pub fn search_collected<S, F, T>(&self, query: S, collector: F) -> Result<T, io::Error>
+    where
+        S: AsRef<str>,
+        F: FnOnce(SearchResult) -> T,
     {
         self.inner.search_collected(query, collector)
     }
@@ -144,8 +144,7 @@ struct DirCacheInner {
     cache: RwLock<Option<DirTree>>,
     root: PathBuf,
     options: Options,
-    ready_flag: Mutex<bool>,
-    ready_cond: Condvar,
+    ready_cond: CondAll,
 }
 
 impl DirCacheInner {
@@ -154,16 +153,12 @@ impl DirCacheInner {
             root: root.as_ref().into(),
             cache: RwLock::new(None),
             options,
-            ready_flag: Mutex::new(false),
-            ready_cond: Condvar::new(),
+            ready_cond: CondAll::new(),
         }
     }
 
     fn wait_ready(&self) {
-        let mut flag = self.ready_flag.lock().unwrap();
-        while !*flag {
-            flag = self.ready_cond.wait(flag).unwrap();
-        }
+        self.ready_cond.wait()
     }
 
     fn load(&self) -> Result<(), io::Error> {
@@ -172,11 +167,7 @@ impl DirCacheInner {
             let mut cache = self.cache.write().unwrap();
             *cache = Some(tree)
         }
-        {
-            let mut flag = self.ready_flag.lock().unwrap();
-            *flag = true;
-            self.ready_cond.notify_all();
-        }
+        self.ready_cond.notify_all();
         Ok(())
     }
 
@@ -193,22 +184,16 @@ impl DirCacheInner {
             .collect())
     }
 
-    fn search_collected<S,F,T>(&self, query:S, collector:F) -> Result<T, io::Error> 
-    where S:AsRef<str>,
-          F: FnOnce(SearchResult) -> T
+    fn search_collected<S, F, T>(&self, query: S, collector: F) -> Result<T, io::Error>
+    where
+        S: AsRef<str>,
+        F: FnOnce(SearchResult) -> T,
     {
         let cache = self.cache.read().unwrap();
         if cache.is_none() {
             return Err(io::Error::new(io::ErrorKind::Other, "cache not ready"));
         }
-        Ok(
-            collector(cache
-            .as_ref()
-            .unwrap()
-            .search(query)
-            )
-        )
-
+        Ok(collector(cache.as_ref().unwrap().search(query)))
     }
 
     fn recent(&self) -> Result<Vec<PathBuf>, io::Error> {
@@ -218,17 +203,16 @@ impl DirCacheInner {
         }
         let recent = cache.as_ref().unwrap().recent();
         match recent {
-            Some(iter) => Ok(iter.map(borrow::ToOwned::to_owned).collect()), 
-            None => Err(io::Error::new(io::ErrorKind::Other, "recent not supported"))
+            Some(iter) => Ok(iter.map(borrow::ToOwned::to_owned).collect()),
+            None => Err(io::Error::new(io::ErrorKind::Other, "recent not supported")),
         }
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_cache() {
         let c = DirCache::new("test_data");
@@ -243,11 +227,13 @@ mod tests {
     fn test_search_collected() {
         let c = DirCache::new("test_data");
         c.load().unwrap();
-        let res = c.search_collected("chesterton modry", |iter| {
-            iter.map(|i| i.path()).collect::<std::collections::HashSet<_>>()
-        }).unwrap();
-        assert_eq!(1,res.len());
-
+        let res = c
+            .search_collected("chesterton modry", |iter| {
+                iter.map(|i| i.path())
+                    .collect::<std::collections::HashSet<_>>()
+            })
+            .unwrap();
+        assert_eq!(1, res.len());
     }
     #[test]
     fn multithread() {
@@ -280,5 +266,4 @@ mod tests {
 
         assert_eq!(NUM_THREADS, counter.load(Ordering::Relaxed));
     }
-
 }

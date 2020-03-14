@@ -1,18 +1,18 @@
 [package]
 name = "websock"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 
-hyper = "0.12.25"
-tokio = "0.1.18"
-futures = "0.1.25"
-log = "0.4"
-tungstenite = "0.6"
+hyper = "0.13"
+tokio = {version="0.2", features=["rt-threaded", "macros", "io-util", "fs"]}
+futures = "0.3"
+log = {version="0.4", features=["max_level_debug"]}
+tokio-tungstenite = "0.10"
 quick-error = "1.2"
-headers = "0.2"
+headers = "0.3"
 
 [dev-dependencies]
-pretty_env_logger = "0.3"
+env_logger = "0.7"

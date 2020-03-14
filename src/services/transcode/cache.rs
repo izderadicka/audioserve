@@ -1,6 +1,6 @@
 use crate::config::get_config;
 use crate::services::transcode::{QualityLevel, TimeSpan};
-use simple_file_cache::Cache;
+use simple_file_cache::AsyncCache as Cache;
 use std::fs;
 use std::path::Path;
 

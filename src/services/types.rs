@@ -1,8 +1,7 @@
 use super::transcode::{QualityLevel, TranscodingFormat};
 use crate::config::get_config;
-use crate::util::os_to_string;
+use crate::util::{guess_mime_type, os_to_string};
 use mime::Mime;
-use mime_guess::guess_mime_type;
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -223,7 +222,7 @@ pub fn is_cover<P: AsRef<Path>>(path: P) -> bool {
     mime.type_() == "image" && has_subtype(&mime, COVERS)
 }
 
-const DESCRIPTIONS: &[&str] = &["html", "plain", "x-markdown"];
+const DESCRIPTIONS: &[&str] = &["html", "plain", "markdown"];
 
 pub fn is_description<P: AsRef<Path>>(path: P) -> bool {
     let mime = guess_mime_type(path);

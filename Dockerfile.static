@@ -1,11 +1,11 @@
-FROM alpine:3.10 AS build
+FROM alpine:3.11 AS build
 MAINTAINER Ivan <ivan@zderadicka.eu>
 ENV CARGO_ARGS=""
 ENV FEATURES=""
 
 RUN apk update &&\
-    apk add git bash curl yasm build-base openssl-dev taglib-dev\
-    wget zlib zlib-dev libbz2 bzip2-dev ffmpeg-dev rust cargo npm &&\
+    apk add git bash curl yasm build-base openssl-dev openssl-libs-static taglib-dev\
+    wget zlib-dev zlib-static bzip2-static bzip2-dev rust cargo npm &&\
     mkdir /src &&\
     mkdir /.cargo &&\
     chmod a+rw /.cargo &&\

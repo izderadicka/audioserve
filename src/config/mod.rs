@@ -1,8 +1,6 @@
 use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
 
 use crate::util;
-use num_cpus;
-use serde_yaml;
 use std::env;
 use std::fs::File;
 use std::io::Read;
@@ -417,30 +415,30 @@ pub fn init_config() -> Result<()> {
 pub mod init {
     /// Static config initialization for tests
     /// as tests are run concurrently it requires also some synchronication
-    use super::{BASE_DATA_DIR, CONFIG, Config};
+    use super::{Config, BASE_DATA_DIR, CONFIG};
     use std::path::PathBuf;
     use std::sync::Mutex;
-    lazy_static!{
-    static ref GUARD:Mutex<bool> = Mutex::new(false); 
+    lazy_static! {
+        static ref GUARD: Mutex<bool> = Mutex::new(false);
     }
     /// this default config is used only for testing
     pub fn init_default_config() {
         let mut l = GUARD.lock().unwrap();
-            unsafe {
-                if BASE_DATA_DIR.is_some() { return }
-                let base_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-                BASE_DATA_DIR = Some(base_dir);
+        unsafe {
+            if BASE_DATA_DIR.is_some() {
+                return;
             }
-            
-            let config = Config::default();
-            unsafe {
-                CONFIG = Some(config);
-            }
-            *l = true
+            let base_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+            BASE_DATA_DIR = Some(base_dir);
+        }
+
+        let config = Config::default();
+        unsafe {
+            CONFIG = Some(config);
+        }
+        *l = true
     }
-
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -476,5 +474,4 @@ mod tests {
         let c3 = load_file("./test_data/transcodings.2.yaml");
         assert_eq!(c3.transcoding.get(QualityLevel::High).bitrate(), 96);
     }
-
 }

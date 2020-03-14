@@ -1,14 +1,14 @@
 extern crate tar;
 
-use std::fs;
 use std::env;
-use std::path::Path;
+use std::fs;
 use std::io::prelude::*;
+use std::path::Path;
 
 fn main() {
     let file = env::args().nth(1).expect("Must provide dir as argument");
     let file_path = Path::new(&file);
-    if ! file_path.is_file() {
+    if !file_path.is_file() {
         panic!("Parameter must file")
     }
 
@@ -20,11 +20,13 @@ fn main() {
 
         let mut data_from_archive = vec![];
         entry.read_to_end(&mut data_from_archive).unwrap();
-        
 
-        println!("File {:?} entry header start {}, file start {}", p, entry.raw_header_position(), entry.raw_file_position());
+        println!(
+            "File {:?} entry header start {}, file start {}",
+            p,
+            entry.raw_header_position(),
+            entry.raw_file_position()
+        );
         println!("File {:?} archive len {}", p, data_from_archive.len())
-        
-
     }
 }

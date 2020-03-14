@@ -1,300 +1,174 @@
-use super::error::Error;
-use super::CacheInner;
+use super::{error::Error, CacheInner};
 use std::fs;
+use std::path::Path;
 use std::sync::{Arc, RwLock};
-use tokio::prelude::*;
-use tokio_threadpool::blocking;
-use tokio::fs as tokio_fs;
+use tokio;
+use tokio::task::spawn_blocking;
 
-pub struct CacheFileWrite {
-    cache: Arc<RwLock<CacheInner>>,
-    key: Option<String>
-}
-
-pub struct CacheFileRead<S> {
-    cache: Arc<RwLock<CacheInner>>,
-    key: Option<S>
-}
-
-impl <S: AsRef<str>> CacheFileRead<S> {
-    pub(crate) fn new(cache: Arc<RwLock<CacheInner>>, key:S) -> Self {
-        CacheFileRead {
-            cache,
-            key: Some(key)
-        }
+impl From<tokio::task::JoinError> for Error {
+    fn from(_f: tokio::task::JoinError) -> Self {
+        Error::Executor
     }
 }
 
-impl <S: AsRef<str>+Clone> Future for CacheFileRead<S> {
-    type Error = Error;
-    type Item = Option<tokio_fs::File>;
+fn invert<T>(x: Option<Result<T>>) -> Result<Option<T>> {
+    x.map_or(Ok(None), |v| v.map(Some))
+}
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        match self.key.take() {
-            None => panic!("Calling resolved future"),
-            Some(key) => match blocking(|| {
-                let mut c = self.cache.write().expect("Cannot lock cache");
-                c.get(key.clone()).map(|f| f.map(|f| tokio_fs::File::from_std(f)))
-                }) {
-                Err(e) => Err(e.into()),
-                Ok(Async::Ready(None)) => Ok(Async::Ready(None)),
-                Ok(Async::Ready(Some(Err(e)))) => Err(e.into()),
-                Ok(Async::Ready(Some(Ok(r)))) => Ok(Async::Ready(Some(r))),
-                Ok(Async::NotReady) => {
-                    self.key = Some(key);
-                    Ok(Async::NotReady)
-                    },
-            },
-        }
+type Result<T> = std::result::Result<T, Error>;
+type CacheInnerType = Arc<RwLock<CacheInner>>;
+
+#[derive(Clone)]
+pub struct Cache {
+    inner: CacheInnerType,
+}
+
+impl Cache {
+    pub fn new<P: AsRef<Path>>(root: P, max_size: u64, max_files: u64) -> Result<Self> {
+        let root = root.as_ref().into();
+        CacheInner::new(root, max_size, max_files).map(|cache| Cache {
+            inner: Arc::new(RwLock::new(cache)),
+        })
+    }
+
+    /// return tuple (free_files, free_size)
+    pub fn free_capacity(&self) -> (u64, u64) {
+        let c = self.inner.read().unwrap();
+        (c.max_files - c.num_files, c.max_size - c.size)
+    }
+
+    pub async fn add<S: AsRef<str>>(
+        &self,
+        key: S
+    ) -> Result<(tokio::fs::File, Finisher)> {
+        let cache = self.inner.clone();
+        let key = key.as_ref().to_string();
+        spawn_blocking(move || {
+            let mut c = cache.write().expect("Cannot lock cache");
+            c.add(key.clone())
+                .and_then(|f| f.try_clone().map_err(|e| e.into()).map(|f2| (f, f2)))
+                .map(|(f, f2)| {
+                    (
+                        tokio::fs::File::from_std(f),
+                        Finisher {
+                            cache: cache.clone(),
+                            key: key,
+                            file: f2,
+                        },
+                    )
+                })
+        })
+        .await?
+    }
+    
+
+    pub async fn get<S: AsRef<str>>(
+        &self, 
+        key: S
+    ) -> Result<Option<tokio::fs::File>> {
+        let key = key.as_ref().to_string();
+        let inner = self.inner.clone();
+        let r = spawn_blocking(move || {
+            let mut c = inner.write().expect("Cannot lock cache");
+            c.get(key)
+                .map(|f| f.map(|f| tokio::fs::File::from_std(f)))
+        })
+        .await?;
+        invert(r)
+    }
+
+    pub async fn get2<S: AsRef<str>>(
+        &self,
+        key: S,
+    ) -> Result<Option<(tokio::fs::File, std::path::PathBuf)>> {
+        let cache = self.inner.clone();
+        let key = key.as_ref().to_string();
+        let r = spawn_blocking(move || {
+            let mut c = cache.write().expect("Cannot lock cache");
+            c.get2(key)
+                .map(|f| f.map(|(f, path)| (tokio::fs::File::from_std(f), path)))
+        })
+        .await?;
+        invert(r)
+    }
+
+    pub async fn save_index(&self) -> Result<()> {
+        let cache = self.inner.clone();
+        spawn_blocking(move || {
+            let cache = cache.write().unwrap();
+            cache.save_index()
+        })
+        .await?
+    }
+
+    pub fn save_index_blocking(&self) -> Result<()> {
+        let cache = self.inner.write().expect("Cannot lock cache");
+        cache.save_index()
     }
 }
 
-pub struct CacheFileRead2<S> {
-    cache: Arc<RwLock<CacheInner>>,
-    key: Option<S>
-}
-
-impl <S: AsRef<str>> CacheFileRead2<S> {
-    pub(crate) fn new(cache: Arc<RwLock<CacheInner>>, key:S) -> Self {
-        CacheFileRead2 {
-            cache,
-            key: Some(key)
-        }
-    }
-}
-
-impl <S: AsRef<str>+Clone> Future for CacheFileRead2<S> {
-    type Error = Error;
-    type Item = Option<(tokio_fs::File, std::path::PathBuf)>;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        match self.key.take() {
-            None => panic!("Calling resolved future"),
-            Some(key) => match blocking(|| {
-                let mut c = self.cache.write().expect("Cannot lock cache");
-                c.get2(key.clone()).map(|f| f.map(|(f,path)| (tokio_fs::File::from_std(f),path)))
-                }) {
-                Err(e) => Err(e.into()),
-                Ok(Async::Ready(None)) => Ok(Async::Ready(None)),
-                Ok(Async::Ready(Some(Err(e)))) => Err(e.into()),
-                Ok(Async::Ready(Some(Ok(r)))) => Ok(Async::Ready(Some(r))),
-                Ok(Async::NotReady) => {
-                    self.key = Some(key);
-                    Ok(Async::NotReady)
-                    },
-            },
-        }
-    }
-}
-
-impl Future for CacheFileWrite {
-    type Item = (tokio_fs::File, Finisher);
-    type Error = Error;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        match self.key.take() {
-            None => panic!("Calling resolved future"),
-            Some(key) => match blocking(|| {
-                let mut c = self.cache.write().expect("Cannot lock cache");
-                c.add(key.clone())
-                    .and_then(|f| f.try_clone().map_err(|e| e.into()).map(|f2| (f, f2)))
-                    .map(|(f, f2)| {
-                        (
-                            tokio_fs::File::from_std(f),
-                            Finisher {
-                                cache: self.cache.clone(),
-                                key: Some(key.clone()),
-                                file: f2,
-                            },
-                        )
-                    })
-            }) {
-                Err(e) => Err(e.into()),
-                Ok(Async::Ready(Err(e))) => Err(e.into()),
-                Ok(Async::Ready(Ok(r))) => Ok(Async::Ready(r)),
-                Ok(Async::NotReady) => {
-                    self.key = Some(key);
-                    Ok(Async::NotReady)
-                    },
-            },
-        }
-    }
-}
-
-impl CacheFileWrite {
-   pub (crate) fn new(cache: Arc<RwLock<CacheInner>>,
-        key: String) -> Self {
-            CacheFileWrite {
-                cache,
-                key: Some(key)
-            }
-        } 
-}
-
-pub struct Finisher{
-    pub(crate) cache: Arc<RwLock<CacheInner>>,
-    pub(crate) key: Option<String>,
+pub struct Finisher {
+    pub(crate) cache: CacheInnerType,
+    pub(crate) key: String,
     pub(crate) file: fs::File,
 }
 
 impl Finisher {
-    pub fn commit(self) -> Finish {
-        Finish{
-            cache:self.cache,
-            key: self.key,
-            file: self.file
-        }
+    pub async fn commit(mut self) -> Result<()> {
+        spawn_blocking(move || {
+            let mut c = self.cache.write().expect("Cannot lock cache");
+            c.finish(self.key, &mut self.file)
+        })
+        .await?
     }
 
-    pub fn roll_back(self) -> CleanUp {
-        CleanUp{
-            cache:self.cache,
-            key: self.key,
-        }
-    }
-}
-
-pub struct CleanUp {
-    pub(crate) cache: Arc<RwLock<CacheInner>>,
-    pub(crate) key: Option<String>,
-}
-
-impl Future for CleanUp {
-    type Item = ();
-    type Error = Error;
-
-    fn poll (&mut self) -> Poll<Self::Item, Self::Error> {
-        match self.key.take() {
-            None => panic!("Calling resolved future"),
-            Some(key) => match blocking(|| {
-                super::cleanup(&self.cache, &key)       
-            }) {
-                Err(e) => Err(e.into()),
-                Ok(Async::Ready(())) => Ok(Async::Ready(())),
-                Ok(Async::NotReady) => {
-                    self.key = Some(key);
-                    Ok(Async::NotReady)
-                    },
-            },
-        }
-    }
-}
-
-pub struct SaveIndex {
-    pub(crate) cache: Arc<RwLock<CacheInner>>,
-}
-
-impl Future for SaveIndex {
-    type Item = ();
-    type Error = Error;
-
-    fn poll (&mut self) -> Poll<Self::Item, Self::Error> {
-            match blocking(|| {
-                let cache = self.cache.write().unwrap();
-                cache.save_index()
-
-            }) {
-                Err(e) => Err(e.into()),
-                Ok(Async::Ready(Err(e))) => Err(e),
-                Ok(Async::Ready(Ok(()))) => Ok(Async::Ready(())),
-                Ok(Async::NotReady) => Ok(Async::NotReady)
-                    
-            }
-    }
-}
-
-
-
-
-pub struct Finish {
-    pub(crate) cache: Arc<RwLock<CacheInner>>,
-    pub(crate) key: Option<String>,
-    pub(crate) file: fs::File,
-}
-
-impl Future for Finish {
-    type Item = ();
-    type Error = Error;
-
-    fn poll (&mut self) -> Poll<Self::Item, Self::Error> {
-        match self.key.take() {
-            None => panic!("Calling resolved future"),
-            Some(key) => match blocking(|| {
-                let mut c = self.cache.write().expect("Cannot lock cache");
-                c.finish(key.clone(), &mut self.file)
-                    
-            }) {
-                Err(e) => Err(e.into()),
-                Ok(Async::Ready(Err(e))) => Err(e.into()),
-                Ok(Async::Ready(Ok(r))) => Ok(Async::Ready(r)),
-                Ok(Async::NotReady) => {
-                    self.key = Some(key);
-                    Ok(Async::NotReady)
-                    },
-            },
-        }
+    pub async fn roll_back(self) -> Result<()> {
+        spawn_blocking(move || super::cleanup(&self.cache, self.key))
+            .await
+            .map_err(From::from)
     }
 }
 
 #[cfg(test)]
 mod tests {
-use tempfile::tempdir;
-use crate::Cache;
-use super::*;
-#[test]
-    fn test_async() {
+    use super::*;
+    use tempfile::tempdir;
+
+    const MY_KEY: &str = "muj_test_1";
+    const MSG: &str = "Hello there you lonely bastard";
+
+    async fn cache_rw(c: Cache) -> Result<()> {
         use tokio::prelude::*;
+        let (mut f, fin) = c.add(MY_KEY).await?;
+        f.write_all(MSG.as_bytes()).await?;
+        fin.commit().await?;
+        match c.get(MY_KEY).await? {
+            None => panic!("cache file not found"),
+            Some(mut f) => {
+                let mut v = Vec::new();
+                f.read_to_end(&mut v).await?;
+                let s = std::str::from_utf8(&v).unwrap();
+                assert_eq!(MSG, s);
+                info!("ALL DONE");
+            }
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_async() {
+        use tokio::prelude::*;
+
         env_logger::try_init().ok();
-        const MY_KEY: &str = "muj_test_1";
         let temp_dir = tempdir().unwrap();
-
-        let msg = String::from("Hello there");
-        let msg2 = msg.clone();
-
         let c = Cache::new(temp_dir.path(), 10000, 10).unwrap();
         let c2 = c.clone();
-
-        let fut = c.add_async(String::from(MY_KEY))
-            .and_then(move |(w,fin)| { 
-                tokio::io::write_all(w,msg.clone())
-                .map_err(|e| e.into())
-                .and_then(|_| fin.commit())
-            })
-            .and_then(move |_| {
-                c.get_async(MY_KEY)
-                .and_then(|maybe_file| {
-                    match maybe_file {
-                        None => panic!("cache file not found"),
-                        Some(f) => {
-                            tokio::io::read_to_end(f, Vec::new())
-                            .map_err(|e| e.into())
-                            .and_then(move |(_, res)| {
-                                let s = std::str::from_utf8(&res).unwrap();
-                                assert_eq!(msg2, s);
-                                info!("ALL DONE");
-                                Ok(())
-                            })
-                        }
-                    }
-                })
-            })
-            ;
-
-            run_future(fut);
-
-            c2.get(MY_KEY).unwrap().unwrap();
+        cache_rw(c).await.unwrap();
+        let mut f = c2.get(MY_KEY).await.unwrap().unwrap();
+        let mut s = String::new();
+        f.read_to_string(&mut s).await.unwrap();
+        assert_eq!(MSG, s);
+                ()
     }
-
-    use tokio_threadpool::Builder;
-    use futures::sync::oneshot;
-    fn run_future<F>(f: F)
-    where
-        F: Future<Item = (), Error = Error> + Send + 'static,
-    {
-        let pool = Builder::new().pool_size(1).build();
-        let (tx, rx) = oneshot::channel::<()>();
-        pool.spawn(f.then(|res| tx.send(res.unwrap())));
-        rx.wait().unwrap()
-    }
-
 }

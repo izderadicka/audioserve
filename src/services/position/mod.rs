@@ -11,8 +11,8 @@ lazy_static! {
     static ref CACHE: Cache = Cache::new(100);
 }
 
-pub fn save_positions() {
-    if let Err(e) = CACHE.save() {
+pub async fn save_positions() {
+    if let Err(e) = CACHE.save().await {
         error!("Cannot save positions to file: {}", e);
     }
 }
@@ -82,7 +82,8 @@ pub fn position_service(req: Request<Body>) -> ResponseFuture {
             .and_then(str::parse);
 
         match message {
-            Ok(message) => match message {
+            Ok(message) => Box::pin(
+                async { Ok(match message {
                 Msg::Position {
                     position,
                     file_path,
@@ -93,55 +94,55 @@ pub fn position_service(req: Request<Body>) -> ResponseFuture {
                                 let mut p = m.context_ref().write().unwrap();
                                 *p = file_path.clone();
                             }
-                            CACHE.insert(file_path, position)
+                            CACHE.insert(file_path, position).await
                         }
 
                         None => {
                             let prev = { m.context_ref().read().unwrap().clone() };
 
                             if !prev.is_empty() {
-                                CACHE.insert(prev, position)
+                                CACHE.insert(prev, position).await
                             } else {
                                 error!("Client sent short position, but there is no context");
                             }
                         }
                     };
 
-                    Box::new(future::ok(None))
+                    None
                 }
                 Msg::GenericQuery { group } => {
-                    let last = CACHE.get_last(group);
+                    let last = CACHE.get_last(group).await;
                     let res = Reply { folder: None, last };
 
-                    Box::new(future::ok(Some(ws::Message::text(
+                    Some(ws::Message::text(
                         serde_json::to_string(&res).unwrap(),
                         m.context(),
-                    ))))
+                    ))
                 }
 
                 Msg::FolderQuery { folder_path } => {
                     let group = Some(folder_path.splitn(2, '/')).and_then(|mut p| p.next());
-                    let last = CACHE.get_last(group.unwrap());
-                    let folder = CACHE.get(&folder_path);
+                    let last = CACHE.get_last(group.unwrap()).await;
+                    let folder = CACHE.get(&folder_path).await;
                     let res = Reply {
                         last: if last != folder { last } else { None },
                         folder,
                     };
 
-                    Box::new(future::ok(Some(ws::Message::text(
+                    Some(ws::Message::text(
                         serde_json::to_string(&res).unwrap(),
                         m.context(),
-                    ))))
+                    ))
                 }
-            },
+            })}),
             Err(e) => {
                 error!("Position message error: {}", e);
-                Box::new(future::ok(None))
+                Box::pin(future::ok(None))
             }
         }
     });
 
-    Box::new(future::ok(res))
+    Box::pin(future::ok(res))
 }
 
 #[cfg(test)]

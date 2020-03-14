@@ -16,8 +16,8 @@ impl Display for Error {
 }
 
 impl StdErr for Error {
-    fn cause(&self) -> Option<&StdErr> {
-        self.0.as_ref().map(|e| e.as_ref() as &StdErr)
+    fn cause(&self) -> Option<&dyn StdErr> {
+        self.0.as_ref().map(|e| e.as_ref() as &dyn StdErr)
     }
 }
 

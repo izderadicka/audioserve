@@ -10,3 +10,4 @@ client/dist/bundle.js
 rls/
 _static_build
 /crates/**/Cargo.lock
+client/dist/bundle.js.LICENSE.txt

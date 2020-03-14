@@ -28,9 +28,9 @@ fn main() {
         println!("cargo:rustc-link-lib=static=avformat");
         println!("cargo:rustc-link-lib=static=avutil");
         println!("cargo:rustc-link-lib=static=avcodec");
-        println!("cargo:rustc-link-search=native={}/ffmpeg-4.1/libavformat", out_dir);
-        println!("cargo:rustc-link-search=native={}/ffmpeg-4.1/libavutil", out_dir);
-        println!("cargo:rustc-link-search=native={}/ffmpeg-4.1/libavcodec", out_dir);
+        println!("cargo:rustc-link-search=native={}/ffmpeg-4.1.5/libavformat", out_dir);
+        println!("cargo:rustc-link-search=native={}/ffmpeg-4.1.5/libavutil", out_dir);
+        println!("cargo:rustc-link-search=native={}/ffmpeg-4.1.5/libavcodec", out_dir);
        
     }
 

@@ -246,6 +246,8 @@ pub fn parse_args() -> Result<Config> {
     parse_args_from(env::args_os())
 }
 
+// Although function  is bit too long it does not make sense to split, as it deals with each config option in very plain matter
+#[allow(clippy::cognitive_complexity)]
 pub fn parse_args_from<I, T>(args: I) -> Result<Config>
 where
     I: IntoIterator<Item = T>,

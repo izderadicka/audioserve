@@ -1,4 +1,5 @@
 use super::AudioCodec;
+use std::borrow::Cow;
 
 // Opus codec parameters
 
@@ -47,18 +48,18 @@ impl Opus {
 }
 
 impl AudioCodec for Opus {
-    fn quality_args(&self) -> Vec<String> {
+    fn quality_args(&self) -> Vec<Cow<'static, str>> {
         let mut v = vec![];
         if self.mono {
             v.push("-ac".into());
             v.push("1".into());
         }
         v.push("-b:a".into());
-        v.push(format!("{}k", self.bitrate));
+        v.push(format!("{}k", self.bitrate).into());
         v.push("-compression_level".into());
-        v.push(format!("{}", self.compression_level));
+        v.push(format!("{}", self.compression_level).into());
         v.push("-cutoff".into());
-        v.push(format!("{}", self.cutoff.to_hz()));
+        v.push(format!("{}", self.cutoff.to_hz()).into());
         v
     }
 
@@ -85,7 +86,7 @@ pub struct Mp3 {
 }
 
 impl AudioCodec for Mp3 {
-    fn quality_args(&self) -> Vec<String> {
+    fn quality_args(&self) -> Vec<Cow<'static, str>> {
         let mut v = vec![];
         if self.mono {
             v.push("-ac".into());
@@ -96,9 +97,9 @@ impl AudioCodec for Mp3 {
             v.push("1".into());
         }
         v.push("-b:a".into());
-        v.push(format!("{}k", self.bitrate));
+        v.push(format!("{}k", self.bitrate).into());
         v.push("-compression_level".into());
-        v.push(format!("{}", self.compression_level));
+        v.push(format!("{}", self.compression_level).into());
 
         v
     }
@@ -164,7 +165,7 @@ pub struct Aac {
 }
 
 impl AudioCodec for Aac {
-    fn quality_args(&self) -> Vec<String> {
+    fn quality_args(&self) -> Vec<Cow<'static, str>> {
         let mut v = vec![];
         if self.mono {
             v.push("-ac".into());
@@ -172,10 +173,10 @@ impl AudioCodec for Aac {
         }
         if self.sr != SampleRate::Unlimited {
             v.push("-ar".into());
-            v.push(self.sr.to_sr().to_string())
+            v.push(self.sr.to_sr().to_string().into())
         }
         v.push("-b:a".into());
-        v.push(format!("{}k", self.bitrate));
+        v.push(format!("{}k", self.bitrate).into());
         v.push("-aac_coder".into());
         v.push("twoloop".into());
         if self.ltp {

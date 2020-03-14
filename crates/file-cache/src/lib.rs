@@ -6,8 +6,6 @@ extern crate quick_error;
 #[macro_use]
 extern crate log;
 extern crate byteorder;
-#[cfg(feature = "asynch")]
-use self::asynch::{CacheFileRead, CacheFileRead2, CacheFileWrite, SaveIndex};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use data_encoding::BASE64URL_NOPAD;
 use linked_hash_map::LinkedHashMap;
@@ -22,6 +20,9 @@ use std::sync::{Arc, RwLock};
 pub use self::error::Error;
 
 #[cfg(feature = "asynch")]
+pub use asynch::{Cache as AsyncCache, Finisher};
+
+#[cfg(feature = "asynch")]
 mod asynch;
 mod error;
 
@@ -31,11 +32,12 @@ const INDEX: &str = "index";
 const MAX_KEY_SIZE: usize = 4096;
 const FILE_KEY_LEN: usize = 32;
 
-pub type Result<T> = std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
+type CacheInnerType = Arc<RwLock<CacheInner>>;
 
 #[derive(Clone)]
 pub struct Cache {
-    inner: Arc<RwLock<CacheInner>>,
+    inner: CacheInnerType,
 }
 
 impl Cache {
@@ -51,32 +53,12 @@ impl Cache {
         let mut c = self.inner.write().expect("Cannot lock cache");
         c.add(key.clone()).map(move |file| FileGuard {
             cache: self.inner.clone(),
-            file: file,
+            file,
             key,
         })
     }
 
-    #[cfg(feature = "asynch")]
-    pub fn add_async<S: AsRef<str>>(&self, key: S) -> CacheFileWrite {
-        let key: String = key.as_ref().into();
-        CacheFileWrite::new(self.inner.clone(), key)
-    }
-
-    #[cfg(feature = "asynch")]
-    pub fn get_async<S>(&self, key: S) -> CacheFileRead<S>
-    where
-        S: AsRef<str>,
-    {
-        CacheFileRead::new(self.inner.clone(), key)
-    }
-
-    #[cfg(feature = "asynch")]
-    pub fn get_async2<S>(&self, key: S) -> CacheFileRead2<S>
-    where
-        S: AsRef<str>,
-    {
-        CacheFileRead2::new(self.inner.clone(), key)
-    }
+    
 
     pub fn get<S: AsRef<str>>(&self, key: S) -> Option<Result<fs::File>> {
         let mut cache = self.inner.write().expect("Cannot lock cache");
@@ -88,15 +70,12 @@ impl Cache {
         cache.save_index()
     }
 
-    #[cfg(feature = "asynch")]
-    pub fn save_index_async(&self) -> SaveIndex {
-        SaveIndex {
-            cache: self.inner.clone(),
-        }
-    }
-
     pub fn len(&self) -> u64 {
         self.inner.read().unwrap().num_files
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub fn max_size(&self) -> u64 {
@@ -117,7 +96,7 @@ impl Cache {
 impl Drop for Cache {
     fn drop(&mut self) {
         // if dropping last reference to cache save index
-        // TODO: reconsider - also FileGuards can hold refeence
+        // TODO: reconsider - also FileGuards can hold reference
         if Arc::strong_count(&self.inner) == 1 {
             if let Err(e) = self.save_index() {
                 error!("Error saving cache index: {}", e)
@@ -178,7 +157,7 @@ fn gen_cache_key() -> String {
     let mut random = [0; FILE_KEY_LEN];
     let mut rng = rand::thread_rng();
     rng.fill_bytes(&mut random);
-    return BASE64URL_NOPAD.encode(&random);
+    BASE64URL_NOPAD.encode(&random)
 }
 
 fn entry_path_helper<P: AsRef<Path>>(root: &PathBuf, file_key: P) -> PathBuf {
@@ -316,6 +295,7 @@ impl CacheInner {
         get_cleanup!(self, res, file_name, key)
     }
 
+    #[allow(dead_code)]
     fn get2<S: AsRef<str>>(&mut self, key: S) -> Option<Result<(fs::File, PathBuf)>> {
         let file_name = self.get_entry_path(&key);
         let res = file_name.as_ref().map(|file_name| {
@@ -701,5 +681,4 @@ mod tests {
 
         assert_eq!(0, list_path())
     }
-
 }

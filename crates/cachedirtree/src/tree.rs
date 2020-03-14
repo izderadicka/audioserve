@@ -3,16 +3,16 @@ use super::Options;
 use bit_vec::BitVec;
 use ego_tree::iter::Descendants;
 use ego_tree::{NodeMut, NodeRef, Tree};
+use std::collections::BinaryHeap;
 use std::fs;
 use std::io;
 use std::iter::{FromIterator, IntoIterator, Iterator, Skip};
 use std::path::{Path, PathBuf};
-use std::collections::BinaryHeap;
 use std::time::SystemTime;
 
 pub struct DirTree {
     tree: Tree<DirEntry>,
-    recent: Option<Vec<DirEntryTimed>>
+    recent: Option<Vec<DirEntryTimed>>,
 }
 
 #[derive(Debug)]
@@ -156,32 +156,32 @@ impl<'a> Iterator for SearchResult<'a> {
 
 impl<'a> SearchResult<'a> {
     fn has_match(&mut self) -> bool {
-        let mut matched = vec![];
-        let mut res = true;
-        let matched_terms = self.matched_terms_stack.last().unwrap();
-        self.search_terms.iter().enumerate().for_each(|(i, term)| {
-            if !matched_terms[i] {
-                let contains = self.current_node.value().search_tag.contains(term);
-                if contains {
-                    matched.push(i)
+        let mut matched_terms = self.matched_terms_stack.last().unwrap().clone();
+        let res = self
+            .search_terms
+            .iter()
+            .enumerate()
+            .filter_map(|(i, term)| {
+                if !matched_terms[i] {
+                    if self.current_node.value().search_tag.contains(term) {
+                        matched_terms.set(i, true);
+                        None
+                    } else {
+                        Some(term) // pasing on only unmatched terms
+                    }
+                } else {
+                    None
                 }
-                res &= contains
-            }
-        });
+            })
+            .count()==0;
         trace!(
-            "Match  for terms {:?}, prev.matches {:?}, new matches {:?} res {:?}",
+            "Match {} for terms {:?},  new matches {:?} res {:?}",
+            self.current_node.value().search_tag,
             self.search_terms,
             matched_terms,
-            matched,
             res
         );
-        if !res && !matched.is_empty() {
-            let mut matched_terms = matched_terms.clone();
-            matched.into_iter().for_each(|i| matched_terms.set(i, true));
-            self.new_matched_terms = Some(matched_terms);
-        } else {
-            self.new_matched_terms  = None;
-        }
+        self.new_matched_terms = if !res { Some(matched_terms) } else { None };
         res
     }
 }
@@ -201,10 +201,9 @@ impl DirTree {
 
     pub fn new_with_options<P: AsRef<Path>>(root_dir: P, opts: Options) -> Result<Self, io::Error> {
         let p: &Path = root_dir.as_ref();
-        let root_name = p.to_str().ok_or_else(|| io::Error::new(
-            io::ErrorKind::Other,
-            "root directory is not utf8",
-        ))?;
+        let root_name = p
+            .to_str()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "root directory is not utf8"))?;
         if !p.is_dir() {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
@@ -212,7 +211,7 @@ impl DirTree {
             ));
         }
         let mut cached = Tree::new(DirEntry::new(root_name));
-        let mut recents = if opts.recent_list_size>0 {
+        let mut recents = if opts.recent_list_size > 0 {
             Some(BinaryHeap::with_capacity(opts.recent_list_size))
         } else {
             None
@@ -221,12 +220,12 @@ impl DirTree {
         {
             let mut root = cached.root_mut();
 
-            fn add_entries<P: AsRef<Path>>(
+            fn add_entries(
                 node: &mut NodeMut<DirEntry>,
                 root_dir: &Path,
-                path: P,
+                path: &Path,
                 opts: &Options,
-                mut recents: Option<&mut BinaryHeap<DirEntryTimed>>
+                mut recents: Option<&mut BinaryHeap<DirEntryTimed>>,
             ) -> Result<(), io::Error> {
                 for e in fs::read_dir(path)? {
                     let e = e?;
@@ -234,25 +233,27 @@ impl DirTree {
                         if file_type.is_dir() {
                             let mut dir_node = node.append(e.file_name().to_string_lossy().into());
                             let p = e.path();
-                            match recents.take() {
-                                Some(r) => {
+                            match recents {
+                                Some(ref mut r) => {
                                     if let Ok(meta) = p.metadata() {
-                                    if let Ok(changed) = meta.modified() {
-                                        if r.len() >= opts.recent_list_size {
-                                            r.pop();
+                                        if let Ok(changed) = meta.modified() {
+                                            if r.len() >= opts.recent_list_size {
+                                                r.pop();
+                                            }
+                                            r.push(DirEntryTimed {
+                                                path: p.strip_prefix(root_dir).unwrap().to_owned(),
+                                                created: changed,
+                                            })
                                         }
-                                        r.push(DirEntryTimed { path: p.strip_prefix(root_dir).unwrap().to_owned(), created:changed })
-                                    }
                                     }
                                     add_entries(&mut dir_node, root_dir, &p, opts, Some(r))?;
-                                    recents = Some(r);
-
+                                    
                                 }
                                 None => {
                                     add_entries(&mut dir_node, root_dir, &p, opts, None)?;
                                 }
                             }
-                            
+                        // TODO: now should also consider single book file - m4b etc.
                         } else if opts.include_files && file_type.is_file() {
                             node.append(e.file_name().to_string_lossy().into());
                         }
@@ -264,7 +265,10 @@ impl DirTree {
             add_entries(&mut root, p, p, &opts, recents.as_mut())?;
         }
 
-        Ok(DirTree { tree: cached, recent: recents.map(BinaryHeap::into_sorted_vec) })
+        Ok(DirTree {
+            tree: cached,
+            recent: recents.map(BinaryHeap::into_sorted_vec),
+        })
     }
 
     pub fn iter(&self) -> Skip<Descendants<DirEntry>> {
@@ -287,8 +291,10 @@ impl DirTree {
         }
     }
 
-    pub fn recent(&self) -> Option<impl Iterator<Item=&Path>> {
-        self.recent.as_ref().map(|v| v.iter().map(|e| e.path.as_ref()))
+    pub fn recent(&self) -> Option<impl Iterator<Item = &Path>> {
+        self.recent
+            .as_ref()
+            .map(|v| v.iter().map(|e| e.path.as_ref()))
     }
 }
 
@@ -360,17 +366,15 @@ mod tests {
         let recents: Vec<_> = c.recent().unwrap().collect();
         println!("Recents {:?}", recents);
         assert_eq!(9, recents.len());
-        
     }
 
-    
     #[test]
     fn test_search_symlinks() {
         env_logger::init();
-        #[cfg(not(feature="symlinks"))]
-        const NUM:usize = 0;
-        #[cfg(feature="symlinks")]
-        const NUM:usize = 1;
+        #[cfg(not(feature = "symlinks"))]
+        const NUM: usize = 0;
+        #[cfg(feature = "symlinks")]
+        const NUM: usize = 1;
         let opts = OptionsBuilder::default()
             .follow_symlinks(true)
             .build()

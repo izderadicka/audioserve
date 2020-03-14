@@ -4,7 +4,8 @@ use serde::Serializer;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
@@ -55,7 +56,7 @@ impl Cache {
         }
     }
 
-    pub fn save(&self) -> io::Result<()> {
+    pub async fn save(&self) -> io::Result<()> {
         let dir = get_config().positions_file.parent();
         if let Some(d) = dir {
             if !d.exists() {
@@ -66,35 +67,35 @@ impl Cache {
         let fname = &get_config().positions_file;
         let f = fs::File::create(fname)?;
         {
-            let c = self.inner.read().unwrap();
+            let c = self.inner.read().await;
             serde_json::to_writer::<_, CacheInner>(f, &c)
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
         }
     }
 
-    pub fn insert<S: Into<String>>(&self, file_path: S, position: f32) {
-        self.inner.write().unwrap().insert(file_path, position)
+    pub async fn insert<S: Into<String>>(&self, file_path: S, position: f32) {
+        self.inner.write().await.insert(file_path, position)
     }
 
-    pub fn get<K>(&self, folder: &K) -> Option<Position>
+    pub async fn get<K>(&self, folder: &K) -> Option<Position>
     where
         K: AsRef<str> + ?Sized,
     {
-        self.inner.read().unwrap().get(folder)
+        self.inner.read().await.get(folder)
     }
 
-    pub fn get_last<G: AsRef<str>>(&self, group: G) -> Option<Position> {
-        self.inner.read().unwrap().get_last(group)
-    }
-
-    #[allow(dead_code)]
-    pub fn clear(&mut self) {
-        self.inner.write().unwrap().clear()
+    pub async fn get_last<G: AsRef<str>>(&self, group: G) -> Option<Position> {
+        self.inner.read().await.get_last(group)
     }
 
     #[allow(dead_code)]
-    pub fn len(&self) -> usize {
-        self.inner.read().unwrap().len()
+    pub async fn clear(&mut self) {
+        self.inner.write().await.clear()
+    }
+
+    #[allow(dead_code)]
+    pub async fn len(&self) -> usize {
+        self.inner.read().await.len()
     }
 }
 

@@ -2,6 +2,7 @@ use super::types::AudioMeta;
 use crate::error::Error;
 use std::path::Path;
 
+
 pub struct Chapter {
     pub number: u32,
     pub title: String,
@@ -9,6 +10,8 @@ pub struct Chapter {
     pub end: u64,
 }
 
+/// trait to generalize access to media metadata 
+/// (so that underlying library can be easily changed)
 pub trait MediaInfo<'a>: Sized {
     fn get_audio_info(&self) -> Option<AudioMeta>;
     fn get_chapters(&self) -> Option<Vec<Chapter>>;
@@ -16,6 +19,14 @@ pub trait MediaInfo<'a>: Sized {
 
 mod libavformat {
     use super::*;
+    use std::sync::Once;
+
+    static INIT_LIBAV: Once = Once::new();
+
+    pub fn init() {
+        INIT_LIBAV.call_once(||  media_info::init())
+    }
+
     pub struct Info {
         media_file: media_info::MediaFile,
     }
@@ -57,9 +68,13 @@ mod libavformat {
             }
         }
     }
-
 }
 
 pub fn get_audio_properties(audio_file_name: &Path) -> Result<impl MediaInfo, Error> {
     libavformat::Info::from_file(audio_file_name)
+}
+
+pub fn init_media_lib() {
+    libavformat::init()
+
 }

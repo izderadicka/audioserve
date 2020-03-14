@@ -14,7 +14,7 @@ fn main() -> io::Result<()> {
     let path = env::args().nth(1).unwrap();
     let opts = OptionsBuilder::default()
         .watch_changes(true)
-//        .include_files(false)
+        //        .include_files(false)
         .build()
         .unwrap();
     let c = DirCache::new_with_options(&path, opts);

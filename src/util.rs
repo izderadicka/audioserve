@@ -1,8 +1,13 @@
-use headers::{Header, HeaderName, HeaderValue};
+use headers::{Header,HeaderMapExt};
 use hyper::http::response::Builder;
+use mime_guess::{self, Mime};
 use std::cmp::{max, min};
-use std::ops::{Bound, RangeBounds};
-use std::path::Path;
+use std::{ops::{Bound, RangeBounds}, path::Path, io};
+use std::fs::DirEntry;
+
+pub fn guess_mime_type<P: AsRef<Path>>(path: P) -> Mime {
+    mime_guess::from_path(path).first_or_octet_stream()
+}
 
 pub fn os_to_string(s: ::std::ffi::OsString) -> String {
     match s.into_string() {
@@ -68,30 +73,43 @@ pub fn header2header<H1: Header, H2: Header>(i: H1) -> Result<impl Header, heade
     H2::decode(&mut v.iter())
 }
 
-struct HeadersExtender<'a, 'b> {
-    builder: &'a mut Builder,
-    name: &'b HeaderName,
-}
-
-impl<'a, 'b> Extend<HeaderValue> for HeadersExtender<'a, 'b> {
-    fn extend<I: IntoIterator<Item = HeaderValue>>(&mut self, iter: I) {
-        for v in iter.into_iter() {
-            self.builder.header(self.name, v);
-        }
-    }
-}
-
 pub trait ResponseBuilderExt {
-    fn typed_header<H: Header>(&mut self, header: H) -> &mut Builder;
+    fn typed_header<H: Header>(self, header: H) -> Self;
 }
 
 impl ResponseBuilderExt for Builder {
-    fn typed_header<H: Header>(&mut self, header: H) -> &mut Builder {
-        let mut extender = HeadersExtender {
-            builder: self,
-            name: H::name(),
-        };
-        header.encode(&mut extender);
+    fn typed_header<H: Header>(mut self, header: H) -> Builder {
+        self.headers_mut().map(|h| h.typed_insert(header));
         self
     }
+}
+
+#[cfg(feature = "symlinks")]
+pub fn get_real_file_type<P: AsRef<Path>>(
+    dir_entry: &DirEntry,
+    full_path: P,
+    allow_symlinks: bool,
+) -> Result<::std::fs::FileType, io::Error> {
+    let ft = dir_entry.file_type()?;
+
+    if allow_symlinks && ft.is_symlink() {
+        let p = std::fs::read_link(dir_entry.path())?;
+        let ap = if p.is_relative() {
+            full_path.as_ref().join(p)
+        } else {
+            p
+        };
+        Ok(ap.metadata()?.file_type())
+    } else {
+        Ok(ft)
+    }
+}
+
+#[cfg(not(feature = "symlinks"))]
+pub fn get_real_file_type<P: AsRef<Path>>(
+    dir_entry: &DirEntry,
+    _full_path: P,
+    _allow_symlinks: bool,
+) -> Result<::std::fs::FileType, io::Error> {
+    dir_entry.file_type()
 }

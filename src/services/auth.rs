@@ -2,40 +2,58 @@ use super::subs::short_response;
 use crate::error::Error;
 use crate::util::ResponseBuilderExt;
 use data_encoding::BASE64;
-use futures::{future, Future, Stream};
+use futures::{future, prelude::*};
 use headers::authorization::Bearer;
 use headers::{Authorization, ContentLength, ContentType, Cookie, HeaderMapExt};
 use hyper::header::SET_COOKIE;
 use hyper::{Body, Method, Request, Response, StatusCode};
-use ring::digest::{digest, SHA256};
-use ring::hmac;
 use ring::rand::{SecureRandom, SystemRandom};
+use ring::{
+    digest::{digest, SHA256},
+    hmac,
+};
 use std::borrow;
 use std::collections::HashMap;
+use std::pin::Pin;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
 use url::form_urlencoded;
 
-type AuthResult<T> = Result<(Request<Body>, T), Response<Body>>;
-type AuthFuture<T> = Box<Future<Item = AuthResult<T>, Error = Error> + Send>;
+pub enum AuthResult<T> {
+    Authenticated{
+        credentials: T,
+        request: Request<Body>
+    },
+    Rejected(Response<Body>),
+    LoggedIn(Response<Body>),
+}
+type AuthFuture<T> = Pin<Box<dyn Future<Output = Result<AuthResult<T>, Error>> + Send>>;
 
 pub trait Authenticator: Send + Sync {
     type Credentials;
     fn authenticate(&self, req: Request<Body>) -> AuthFuture<Self::Credentials>;
 }
 
-#[derive(Clone)]
-pub struct SharedSecretAuthenticator {
+#[derive(Clone, Debug)]
+struct Secrets {
     shared_secret: String,
-    my_secret: Vec<u8>,
+    server_secret: Vec<u8>,
     token_validity_hours: u32,
 }
 
+#[derive(Clone)]
+pub struct SharedSecretAuthenticator {
+    secrets: Arc<Secrets>,
+}
+
 impl SharedSecretAuthenticator {
-    pub fn new(shared_secret: String, my_secret: Vec<u8>, token_validity_hours: u32) -> Self {
+    pub fn new(shared_secret: String, server_secret: Vec<u8>, token_validity_hours: u32) -> Self {
         SharedSecretAuthenticator {
+            secrets: Arc::new(Secrets{
             shared_secret,
-            my_secret,
+            server_secret,
             token_validity_hours,
+            })
         }
     }
 }
@@ -47,17 +65,17 @@ impl Authenticator for SharedSecretAuthenticator {
     type Credentials = ();
     fn authenticate(&self, req: Request<Body>) -> AuthFuture<()> {
         fn deny() -> AuthResult<()> {
-            Err(short_response(StatusCode::UNAUTHORIZED, ACCESS_DENIED))
+            AuthResult::Rejected(short_response(StatusCode::UNAUTHORIZED, ACCESS_DENIED))
         }
         // this is part where client can authenticate itself and get token
         if req.method() == Method::POST && req.uri().path() == "/authenticate" {
             debug!("Authentication request");
-            let auth = self.clone();
-            return Box::new(
-                req.into_body()
-                    .concat2()
-                    .map_err(Error::new_with_cause)
-                    .map(move |b| {
+            let auth = self.secrets.clone(); // TODO: auth need to be 'static - is there better way?
+            return Box::pin(
+                async move {
+                match hyper::body::to_bytes(req.into_body()).await {
+                    Err(e) => Err(Error::new_with_cause(e)),
+                    Ok(b) => {
                         let params = form_urlencoded::parse(b.as_ref())
                             .into_owned()
                             .collect::<HashMap<String, String>>();
@@ -66,29 +84,30 @@ impl Authenticator for SharedSecretAuthenticator {
                             if auth.auth_token_ok(secret) {
                                 debug!("Authentication success");
                                 let token = auth.new_auth_token();
-                                Err(Response::builder()
-                                    .typed_header(ContentType::text())
-                                    .typed_header(ContentLength(token.len() as u64))
-                                    .header(
-                                        SET_COOKIE,
-                                        format!(
-                                            "{}={}; Max-Age={}",
-                                            COOKIE_NAME,
-                                            token,
-                                            10 * 365 * 24 * 3600
-                                        )
-                                        .as_str(),
+                                let resp = Response::builder()
+                                .typed_header(ContentType::text())
+                                .typed_header(ContentLength(token.len() as u64))
+                                .header(
+                                    SET_COOKIE,
+                                    format!(
+                                        "{}={}; Max-Age={}",
+                                        COOKIE_NAME,
+                                        token,
+                                        10 * 365 * 24 * 3600
                                     )
-                                    .body(token.into())
-                                    .unwrap())
+                                    .as_str(),
+                                );
+
+                                Ok(AuthResult::LoggedIn(resp.body(token.into()).unwrap()))
                             } else {
-                                deny()
+                                Ok(deny())
                             }
                         } else {
-                            deny()
+                            Ok(deny())
                         }
-                    }),
-            );
+                    }
+                }
+            })
         } else {
             // And in this part we check token
             let mut token = req
@@ -102,16 +121,16 @@ impl Authenticator for SharedSecretAuthenticator {
                     .and_then(|c| c.get(COOKIE_NAME).map(borrow::ToOwned::to_owned));
             }
 
-            if token.is_none() || !self.token_ok(&token.unwrap()) {
-                return Box::new(future::ok(deny()));
+            if token.is_none() || !self.secrets.token_ok(&token.unwrap()) {
+                return Box::pin(future::ok(deny()));
             }
         }
         // If everything is ok we return credentials (in this case they are just unit type) and we return back request
-        Box::new(future::ok(Ok((req, ()))))
+        Box::pin(future::ok(AuthResult::Authenticated{request:req, credentials:()}))
     }
 }
 
-impl SharedSecretAuthenticator {
+impl Secrets {
     fn auth_token_ok(&self, token: &str) -> bool {
         let parts = token
             .split('|')
@@ -131,12 +150,12 @@ impl SharedSecretAuthenticator {
         false
     }
     fn new_auth_token(&self) -> String {
-        Token::new(self.token_validity_hours, &self.my_secret).into()
+        Token::new(self.token_validity_hours, &self.server_secret).into()
     }
 
     fn token_ok(&self, token: &str) -> bool {
         match token.parse::<Token>() {
-            Ok(token) => token.is_valid(&self.my_secret),
+            Ok(token) => token.is_valid(&self.server_secret),
             Err(e) => {
                 warn!("Invalid token: {}", e);
                 false
@@ -175,7 +194,7 @@ impl Token {
         let validity: u64 = now() + u64::from(token_validity_hours) * 3600;
         let validity: [u8; 8] = unsafe { ::std::mem::transmute(validity.to_be()) };
         let to_sign = prepare_data(&random, validity);
-        let key = hmac::SigningKey::new(&SHA256, secret);
+        let key = hmac::Key::new(hmac::HMAC_SHA256, secret);
         let sig = hmac::sign(&key, &to_sign);
         let slice = sig.as_ref();
         assert!(slice.len() == 32);
@@ -190,7 +209,7 @@ impl Token {
     }
 
     fn is_valid(&self, secret: &[u8]) -> bool {
-        let key = hmac::VerificationKey::new(&SHA256, secret);
+        let key = hmac::Key::new(hmac::HMAC_SHA256, secret);
         let data = prepare_data(&self.random, self.validity);
         if hmac::verify(&key, &data, &self.signature).is_err() {
             return false;

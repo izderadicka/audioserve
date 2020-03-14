@@ -1,4 +1,4 @@
-use super::audio_folder::get_real_file_type;
+use crate::util::get_real_file_type;
 use super::types::{AudioFolderShort, FoldersOrdering, SearchResult};
 use crate::config::get_config;
 use std::collections::BinaryHeap;
@@ -9,7 +9,7 @@ use std::time::SystemTime;
 
 const RECENT_LIST_SIZE: usize = 64;
 
-pub trait SearchTrait<S: AsRef<str>> {
+pub trait SearchTrait<S> {
     fn search(&self, collection: usize, query: S, ordering: FoldersOrdering) -> SearchResult;
     fn recent(&self, collection: usize) -> SearchResult;
 }
@@ -17,8 +17,8 @@ pub trait SearchTrait<S: AsRef<str>> {
 struct FoldersSearch;
 
 #[derive(Clone)]
-pub struct Search<S: AsRef<str>> {
-    inner: Arc<Box<SearchTrait<S> + Send + Sync>>,
+pub struct Search<S> {
+    inner: Arc<Box<dyn SearchTrait<S> + Send + Sync>>,
 }
 
 impl<S: AsRef<str>> SearchTrait<S> for Search<S> {
@@ -191,7 +191,7 @@ impl FoldersSearch {
 
         let tokens: Vec<String> = query
             .as_ref()
-            .split(' ')
+            .split_whitespace()
             .filter(|s| !s.is_empty())
             .map(str::to_lowercase)
             .collect();

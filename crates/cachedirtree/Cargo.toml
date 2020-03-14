@@ -1,14 +1,14 @@
 [package]
 name = "cachedirtree"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 #edition = "2018"
 
 [dependencies]
-ego-tree="0.5"
-bit-vec = "0.5"
+ego-tree="0.6"
+bit-vec = "0.6"
 notify = "4.0"
-derive_builder = "0.7"
+derive_builder = "0.9"
 
 
 [dependencies.log]
@@ -16,7 +16,7 @@ version = "0.4"
 
 
 [dev-dependencies]
-env_logger = "0.5"
+env_logger = "0.7"
 
 [features]
 default=["symlinks"]

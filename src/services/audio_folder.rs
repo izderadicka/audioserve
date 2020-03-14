@@ -1,7 +1,6 @@
 use std::borrow;
 use std::ffi::OsStr;
 use std::fs;
-use std::fs::DirEntry;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -9,7 +8,7 @@ use super::audio_meta::{get_audio_properties, Chapter, MediaInfo};
 use super::transcode::TimeSpan;
 use super::types::*;
 use crate::config::get_config;
-use crate::util::os_to_string;
+use crate::util::{guess_mime_type, os_to_string, get_real_file_type};
 use regex::Regex;
 
 pub fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
@@ -213,7 +212,7 @@ fn list_dir_file<P: AsRef<Path>>(
     chapters: Vec<Chapter>,
 ) -> Result<AudioFolder, io::Error> {
     let path = full_path.strip_prefix(&base_dir).unwrap();
-    let mime = ::mime_guess::guess_mime_type(&path);
+    let mime = guess_mime_type(&path);
     let files = chapters
         .into_iter()
         .map(|chap| {
@@ -276,7 +275,7 @@ fn list_dir_dir<P: AsRef<Path>>(
                                 )?)
                             } else if ft.is_file() {
                                 if is_audio(&path) {
-                                    let mime = ::mime_guess::guess_mime_type(&path);
+                                    let mime = guess_mime_type(&path);
                                     let audio_file_path = base_dir.as_ref().join(&path);
                                     let meta = match get_audio_properties(&audio_file_path) {
                                         Ok(meta) => meta,
@@ -418,36 +417,6 @@ pub fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
     }
 }
 
-#[cfg(feature = "symlinks")]
-pub fn get_real_file_type<P: AsRef<Path>>(
-    dir_entry: &DirEntry,
-    full_path: P,
-    allow_symlinks: bool,
-) -> Result<::std::fs::FileType, io::Error> {
-    let ft = dir_entry.file_type()?;
-
-    if allow_symlinks && ft.is_symlink() {
-        let p = fs::read_link(dir_entry.path())?;
-        let ap = if p.is_relative() {
-            full_path.as_ref().join(p)
-        } else {
-            p
-        };
-        Ok(ap.metadata()?.file_type())
-    } else {
-        Ok(ft)
-    }
-}
-
-#[cfg(not(feature = "symlinks"))]
-pub fn get_real_file_type<P: AsRef<Path>>(
-    dir_entry: &DirEntry,
-    _full_path: P,
-    _allow_symlinks: bool,
-) -> Result<::std::fs::FileType, io::Error> {
-    dir_entry.file_type()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -518,7 +487,7 @@ mod tests {
 
     #[test]
     fn test_chapters_file() {
-        //pretty_env_logger::init();
+        //env_logger::init();
         let path = Path::new("./test_data/01-file.mp3");
         let chapters = chapters_from_csv(path).unwrap().unwrap();
         assert_eq!(3, chapters.len());
@@ -535,5 +504,4 @@ mod tests {
             ms_from_time("02:35:01.1")
         );
     }
-
 }
