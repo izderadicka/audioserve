@@ -250,7 +250,7 @@ Download the latest "development" version of Windows 64-bit binaries of FFmpeg f
 
 Open a Command prompt or a PowerShell window, change to the directory where you have previously extracted the contents of `audioserve-master` and run:
 
-    cargo build --release
+    cargo build --release --no-default-features
 
 After compilation, you will find the compiled binary, `audioserve.exe`, in the `target\release` sub-folder.
 
