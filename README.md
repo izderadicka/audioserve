@@ -265,9 +265,9 @@ Transfer the resulting `audioserve.exe` with the entire contents of the `client`
 
  * compilation with the `--features partially-static` option does not work (instead, use the shared FFmpeg libraries as described above).
  * Audioserve doesn't recognize the paths that contain drive letters (i.e. `C:\`) and paths with symlinks or directory junctions. Put the `audioserve.exe` to the same disk drive as the folder with audio files and use it with paths _relative to the root_ of the drive. For example, if the path to the program is `d:\Audioserve\audioserve.exe`, its data folder is `D:\Audioserve\data` and your audio files are located in `C:\Audiobooks\`, launch the program as `D:\Audioserve\audioserve.exe --no-authentication --data-dir \Audioserve\data \Audiobooks`.
- * As the result of the above, you can not use the multiple folders with audio files across the different disks.
+ * As the result of the above, you can not use the multiple folders with audio files across the different disks with Audioserve.
  * `Audioserve.exe` does not have an application icon.
- * The program keeps the terminal window open while it is running. To hide it, use any Windows utility that allows launching terminal programs as "Windows services".
+ * The program keeps the terminal window open while it is running. To hide it, use any Windows [utility](https://robotronic.de/runasserviceen.html) that allows launching terminal programs as "Windows services" in the background.
  * Above instructions were only tested on a 64-bit Windows 10 platform.
 
 ### Other platforms
