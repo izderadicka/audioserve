@@ -246,7 +246,7 @@ or download the ZIP archive.
 
 Download the `x86_64-pc-windows-msvc` version of Rust compiler from [rust-lang.org](https://forge.rust-lang.org/infra/other-installation-methods.html#standalone). Also download and perform the default installation of the [Build tools for Visual Studio](https://visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=BuildTools&rel=16). You may ignore the request to reboot the system after the installation.
 
-Download the latest "development" version of Windows 64-bit binaries of FFmpeg from [the official website](https://ffmpeg.zeranoe.com/builds/win64/dev/). Extract all `/lib/*.lib` files such as `avcodec.lib` from the archive to the `C:\Program Files\Rust stable MSVC 1.43\lib\rustlib\x86_64-pc-windows-msvc\lib` folder.
+Download the 4.1 "development" version of Windows 64-bit binaries of FFmpeg from [the official website](https://ffmpeg.zeranoe.com/builds/win64/dev/). Extract all `/lib/*.lib` files such as `avcodec.lib` from the archive to the `C:\Program Files\Rust stable MSVC 1.43\lib\rustlib\x86_64-pc-windows-msvc\lib` folder.
 
 Open a Command prompt or a PowerShell window, change to the directory where you have previously extracted the contents of `audioserve-master` and run:
 
