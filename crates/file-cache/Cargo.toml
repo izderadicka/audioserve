@@ -1,15 +1,15 @@
 [package]
 name = "simple-file-cache"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-linked-hash-map = "0.5.2"
+linked-hash-map = "0.5.3"
 #filetime = "0.2"
 rand = "0.7"
 data-encoding = "2.2"
-quick-error ="1.2"
+thiserror ="1.0"
 log = "0.4"
 byteorder = "1.3"
 

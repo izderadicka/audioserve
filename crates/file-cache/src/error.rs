@@ -1,43 +1,29 @@
 use std::io;
+use thiserror::Error;
 
-quick_error! {
-    #[derive(Debug)]
-    pub enum Error {
-        Io(err: io::Error) {
-            from()
-            cause(err)
-            display("io error: {}", err)
-        }
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("io error: {0}")]
+    Io(#[from] io::Error),
 
+    #[error("key {0} exists")]
+    KeyAlreadyExists(String),
 
-        KeyAlreadyExists(key: String) {
-            display("key {} exists", key)
-        }
+    #[error("key is invalid - too big")]
+    InvalidKey,
 
-        InvalidKey {
-            display("key is invalid - too big")
-        }
+    #[error("index file is invalid")]
+    InvalidIndex,
 
-        InvalidIndex {
-            display("index file is invalid")
-        }
+    #[error("file bigger then max cache size")]
+    FileTooBig,
 
-        FileTooBig {
-            display("file bigger then max cache size")
-        }
+    #[error("key {0} is being added")]
+    KeyOpened(String),
 
-        KeyOpened(key: String) {
-            display("key {} is being added", key)
-        }
+    #[error("invalid cache state: {0}")]
+    InvalidCacheState(String),
 
-        InvalidCacheState(reason: String) {
-            display("invalid cache state: {}", reason)
-        }
-
-        Executor {
-            display("Error when running async task")
-        }
-    }
-
-
+    #[error("Error when running async task")]
+    Executor,
 }

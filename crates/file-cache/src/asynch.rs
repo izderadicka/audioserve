@@ -37,10 +37,7 @@ impl Cache {
         (c.max_files - c.num_files, c.max_size - c.size)
     }
 
-    pub async fn add<S: AsRef<str>>(
-        &self,
-        key: S
-    ) -> Result<(tokio::fs::File, Finisher)> {
+    pub async fn add<S: AsRef<str>>(&self, key: S) -> Result<(tokio::fs::File, Finisher)> {
         let cache = self.inner.clone();
         let key = key.as_ref().to_string();
         spawn_blocking(move || {
@@ -60,18 +57,13 @@ impl Cache {
         })
         .await?
     }
-    
 
-    pub async fn get<S: AsRef<str>>(
-        &self, 
-        key: S
-    ) -> Result<Option<tokio::fs::File>> {
+    pub async fn get<S: AsRef<str>>(&self, key: S) -> Result<Option<tokio::fs::File>> {
         let key = key.as_ref().to_string();
         let inner = self.inner.clone();
         let r = spawn_blocking(move || {
             let mut c = inner.write().expect("Cannot lock cache");
-            c.get(key)
-                .map(|f| f.map(|f| tokio::fs::File::from_std(f)))
+            c.get(key).map(|f| f.map(|f| tokio::fs::File::from_std(f)))
         })
         .await?;
         invert(r)
@@ -169,6 +161,6 @@ mod tests {
         let mut s = String::new();
         f.read_to_string(&mut s).await.unwrap();
         assert_eq!(MSG, s);
-                ()
+        ()
     }
 }

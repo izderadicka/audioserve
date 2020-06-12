@@ -2,8 +2,6 @@ extern crate data_encoding;
 extern crate linked_hash_map;
 extern crate rand;
 #[macro_use]
-extern crate quick_error;
-#[macro_use]
 extern crate log;
 extern crate byteorder;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -57,8 +55,6 @@ impl Cache {
             key,
         })
     }
-
-    
 
     pub fn get<S: AsRef<str>>(&self, key: S) -> Option<Result<fs::File>> {
         let mut cache = self.inner.write().expect("Cannot lock cache");
