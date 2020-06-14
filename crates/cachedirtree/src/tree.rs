@@ -173,7 +173,8 @@ impl<'a> SearchResult<'a> {
                     None
                 }
             })
-            .count()==0;
+            .count()
+            == 0;
         trace!(
             "Match {} for terms {:?},  new matches {:?} res {:?}",
             self.current_node.value().search_tag,
@@ -247,7 +248,6 @@ impl DirTree {
                                         }
                                     }
                                     add_entries(&mut dir_node, root_dir, &p, opts, Some(r))?;
-                                    
                                 }
                                 None => {
                                     add_entries(&mut dir_node, root_dir, &p, opts, None)?;
