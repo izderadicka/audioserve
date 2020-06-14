@@ -48,7 +48,9 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "tar",
+ "tempfile",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -212,6 +214,7 @@ dependencies = [
  "bit-vec",
  "derive_builder",
  "ego-tree",
+ "env_logger",
  "log",
  "notify",
 ]
@@ -1423,9 +1426,11 @@ version = "0.2.1"
 dependencies = [
  "byteorder",
  "data-encoding",
+ "env_logger",
  "linked-hash-map 0.5.3",
  "log",
  "rand",
+ "tempfile",
  "thiserror",
  "tokio",
 ]
@@ -1904,6 +1909,7 @@ dependencies = [
 name = "websock"
 version = "0.2.0"
 dependencies = [
+ "env_logger",
  "futures",
  "headers",
  "hyper",

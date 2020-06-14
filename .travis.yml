@@ -9,7 +9,7 @@ before_install:
 #cache: cargo
 script:
   - cargo test --verbose --features partially-static,transcoding-cache
-  - cargo test --verbose --no-default-features --features partially-static
+  - cargo test --verbose --no-default-features --features partially-static --workspace
 matrix:
   fast_finish: true
   allow_failures:
