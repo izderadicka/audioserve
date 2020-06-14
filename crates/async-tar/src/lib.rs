@@ -340,7 +340,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let tar_file_name = temp_dir.path().join("test2.tar");
         let tar_file_name2 = tar_file_name.clone();
-        let files = &["README.md", "Cargo.lock", "Cargo.toml"];
+        let files = &["README.md",  "Cargo.toml"];
         let sizes = files.iter().map(|f| Path::new(f).metadata().unwrap().len());
         let expected_archive_len = calc_size(sizes);
         let tar_stream =
@@ -367,7 +367,7 @@ mod tests {
             archive_len, expected_archive_len,
             "archive size is as expected"
         );
-        check_archive(tar_file_name2, 3);
+        check_archive(tar_file_name2, 2);
         temp_dir.close().unwrap();
     }
 
@@ -391,7 +391,7 @@ mod tests {
         let mut rt = Runtime::new().unwrap();
         rt.block_on(f).unwrap();
 
-        check_archive(tar_file_name2, 3);
+        check_archive(tar_file_name2, 2);
         temp_dir.close().unwrap();
     }
 
