@@ -1,9 +1,13 @@
-use headers::{Header,HeaderMapExt};
+use headers::{Header, HeaderMapExt};
 use hyper::http::response::Builder;
 use mime_guess::{self, Mime};
 use std::cmp::{max, min};
-use std::{ops::{Bound, RangeBounds}, path::Path, io};
 use std::fs::DirEntry;
+use std::{
+    io,
+    ops::{Bound, RangeBounds},
+    path::Path,
+};
 
 pub fn guess_mime_type<P: AsRef<Path>>(path: P) -> Mime {
     mime_guess::from_path(path).first_or_octet_stream()

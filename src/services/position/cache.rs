@@ -5,9 +5,9 @@ use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
+use tokio::sync::RwLock;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PositionRecord {

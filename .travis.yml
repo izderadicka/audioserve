@@ -8,6 +8,7 @@ before_install:
   - sudo apt-get install -y  openssl libssl-dev libbz2-dev zlib1g-dev ffmpeg yasm
 #cache: cargo
 script:
+  - cargo fmt --all -- --check
   - cargo test --verbose --features partially-static,transcoding-cache
   - cargo test --verbose --no-default-features --features partially-static --workspace
 matrix:

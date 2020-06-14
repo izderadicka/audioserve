@@ -82,59 +82,60 @@ pub fn position_service(req: Request<Body>) -> ResponseFuture {
             .and_then(str::parse);
 
         match message {
-            Ok(message) => Box::pin(
-                async { Ok(match message {
-                Msg::Position {
-                    position,
-                    file_path,
-                } => {
-                    match file_path {
-                        Some(file_path) => {
-                            {
-                                let mut p = m.context_ref().write().unwrap();
-                                *p = file_path.clone();
+            Ok(message) => Box::pin(async {
+                Ok(match message {
+                    Msg::Position {
+                        position,
+                        file_path,
+                    } => {
+                        match file_path {
+                            Some(file_path) => {
+                                {
+                                    let mut p = m.context_ref().write().unwrap();
+                                    *p = file_path.clone();
+                                }
+                                CACHE.insert(file_path, position).await
                             }
-                            CACHE.insert(file_path, position).await
-                        }
 
-                        None => {
-                            let prev = { m.context_ref().read().unwrap().clone() };
+                            None => {
+                                let prev = { m.context_ref().read().unwrap().clone() };
 
-                            if !prev.is_empty() {
-                                CACHE.insert(prev, position).await
-                            } else {
-                                error!("Client sent short position, but there is no context");
+                                if !prev.is_empty() {
+                                    CACHE.insert(prev, position).await
+                                } else {
+                                    error!("Client sent short position, but there is no context");
+                                }
                             }
-                        }
-                    };
+                        };
 
-                    None
-                }
-                Msg::GenericQuery { group } => {
-                    let last = CACHE.get_last(group).await;
-                    let res = Reply { folder: None, last };
+                        None
+                    }
+                    Msg::GenericQuery { group } => {
+                        let last = CACHE.get_last(group).await;
+                        let res = Reply { folder: None, last };
 
-                    Some(ws::Message::text(
-                        serde_json::to_string(&res).unwrap(),
-                        m.context(),
-                    ))
-                }
+                        Some(ws::Message::text(
+                            serde_json::to_string(&res).unwrap(),
+                            m.context(),
+                        ))
+                    }
 
-                Msg::FolderQuery { folder_path } => {
-                    let group = Some(folder_path.splitn(2, '/')).and_then(|mut p| p.next());
-                    let last = CACHE.get_last(group.unwrap()).await;
-                    let folder = CACHE.get(&folder_path).await;
-                    let res = Reply {
-                        last: if last != folder { last } else { None },
-                        folder,
-                    };
+                    Msg::FolderQuery { folder_path } => {
+                        let group = Some(folder_path.splitn(2, '/')).and_then(|mut p| p.next());
+                        let last = CACHE.get_last(group.unwrap()).await;
+                        let folder = CACHE.get(&folder_path).await;
+                        let res = Reply {
+                            last: if last != folder { last } else { None },
+                            folder,
+                        };
 
-                    Some(ws::Message::text(
-                        serde_json::to_string(&res).unwrap(),
-                        m.context(),
-                    ))
-                }
-            })}),
+                        Some(ws::Message::text(
+                            serde_json::to_string(&res).unwrap(),
+                            m.context(),
+                        ))
+                    }
+                })
+            }),
             Err(e) => {
                 error!("Position message error: {}", e);
                 Box::pin(future::ok(None))

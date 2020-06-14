@@ -8,7 +8,7 @@ use super::audio_meta::{get_audio_properties, Chapter, MediaInfo};
 use super::transcode::TimeSpan;
 use super::types::*;
 use crate::config::get_config;
-use crate::util::{guess_mime_type, os_to_string, get_real_file_type};
+use crate::util::{get_real_file_type, guess_mime_type, os_to_string};
 use regex::Regex;
 
 pub fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(

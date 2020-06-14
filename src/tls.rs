@@ -1,4 +1,7 @@
-use futures::{future, stream::{StreamExt, TryStreamExt}};
+use futures::{
+    future,
+    stream::{StreamExt, TryStreamExt},
+};
 use hyper::server::accept::{from_stream, Accept};
 use native_tls::Identity;
 use std::fs::File;
@@ -27,17 +30,19 @@ pub(crate) async fn tls_acceptor(
     let private_key = load_private_key(&ssl.key_file, &ssl.key_password)?;
     let tls_cx = native_tls::TlsAcceptor::builder(private_key).build()?;
     let tls_cx = tokio_tls::TlsAcceptor::from(tls_cx);
-    let stream = TcpListener::bind(addr).await?.and_then(move |s| {
-        let acceptor = tls_cx.clone();
-        async move {
-            let conn = acceptor.accept(s).await;
-            conn.map_err(|e| {
-                error!("Error when accepting TLS connection {}", e);
-                io::Error::new(io::ErrorKind::Other, e)
-            })
-        }
-    })
-    .filter(|i| future::ready(i.is_ok())); // Need to filter out errors as they will stop server to accept connections
+    let stream = TcpListener::bind(addr)
+        .await?
+        .and_then(move |s| {
+            let acceptor = tls_cx.clone();
+            async move {
+                let conn = acceptor.accept(s).await;
+                conn.map_err(|e| {
+                    error!("Error when accepting TLS connection {}", e);
+                    io::Error::new(io::ErrorKind::Other, e)
+                })
+            }
+        })
+        .filter(|i| future::ready(i.is_ok())); // Need to filter out errors as they will stop server to accept connections
 
     Ok(from_stream(stream))
 }

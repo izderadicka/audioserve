@@ -25,9 +25,9 @@ use std::sync::Arc;
 mod config;
 mod error;
 mod services;
-mod util;
 #[cfg(feature = "tls")]
 mod tls;
+mod util;
 
 fn generate_server_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error> {
     let file = file.as_ref();
@@ -67,11 +67,9 @@ fn generate_server_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error>
     }
 }
 
-type RuntimeError = Box<dyn std::error::Error+'static>;
+type RuntimeError = Box<dyn std::error::Error + 'static>;
 
-fn start_server(
-    server_secret: Vec<u8>,
-) -> Result<tokio::runtime::Runtime, RuntimeError> {
+fn start_server(server_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, RuntimeError> {
     let cfg = get_config();
     let svc = FileSendService {
         authenticator: get_config().shared_secret.as_ref().map(
@@ -91,32 +89,30 @@ fn start_server(
     };
     let addr = cfg.listen;
     let start_server = async move {
-        
-
         let server: Pin<Box<dyn Future<Output = Result<(), RuntimeError>> + Send>> =
             match get_config().ssl.as_ref() {
                 None => {
-                    let server = HttpServer::bind(&addr).serve(make_service_fn(
-                        move |_| future::ok::<_, error::Error>(svc.clone()),
-                    ));
+                    let server = HttpServer::bind(&addr).serve(make_service_fn(move |_| {
+                        future::ok::<_, error::Error>(svc.clone())
+                    }));
                     info!("Server listening on {}", &addr);
                     Box::pin(server.map_err(|e| e.into()))
                 }
                 Some(ssl) => {
                     #[cfg(feature = "tls")]
-                    {   
+                    {
                         info!("Server Listening on {} with TLS", &addr);
                         let create_server = async move {
-                            let incoming = tls::tls_acceptor(&addr,&ssl).await?;
-                            let server = HttpServer::builder(incoming).serve(make_service_fn(
-                                move |_| future::ok::<_, error::Error>(svc.clone()),
-                            )).await;
-                            
+                            let incoming = tls::tls_acceptor(&addr, &ssl).await?;
+                            let server = HttpServer::builder(incoming)
+                                .serve(make_service_fn(move |_| {
+                                    future::ok::<_, error::Error>(svc.clone())
+                                }))
+                                .await;
+
                             server.map_err(|e| e.into())
                         };
-                        
 
-                        
                         Box::pin(create_server)
                     }
 
@@ -149,7 +145,6 @@ fn start_server(
 async fn terminate_server() {
     use tokio::signal;
     signal::ctrl_c().await.unwrap_or(());
-
 }
 
 #[cfg(unix)]
@@ -164,7 +159,6 @@ async fn terminate_server() {
         _ = sigterm.next() => {info!("Terminated on SIGTERM")},
         _ = sigquit.next() => {info!("Terminated on SIGQUIT")}
     )
-
 }
 
 fn main() {
@@ -215,11 +209,12 @@ fn main() {
 
     runtime.block_on(terminate_server());
 
-    #[cfg(feature = "shared-positions")]{
+    #[cfg(feature = "shared-positions")]
+    {
         debug!("Saving shared positions");
         runtime.block_on(crate::services::position::save_positions());
     }
-        //graceful shutdown of server will wait till transcoding ends, so rather shut it down hard
+    //graceful shutdown of server will wait till transcoding ends, so rather shut it down hard
     runtime.shutdown_timeout(std::time::Duration::from_millis(300));
 
     #[cfg(feature = "transcoding-cache")]
@@ -230,7 +225,6 @@ fn main() {
             error!("Error saving transcoding cache index {}", e);
         }
     }
-        
-    
+
     info!("Server finished");
 }

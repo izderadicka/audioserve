@@ -36,7 +36,7 @@ fn cut_path<P: AsRef<OsStr>>(p: P, max_len: usize) -> OsString {
     }
 }
 
-type PinnedFuture<T> =  Pin<Box<dyn Future<Output = T>+Send+Sync>>;
+type PinnedFuture<T> = Pin<Box<dyn Future<Output = T> + Send + Sync>>;
 
 #[allow(clippy::large_enum_variant)] // not a problem as there is only one instance of state
 enum TarState {
@@ -340,7 +340,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let tar_file_name = temp_dir.path().join("test2.tar");
         let tar_file_name2 = tar_file_name.clone();
-        let files = &["README.md",  "Cargo.toml"];
+        let files = &["README.md", "Cargo.toml"];
         let sizes = files.iter().map(|f| Path::new(f).metadata().unwrap().len());
         let expected_archive_len = calc_size(sizes);
         let tar_stream =

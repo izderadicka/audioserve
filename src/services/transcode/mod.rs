@@ -6,6 +6,7 @@ use crate::error::Error;
 use futures::future::Either;
 use futures::prelude::*;
 use mime::Mime;
+use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fmt::Debug;
 #[cfg(feature = "transcoding-cache")]
@@ -15,7 +16,6 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 use tokio::process::{ChildStdout, Command};
 use tokio::time::delay_for;
-use std::borrow::Cow;
 
 #[cfg(feature = "transcoding-cache")]
 pub mod cache;
@@ -376,14 +376,9 @@ impl Transcoder {
                                         .and_then(|_| {
                                             debug!("Added to cache");
                                             if false {
-                                                box_me(get_cache().save_index().map_err(
-                                                    |e| {
-                                                        error!(
-                                                            "Error when saving cache index: {}",
-                                                            e
-                                                        )
-                                                    },
-                                                ))
+                                                box_me(get_cache().save_index().map_err(|e| {
+                                                    error!("Error when saving cache index: {}", e)
+                                                }))
                                             } else {
                                                 box_me(future::ok(()))
                                             }
@@ -442,7 +437,7 @@ impl Transcoder {
         let counter2 = counter.clone();
         match cmd.spawn() {
             Ok(mut child) => {
-                if let Some(out)  = child.stdout.take() {
+                if let Some(out) = child.stdout.take() {
                     counter.fetch_add(1, Ordering::SeqCst);
                     let start = Instant::now();
                     let stream = ChunkStream::new(out);
@@ -593,7 +588,7 @@ mod tests {
             }
             child.await
         };
-        
+
         let status = f.await.expect("cannot get status");
         assert!(status.success());
         assert!(out_file.exists());
@@ -621,7 +616,8 @@ mod tests {
             None as Option<&str>,
             true,
             None,
-        ).await
+        )
+        .await
     }
 
     #[tokio::test]
@@ -632,7 +628,8 @@ mod tests {
             None as Option<&str>,
             false,
             None,
-        ).await;
+        )
+        .await;
         let out_file = temp_dir().join("audioserve_transcoded2.opus");
         dummy_transcode(
             "audioserve_transcoded3.opus",
@@ -640,7 +637,8 @@ mod tests {
             Some(&out_file),
             true,
             None,
-        ).await;
+        )
+        .await;
         remove_file(out_file).unwrap();
     }
 
@@ -655,6 +653,7 @@ mod tests {
                 start: 100,
                 duration: Some(1800),
             }),
-        ).await;
+        )
+        .await;
     }
 }

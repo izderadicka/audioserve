@@ -15,14 +15,14 @@ use ring::{
 use std::borrow;
 use std::collections::HashMap;
 use std::pin::Pin;
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use url::form_urlencoded;
 
 pub enum AuthResult<T> {
-    Authenticated{
+    Authenticated {
         credentials: T,
-        request: Request<Body>
+        request: Request<Body>,
     },
     Rejected(Response<Body>),
     LoggedIn(Response<Body>),
@@ -49,11 +49,11 @@ pub struct SharedSecretAuthenticator {
 impl SharedSecretAuthenticator {
     pub fn new(shared_secret: String, server_secret: Vec<u8>, token_validity_hours: u32) -> Self {
         SharedSecretAuthenticator {
-            secrets: Arc::new(Secrets{
-            shared_secret,
-            server_secret,
-            token_validity_hours,
-            })
+            secrets: Arc::new(Secrets {
+                shared_secret,
+                server_secret,
+                token_validity_hours,
+            }),
         }
     }
 }
@@ -71,8 +71,7 @@ impl Authenticator for SharedSecretAuthenticator {
         if req.method() == Method::POST && req.uri().path() == "/authenticate" {
             debug!("Authentication request");
             let auth = self.secrets.clone(); // TODO: auth need to be 'static - is there better way?
-            return Box::pin(
-                async move {
+            return Box::pin(async move {
                 match hyper::body::to_bytes(req.into_body()).await {
                     Err(e) => Err(Error::new_with_cause(e)),
                     Ok(b) => {
@@ -85,18 +84,18 @@ impl Authenticator for SharedSecretAuthenticator {
                                 debug!("Authentication success");
                                 let token = auth.new_auth_token();
                                 let resp = Response::builder()
-                                .typed_header(ContentType::text())
-                                .typed_header(ContentLength(token.len() as u64))
-                                .header(
-                                    SET_COOKIE,
-                                    format!(
-                                        "{}={}; Max-Age={}",
-                                        COOKIE_NAME,
-                                        token,
-                                        10 * 365 * 24 * 3600
-                                    )
-                                    .as_str(),
-                                );
+                                    .typed_header(ContentType::text())
+                                    .typed_header(ContentLength(token.len() as u64))
+                                    .header(
+                                        SET_COOKIE,
+                                        format!(
+                                            "{}={}; Max-Age={}",
+                                            COOKIE_NAME,
+                                            token,
+                                            10 * 365 * 24 * 3600
+                                        )
+                                        .as_str(),
+                                    );
 
                                 Ok(AuthResult::LoggedIn(resp.body(token.into()).unwrap()))
                             } else {
@@ -107,7 +106,7 @@ impl Authenticator for SharedSecretAuthenticator {
                         }
                     }
                 }
-            })
+            });
         } else {
             // And in this part we check token
             let mut token = req
@@ -126,7 +125,10 @@ impl Authenticator for SharedSecretAuthenticator {
             }
         }
         // If everything is ok we return credentials (in this case they are just unit type) and we return back request
-        Box::pin(future::ok(AuthResult::Authenticated{request:req, credentials:()}))
+        Box::pin(future::ok(AuthResult::Authenticated {
+            request: req,
+            credentials: (),
+        }))
     }
 }
 
