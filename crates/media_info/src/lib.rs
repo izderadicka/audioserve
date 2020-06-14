@@ -1,10 +1,9 @@
-#[macro_use]
-extern crate quick_error;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
+use thiserror::Error;
 
 #[allow(dead_code)]
 #[allow(non_upper_case_globals)]
@@ -12,21 +11,15 @@ use std::slice;
 #[allow(non_snake_case)]
 mod ffi;
 
-quick_error! {
-    #[derive(Debug)]
-    pub enum Error {
-        AVError(code:i32) {
-            display("libav error code {}", code)
-        }
-        AllocationError {
-            display("memory allocation error - maybe full memory")
-        }
-        InvalidString(err: std::str::Utf8Error) {
-            display("UTF8 error: {}", err)
-            from()
-        }
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("libav error code {0}")]
+    AVError(i32),
+    #[error("memory allocation error - maybe full memory")]
+    AllocationError,
 
-    }
+    #[error("UTF8 error: {0}")]
+    InvalidString(#[from] std::str::Utf8Error),
 }
 
 // fn string_from_ptr(ptr: *const c_char) -> Result<Option<String>> {
@@ -74,7 +67,12 @@ impl Dictionary {
         let mut prev = ptr::null();
         loop {
             unsafe {
-                let current = ffi::av_dict_get(self.dic, empty.as_ptr(), prev, ffi::AV_DICT_IGNORE_SUFFIX as i32);
+                let current = ffi::av_dict_get(
+                    self.dic,
+                    empty.as_ptr(),
+                    prev,
+                    ffi::AV_DICT_IGNORE_SUFFIX as i32,
+                );
                 if current.is_null() {
                     break;
                 } else {
@@ -116,7 +114,7 @@ pub struct Chapter {
     pub title: String,
     pub num: i32,
     pub start: u64,
-    pub end: u64
+    pub end: u64,
 }
 
 pub struct MediaFile {
@@ -152,7 +150,7 @@ impl MediaFile {
 
             let mut m = (*ctx).metadata;
 
-            if ffi::av_dict_count(m) == 0 && (*ctx).nb_streams > 0{
+            if ffi::av_dict_count(m) == 0 && (*ctx).nb_streams > 0 {
                 //OK we do not have meta in main header, let's look at streams
 
                 let streams = slice::from_raw_parts((*ctx).streams, (*ctx).nb_streams as usize);
@@ -196,25 +194,23 @@ impl MediaFile {
     meta_methods!(self title album artist composer genre track  );
 
     pub fn meta<S: AsRef<str>>(&self, key: S) -> Option<String> {
-        self.meta
-            .get(&key)
-            //.or_else(|| self.meta.get(key.as_ref().to_uppercase()))
+        self.meta.get(&key)
+        //.or_else(|| self.meta.get(key.as_ref().to_uppercase()))
     }
 
-    pub fn all_meta(&self) -> HashMap<String,String> {
+    pub fn all_meta(&self) -> HashMap<String, String> {
         self.meta.get_all()
     }
 
     pub fn chapters(&self) -> Option<Vec<Chapter>> {
-        
         fn norm_time(t: i64, time_base: ffi::AVRational) -> u64 {
-            assert!(t>=0);
+            assert!(t >= 0);
             t as u64 * 1000 * time_base.num as u64 / time_base.den as u64
         }
         unsafe {
             let num_chapters = (*self.ctx).nb_chapters as usize;
             if num_chapters == 0 {
-                return None
+                return None;
             }
             let mut c = Vec::new();
             let chaps = slice::from_raw_parts((*self.ctx).chapters, num_chapters);
@@ -222,18 +218,21 @@ impl MediaFile {
                 let chap = **chap;
                 let meta = Dictionary::new(chap.metadata);
                 let num = chap.id;
-                let title = meta.get("title").unwrap_or_else(|| format!("Chapter {}", num));
+                let title = meta
+                    .get("title")
+                    .unwrap_or_else(|| format!("Chapter {}", num));
                 let start = norm_time(chap.start, chap.time_base);
                 let end = norm_time(chap.end, chap.time_base);
-                c.push(Chapter{num,title, start, end});
+                c.push(Chapter {
+                    num,
+                    title,
+                    start,
+                    end,
+                });
             }
             Some(c)
         }
-
-        
     }
-
-    
 }
 
 impl Drop for MediaFile {
