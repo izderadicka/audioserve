@@ -1907,14 +1907,14 @@ dependencies = [
 
 [[package]]
 name = "websock"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "env_logger",
  "futures",
  "headers",
  "hyper",
  "log",
- "quick-error",
+ "thiserror",
  "tokio",
  "tokio-tungstenite",
 ]

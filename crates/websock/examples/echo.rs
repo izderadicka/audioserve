@@ -4,11 +4,11 @@ extern crate websock as ws;
 use futures::future;
 use hyper::server::Server;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, self, Method, StatusCode};
+use hyper::{self, Body, Method, Request, Response, StatusCode};
 use std::convert::Infallible;
+use std::io;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
-use std::io;
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -23,29 +23,25 @@ async fn send_file(p: &str) -> Result<Response<Body>, std::io::Error> {
 
 fn error_response(err: String) -> Response<Body> {
     Response::builder()
-    .status(StatusCode::INTERNAL_SERVER_ERROR)
-    .body(err.into())
-    .unwrap()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .body(err.into())
+        .unwrap()
 }
-
 
 fn not_found() -> Response<Body> {
     Response::builder()
-    .status(StatusCode::NOT_FOUND)
-    .body("Not Found".into())
-    .unwrap()
+        .status(StatusCode::NOT_FOUND)
+        .body("Not Found".into())
+        .unwrap()
 }
 
-async fn route(req: Request<Body>) -> Result<Response<Body>,io::Error> {
-
-    
+async fn route(req: Request<Body>) -> Result<Response<Body>, io::Error> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => send_file(INDEX_PATH).await,
         (&Method::GET, "/socket") => server_upgrade(req).await,
-        _ => Ok(not_found())
+        _ => Ok(not_found()),
     }
     .or_else(|e| Ok(error_response(e.to_string())))
-    
 }
 
 /// Our server HTTP handler to initiate HTTP upgrades.
@@ -70,7 +66,7 @@ async fn server_upgrade(req: Request<Body>) -> Result<Response<Body>, io::Error>
 async fn main() -> Result<(), GenericError> {
     env_logger::init();
     let addr = ([127, 0, 0, 1], 5000).into();
-    let service = make_service_fn(|_| async { Ok::<_, Infallible>(service_fn(route))});
+    let service = make_service_fn(|_| async { Ok::<_, Infallible>(service_fn(route)) });
     let server = Server::bind(&addr).serve(service);
     info!("Serving on {}", addr);
     server.await?;

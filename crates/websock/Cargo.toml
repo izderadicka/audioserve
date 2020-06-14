@@ -1,6 +1,6 @@
 [package]
 name = "websock"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2018"
 
@@ -11,7 +11,7 @@ tokio = {version="0.2", features=["rt-threaded", "macros", "io-util", "fs"]}
 futures = "0.3"
 log = {version="0.4", features=["max_level_debug"]}
 tokio-tungstenite = "0.10"
-quick-error = "1.2"
+thiserror = "1.0"
 headers = "0.3"
 
 [dev-dependencies]

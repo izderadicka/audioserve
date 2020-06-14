@@ -7,32 +7,28 @@ use futures::ready;
 use headers::{self, HeaderMapExt};
 use hyper::header::{self, AsHeaderName, HeaderMap, HeaderValue};
 use hyper::{Body, Request, Response, StatusCode};
-use quick_error::quick_error;
 use std::fmt;
 use std::io;
 use std::pin::Pin;
-use std::task::{Context, Poll};
 use std::sync::{Arc, RwLock};
+use std::task::{Context, Poll};
+use thiserror::Error;
 use tokio;
 use tokio_tungstenite::{
     tungstenite::{self, protocol},
     WebSocketStream,
 };
 
-quick_error! {
-    #[derive(Debug)]
-    pub enum Error {
-        Ws(err: tungstenite::Error) {
-            from()
-        }
-        Io(err: io::Error) {
-            from()
-        }
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Websocket error: {0}")]
+    Ws(#[from] tungstenite::Error),
 
-        InvalidMessageType {
-            description("Message is of incorrect type")
-        }
-    }
+    #[error("IO error: {0}")]
+    Io(#[from] io::Error),
+
+    #[error("Message is of incorrect type")]
+    InvalidMessageType,
 }
 
 fn header_matches<S: AsHeaderName>(headers: &HeaderMap<HeaderValue>, name: S, value: &str) -> bool {
@@ -55,9 +51,7 @@ fn header_matches<S: AsHeaderName>(headers: &HeaderMap<HeaderValue>, name: S, va
 pub fn spawn_websocket<T, F>(req: Request<Body>, mut f: F) -> Response<Body>
 where
     T: Default + Send + Sync + 'static,
-    F: FnMut(
-            Message<T>,
-        ) -> Pin<Box<dyn Future<Output = Result<Option<Message<T>>, Error>> + Send>>
+    F: FnMut(Message<T>) -> Pin<Box<dyn Future<Output = Result<Option<Message<T>>, Error>> + Send>>
         + Send
         + 'static,
 {
@@ -67,14 +61,15 @@ where
             let ws_process = ws_future.and_then(move |ws| {
                 let (tx, rc) = ws.split();
                 rc.and_then(move |m| match m.inner {
-                    protocol::Message::Ping(p) => { // Send Pong for Ping
+                    protocol::Message::Ping(p) => {
+                        // Send Pong for Ping
                         debug!("Got ping {:?}", p);
                         Box::pin(future::ok(Some(Message {
                             inner: protocol::Message::Pong(p),
                             context: m.context,
                         })))
                     }
-                    protocol::Message::Close(_)=> Box::pin(future::ok(None)), // No response for Close message
+                    protocol::Message::Close(_) => Box::pin(future::ok(None)), // No response for Close message
                     _ => f(m),
                 })
                 .try_filter_map(|m| async { Ok(m) })
@@ -157,7 +152,6 @@ pub fn upgrade_connection<T: Default>(
 
     Ok((res, upgraded))
 }
-
 
 /// A websocket `Stream` and `Sink`
 /// This struct can hold a context for this particular connection
