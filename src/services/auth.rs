@@ -18,6 +18,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use url::form_urlencoded;
+use thiserror::Error;
 
 pub enum AuthResult<T> {
     Authenticated {
@@ -233,16 +234,15 @@ impl Into<String> for Token {
     }
 }
 
-quick_error! {
-    #[derive(Debug, PartialEq)]
+    #[derive(Error, Debug, PartialEq)]
     enum TokenError {
-        InvalidSize { }
-        InvalidEncoding(error: ::data_encoding::DecodeError) {
-            from()
-        }
+        #[error("Invalid token size")]
+        InvalidSize,
 
+        #[error("Invalid token encoding")]
+        InvalidEncoding(#[from]::data_encoding::DecodeError),
     }
-}
+
 
 impl ::std::str::FromStr for Token {
     type Err = TokenError;

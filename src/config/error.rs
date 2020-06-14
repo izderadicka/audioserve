@@ -1,36 +1,21 @@
 use std::borrow::Cow;
-use std::fmt::{self, Display};
+use thiserror::Error;
 
-#[derive(Debug)]
-pub enum ErrorKind {
+#[derive(Error,Debug)]
+pub enum Error {
+    #[error("Error in argument {argument}: {message}")]
     Argument {
         argument: &'static str,
         message: Cow<'static, str>,
     },
+
+    #[error("Error in config value {name}: {message}")]
     ConfigValue {
         name: &'static str,
         message: Cow<'static, str>,
     },
 }
 
-#[derive(Debug)]
-pub struct Error(ErrorKind);
-
-impl Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.0 {
-            ErrorKind::Argument {
-                argument,
-                ref message,
-            } => write!(f, "Error in argument {}: {}", argument, message),
-            ErrorKind::ConfigValue { name, ref message } => {
-                write!(f, "Error in config value {}: {}", name, message)
-            }
-        }
-    }
-}
-
-impl std::error::Error for Error {}
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -39,20 +24,20 @@ impl Error {
     where
         S: Into<Cow<'static, str>>,
     {
-        Err(Error(ErrorKind::Argument {
+        Err(Error::Argument {
             argument,
             message: msg.into(),
-        }))
+        })
     }
 
     pub fn in_value<T, S>(name: &'static str, msg: S) -> std::result::Result<T, Self>
     where
         S: Into<Cow<'static, str>>,
     {
-        Err(Error(ErrorKind::ConfigValue {
+        Err(Error::ConfigValue {
             name,
             message: msg.into(),
-        }))
+        })
     }
 }
 
