@@ -192,7 +192,7 @@ pub struct Transcoder {
 type TranscodedStream =
     Pin<Box<dyn futures::Stream<Item = Result<Vec<u8>, std::io::Error>> + Send + Sync + 'static>>;
 #[cfg(feature = "transcoding-cache")]
-type TranscodedFuture = Pin<Box<dyn Future<Output = Result<TranscodedStream, Error>> + Send>>;
+type TranscodedFuture = Pin<Box<dyn Future<Output = Result<TranscodedStream>> + Send>>;
 
 impl Transcoder {
     pub fn new(quality: TranscodingFormat) -> Self {

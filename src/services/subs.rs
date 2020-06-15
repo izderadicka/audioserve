@@ -125,7 +125,7 @@ fn serve_file_cached_or_transcoded(
                         .transcoded_mime();
                     Box::pin(serve_opened_file(f, range, None, mime).map_err(|e| {
                         error!("Error sending cached file: {}", e);
-                        Error::new_with_cause(e)
+                        Error::new(e)
                     }))
                 }
             }
