@@ -23,7 +23,7 @@ mod libavformat {
     static INIT_LIBAV: Once = Once::new();
 
     pub fn init() {
-        INIT_LIBAV.call_once(|| media_info::init())
+        INIT_LIBAV.call_once(media_info::init)
     }
 
     pub struct Info {

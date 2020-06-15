@@ -68,6 +68,7 @@ dependencies = [
 name = "audioserve"
 version = "0.12.1"
 dependencies = [
+ "anyhow",
  "async-tar",
  "bytes",
  "cachedirtree",

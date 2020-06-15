@@ -83,7 +83,9 @@ pub trait ResponseBuilderExt {
 
 impl ResponseBuilderExt for Builder {
     fn typed_header<H: Header>(mut self, header: H) -> Builder {
-        self.headers_mut().map(|h| h.typed_insert(header));
+        if let Some(h) = self.headers_mut() {
+            h.typed_insert(header)
+        };
         self
     }
 }

@@ -19,6 +19,7 @@ matrix:
   - rust: nightly
   include:
     - language: node_js
+      before_script: true
       node_js:
       - "10"
       cache:
@@ -31,6 +32,7 @@ matrix:
     - language: minimal
       if: tag IS present
       before_install: true
+      before_script: true
       script: true
       services:
         - docker
@@ -46,6 +48,7 @@ matrix:
       before_install: true
       services:
         - docker
+      before_script: true
       script: 
         - ./build_static.sh
       deploy:

@@ -17,8 +17,8 @@ use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use url::form_urlencoded;
 use thiserror::Error;
+use url::form_urlencoded;
 
 pub enum AuthResult<T> {
     Authenticated {
@@ -234,15 +234,14 @@ impl Into<String> for Token {
     }
 }
 
-    #[derive(Error, Debug, PartialEq)]
-    enum TokenError {
-        #[error("Invalid token size")]
-        InvalidSize,
+#[derive(Error, Debug, PartialEq)]
+enum TokenError {
+    #[error("Invalid token size")]
+    InvalidSize,
 
-        #[error("Invalid token encoding")]
-        InvalidEncoding(#[from]::data_encoding::DecodeError),
-    }
-
+    #[error("Invalid token encoding")]
+    InvalidEncoding(#[from] ::data_encoding::DecodeError),
+}
 
 impl ::std::str::FromStr for Token {
     type Err = TokenError;

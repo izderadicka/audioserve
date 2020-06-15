@@ -231,7 +231,7 @@ impl<T: AsyncRead + Unpin> Stream for ChunkStream<T> {
             }
         } else {
             error!("Polling after stream is done");
-            return Poll::Ready(None);
+            Poll::Ready(None)
         }
     }
 }

@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use thiserror::Error;
 
-#[derive(Error,Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     #[error("Error in argument {argument}: {message}")]
     Argument {
@@ -15,7 +15,6 @@ pub enum Error {
         message: Cow<'static, str>,
     },
 }
-
 
 pub type Result<T> = std::result::Result<T, Error>;
 
