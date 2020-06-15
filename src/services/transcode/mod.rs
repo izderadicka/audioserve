@@ -418,11 +418,10 @@ impl Transcoder {
         seek: Option<f32>,
         span: Option<TimeSpan>,
         counter: super::Counter,
-    ) -> Result<
-        (
-            ChunkStream<ChildStdout>,
-            impl Future<Output = Result<(), ()>>,
-        )> {
+    ) -> Result<(
+        ChunkStream<ChildStdout>,
+        impl Future<Output = Result<(), ()>>,
+    )> {
         let mut cmd = match (&file, &self.quality) {
             (_, TranscodingFormat::Remux) => {
                 self.build_remux_command(file.as_ref(), seek, span, false)
