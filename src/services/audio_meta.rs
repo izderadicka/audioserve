@@ -1,5 +1,5 @@
 use super::types::AudioMeta;
-use crate::error::Error;
+use crate::error::{bail, Result};
 use std::path::Path;
 
 pub struct Chapter {
@@ -51,25 +51,25 @@ mod libavformat {
     }
 
     impl Info {
-        pub fn from_file(path: &Path) -> Result<Info, Error> {
+        pub fn from_file(path: &Path) -> Result<Info> {
             match path.as_os_str().to_str() {
                 Some(fname) => match media_info::MediaFile::open(fname) {
                     Ok(media_file) => Ok(Info { media_file }),
                     Err(e) => {
                         error!("Cannot get media info, error {}", e);
-                        Err(Error::new_with_cause(e))
+                        bail!(e)
                     }
                 },
                 None => {
                     error!("Invalid file name {:?}, not utf-8", path);
-                    Err(Error::new_with_cause("Non UTF-8 file name"))
+                    bail!("Non UTF-8 file name")
                 }
             }
         }
     }
 }
 
-pub fn get_audio_properties(audio_file_name: &Path) -> Result<impl MediaInfo, Error> {
+pub fn get_audio_properties(audio_file_name: &Path) -> Result<impl MediaInfo> {
     libavformat::Info::from_file(audio_file_name)
 }
 

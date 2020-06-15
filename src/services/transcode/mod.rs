@@ -2,7 +2,7 @@ use self::codecs::*;
 use super::subs::ChunkStream;
 use super::types::AudioFormat;
 use crate::config::get_config;
-use crate::error::Error;
+use crate::error::{bail, Result};
 use futures::future::Either;
 use futures::prelude::*;
 use mime::Mime;
@@ -303,7 +303,7 @@ impl Transcoder {
         span: Option<TimeSpan>,
         counter: super::Counter,
         _quality: QualityLevel,
-    ) -> impl Future<Output = Result<ChunkStream<ChildStdout>, Error>> {
+    ) -> impl Future<Output = Result<ChunkStream<ChildStdout>>> {
         future::ready(
             self.transcode_inner(file, seek, span, counter)
                 .map(|(stream, f)| {
@@ -422,9 +422,7 @@ impl Transcoder {
         (
             ChunkStream<ChildStdout>,
             impl Future<Output = Result<(), ()>>,
-        ),
-        Error,
-    > {
+        )> {
         let mut cmd = match (&file, &self.quality) {
             (_, TranscodingFormat::Remux) => {
                 self.build_remux_command(file.as_ref(), seek, span, false)
@@ -494,12 +492,12 @@ impl Transcoder {
                     Ok((stream, fut))
                 } else {
                     error!("Cannot get stdout");
-                    Err(Error::new_with_cause("Cannot get stdout"))
+                    bail!("Cannot get stdout");
                 }
             }
             Err(e) => {
                 error!("Cannot spawn child process: {:?}", e);
-                Err(Error::new_with_cause("Cannot spawn child"))
+                bail!("Cannot spawn child");
             }
         }
     }

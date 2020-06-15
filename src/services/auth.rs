@@ -1,5 +1,5 @@
 use super::subs::short_response;
-use crate::error::Error;
+use crate::error::{Result, bail};
 use crate::util::ResponseBuilderExt;
 use data_encoding::BASE64;
 use futures::{future, prelude::*};
@@ -28,7 +28,7 @@ pub enum AuthResult<T> {
     Rejected(Response<Body>),
     LoggedIn(Response<Body>),
 }
-type AuthFuture<T> = Pin<Box<dyn Future<Output = Result<AuthResult<T>, Error>> + Send>>;
+type AuthFuture<T> = Pin<Box<dyn Future<Output = Result<AuthResult<T>>> + Send>>;
 
 pub trait Authenticator: Send + Sync {
     type Credentials;
@@ -74,7 +74,7 @@ impl Authenticator for SharedSecretAuthenticator {
             let auth = self.secrets.clone(); // TODO: auth need to be 'static - is there better way?
             return Box::pin(async move {
                 match hyper::body::to_bytes(req.into_body()).await {
-                    Err(e) => Err(Error::new_with_cause(e)),
+                    Err(e) => bail!(e),
                     Ok(b) => {
                         let params = form_urlencoded::parse(b.as_ref())
                             .into_owned()

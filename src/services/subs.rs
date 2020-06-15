@@ -7,7 +7,7 @@ use super::transcode::{guess_format, AudioFilePath, QualityLevel, TimeSpan};
 use super::types::*;
 use super::Counter;
 use crate::config::get_config;
-use crate::error::Error;
+use crate::error::{Error, Result};
 use crate::util::{
     checked_dec, guess_mime_type, into_range_bounds, to_satisfiable_range, ResponseBuilderExt,
 };
@@ -180,7 +180,7 @@ fn serve_file_transcoded(
                 HyperResponse::builder()
                     .typed_header(ContentType::from(mime))
                     .header("X-Transcode", params.as_bytes())
-                    .body(Body::wrap_stream(stream.map_err(Error::new_with_cause)))
+                    .body(Body::wrap_stream(stream.map_err(Error::new)))
                     .unwrap(),
             ),
             Err(e) => {
@@ -314,7 +314,7 @@ fn serve_file_from_fs(
                 let mime = guess_mime_type(&filename);
                 serve_opened_file(file, range, caching, mime)
                     .await
-                    .map_err(Error::new_with_cause)
+                    .map_err(Error::new)
             }
             Err(e) => {
                 error!("Error when sending file {:?} : {}", filename, e);
@@ -383,7 +383,7 @@ pub fn get_folder(
                 Ok(folder) => json_response(&folder),
                 Err(_) => short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE),
             })
-            .map_err(Error::new_with_cause),
+            .map_err(Error::new),
     )
 }
 
@@ -398,7 +398,7 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
     let f = tokio::fs::metadata(full_path.clone())
         .map_err(|e| {
             error!("Cannot get meta for download path");
-            Error::new_with_cause(e)
+            Error::new(e)
         })
         .and_then(move |meta| {
             if meta.is_file() {
@@ -438,7 +438,7 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
                     })
                     .map_err(|e| {
                         error!("Error listing files for tar: {}", e);
-                        Error::new_with_cause(e)
+                        Error::new(e)
                     });
 
                 Box::pin(fut)
@@ -488,7 +488,7 @@ pub fn search(
             let res = searcher.search(collection, query, ordering);
             json_response(&res)
         })
-        .map_err(Error::new_with_cause),
+        .map_err(Error::new),
     )
 }
 
@@ -498,6 +498,6 @@ pub fn recent(collection: usize, searcher: Search<String>) -> ResponseFuture {
             let res = searcher.recent(collection);
             json_response(&res)
         })
-        .map_err(Error::new_with_cause),
+        .map_err(Error::new),
     )
 }
