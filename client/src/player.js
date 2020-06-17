@@ -28,6 +28,11 @@ const NO_RELOAD_JUMP_BACK = 300;
 const NO_RELOAD_JUMP_FWD = 120;
 const MEDIA_ERRORS = ["MEDIA_ERR_ABORTED", "MEDIA_ERR_NETWORK", "MEDIA_ERR_DECODE", "MEDIA_ERR_SRC_NOT_SUPPORTED"];
 
+function isHidden(el) {
+    var style = window.getComputedStyle(el);
+    return (style.display === 'none')
+}
+
 export class AudioPlayer {
     // Most of code copied from https://codepen.io/gregh/pen/NdVvbm
 
@@ -188,6 +193,23 @@ export class AudioPlayer {
         );
 
         this.initPlayer();
+
+        // space key - let's capture those that bubble up to document and are not from inputs
+        // and emit click - this would be probably easiest 
+        window.addEventListener('keydown', (evt) => {
+            
+            if (evt.keyCode == 32 && evt.target.tagName != "INPUT") {
+                evt.preventDefault();
+                evt.stopPropagation();
+                debug("space press", evt.target.tagName);
+                if (! isHidden(this._playpauseBtn)) {
+                    debug("Click play- pause");
+                    this._playpauseBtn.dispatchEvent(new Event('click'));
+                }
+                return false;
+               
+            }
+        })
     }
 
     initPlayer() {
