@@ -1,4 +1,5 @@
 use super::ResponseFuture;
+use crate::error::{bail, Context, Error};
 use cache::{Cache, Position};
 use futures::future;
 use hyper::{Body, Request};
@@ -38,12 +39,12 @@ struct Reply {
 }
 
 impl FromStr for Msg {
-    type Err = &'static str;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<_> = s.split('|').collect();
         if parts.len() == 2 {
-            let position: f32 = parts[0].parse().map_err(|_| "Position is not a number")?;
+            let position: f32 = parts[0].parse().context("Position is not a number")?;
             if parts[1].is_empty() {
                 Ok(Msg::Position {
                     position,
@@ -66,7 +67,7 @@ impl FromStr for Msg {
                 })
             }
         } else {
-            Err("Too many |")
+            bail!("Too many |")
         }
     }
 }
@@ -76,10 +77,7 @@ pub fn position_service(req: Request<Body>) -> ResponseFuture {
 
     let res = spawn_websocket::<String, _>(req, |m| {
         debug!("Got message {:?}", m);
-        let message = m
-            .to_str()
-            .map_err(|_| "Invalid ws message")
-            .and_then(str::parse);
+        let message = m.to_str().map_err(Error::new).and_then(str::parse);
 
         match message {
             Ok(message) => Box::pin(async {

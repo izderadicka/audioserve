@@ -1,3 +1,4 @@
+use crate::error::{Context, Error};
 use futures::{
     future,
     stream::{StreamExt, TryStreamExt},
@@ -10,16 +11,16 @@ use std::path::Path;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tls::TlsStream;
 
-type Error = Box<dyn std::error::Error + 'static>;
-
 fn load_private_key<P>(file: P, pass: &str) -> Result<Identity, Error>
 where
     P: AsRef<Path>,
 {
     let mut bytes = vec![];
-    let mut f = File::open(file)?;
-    f.read_to_end(&mut bytes)?;
-    let key = Identity::from_pkcs12(&bytes, pass)?;
+    let mut f = File::open(&file)
+        .with_context(|| format!("cannot open private key file {:?}", file.as_ref()))?;
+    f.read_to_end(&mut bytes)
+        .context("cannot read private key file")?;
+    let key = Identity::from_pkcs12(&bytes, pass).context("invalid private key")?;
     Ok(key)
 }
 
@@ -28,10 +29,13 @@ pub(crate) async fn tls_acceptor(
     ssl: &crate::config::SslConfig,
 ) -> Result<impl Accept<Conn = TlsStream<TcpStream>, Error = io::Error>, Error> {
     let private_key = load_private_key(&ssl.key_file, &ssl.key_password)?;
-    let tls_cx = native_tls::TlsAcceptor::builder(private_key).build()?;
+    let tls_cx = native_tls::TlsAcceptor::builder(private_key)
+        .build()
+        .context("cannot build native TLS acceptor")?;
     let tls_cx = tokio_tls::TlsAcceptor::from(tls_cx);
     let stream = TcpListener::bind(addr)
-        .await?
+        .await
+        .with_context(|| format!("cannot bind address {}", addr))?
         .and_then(move |s| {
             let acceptor = tls_cx.clone();
             async move {

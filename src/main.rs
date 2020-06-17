@@ -6,6 +6,7 @@ extern crate serde_derive;
 extern crate lazy_static;
 
 use config::{get_config, init_config};
+use error::{bail, Context, Error};
 use futures::prelude::*;
 use hyper::{service::make_service_fn, Server as HttpServer};
 use ring::rand::{SecureRandom, SystemRandom};
@@ -27,17 +28,17 @@ mod services;
 mod tls;
 mod util;
 
-fn generate_server_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error> {
+fn generate_server_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, Error> {
     let file = file.as_ref();
     if file.exists() {
         let mut v = vec![];
-        let size = file.metadata()?.len();
+        let size = file.metadata().context("secret file metadata")?.len();
         if size > 128 {
-            return Err(io::Error::new(io::ErrorKind::Other, "Secret too long"));
+            bail!("Secret too long");
         }
 
-        let mut f = File::open(file)?;
-        f.read_to_end(&mut v)?;
+        let mut f = File::open(file).context("cannot open secret file")?;
+        f.read_to_end(&mut v).context("cannot read secret file")?;
         Ok(v)
     } else {
         let mut random = [0u8; 32];
@@ -65,9 +66,7 @@ fn generate_server_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, io::Error>
     }
 }
 
-type RuntimeError = Box<dyn std::error::Error + 'static>;
-
-fn start_server(server_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, RuntimeError> {
+fn start_server(server_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Error> {
     let cfg = get_config();
     let svc = FileSendService {
         authenticator: get_config().shared_secret.as_ref().map(
@@ -87,7 +86,7 @@ fn start_server(server_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Runti
     };
     let addr = cfg.listen;
     let start_server = async move {
-        let server: Pin<Box<dyn Future<Output = Result<(), RuntimeError>> + Send>> =
+        let server: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> =
             match get_config().ssl.as_ref() {
                 None => {
                     let server = HttpServer::bind(&addr).serve(make_service_fn(move |_| {
@@ -101,7 +100,9 @@ fn start_server(server_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Runti
                     {
                         info!("Server Listening on {} with TLS", &addr);
                         let create_server = async move {
-                            let incoming = tls::tls_acceptor(&addr, &ssl).await?;
+                            let incoming = tls::tls_acceptor(&addr, &ssl)
+                                .await
+                                .context("TLS handshake")?;
                             let server = HttpServer::builder(incoming)
                                 .serve(make_service_fn(move |_| {
                                     future::ok::<_, error::Error>(svc.clone())

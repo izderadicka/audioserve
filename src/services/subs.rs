@@ -125,7 +125,7 @@ fn serve_file_cached_or_transcoded(
                         .transcoded_mime();
                     Box::pin(serve_opened_file(f, range, None, mime).map_err(|e| {
                         error!("Error sending cached file: {}", e);
-                        Error::new(e)
+                        Error::new(e).context("sending cached file")
                     }))
                 }
             }
@@ -398,7 +398,7 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
     let f = tokio::fs::metadata(full_path.clone())
         .map_err(|e| {
             error!("Cannot get meta for download path");
-            Error::new(e)
+            Error::new(e).context("metadata for folder download")
         })
         .and_then(move |meta| {
             if meta.is_file() {
@@ -438,7 +438,7 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
                     })
                     .map_err(|e| {
                         error!("Error listing files for tar: {}", e);
-                        Error::new(e)
+                        Error::new(e).context("listing files for tar")
                     });
 
                 Box::pin(fut)
