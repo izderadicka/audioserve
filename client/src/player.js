@@ -1,6 +1,9 @@
 import "./player.css";
 import { debug, ifDebug } from "./debug.js";
 
+const JUMP_STEP_SHORT = 10;
+const JUMP_STEP_LONG = 60;
+
 export function formatTime(dur) {
     if (!isFinite(dur)) return "?";
     let hours = 0;
@@ -59,6 +62,8 @@ export class AudioPlayer {
         this._cacheIndicator = audioPlayer.querySelector('.player-cache');
         this._currentlyDragged = null;
         this._isChrome = !!window.chrome; // Chrome requires some tweaks
+        this._rewind_step = JUMP_STEP_SHORT;
+
 
         let volumeBtn = audioPlayer.querySelector('.volume-btn');
         let sliderTime = audioPlayer.querySelector(".controls .slider");
@@ -194,20 +199,45 @@ export class AudioPlayer {
 
         this.initPlayer();
 
-        // space key - let's capture those that bubble up to document and are not from inputs
-        // and emit click - this would be probably easiest 
+        window.addEventListener('keyup', (evt) => {
+            if (evt.keyCode == 16) {
+                this._rewind_step = JUMP_STEP_SHORT;
+            }
+        });
+        // play and forward and rewind by keys
         window.addEventListener('keydown', (evt) => {
-            
-            if (evt.keyCode == 32 && evt.target.tagName != "INPUT") {
+            if (evt.keyCode == 16) {
+                this._rewind_step = JUMP_STEP_LONG;
+            }
+            // disable for certain elements where keys plays a role
+            if (!['INPUT', 'SELECT', 'TEXTAREA'].includes(evt.target.tagName) && [32, 37, 39].includes(evt.keyCode)) {
                 evt.preventDefault();
                 evt.stopPropagation();
-                debug("space press", evt.target.tagName);
-                if (! isHidden(this._playpauseBtn)) {
-                    debug("Click play- pause");
-                    this._playpauseBtn.dispatchEvent(new Event('click'));
+
+                // ArrowRight 39
+                if (evt.keyCode == 39) {
+                    this._player.currentTime = this._player.currentTime + this._rewind_step;
+                }
+
+                // ArrowLeft 37
+                if (evt.keyCode == 37) {
+                    var time = this._timeOffset + this._player.currentTime - this._rewind_step;
+                    time = Math.max(time, 0);
+                    this.jumpToTime(time);
+                }
+
+                // Space
+                if (evt.keyCode == 32) {
+                    debug("space press", evt.target.tagName);
+
+                    //only if play_pause is visible
+                    if (!isHidden(this._playpauseBtn)) {
+                        debug("Click play- pause");
+                        this._playpauseBtn.dispatchEvent(new Event('click'));
+                    }
                 }
                 return false;
-               
+
             }
         })
     }
@@ -236,15 +266,15 @@ export class AudioPlayer {
         this._player.addEventListener('timeupdate', this._updateProgress.bind(this));
         this._player.addEventListener('volumechange', this._updateVolume.bind(this));
         this._player.addEventListener('durationchange', this._updateTotal.bind(this));
-        this._player.addEventListener('loadedmetadata', (evt) => {  
-            if (isFinite(this._player.duration) && this._player.duration>0) {
+        this._player.addEventListener('loadedmetadata', (evt) => {
+            if (isFinite(this._player.duration) && this._player.duration > 0) {
                 debug(`Known duration ${this._player.duration}`);
                 this._sizedContent = true;
                 this._updateTotal();
             } else {
                 this._sizedContent = false;
             }
-            
+
         });
         this._player.addEventListener('canplay', () => {
             this._showPlay();
@@ -427,11 +457,11 @@ export class AudioPlayer {
     _jumpWithSeek(time) {
         debug(`Reloading media by server seek with time ${time}`);
         //This is a hack - it's just not good to jump directly to the end 
-        if (time>= this.getTotalTime() && time >=1) time = this.getTotalTime() - 0.51;
+        if (time >= this.getTotalTime() && time >= 1) time = this.getTotalTime() - 0.51;
         let queryIndex = this._player.src.indexOf("&seek=");
         let baseUrl = queryIndex > 0 ? this._player.src.substr(0, queryIndex) : this._player.src;
         let wasPlaying = !this._player.paused;
-        let url = baseUrl + `&seek=${Math.round(time * 1000)/1000}`;
+        let url = baseUrl + `&seek=${Math.round(time * 1000) / 1000}`;
         this._timeOffset = time;
         this._player.src = url;
         this._player.currentTime = 0;
@@ -525,18 +555,18 @@ export class AudioPlayer {
     }
 
 
-    
+
     play(beforePlay) {
-        return (beforePlay?beforePlay():Promise.resolve())
-        .then((cont) => {
-        if (cont === false) return Promise.resolve();
-            return this._player.play()
-            .catch((e) => {
-                this.pause();
-                console.log("Play error", e);
-            }
-            );
-        });
+        return (beforePlay ? beforePlay() : Promise.resolve())
+            .then((cont) => {
+                if (cont === false) return Promise.resolve();
+                return this._player.play()
+                    .catch((e) => {
+                        this.pause();
+                        console.log("Play error", e);
+                    }
+                    );
+            });
     }
 
     pause() {
