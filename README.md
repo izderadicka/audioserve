@@ -20,7 +20,7 @@ Audioserve is intended to serve files from directory in exactly same structure (
 Files should be named so they are in right alphabetical order - ideal is:
 
     001 - First Chapter Name.opus
-    002 - Seconf Chapter Name.opus
+    002 - Second Chapter Name.opus
 
 But this structure is not mandatory -  you will just see whatever directories and files you have, so use anything that will suite you.
 
