@@ -248,6 +248,7 @@ pub struct Config {
     pub listen: SocketAddr,
     pub thread_pool: ThreadPoolConfig,
     pub base_dirs: Vec<PathBuf>,
+    pub base_url: Option<String>,
     pub shared_secret: Option<String>,
     pub transcoding: TranscodingConfig,
     pub token_validity_hours: u32,
@@ -366,6 +367,12 @@ impl Config {
             }
         }
 
+        if let Some(url) = &self.base_url {
+            if let Err(e) = validators::is_valid_base_url(url.clone()) {
+                return value_error!("base_url", e)
+            }
+        }
+
         Ok(())
     }
 }
@@ -375,6 +382,7 @@ impl Default for Config {
         let data_base_dir = base_data_dir();
         Config {
             base_dirs: vec![],
+            base_url: None,
             listen: ([0, 0, 0, 0], 3000u16).into(),
             thread_pool: ThreadPoolConfig::default(),
             shared_secret: None,

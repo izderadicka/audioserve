@@ -140,7 +140,14 @@ fn create_parser<'a>() -> Parser<'a> {
             .validator(is_number)
             .env("AUDIOSERVE_CHAPTERS_FROM_DURATION")
             .help("If long files is presented as chapters, one chapter has x mins [default: 30]")
-        );
+        )
+        .arg(Arg::with_name("base-url")
+        .long("base-url")
+        .takes_value(true)
+        .validator(is_valid_base_url)
+        .env("AUDIOSERVE_BASE_URL")
+        .help("Base URL is a fixed path that is before audioserve path part, must start with / and not end with /  [default: none]")
+    );
 
     if cfg!(feature = "folder-download") {
         parser = parser.arg(
@@ -446,6 +453,10 @@ where
         );
     }
 
+   if let Some(s) = args.value_of("base-url").map(std::string::ToString::to_string) {
+       config.base_url = Some(s);
+   };
+
     config.check()?;
     if args.is_present("print-config") {
         println!("{}", serde_yaml::to_string(&config).unwrap());
@@ -489,6 +500,8 @@ mod test {
             "--chapters-duration",
             "99",
             "--cors",
+            "--base-url",
+            "/user/audioserve",
             "test_data",
             "client",
         ])
@@ -507,6 +520,7 @@ mod test {
         assert_eq!(99, c.chapters.from_duration);
         assert_eq!(99, c.chapters.duration);
         assert!(c.cors);
+        assert_eq!("/user/audioserve", c.base_url.unwrap())
     }
 
     #[test]
@@ -573,6 +587,8 @@ mod test {
         let c =
             parse_args_from(&["audioserve", "--config", "test_data/sample-config.yaml"]).unwrap();
 
-        assert_eq!("neco", c.ssl.unwrap().key_password);
+        assert_eq!("neco", c.ssl.as_ref().unwrap().key_password);
+        assert_eq!(Some("asecret".into()), c.shared_secret);
+        assert_eq!(Some("/user/audioserve".into()), c.base_url);
     }
 }
