@@ -369,7 +369,7 @@ impl Config {
 
         if let Some(url) = &self.base_url {
             if let Err(e) = validators::is_valid_base_url(url.clone()) {
-                return value_error!("base_url", e)
+                return value_error!("base_url", e);
             }
         }
 

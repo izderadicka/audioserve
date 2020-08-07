@@ -453,9 +453,12 @@ where
         );
     }
 
-   if let Some(s) = args.value_of("base-url").map(std::string::ToString::to_string) {
-       config.base_url = Some(s);
-   };
+    if let Some(s) = args
+        .value_of("base-url")
+        .map(std::string::ToString::to_string)
+    {
+        config.base_url = Some(s);
+    };
 
     config.check()?;
     if args.is_present("print-config") {

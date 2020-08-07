@@ -47,5 +47,9 @@ pub fn parent_dir_exists(p: &OsStr) -> Result<(), OsString> {
 }
 
 pub fn is_valid_base_url(s: String) -> ValidatorResult {
-    if s.starts_with('/') && ! s.ends_with('/') {Ok(())} else { Err("Must start with / but not end with it".into())}
+    if s.starts_with('/') && !s.ends_with('/') {
+        Ok(())
+    } else {
+        Err("Must start with / but not end with it".into())
+    }
 }
