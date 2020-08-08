@@ -68,7 +68,11 @@ fn generate_server_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, Error> {
 
 macro_rules! get_url_path {
     () => {
-        get_config().url_path_prefix.as_ref().map(|s| s.to_string()+"/").unwrap_or_default()
+        get_config()
+            .url_path_prefix
+            .as_ref()
+            .map(|s| s.to_string() + "/")
+            .unwrap_or_default()
     };
 }
 
