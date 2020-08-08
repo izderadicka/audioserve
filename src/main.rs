@@ -66,6 +66,12 @@ fn generate_server_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, Error> {
     }
 }
 
+macro_rules! get_url_path {
+    () => {
+        get_config().url_path_prefix.as_ref().map(|s| s.to_string()+"/").unwrap_or_default()
+    };
+}
+
 fn start_server(server_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Error> {
     let cfg = get_config();
     let svc = FileSendService {
@@ -92,13 +98,13 @@ fn start_server(server_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Error
                     let server = HttpServer::bind(&addr).serve(make_service_fn(move |_| {
                         future::ok::<_, error::Error>(svc.clone())
                     }));
-                    info!("Server listening on {}", &addr);
+                    info!("Server listening on {}{}", &addr, get_url_path!());
                     Box::pin(server.map_err(|e| e.into()))
                 }
                 Some(ssl) => {
                     #[cfg(feature = "tls")]
                     {
-                        info!("Server Listening on {} with TLS", &addr);
+                        info!("Server listening on {}{} with TLS", &addr, get_url_path!());
                         let create_server = async move {
                             let incoming = tls::tls_acceptor(&addr, &ssl)
                                 .await

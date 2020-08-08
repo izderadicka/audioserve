@@ -13,11 +13,14 @@ import config from "./config";
 
 $(function () {
     const RECENT_QUERY = "__RECENT__";
-    let baseUrl;
+    var baseUrl;
     if (AUDIOSERVE_DEVELOPMENT) {
         baseUrl = `${window.location.protocol}//${window.location.hostname}:${config.DEVELOPMENT_PORT}`;
     } else {
         baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname.length > 1 ? window.location.pathname : ""}`;
+        if (baseUrl.endsWith('/')) {
+            baseUrl = baseUrl.substr(0, baseUrl.length-1);
+        }
     }
 
 

@@ -15,7 +15,7 @@ class PlaybackSync {
             `${mapProtocol(window.location.protocol)}//${window.location.hostname}:${config.DEVELOPMENT_PORT}`:
             `${mapProtocol(window.location.protocol)}//${window.location.host}${window.location.pathname.length > 1 ? window.location.pathname : ""}`;
         
-        this.socketUrl = baseUrl+"/position";
+        this.socketUrl = baseUrl + (baseUrl.endsWith("/")?"":"/") + "position";
         this.closed = false;
         this.filePath = null;
         this.groupPrefix = null;
