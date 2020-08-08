@@ -1,7 +1,7 @@
 use super::subs::short_response;
 use crate::error::{bail, Result};
-use crate::util::ResponseBuilderExt;
 use crate::services::RequestWrapper;
+use crate::util::ResponseBuilderExt;
 use data_encoding::BASE64;
 use futures::{future, prelude::*};
 use headers::authorization::Bearer;

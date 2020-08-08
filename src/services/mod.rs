@@ -42,7 +42,7 @@ type Counter = Arc<AtomicUsize>;
 
 pub struct RequestWrapper {
     request: Request<Body>,
-    path: String
+    path: String,
 }
 
 impl RequestWrapper {
@@ -54,22 +54,26 @@ impl RequestWrapper {
                 return Err(error::Error::msg("Invalid path encoding"));
             }
         };
-        let path  = match path_prefix {
+        let path = match path_prefix {
             Some(p) => match path.strip_prefix(p) {
                 Some(s) => s.to_string(),
-                None => return Err(error::Error::msg(format!("URL path us missing prefix {}", p)))
+                None => {
+                    return Err(error::Error::msg(format!(
+                        "URL path us missing prefix {}",
+                        p
+                    )))
+                }
             },
-            None => path
-
+            None => path,
         };
-        Ok(RequestWrapper{request, path})
+        Ok(RequestWrapper { request, path })
     }
 
     pub fn path(&self) -> &str {
         self.path.as_str()
     }
 
-    pub fn headers(&self) -> &hyper::HeaderMap{
+    pub fn headers(&self) -> &hyper::HeaderMap {
         self.request.headers()
     }
 
@@ -142,9 +146,12 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        let req = match RequestWrapper::new(req, get_config().url_path_prefix.as_ref().map(|s| s.as_str())) {
+        let req = match RequestWrapper::new(
+            req,
+            get_config().url_path_prefix.as_ref().map(|s| s.as_str()),
+        ) {
             Ok(r) => r,
-            Err(_) => return short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE) 
+            Err(_) => return short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE),
         };
         //static files
         if req.path() == "/" {
