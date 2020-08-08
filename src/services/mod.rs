@@ -58,10 +58,11 @@ impl RequestWrapper {
             Some(p) => match path.strip_prefix(p) {
                 Some(s) => s.to_string(),
                 None => {
+                    error!("URL path is missing prefix {}", p);
                     return Err(error::Error::msg(format!(
-                        "URL path us missing prefix {}",
+                        "URL path is missing prefix {}",
                         p
-                    )))
+                    )));
                 }
             },
             None => path,
