@@ -46,7 +46,7 @@ pub fn parent_dir_exists(p: &OsStr) -> Result<(), OsString> {
     }
 }
 
-pub fn is_valid_base_url(s: String) -> ValidatorResult {
+pub fn is_valid_url_path_prefix(s: String) -> ValidatorResult {
     if s.starts_with('/') && !s.ends_with('/') {
         Ok(())
     } else {

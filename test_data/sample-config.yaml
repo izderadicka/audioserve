@@ -9,7 +9,7 @@ thread_pool:
 base_dirs:
   - test_data
 shared_secret: asecret
-base_url: /user/audioserve
+url_path_prefix: /user/audioserve
 transcoding:
   max_parallel_processes: 8
   max_runtime_hours: 24

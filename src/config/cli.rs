@@ -141,11 +141,11 @@ fn create_parser<'a>() -> Parser<'a> {
             .env("AUDIOSERVE_CHAPTERS_FROM_DURATION")
             .help("If long files is presented as chapters, one chapter has x mins [default: 30]")
         )
-        .arg(Arg::with_name("base-url")
-        .long("base-url")
+        .arg(Arg::with_name("url-path-prefix")
+        .long("url-path-prefix")
         .takes_value(true)
-        .validator(is_valid_base_url)
-        .env("AUDIOSERVE_BASE_URL")
+        .validator(is_valid_url_path_prefix)
+        .env("AUDIOSERVE_URL_PATH_PREFIX")
         .help("Base URL is a fixed path that is before audioserve path part, must start with / and not end with /  [default: none]")
     );
 
@@ -454,10 +454,10 @@ where
     }
 
     if let Some(s) = args
-        .value_of("base-url")
+        .value_of("url-path-prefix")
         .map(std::string::ToString::to_string)
     {
-        config.base_url = Some(s);
+        config.url_path_prefix = Some(s);
     };
 
     config.check()?;
@@ -503,7 +503,7 @@ mod test {
             "--chapters-duration",
             "99",
             "--cors",
-            "--base-url",
+            "--url-path-prefix",
             "/user/audioserve",
             "test_data",
             "client",
@@ -523,7 +523,7 @@ mod test {
         assert_eq!(99, c.chapters.from_duration);
         assert_eq!(99, c.chapters.duration);
         assert!(c.cors);
-        assert_eq!("/user/audioserve", c.base_url.unwrap())
+        assert_eq!("/user/audioserve", c.url_path_prefix.unwrap())
     }
 
     #[test]
@@ -592,6 +592,6 @@ mod test {
 
         assert_eq!("neco", c.ssl.as_ref().unwrap().key_password);
         assert_eq!(Some("asecret".into()), c.shared_secret);
-        assert_eq!(Some("/user/audioserve".into()), c.base_url);
+        assert_eq!(Some("/user/audioserve".into()), c.url_path_prefix);
     }
 }
