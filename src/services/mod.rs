@@ -7,7 +7,7 @@ use self::subs::{
 use self::transcode::QualityLevel;
 use self::types::FoldersOrdering;
 use crate::config::get_config;
-use crate::util::header2header;
+use crate::{error, util::header2header};
 use futures::prelude::*;
 use futures::{future, TryFutureExt};
 use headers::{
@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
-use std::task::Poll;
+use std::{borrow::Cow, task::Poll};
 use url::form_urlencoded;
 
 pub mod audio_folder;
@@ -40,6 +40,58 @@ const FOLDER_INFO_FILES_CACHE_AGE: u32 = 24 * 3600;
 
 type Counter = Arc<AtomicUsize>;
 
+pub struct RequestWrapper {
+    request: Request<Body>,
+    path: String
+}
+
+impl RequestWrapper {
+    pub fn new(request: Request<Body>, path_prefix: Option<&str>) -> error::Result<Self> {
+        let path = match percent_decode(request.uri().path().as_bytes()).decode_utf8() {
+            Ok(s) => s.into_owned(),
+            Err(e) => {
+                error!("Decoded path {} is not UTF8: {}", request.uri().path(), e);
+                return Err(error::Error::msg("Invalid path encoding"));
+            }
+        };
+        let path  = match path_prefix {
+            Some(p) => match path.strip_prefix(p) {
+                Some(s) => s.to_string(),
+                None => return Err(error::Error::msg(format!("URL path us missing prefix {}", p)))
+            },
+            None => path
+
+        };
+        Ok(RequestWrapper{request, path})
+    }
+
+    pub fn path(&self) -> &str {
+        self.path.as_str()
+    }
+
+    pub fn headers(&self) -> &hyper::HeaderMap{
+        self.request.headers()
+    }
+
+    pub fn method(&self) -> &hyper::Method {
+        self.request.method()
+    }
+
+    pub fn into_body(self) -> Body {
+        self.request.into_body()
+    }
+
+    pub fn into_request(self) -> Request<Body> {
+        self.request
+    }
+
+    pub fn params(&self) -> Option<HashMap<Cow<str>, Cow<str>>> {
+        self.request
+            .uri()
+            .query()
+            .map(|query| form_urlencoded::parse(query.as_bytes()).collect::<HashMap<_, _>>())
+    }
+}
 #[derive(Clone)]
 pub struct TranscodingDetails {
     pub transcodings: Counter,
@@ -82,7 +134,7 @@ fn add_cors_headers(
 #[allow(clippy::type_complexity)]
 impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
     type Response = Response<Body>;
-    type Error = crate::error::Error;
+    type Error = error::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, _cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -90,15 +142,19 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
+        let req = match RequestWrapper::new(req, get_config().url_path_prefix.as_ref().map(|s| s.as_str())) {
+            Ok(r) => r,
+            Err(_) => return short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE) 
+        };
         //static files
-        if req.uri().path() == "/" {
+        if req.path() == "/" {
             return send_file_simple(
                 &get_config().client_dir,
                 "index.html",
                 Some(APP_STATIC_FILES_CACHE_AGE),
             );
         };
-        if req.uri().path() == "/bundle.js" {
+        if req.path() == "/bundle.js" {
             return send_file_simple(
                 &get_config().client_dir,
                 "bundle.js",
@@ -130,24 +186,15 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
 
 impl<C> FileSendService<C> {
     fn process_checked(
-        req: Request<Body>,
+        req: RequestWrapper,
         searcher: Search<String>,
         transcoding: TranscodingDetails,
     ) -> ResponseFuture {
-        let params = req
-            .uri()
-            .query()
-            .map(|query| form_urlencoded::parse(query.as_bytes()).collect::<HashMap<_, _>>());
+        let params = req.params();
 
         match *req.method() {
             Method::GET => {
-                let path = match percent_decode(req.uri().path().as_bytes()).decode_utf8() {
-                    Ok(s) => s.into_owned(),
-                    Err(e) => {
-                        error!("Decoded path {} is not UTF8: {}", req.uri().path(), e);
-                        return short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE);
-                    }
-                };
+                let path = req.path();
 
                 if path.starts_with("/collections") {
                     collections_list()
@@ -218,7 +265,7 @@ impl<C> FileSendService<C> {
     }
 
     fn serve_audio(
-        req: &Request<Body>,
+        req: &RequestWrapper,
         base_dir: &'static Path,
         path: &str,
         transcoding: TranscodingDetails,
@@ -272,12 +319,12 @@ lazy_static! {
     static ref COLLECTION_NUMBER_RE: Regex = Regex::new(r"^/(\d+)/.+").unwrap();
 }
 
-fn extract_collection_number(path: String) -> Result<(String, usize), ()> {
+fn extract_collection_number(path: &str) -> Result<(&str, usize), ()> {
     let matches = COLLECTION_NUMBER_RE.captures(&path);
     if let Some(matches) = matches {
         let cnum = matches.get(1).unwrap();
         // match gives us char position it's safe to slice
-        let new_path = (&path[cnum.end()..]).to_string();
+        let new_path = &path[cnum.end()..];
         // and cnum is guarateed to contain digits only
         let cnum: usize = cnum.as_str().parse().unwrap();
         if cnum >= get_config().base_dirs.len() {

@@ -1,8 +1,7 @@
-use super::ResponseFuture;
+use super::{RequestWrapper, ResponseFuture};
 use crate::error::{bail, Context, Error};
 use cache::{Cache, Position};
 use futures::future;
-use hyper::{Body, Request};
 use std::str::FromStr;
 use websock::{self as ws, spawn_websocket};
 
@@ -72,10 +71,10 @@ impl FromStr for Msg {
     }
 }
 
-pub fn position_service(req: Request<Body>) -> ResponseFuture {
+pub fn position_service(req: RequestWrapper) -> ResponseFuture {
     debug!("We got these headers: {:?}", req.headers());
 
-    let res = spawn_websocket::<String, _>(req, |m| {
+    let res = spawn_websocket::<String, _>(req.into_request(), |m| {
         debug!("Got message {:?}", m);
         let message = m.to_str().map_err(Error::new).and_then(str::parse);
 

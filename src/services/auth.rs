@@ -1,12 +1,13 @@
 use super::subs::short_response;
 use crate::error::{bail, Result};
 use crate::util::ResponseBuilderExt;
+use crate::services::RequestWrapper;
 use data_encoding::BASE64;
 use futures::{future, prelude::*};
 use headers::authorization::Bearer;
 use headers::{Authorization, ContentLength, ContentType, Cookie, HeaderMapExt};
 use hyper::header::SET_COOKIE;
-use hyper::{Body, Method, Request, Response, StatusCode};
+use hyper::{Body, Method, Response, StatusCode};
 use ring::rand::{SecureRandom, SystemRandom};
 use ring::{
     digest::{digest, SHA256},
@@ -23,7 +24,7 @@ use url::form_urlencoded;
 pub enum AuthResult<T> {
     Authenticated {
         credentials: T,
-        request: Request<Body>,
+        request: RequestWrapper,
     },
     Rejected(Response<Body>),
     LoggedIn(Response<Body>),
@@ -32,7 +33,7 @@ type AuthFuture<T> = Pin<Box<dyn Future<Output = Result<AuthResult<T>>> + Send>>
 
 pub trait Authenticator: Send + Sync {
     type Credentials;
-    fn authenticate(&self, req: Request<Body>) -> AuthFuture<Self::Credentials>;
+    fn authenticate(&self, req: RequestWrapper) -> AuthFuture<Self::Credentials>;
 }
 
 #[derive(Clone, Debug)]
@@ -64,12 +65,12 @@ const ACCESS_DENIED: &str = "Access denied";
 
 impl Authenticator for SharedSecretAuthenticator {
     type Credentials = ();
-    fn authenticate(&self, req: Request<Body>) -> AuthFuture<()> {
+    fn authenticate(&self, req: RequestWrapper) -> AuthFuture<()> {
         fn deny() -> AuthResult<()> {
             AuthResult::Rejected(short_response(StatusCode::UNAUTHORIZED, ACCESS_DENIED))
         }
         // this is part where client can authenticate itself and get token
-        if req.method() == Method::POST && req.uri().path() == "/authenticate" {
+        if req.method() == Method::POST && req.path() == "/authenticate" {
             debug!("Authentication request");
             let auth = self.secrets.clone(); // TODO: auth need to be 'static - is there better way?
             return Box::pin(async move {
