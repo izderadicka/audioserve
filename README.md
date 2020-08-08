@@ -69,6 +69,14 @@ Audioserve supports TLS/SSL - to enable it you need to provide your private serv
 
 You can also run audioserve behind reverse proxy like nginx or ha-proxy and terminate SSL there (in that case you can compile audioserve without TLS support see compilation without default features below)
 
+#### Reverse proxy
+
+Often best way how to deploy audioserve is behind reverse proxy, which terminates TLS/SSL and connects to backend audioserve. Reverse proxy can serve also other backend servers on same domain, in this case audioserve server should be determined by URL path prefix - so external address is like https://yourdomain.com/audioserve and it's map to http://local_name_or_ip:3000 (or whatever port you are using). Decent proxy can do such mapping, but I've heard about setups (shared seedbox), when this is not possible and URL path prefix is automatically forwarded to backend. For that case audioserve has argument `--url-path-prefix`, which contains prefix (without final slash) and audioserve accepts this prefix as root path (in browser you must use it with trailing slash e.g. http://audioserve.domain.com?your/prefix/) 
+
+Another gotcha for reverse proxy might be usage of last [playback position](#sharing-playback-positions-between-clients) feature, which requires websocket connection and some special configuration for that might be needed in reverse proxy.
+
+You can check some reverse proxy configurations in [reverse_proxy.md](./docs/reverse_proxy.md) (If you have successful configuration of reverse proxy please share via PR).
+
 Performance
 -----------
 
