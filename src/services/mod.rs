@@ -56,7 +56,13 @@ impl RequestWrapper {
         };
         let path = match path_prefix {
             Some(p) => match path.strip_prefix(p) {
-                Some(s) => s.to_string(),
+                Some(s) => {
+                    if s.is_empty() {
+                        "/".to_string()
+                    } else {
+                        s.to_string()
+                    }
+                }
                 None => {
                     error!("URL path is missing prefix {}", p);
                     return Err(error::Error::msg(format!(

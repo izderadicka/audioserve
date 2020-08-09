@@ -254,7 +254,11 @@
       </g>
     </svg>
   </div>
-
+  <script>
+    if (window.location.pathname.length>0 && !window.location.pathname.endsWith("/")) {
+      window.location.pathname += "/";
+    }
+  </script>
   <script src="bundle.js"></script>
 </body>
 
