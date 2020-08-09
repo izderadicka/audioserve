@@ -13,6 +13,7 @@ script:
   - cargo fmt --all -- --check
   - cargo test --verbose --features partially-static,transcoding-cache
   - cargo test --verbose --no-default-features --features partially-static --workspace
+  - if [[ "$TRAVIS_RUST_VERSION" = "stable" ]]; then cargo test --features partially-static,transcoding-cache  --test test_binary -- --ignored; fi
 matrix:
   fast_finish: true
   allow_failures:
@@ -20,8 +21,7 @@ matrix:
   include:
     - language: node_js
       before_script: true
-      node_js:
-      - "10"
+      node_js: "10"
       cache:
         directories:
         - "client/node_modules"
@@ -41,8 +41,7 @@ matrix:
           on:
             branch: master
             tags: true
-          script: 
-            - bash docker_push.sh
+          script: bash docker_push.sh
     - language: minimal
       if: tag IS present
       before_install: true
