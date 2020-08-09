@@ -81,4 +81,5 @@ lto = true
 codegen-units = 1
 
 [dev-dependencies]
-reqwest = "0.10"
+reqwest = {version="0.10", features=['blocking', 'json']}
+escargot = "0.5" 
