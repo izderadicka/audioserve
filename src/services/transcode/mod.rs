@@ -531,15 +531,10 @@ mod vec_codec {
 
     pub struct VecEncoder;
 
-    impl Encoder for VecEncoder {
-        type Item = Vec<u8>;
+    impl Encoder<Vec<u8>> for VecEncoder {
         type Error = io::Error;
 
-        fn encode(
-            &mut self,
-            data: Self::Item,
-            buf: &mut bytes::BytesMut,
-        ) -> Result<(), Self::Error> {
+        fn encode(&mut self, data: Vec<u8>, buf: &mut bytes::BytesMut) -> Result<(), Self::Error> {
             buf.reserve(data.len());
             buf.put(&data[..]);
             Ok(())

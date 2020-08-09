@@ -25,13 +25,13 @@ thiserror = "1.0"
 anyhow = "1.0"
 url = "2.1"
 percent-encoding = "2.1"
-num_cpus = "1.12"
+num_cpus = "1.13"
 ring = "0.16"
-data-encoding = "2.1"
-regex = "1.1"
+data-encoding = "2.2"
+regex = "1.3"
 tokio = {version="0.2", features=["full"]}
 
-dirs = "2.0"
+dirs = "3.0"
 csv = "1.1"
 unicase = "2.6"
 unicase_serde = "0.1.0"
@@ -45,7 +45,7 @@ cachedirtree = {path="crates/cachedirtree", optional=true}
 
 bytes = {version="0.5", optional=true}
 
-tokio-util = {version="0.2", optional=true}
+tokio-util = {version="0.3", optional=true}
 
 media_info = {path="crates/media_info"}
 
@@ -63,7 +63,7 @@ path="crates/websock"
 optional = true
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.17"
+nix = "0.18"
 
 [features]
 default = ["tls", "symlinks","search-cache", "folder-download", "shared-positions"]
@@ -79,3 +79,6 @@ shared-positions = ["websock"]
 [profile.release]
 lto = true
 codegen-units = 1
+
+[dev-dependencies]
+reqwest = "0.10"
