@@ -9,7 +9,9 @@ fn make_url(path: &str) -> String {
     BASE_URL.to_string() + path
 }
 
+
 #[test]
+#[ignore]
 fn test_binary() -> Result<()> {
     let bin = CargoBuild::new()
         .bin("audioserve")
