@@ -55,7 +55,8 @@ impl RequestWrapper {
             }
         };
         let path = match path_prefix {
-            Some(p) => match crate::util::strip_prefix_of(p, &path) { //TODO: later replace with new std function strip_prefix
+            Some(p) => match crate::util::strip_prefix_of(p, &path) {
+                //TODO: later replace with new std function strip_prefix
                 Some(s) => {
                     if s.is_empty() {
                         "/".to_string()

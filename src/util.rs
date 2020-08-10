@@ -122,7 +122,7 @@ pub fn get_real_file_type<P: AsRef<Path>>(
 
 /// Checks whether the pattern matches at the front of the haystack.
 #[inline]
-fn is_prefix_of(needle: &str, haystack: & str) -> bool {
+fn is_prefix_of(needle: &str, haystack: &str) -> bool {
     haystack.as_bytes().starts_with(needle.as_bytes())
 }
 
