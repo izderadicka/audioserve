@@ -883,17 +883,17 @@ checksum = "a2f02823cf78b754822df5f7f268fb59822e7296276d3e069d8e8cb26a14bd10"
 [[package]]
 name = "linked-hash-map"
 version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
+
+[[package]]
+name = "linked-hash-map"
+version = "0.5.3"
 source = "git+https://github.com/izderadicka/linked-hash-map.git#f26fda4553a9491eb377b296fb29b7639d37e4af"
 dependencies = [
  "serde",
  "serde_test",
 ]
-
-[[package]]
-name = "linked-hash-map"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
 
 [[package]]
 name = "log"
