@@ -246,6 +246,8 @@ Build client in its directory (`cd client`):
 
 ### Windows build
 
+**WARNING**: Windows are not officially supported - windows build instructions are contributed and resulting executable has some limitations (no features) and issues.
+
 Clone the repository with:
 
     git clone https://github.com/izderadicka/audioserve

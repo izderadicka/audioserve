@@ -199,13 +199,13 @@ Lists top 64 most recent folders in the collection (based on folder modification
 
 **audio**
 
-Sample URL: https://your_server_name:3000/folder/Doyle Arthur Conan/5 pomerancovych jaderek.mp3  
-Sample URL: https://your_server_name:3000/folder/Doyle Arthur Conan/5 pomerancovych jaderek.mp3?trans=m  
-Sample URL: https://your_server_name:3000/folder/Doyle Arthur Conan/5 pomerancovych jaderek.mp3?trans=m&seek=537.42  
-Sample URL: https://your_server_name:3000/2/folder/author_name/series_name/audiobook_name/chapter1.opus
+Sample URL: https://your_server_name:3000/audio/Doyle Arthur Conan/5 pomerancovych jaderek.mp3  
+Sample URL: https://your_server_name:3000/audio/Doyle Arthur Conan/5 pomerancovych jaderek.mp3?trans=m  
+Sample URL: https://your_server_name:3000/audio/Doyle Arthur Conan/5 pomerancovych jaderek.mp3?trans=m&seek=537.42  
+Sample URL: https://your_server_name:3000/2/audio/author_name/series_name/audiobook_name/chapter1.opus
 
-This endpoint allows to access audio file, either as it is stored (in this case [http bytes range](https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests) is supported - but only one range per response)  
-or transcoded (in this case response content is [chunck encoded](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding) and its length is not known in advance). 
+This endpoint allows to access audio file, either as it is stored audio file (in this case [http bytes range](https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests) is supported - but only one range per response)  
+or transcoded content of the file (in this case response content is [chunck encoded](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding) and its length is not known in advance). 
 It's responsibility of client to choose direct or transcoded content as needed. 
 
 Transcoding is triggered by query string paramater `trans`, which can have one of three possible values `l` (Low profile), 
