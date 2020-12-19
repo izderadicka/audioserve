@@ -82,7 +82,7 @@ dependencies = [
  "headers",
  "hyper",
  "lazy_static",
- "linked-hash-map 0.5.2",
+ "linked-hash-map 0.5.3 (git+https://github.com/izderadicka/linked-hash-map.git)",
  "log",
  "media_info",
  "mime",
@@ -882,18 +882,18 @@ checksum = "a2f02823cf78b754822df5f7f268fb59822e7296276d3e069d8e8cb26a14bd10"
 
 [[package]]
 name = "linked-hash-map"
-version = "0.5.2"
-source = "git+https://github.com/izderadicka/linked-hash-map.git#e1361b3697748703d998821698aac3b863b3aff6"
-dependencies = [
- "serde",
- "serde_test",
-]
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
 
 [[package]]
 name = "linked-hash-map"
 version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
+source = "git+https://github.com/izderadicka/linked-hash-map.git#f26fda4553a9491eb377b296fb29b7639d37e4af"
+dependencies = [
+ "serde",
+ "serde_test",
+]
 
 [[package]]
 name = "log"
@@ -1479,7 +1479,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae3e2dd40a7cdc18ca80db804b7f461a39bb721160a85c9a1fa30134bf3c02a5"
 dependencies = [
  "dtoa",
- "linked-hash-map 0.5.3",
+ "linked-hash-map 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "yaml-rust",
 ]
@@ -1513,7 +1513,7 @@ dependencies = [
  "byteorder",
  "data-encoding",
  "env_logger",
- "linked-hash-map 0.5.3",
+ "linked-hash-map 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log",
  "rand",
  "tempfile",
@@ -2086,5 +2086,5 @@ version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39f0c922f1a334134dc2f7a8b67dc5d25f0735263feec974345ff706bcf20b0d"
 dependencies = [
- "linked-hash-map 0.5.3",
+ "linked-hash-map 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
