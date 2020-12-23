@@ -30,7 +30,7 @@ Search is done for folder names only (not individual files, neither audio metada
 
 You can have several libraries/ collections - just use several root directories as audioserve start parametes. In client you can switch between collections in the client. Typical usage will be to have separate collections for different languages.
 
-By default symbolic(soft) links are not followed in the collections directory (because if incorretly used it can have quite negative impact on search and browse), but they can be enabled by `--allow-soflinks` program argument.
+By default symbolic(soft) links are not followed in the collections directory (because if incorretly used it can have quite negative impact on search and browse), but they can be enabled by `--allow-symlinks` program argument.
 
 ### Single file audiobooks and chapters
 
