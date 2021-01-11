@@ -1,8 +1,7 @@
 extern crate tar;
 extern crate tokio;
 
-use futures::future::{Future, TryFutureExt};
-use futures::stream::{Stream, StreamExt, TryStreamExt};
+use futures::{future::Future, stream::Stream};
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io;
@@ -11,8 +10,7 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::fs as tokio_fs;
-use tokio::prelude::*;
+use tokio::{fs as tokio_fs, io::AsyncRead};
 
 const EMPTY_BLOCK: [u8; 512] = [0; 512];
 const BUFFER_LENGTH: usize = 8 * 1024; // must be multiple of 512 !!!
@@ -101,26 +99,17 @@ impl TarStream<PathBuf> {
     /// (as directory listing is done asychronously)
     pub async fn tar_dir<P: AsRef<Path> + Send>(dir: P) -> Result<Self, io::Error> {
         let dir: PathBuf = dir.as_ref().to_owned();
-        let dir = tokio_fs::read_dir(dir).await?;
-
-        let files: Vec<_> = dir
-            .and_then(|entry| {
-                let path = entry.path();
-                async move {
-                    entry
-                        .file_type()
-                        .map_ok(|file_type| (path, file_type))
-                        .await
+        let mut dir = tokio_fs::read_dir(dir).await?;
+        let mut files = Vec::new();
+        while let Some(entry) = dir.next_entry().await? {
+            let path = entry.path();
+            let res = entry.file_type().await;
+            if let Ok(file_type) = res {
+                if file_type.is_file() {
+                    files.push(path)
                 }
-            })
-            .filter_map(|res| async {
-                match res {
-                    Ok((path, file_type)) if file_type.is_file() => Some(path),
-                    _ => None,
-                }
-            })
-            .collect()
-            .await;
+            };
+        }
 
         let iter = files.into_iter();
         let state = Some(TarState::BeforeNext);
@@ -270,13 +259,15 @@ impl<P: AsRef<Path> + Send> Stream for TarStream<P> {
                         //and send file data into stream
                         TarState::Sending { mut file } => {
                             let pos = self.position;
-                            match Pin::new(&mut file).poll_read(ctx, &mut self.buf[pos..]) {
+                            let mut buf = tokio::io::ReadBuf::new(&mut self.buf[pos..]);
+                            match Pin::new(&mut file).poll_read(ctx, &mut buf) {
                                 Poll::Pending => {
                                     self.state = Some(TarState::Sending { file });
                                     return Poll::Pending;
                                 }
 
-                                Poll::Ready(Ok(read)) => {
+                                Poll::Ready(Ok(_)) => {
+                                    let read = buf.filled().len();
                                     if read == 0 {
                                         self.state = Some(TarState::BeforeNext);
                                         if pos > 0 {
@@ -330,13 +321,13 @@ mod tests {
     use super::*;
     use futures::sink::SinkExt;
     use futures::stream::{StreamExt, TryStreamExt};
+    use io::Result;
     use std::io::Read;
     use tempfile::tempdir;
-    use tokio::runtime::Runtime;
     use tokio_util::codec::Decoder;
 
-    #[test]
-    fn test_tar_from_iter() {
+    #[tokio::test]
+    async fn test_tar_from_iter() -> Result<()> {
         let temp_dir = tempdir().unwrap();
         let tar_file_name = temp_dir.path().join("test2.tar");
         let tar_file_name2 = tar_file_name.clone();
@@ -345,23 +336,13 @@ mod tests {
         let expected_archive_len = calc_size(sizes);
         let tar_stream =
             TarStream::tar_iter_rel(files.into_iter(), std::env::current_dir().unwrap());
+        let tar_file = tokio_fs::File::create(tar_file_name).await?;
+        let codec = tokio_util::codec::BytesCodec::new();
+        let mut file_sink = codec.framed(tar_file);
+        file_sink
+            .send_all(&mut tar_stream.map(|v| v.map(|x| x.into())))
+            .await?;
 
-        {
-            let tar_file = tokio_fs::File::create(tar_file_name);
-            let f = tar_file
-                .and_then(|f| async move {
-                    let codec = tokio_util::codec::BytesCodec::new();
-                    let mut file_sink = codec.framed(f);
-                    file_sink
-                        .send_all(&mut tar_stream.map(|v| v.map(|x| x.into())))
-                        .await
-                })
-                .map_ok(|_r| ())
-                .map_err(|e| eprintln!("Error during tar creation: {}", e));
-
-            let mut rt = Runtime::new().unwrap();
-            rt.block_on(f).unwrap();
-        }
         let archive_len = tar_file_name2.metadata().unwrap().len();
         assert_eq!(
             archive_len, expected_archive_len,
@@ -369,30 +350,25 @@ mod tests {
         );
         check_archive(tar_file_name2, 2);
         temp_dir.close().unwrap();
+        Ok(())
     }
 
-    #[test]
-    fn test_create_tar() {
+    #[tokio::test]
+    async fn test_create_tar() -> Result<()> {
         let temp_dir = tempdir().unwrap();
         let tar_file_name = temp_dir.path().join("test.tar");
         //let tar_file_name = Path::new("/tmp/test.tar");
         let tar_file_name2 = tar_file_name.clone();
 
-        // create tar file asynchronously
-        // here rewritten to async await - much easier and nicer
-        let f = async move {
-            let tar = TarStream::tar_dir(".").await?;
-            let tar_file = tokio_fs::File::create(tar_file_name).await?;
-            let codec = tokio_util::codec::BytesCodec::new();
-            let mut file_sink = codec.framed(tar_file);
-            file_sink.send_all(&mut tar.map_ok(|v| v.into())).await
-        };
-
-        let mut rt = Runtime::new().unwrap();
-        rt.block_on(f).unwrap();
+        let tar = TarStream::tar_dir(".").await?;
+        let tar_file = tokio_fs::File::create(tar_file_name).await?;
+        let codec = tokio_util::codec::BytesCodec::new();
+        let mut file_sink = codec.framed(tar_file);
+        file_sink.send_all(&mut tar.map_ok(|v| v.into())).await?;
 
         check_archive(tar_file_name2, 2);
         temp_dir.close().unwrap();
+        Ok(())
     }
 
     fn check_archive(p: PathBuf, num_files: usize) {

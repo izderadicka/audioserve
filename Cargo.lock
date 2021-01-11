@@ -44,13 +44,13 @@ checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 
 [[package]]
 name = "async-tar"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "futures",
  "tar",
  "tempfile",
- "tokio 0.2.22",
- "tokio-util 0.2.0",
+ "tokio 1.0.1",
+ "tokio-util 0.6.0",
 ]
 
 [[package]]
@@ -2009,20 +2009,6 @@ dependencies = [
  "pin-project 0.4.23",
  "tokio 0.2.22",
  "tungstenite",
-]
-
-[[package]]
-name = "tokio-util"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "571da51182ec208780505a32528fc5512a8fe1443ab960b3f2f3ef093cd16930"
-dependencies = [
- "bytes 0.5.6",
- "futures-core",
- "futures-sink",
- "log",
- "pin-project-lite 0.1.7",
- "tokio 0.2.22",
 ]
 
 [[package]]
