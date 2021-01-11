@@ -4,11 +4,16 @@ if [[ -n "$1" ]]; then
   cd "$1"
 fi
 
+if [[ -z "$FFMPEG_VERSION" ]]; then
+  echo FFMPEG_VERSION environmet variable must be defined like FFMPEG_VERSION=ffmpeg-4.1.5 >&2
+  exit 2
+fi
+
 set -e
-wget https://www.ffmpeg.org/releases/ffmpeg-4.1.5.tar.xz
-tar xvf ffmpeg-4.1.5.tar.xz 
-rm ffmpeg-4.1.5.tar.xz
-cd ffmpeg-4.1.5/
+wget https://www.ffmpeg.org/releases/$FFMPEG_VERSION.tar.xz
+tar xvf $FFMPEG_VERSION.tar.xz 
+rm $FFMPEG_VERSION.tar.xz
+cd $FFMPEG_VERSION/
 ./configure \
  --disable-programs \
  --disable-swresample \

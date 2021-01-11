@@ -1,18 +1,21 @@
 fn main() {
     #[cfg(any(feature = "static", feature = "partially-static"))]
     {
+        const FFMPEG_VERSION: &str = "ffmpeg-4.1.5";
+
         use std::env;
         use std::path;
         use std::process;
 
         let out_dir = env::var("OUT_DIR").unwrap();
-        let ffmpeg_dir = path::Path::new(&out_dir).join("ffmpeg-4.1");
+        let ffmpeg_dir = path::Path::new(&out_dir).join(FFMPEG_VERSION);
         if !ffmpeg_dir.exists() {
             use std::fs::File;
             let fflog = File::create(path::Path::new(&out_dir).join("ffmpeg-compilation.log"))
                 .expect("cannot create log file");
             let rc = process::Command::new("./build_ffmpeg.sh")
                 .arg(&out_dir)
+                .env("FFMPEG_VERSION", FFMPEG_VERSION)
                 .stdout(fflog)
                 .status()
                 .expect("cannot run ffmpeg build script");
@@ -29,16 +32,16 @@ fn main() {
         println!("cargo:rustc-link-lib=static=avutil");
         println!("cargo:rustc-link-lib=static=avcodec");
         println!(
-            "cargo:rustc-link-search=native={}/ffmpeg-4.1.5/libavformat",
-            out_dir
+            "cargo:rustc-link-search=native={}/{}/libavformat",
+            out_dir, FFMPEG_VERSION
         );
         println!(
-            "cargo:rustc-link-search=native={}/ffmpeg-4.1.5/libavutil",
-            out_dir
+            "cargo:rustc-link-search=native={}/{}/libavutil",
+            out_dir, FFMPEG_VERSION
         );
         println!(
-            "cargo:rustc-link-search=native={}/ffmpeg-4.1.5/libavcodec",
-            out_dir
+            "cargo:rustc-link-search=native={}/{}/libavcodec",
+            out_dir, FFMPEG_VERSION
         );
     }
 
