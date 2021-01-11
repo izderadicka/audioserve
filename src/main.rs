@@ -109,21 +109,22 @@ fn start_server(server_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Error
                     #[cfg(feature = "tls")]
                     {
                         info!("Server listening on {}{} with TLS", &addr, get_url_path!());
-                        let create_server = async move {
-                            let incoming = tls::tls_acceptor(&addr, &ssl)
-                                .await
-                                .context("TLS handshake")?;
-                            let server = HttpServer::builder(incoming)
-                                .serve(make_service_fn(move |_| {
-                                    future::ok::<_, error::Error>(svc.clone())
-                                }))
-                                .await;
+                        // let create_server = async move {
+                        //     let incoming = tls::tls_acceptor(&addr, &ssl)
+                        //         .await
+                        //         .context("TLS handshake")?;
+                        //     let server = HttpServer::builder(incoming)
+                        //         .serve(make_service_fn(move |_| {
+                        //             future::ok::<_, error::Error>(svc.clone())
+                        //         }))
+                        //         .await;
 
-                            server.map_err(|e| e.into())
-                        };
+                        //     server.map_err(|e| e.into())
+                        // };
 
-                        Box::pin(create_server)
+                        // Box::pin(create_server)
                     }
+                    todo!("Fix SSL implementation");
 
                     #[cfg(not(feature = "tls"))]
                     {
@@ -138,11 +139,10 @@ fn start_server(server_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Error
         server.await
     };
 
-    let rt = tokio::runtime::Builder::new()
-        .threaded_scheduler()
+    let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .core_threads(cfg.thread_pool.num_threads as usize)
-        .max_threads(cfg.thread_pool.num_threads as usize + cfg.thread_pool.queue_size as usize)
+        .worker_threads(cfg.thread_pool.num_threads as usize)
+        .max_blocking_threads(cfg.thread_pool.queue_size as usize)
         .build()
         .unwrap();
 
@@ -164,9 +164,9 @@ async fn terminate_server() {
     let mut sigquit = signal(SignalKind::quit()).expect("Cannot create SIGQUIT handler");
 
     tokio::select!(
-        _ = sigint.next() => {info!("Terminated on SIGINT")},
-        _ = sigterm.next() => {info!("Terminated on SIGTERM")},
-        _ = sigquit.next() => {info!("Terminated on SIGQUIT")}
+        _ = sigint.recv() => {info!("Terminated on SIGINT")},
+        _ = sigterm.recv() => {info!("Terminated on SIGTERM")},
+        _ = sigquit.recv() => {info!("Terminated on SIGQUIT")}
     )
 }
 

@@ -474,6 +474,8 @@ extern crate env_logger;
 extern crate tempfile;
 #[cfg(test)]
 mod tests {
+    use std::ops::Range;
+
     use super::*;
     use tempfile::tempdir;
     #[test]
@@ -644,7 +646,9 @@ mod tests {
                     let mut rng = rand::thread_rng();
                     for j in 0..8 {
                         f.write_all(&data[128 * j..128 * (j + 1)]).unwrap();
-                        thread::sleep(std::time::Duration::from_millis(rng.gen_range(1, 100)))
+                        thread::sleep(std::time::Duration::from_millis(
+                            rng.gen_range(Range { start: 1, end: 100 }),
+                        ))
                     }
                     f.finish().unwrap();
                 }));

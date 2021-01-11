@@ -125,12 +125,11 @@ impl Finisher {
 mod tests {
     use super::*;
     use tempfile::tempdir;
-
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     const MY_KEY: &str = "muj_test_1";
     const MSG: &str = "Hello there you lonely bastard";
 
     async fn cache_rw(c: Cache) -> Result<()> {
-        use tokio::prelude::*;
         let (mut f, fin) = c.add(MY_KEY).await?;
         f.write_all(MSG.as_bytes()).await?;
         fin.commit().await?;
@@ -150,7 +149,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_async() {
-        use tokio::prelude::*;
 
         env_logger::try_init().ok();
         let temp_dir = tempdir().unwrap();

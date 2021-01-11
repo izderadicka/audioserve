@@ -1,6 +1,6 @@
 [package]
 name = "audioserve"
-version = "0.13.0"
+version = "0.14.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2018"
 
@@ -8,9 +8,9 @@ edition = "2018"
 members = ["crates/*"]
 
 [dependencies]
-env_logger = "0.7"
+env_logger = "0.8"
 log = {version="0.4", features = ["release_max_level_info"]}
-hyper = "0.13"
+hyper = {version="0.14", features = ["full"]}
 headers = "0.3"
 futures = "0.3"
 mime = "0.3"
@@ -29,7 +29,7 @@ num_cpus = "1.13"
 ring = "0.16"
 data-encoding = "2.2"
 regex = "1.3"
-tokio = {version="0.2", features=["full"]}
+tokio = {version="1.0", features=["full"]}
 
 dirs = "3.0"
 csv = "1.1"
@@ -43,9 +43,9 @@ native-tls = {version="0.2", optional=true}
 
 cachedirtree = {path="crates/cachedirtree", optional=true}
 
-bytes = {version="0.5", optional=true}
+bytes = {version="1.0", optional=true}
 
-tokio-util = {version="0.3", optional=true}
+tokio-util = {version="0.6", optional=true}
 
 media_info = {path="crates/media_info"}
 
@@ -63,7 +63,7 @@ path="crates/websock"
 optional = true
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.18"
+nix = "0.19"
 
 [features]
 default = ["tls", "symlinks","search-cache", "folder-download", "shared-positions"]
@@ -81,5 +81,5 @@ lto = true
 codegen-units = 1
 
 [dev-dependencies]
-reqwest = {version="0.10", features=['blocking', 'json']}
+reqwest = {version="0.11", features=['blocking', 'json']}
 escargot = "0.5" 
