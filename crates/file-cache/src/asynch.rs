@@ -149,7 +149,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_async() {
-
         env_logger::try_init().ok();
         let temp_dir = tempdir().unwrap();
         let c = Cache::new(temp_dir.path(), 10000, 10).unwrap();
