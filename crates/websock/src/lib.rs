@@ -6,14 +6,15 @@ use futures::prelude::*;
 use futures::ready;
 use headers::{self, HeaderMapExt};
 use hyper::header::{self, AsHeaderName, HeaderMap, HeaderValue};
+use hyper::upgrade;
 use hyper::{Body, Request, Response, StatusCode};
 use std::fmt;
 use std::io;
 use std::pin::Pin;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use thiserror::Error;
-use tokio;
+use tokio::{self, sync::RwLock};
 use tokio_tungstenite::{
     tungstenite::{self, protocol},
     WebSocketStream,
@@ -91,7 +92,7 @@ where
 /// Websocket can have context of type T, which is then shared (guarded by RwLock) with all
 /// messages in this websocket.
 pub fn upgrade_connection<T: Default>(
-    req: Request<Body>,
+    mut req: Request<Body>,
 ) -> Result<
     (
         Response<Body>,
@@ -140,9 +141,7 @@ pub fn upgrade_connection<T: Default>(
     h.typed_insert(headers::Upgrade::websocket());
     h.typed_insert(headers::SecWebsocketAccept::from(key.unwrap()));
     h.typed_insert(headers::Connection::upgrade());
-    let upgraded = req
-        .into_body()
-        .on_upgrade()
+    let upgraded = upgrade::on(&mut req)
         .map_err(|err| error!("Cannot create websocket: {} ", err))
         .and_then(|upgraded| async {
             debug!("Connection upgraded to websocket");

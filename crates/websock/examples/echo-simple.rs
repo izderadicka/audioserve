@@ -56,7 +56,7 @@ fn header_matches<S: AsHeaderName>(headers: &HeaderMap<HeaderValue>, name: S, va
 }
 
 pub fn upgrade_connection(
-    req: Request<Body>,
+    mut req: Request<Body>,
 ) -> Result<
     (
         Response<Body>,
@@ -105,9 +105,7 @@ pub fn upgrade_connection(
     h.typed_insert(headers::Upgrade::websocket());
     h.typed_insert(headers::SecWebsocketAccept::from(key.unwrap()));
     h.typed_insert(headers::Connection::upgrade());
-    let upgraded = req
-        .into_body()
-        .on_upgrade()
+    let upgraded = hyper::upgrade::on(&mut req)
         .map_err(|err| error!("Cannot create websocket: {} ", err))
         .and_then(|upgraded| async {
             debug!("Connection upgraded to websocket");
