@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate log;
 extern crate websock as ws;
-use futures::future;
 use hyper::server::Server;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{self, Body, Method, Request, Response, StatusCode};

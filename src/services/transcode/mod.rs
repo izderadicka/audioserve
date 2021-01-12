@@ -3,7 +3,6 @@ use super::subs::ChunkStream;
 use super::types::AudioFormat;
 use crate::config::get_config;
 use crate::error::{bail, Result};
-use futures::future::Either;
 use futures::prelude::*;
 use mime::Mime;
 use std::borrow::Cow;
@@ -15,7 +14,7 @@ use std::process::Stdio;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 use tokio::process::{ChildStdout, Command};
-use tokio::time::delay_for;
+use tokio::time::timeout;
 
 #[cfg(feature = "transcoding-cache")]
 pub mod cache;
@@ -440,54 +439,54 @@ impl Transcoder {
                     let stream = ChunkStream::new(out);
                     let pid = child.id();
                     debug!("waiting for transcode process to end");
-                    let fut =
-                        future::select(child, delay_for(
-                                Duration::from_secs(
-                                    u64::from(get_config().transcoding.max_runtime_hours * 3600),
-                                ),
-                        ))
-                        .then(move |res| {
-                            counter2.fetch_sub(1, Ordering::SeqCst);
-                            match res {
-                                Either::Left((res, _d)) => {
-                                    match res {
+                    let fut = async move {
+                        let res = timeout(
+                            Duration::from_secs(u64::from(
+                                get_config().transcoding.max_runtime_hours * 3600,
+                            )),
+                            child.wait(),
+                        )
+                        .await;
 
-                                        Ok(res) =>
-                                        if res.success() {
-                                            debug!("Finished transcoding process of {:?} normally after {:?}",
+                        counter2.fetch_sub(1, Ordering::SeqCst);
+                        match res {
+                            Ok(res) => match res {
+                                Ok(res) => {
+                                    if res.success() {
+                                        debug!("Finished transcoding process of {:?} normally after {:?}",
                                         file.as_ref(),
                                         Instant::now() - start);
-                                        future::ok(())
-                                        } else {
-                                            warn!(
-                                                "Transconding of file {:?} failed with code {:?}",
-                                                file.as_ref(),
-                                                res.code()
-                                            );
-                                            future::err(())
-                                        }
-                                        Err(e) => {
-                                            error!(
-                                                "Error running transcoding process for file {:?} error {}",
-                                                file.as_ref(),
-                                                e
-                                            );
-                                            future::err(())
-                                        }
+                                        Ok(())
+                                    } else {
+                                        warn!(
+                                            "Transconding of file {:?} failed with code {:?}",
+                                            file.as_ref(),
+                                            res.code()
+                                        );
+                                        Err(())
+                                    }
                                 }
-                                }
-                                Either::Right((_d, mut child)) => {
+                                Err(e) => {
                                     error!(
-                                        "Transcoding of file {:?} took longer then deadline",
-                                        file.as_ref()
+                                        "Error running transcoding process for file {:?} error {}",
+                                        file.as_ref(),
+                                        e
                                     );
-                                    child.kill().unwrap_or_else(|e| {
-                                        error!("Failed to kill process pid {} error {}", pid, e)
-                                    });
-                                    future::err(())
+                                    Err(())
                                 }
+                            },
+                            Err(_timeout_elapsed) => {
+                                error!(
+                                    "Transcoding of file {:?} took longer then deadline",
+                                    file.as_ref()
+                                );
+                                child.kill().await.unwrap_or_else(|e| {
+                                    error!("Failed to kill process pid {:?} error {}", pid, e)
+                                });
+                                Err(())
                             }
-                        });
+                        }
+                    };
                     Ok((stream, fut))
                 } else {
                     error!("Cannot get stdout");
@@ -578,7 +577,7 @@ mod tests {
                     .await
                     .expect("file cope failed");
             }
-            child.await
+            child.wait().await
         };
 
         let status = f.await.expect("cannot get status");

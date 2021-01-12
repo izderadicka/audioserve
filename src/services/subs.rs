@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::atomic::Ordering;
 use std::task::{Context, Poll};
-use tokio::io::AsyncRead;
+use tokio::io::{AsyncRead, AsyncSeekExt, ReadBuf};
 use tokio::task::spawn_blocking as blocking;
 
 pub type ByteRange = (Bound<u64>, Bound<u64>);
@@ -210,13 +210,15 @@ impl<T: AsyncRead + Unpin> Stream for ChunkStream<T> {
                 pin.src.take();
                 return Poll::Ready(None);
             }
+            let mut buf = ReadBuf::new(&mut pin.buf[..]);
             match ready! {
                 {
                 let pinned_stream = Pin::new(src);
-                pinned_stream.poll_read(ctx, &mut pin.buf[..])
+                pinned_stream.poll_read(ctx, &mut buf)
                 }
             } {
-                Ok(read) => {
+                Ok(_) => {
+                    let read = buf.filled().len();
                     if read == 0 {
                         pin.src.take();
                         Poll::Ready(None)

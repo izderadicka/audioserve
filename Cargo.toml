@@ -37,9 +37,10 @@ unicase = "2.6"
 unicase_serde = "0.1.0"
 linked-hash-map = {git="https://github.com/izderadicka/linked-hash-map.git", version="0.5.3", features=["serde_impl"]}
 
-# for ssl
-tokio-tls = {version="0.3", optional=true}
+# for tls
+tokio-native-tls = {version="0.3", optional=true}
 native-tls = {version="0.2", optional=true}
+async-stream ={version="0.3", optional=true}
 
 cachedirtree = {path="crates/cachedirtree", optional=true}
 
@@ -67,7 +68,7 @@ nix = "0.19"
 
 [features]
 default = ["tls", "symlinks","search-cache", "folder-download", "shared-positions"]
-tls=["tokio-tls", "native-tls"]
+tls=["tokio-native-tls", "native-tls", "async-stream"]
 symlinks=["cachedirtree/symlinks"]
 search-cache=["cachedirtree"]
 transcoding-cache=["simple-file-cache", "bytes", "tokio-util"]

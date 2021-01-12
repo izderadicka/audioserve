@@ -88,14 +88,14 @@ pub fn position_service(req: RequestWrapper) -> ResponseFuture {
                         match file_path {
                             Some(file_path) => {
                                 {
-                                    let mut p = m.context_ref().write().unwrap();
+                                    let mut p = m.context_ref().write().await;
                                     *p = file_path.clone();
                                 }
                                 CACHE.insert(file_path, position).await
                             }
 
                             None => {
-                                let prev = { m.context_ref().read().unwrap().clone() };
+                                let prev = { m.context_ref().read().await.clone() };
 
                                 if !prev.is_empty() {
                                     CACHE.insert(prev, position).await

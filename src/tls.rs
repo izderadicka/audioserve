@@ -1,15 +1,12 @@
 use crate::error::{Context, Error};
-use futures::{
-    future,
-    stream::{StreamExt, TryStreamExt},
-};
+use async_stream::try_stream;
 use hyper::server::accept::{from_stream, Accept};
 use native_tls::Identity;
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
 use tokio::net::{TcpListener, TcpStream};
-use tokio_tls::TlsStream;
+use tokio_native_tls::{TlsAcceptor, TlsStream};
 
 fn load_private_key<P>(file: P, pass: &str) -> Result<Identity, Error>
 where
@@ -32,21 +29,34 @@ pub(crate) async fn tls_acceptor(
     let tls_cx = native_tls::TlsAcceptor::builder(private_key)
         .build()
         .context("cannot build native TLS acceptor")?;
-    let tls_cx = tokio_tls::TlsAcceptor::from(tls_cx);
-    let stream = TcpListener::bind(addr)
+    let tls_cx = TlsAcceptor::from(tls_cx);
+    let listener = TcpListener::bind(addr)
         .await
-        .with_context(|| format!("cannot bind address {}", addr))?
-        .and_then(move |s| {
-            let acceptor = tls_cx.clone();
-            async move {
-                let conn = acceptor.accept(s).await;
-                conn.map_err(|e| {
-                    error!("Error when accepting TLS connection {}", e);
-                    io::Error::new(io::ErrorKind::Other, e)
-                })
+        .with_context(|| format!("cannot bind address {}", addr))?;
+
+    let stream = try_stream! {
+            loop {
+                let s =  listener.accept().await;
+                match s {
+                    Ok((s, addr)) => {
+                        debug!("Accepted connection from {}", addr);
+                        let acceptor = tls_cx.clone();
+                        let conn = acceptor.accept(s).await;
+                        match conn {
+                            Ok(conn) => {
+                                yield conn
+                    }
+                    Err(e) => {
+                        error!("Error when accepting TLS connection {}", e);
+                    }
+                }
             }
-        })
-        .filter(|i| future::ready(i.is_ok())); // Need to filter out errors as they will stop server to accept connections
+            Err(e) => {
+                error!("Error accepting connection: {}", e);
+            }
+            }
+        }
+    };
 
     Ok(from_stream(stream))
 }

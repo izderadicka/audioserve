@@ -109,22 +109,21 @@ fn start_server(server_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Error
                     #[cfg(feature = "tls")]
                     {
                         info!("Server listening on {}{} with TLS", &addr, get_url_path!());
-                        // let create_server = async move {
-                        //     let incoming = tls::tls_acceptor(&addr, &ssl)
-                        //         .await
-                        //         .context("TLS handshake")?;
-                        //     let server = HttpServer::builder(incoming)
-                        //         .serve(make_service_fn(move |_| {
-                        //             future::ok::<_, error::Error>(svc.clone())
-                        //         }))
-                        //         .await;
+                        let create_server = async move {
+                            let incoming = tls::tls_acceptor(&addr, &ssl)
+                                .await
+                                .context("TLS handshake")?;
+                            let server = HttpServer::builder(incoming)
+                                .serve(make_service_fn(move |_| {
+                                    future::ok::<_, error::Error>(svc.clone())
+                                }))
+                                .await;
 
-                        //     server.map_err(|e| e.into())
-                        // };
+                            server.map_err(|e| e.into())
+                        };
 
-                        // Box::pin(create_server)
+                        Box::pin(create_server)
                     }
-                    todo!("Fix SSL implementation");
 
                     #[cfg(not(feature = "tls"))]
                     {
@@ -208,7 +207,7 @@ fn main() {
         }
     };
 
-    let mut runtime = match start_server(server_secret) {
+    let runtime = match start_server(server_secret) {
         Ok(rt) => rt,
         Err(e) => {
             error!("Error starting server: {}", e);
