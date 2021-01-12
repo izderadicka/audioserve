@@ -1,4 +1,5 @@
 use crate::error::{Context, Error};
+use futures::{channel::mpsc, SinkExt};
 use hyper::server::accept::{from_stream, Accept};
 use native_tls::Identity;
 use std::fs::File;
@@ -6,7 +7,6 @@ use std::io::{self, Read};
 use std::path::Path;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_native_tls::{TlsAcceptor, TlsStream};
-use futures::{SinkExt, channel::mpsc};
 
 fn load_private_key<P>(file: P, pass: &str) -> Result<Identity, Error>
 where
@@ -37,34 +37,32 @@ pub(crate) async fn tls_acceptor(
     let (sender, stream) = mpsc::channel(32);
 
     tokio::spawn(async move {
-            loop {
-                let s =  listener.accept().await;
-                match s {
-                    Ok((s, addr)) => {
-                        debug!("Accepted connection from {}", addr);
-                        let acceptor = tls_cx.clone();
-                        let mut res_sender = sender.clone();
-                        tokio::spawn(async move {
-                            let conn = acceptor.accept(s).await;
+        loop {
+            let s = listener.accept().await;
+            match s {
+                Ok((s, addr)) => {
+                    debug!("Accepted connection from {}", addr);
+                    let acceptor = tls_cx.clone();
+                    let mut res_sender = sender.clone();
+                    tokio::spawn(async move {
+                        let conn = acceptor.accept(s).await;
                         match conn {
                             Ok(conn) => {
-                                 if let Err(e) = res_sender.send(Ok(conn)).await {
-                                     error!("internal channel send error: {}", e)
-                                 };
-                    }
-                    Err(e) => {
-                        error!("Error when accepting TLS connection {}", e);
-                    }
+                                if let Err(e) = res_sender.send(Ok(conn)).await {
+                                    error!("internal channel send error: {}", e)
+                                };
+                            }
+                            Err(e) => {
+                                error!("Error when accepting TLS connection {}", e);
+                            }
                         }
-                        
-                });
-            }
-            Err(e) => {
-                error!("Error accepting connection: {}", e);
-            }
+                    });
+                }
+                Err(e) => {
+                    error!("Error accepting connection: {}", e);
+                }
             }
         }
-
     });
     Ok(from_stream(stream))
 }
@@ -87,7 +85,6 @@ pub(crate) async fn tls_acceptor(
 //         .await
 //         .with_context(|| format!("cannot bind address {}", addr))?;
 
-        
 //     }
 // }
 
