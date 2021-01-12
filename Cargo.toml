@@ -40,7 +40,6 @@ linked-hash-map = {git="https://github.com/izderadicka/linked-hash-map.git", ver
 # for tls
 tokio-native-tls = {version="0.3", optional=true}
 native-tls = {version="0.2", optional=true}
-async-stream ={version="0.3", optional=true}
 
 cachedirtree = {path="crates/cachedirtree", optional=true}
 
@@ -68,7 +67,7 @@ nix = "0.19"
 
 [features]
 default = ["tls", "symlinks","search-cache", "folder-download", "shared-positions"]
-tls=["tokio-native-tls", "native-tls", "async-stream"]
+tls=["tokio-native-tls", "native-tls"]
 symlinks=["cachedirtree/symlinks"]
 search-cache=["cachedirtree"]
 transcoding-cache=["simple-file-cache", "bytes", "tokio-util"]
