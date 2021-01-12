@@ -92,19 +92,19 @@ For fast searches enable search cache with `--search-cache`, it will load direct
 
 ### Transcoding Cache
 
-Optionally you can enable transcoding cache (by compiling audioserve with `transcoding-cache` feature). Contribution of this cache to overall performance depends very much on usage scenarios.  If there is only one user, which basically listens to audiobooks in linear order (chapter after chapter, not jumping back and forth), benefit will be minimal. If there are more users, listening to same audiobook (with same transcoding levels) and/or jumping often back and forth between chapters, then benefit of this cache can be significat. You should test to see the difference (when transcoding cache is compiled in it can be still disabled by `--t-cache-disable` option).
+Optionally you can enable transcoding cache (by compiling audioserve with `transcoding-cache` feature). Contribution of this cache to overall performance depends very much on usage scenarios.  If there is only one user, which basically listens to audiobooks in linear order (chapter after chapter, not jumping back and forth), benefit will be minimal. If there are more users, listening to same audiobook (with same transcoding levels) and/or jumping often back and forth between chapters, then benefit of this cache can be significant. You should test to see the difference (when transcoding cache is compiled in it can be still disabled by `--t-cache-disable` option).
 
 Transcoding
 -----------
 
-Audioserve offers possibility to transcode audio files to opus format (opus codec, ogg or webm container) or few other formats to save bandwidth and volume of transfered data. For transcoding to work `ffmpeg` program must be installed and available on system's PATH.
-Transconding is provided in three variants and client can choose between them (using query parameter `trans` with value l,m or h):
+Audioserve offers possibility to transcode audio files to opus format (opus codec, ogg or webm container) or few other formats to save bandwidth and volume of transferred data. For transcoding to work `ffmpeg` program must be installed and available on system's PATH.
+Transcoding is provided in three variants and client can choose between them (using query parameter `trans` with value l,m or h):
 
 * low - (default 32 kbps opus with 12kHz cutoff mono)
 * medium - (default 48 kbps opus with 12kHz cutoff)
 * high - (default 64 kbps opus with 20kHz cutoff)
 
-As already noted audioserve is intended primarily for audiobooks and believe me opus codec is excellent there even in low bitrates. However if you want to change parameters of these three trancodings you can easily do so by providing yaml confing file to argument `--config`. Here is sample file:
+As already noted audioserve is intended primarily for audiobooks and believe me opus codec is excellent there even in low bitrates. However if you want to change parameters of these three transcodings you can easily do so by providing yaml confing file to argument `--config`. Here is sample file:
 
 ```yaml
 transcoding:
@@ -129,7 +129,7 @@ transcoding:
 
 In each key first you have specification of codec-container combination, currently it supports `opus-in-ogg`, `opus-in-webm`, `mp3`, `aac-in-adts` (but other containers or codecs can relatively easily be added, provided they are supported by ffmpeg and container creation does not require seekable output - like MP4 container).
 
-I have good experinces with `opus-in-ogg`, which is also default. `opus-in-webm` works well in browsers (and is supported  in browsers MSE API), but as it does not contain audio duration after trascoding, audio cannot be sought during playback in Android client, which is significant drawback. `mp3` is classical MPEG-2 Audio Layer III audio stream. `aac-in-adts` is AAC encoded audio in ADTS stream, it also may have problems with seeking in Android client.
+I have good experiences with `opus-in-ogg`, which is also default. `opus-in-webm` works well in browsers (and is supported  in browsers MSE API), but as it does not contain audio duration after trascoding, audio cannot be sought during playback in Android client, which is significant drawback. `mp3` is classical MPEG-2 Audio Layer III audio stream. `aac-in-adts` is AAC encoded audio in ADTS stream, it also may have problems with seeking in Android client.
 
 For opus transcodings there are 3 other parameters, where `bitrate` is desired bitrate in kbps, `compression_level` is determining audio quality and speed of transcoding with values 1-10 ( 1 - worst quality, but fastest, 10 - best quality, but slowest ) and `cutoff` is determining audio freq. bandwidth (NarrowBand => 4kHz, MediumBand => 6kHz, WideBand => 8kHz, SuperWideBand => 12kHz, FullBand => 20kHz).
 
@@ -141,7 +141,7 @@ All encodings have optional parameter `mono`, if set to `true` audio will be dow
 
 Overall `opus-in-ogg` provides best results from both quality and  functionality perspective, so I'd highly recommend to stick to it, unless you have some problem with it.
 
-You can overide one two or all three defaults, depending on what sections you have in this config file.
+You can override one two or all three defaults, depending on what sections you have in this config file.
 
 Command line
 ------------
@@ -161,7 +161,7 @@ Web client is bundled with server. It provides simple interface (using bootstrap
 Otherwise it's rather minimalistic (following KISS principle).
 
 It's tested on Firefox and Chrome (on Linux and Android, should work on Windows, on OSX too on these browsers).
-On iOS default transcoding (opus+ogg) is not working - so switch transconding off or try custom transcoding profile.
+On iOS default transcoding (opus+ogg) is not working - so switch transcoding off or try custom transcoding profile.
 
 Web client is not working on MS Edge(this might be fixed in future) and IE (which will never be supported).
 
