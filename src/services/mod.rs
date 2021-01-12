@@ -156,7 +156,7 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         let req = match RequestWrapper::new(
             req,
-            get_config().url_path_prefix.as_ref().map(|s| s.as_str()),
+            get_config().url_path_prefix.as_deref(),
         ) {
             Ok(r) => r,
             Err(_) => return short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE),

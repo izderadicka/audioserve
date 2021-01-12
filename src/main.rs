@@ -76,7 +76,7 @@ macro_rules! get_url_path {
     };
 }
 
-fn start_server(server_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Error> {
+fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
     let cfg = get_config();
     let svc = FileSendService {
         authenticator: get_config().shared_secret.as_ref().map(
@@ -146,7 +146,7 @@ fn start_server(server_secret: Vec<u8>) -> Result<tokio::runtime::Runtime, Error
         .unwrap();
 
     rt.spawn(start_server.map_err(|e| error!("Http Server Error: {}", e)));
-    Ok(rt)
+    rt
 }
 
 #[cfg(not(unix))]
@@ -207,13 +207,7 @@ fn main() {
         }
     };
 
-    let runtime = match start_server(server_secret) {
-        Ok(rt) => rt,
-        Err(e) => {
-            error!("Error starting server: {}", e);
-            process::exit(3)
-        }
-    };
+    let runtime = start_server(server_secret);
 
     runtime.block_on(terminate_server());
 

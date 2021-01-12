@@ -205,6 +205,7 @@ pub fn parse_chapter_path(p: &Path) -> (&Path, Option<TimeSpan>) {
     (p, None)
 }
 
+#[allow(clippy::unnecessary_wraps)] // actually as its used in match with function returning results it's better to have Result return type
 fn list_dir_file<P: AsRef<Path>>(
     base_dir: P,
     full_path: PathBuf,
