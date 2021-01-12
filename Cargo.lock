@@ -252,7 +252,7 @@ checksum = "ad1f8e949d755f9d79112b5bb46938e0ef9d3804a0b16dfab13aafcaa5f0fa72"
 
 [[package]]
 name = "cachedirtree"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "bit-vec",
  "derive_builder",
@@ -1029,7 +1029,7 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 
 [[package]]
 name = "media_info"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "thiserror",
 ]
@@ -1727,7 +1727,7 @@ dependencies = [
 
 [[package]]
 name = "simple-file-cache"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "byteorder",
  "data-encoding",
@@ -2231,7 +2231,7 @@ dependencies = [
 
 [[package]]
 name = "websock"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "env_logger",
  "futures",
