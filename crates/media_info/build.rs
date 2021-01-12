@@ -1,7 +1,7 @@
 fn main() {
     #[cfg(any(feature = "static", feature = "partially-static"))]
     {
-        const FFMPEG_VERSION: &str = "ffmpeg-4.1.5";
+        const FFMPEG_VERSION: &str = "ffmpeg-4.3.1";
 
         use std::env;
         use std::path;

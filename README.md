@@ -219,9 +219,9 @@ You can also create your own static build with script `build_static.sh` (Docker 
 
 ### Local build (Linux)
 
-Now audioserve depends on ffmpeg's libavformat 4.1 (and its dependent libavutil and libavcodec libs), which is a complex beast. If you are building locally you need this dependence (plus couple of others). If you have available right version on your system you can dynamically link against it (remember it has to be correct version). Other option is to use feature `partially-static`, which will download right version of ffmpeg, compile it and statically link it into audioserve (but then binary will be indeed bigger).
+Now audioserve depends on ffmpeg's libavformat 4.3 (and its dependent libavutil and libavcodec libs), which is a complex beast. If you are building locally you need this dependence (plus couple of others). If you have available right version on your system you can dynamically link against it (remember it has to be correct version). Other option is to use feature `partially-static`, which will download right version of ffmpeg, compile it and statically link it into audioserve (but then binary will be indeed bigger).
 
-Install required dependencies (some dependecies are optional, depending on features chosen in build):
+Install required dependencies (some dependencies are optional, depending on features chosen in build):
 
     # Ubuntu - for other distros look for equivalent packages
     sudo apt-get install -y  openssl libssl-dev pkg-config\

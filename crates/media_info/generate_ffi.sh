@@ -18,5 +18,5 @@ bindgen \
 --whitelist-var AV_LOG_QUIET \
 --whitelist-var AV_DICT_IGNORE_SUFFIX \
 --whitelist-var AV_TIME_BASE \
-wrapper.h -- -I ffmpeg-4.1 \
+wrapper.h -- -I ffmpeg-4.3.1 \
 > src/ffi.rs
