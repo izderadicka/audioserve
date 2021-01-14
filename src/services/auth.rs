@@ -101,11 +101,17 @@ impl Authenticator for SharedSecretAuthenticator {
 
                                 Ok(AuthResult::LoggedIn(resp.body(token.into()).unwrap()))
                             } else {
-                                error!("Invalid authentication: invalid shared secret, client: {:?}", req.remote_addr());
+                                error!(
+                                    "Invalid authentication: invalid shared secret, client: {:?}",
+                                    req.remote_addr()
+                                );
                                 Ok(deny())
                             }
                         } else {
-                            error!("Invalid authentication: missing shared secret, client: {:?}", req.remote_addr());
+                            error!(
+                                "Invalid authentication: missing shared secret, client: {:?}",
+                                req.remote_addr()
+                            );
                             Ok(deny())
                         }
                     }
@@ -124,12 +130,18 @@ impl Authenticator for SharedSecretAuthenticator {
                     .and_then(|c| c.get(COOKIE_NAME).map(borrow::ToOwned::to_owned));
             }
 
-            if token.is_none()  {
-                error!("Invalid access: missing token, client: {:?}", req.remote_addr());
+            if token.is_none() {
+                error!(
+                    "Invalid access: missing token, client: {:?}",
+                    req.remote_addr()
+                );
                 return Box::pin(future::ok(deny()));
             }
             if !self.secrets.token_ok(&token.unwrap()) {
-                error!("Invalid access: invalid token, client: {:?}", req.remote_addr());
+                error!(
+                    "Invalid access: invalid token, client: {:?}",
+                    req.remote_addr()
+                );
                 return Box::pin(future::ok(deny()));
             }
         }

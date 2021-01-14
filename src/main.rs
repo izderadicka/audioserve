@@ -10,16 +10,18 @@ use error::{bail, Context, Error};
 use futures::prelude::*;
 use hyper::{service::make_service_fn, Server as HttpServer};
 use ring::rand::{SecureRandom, SystemRandom};
-use services::{ServiceFactory, TranscodingDetails, auth::SharedSecretAuthenticator, search::Search};
-use tokio::net::TcpStream;
-use tokio_native_tls::TlsStream;
-use std::{fs::File};
+use services::{
+    auth::SharedSecretAuthenticator, search::Search, ServiceFactory, TranscodingDetails,
+};
+use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
 use std::pin::Pin;
 use std::process;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use tokio::net::TcpStream;
+use tokio_native_tls::TlsStream;
 
 mod config;
 mod error;
@@ -78,25 +80,15 @@ macro_rules! get_url_path {
 
 fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
     let cfg = get_config();
-    let authenticator = get_config().shared_secret.as_ref().map(
-        |secret| {
-            SharedSecretAuthenticator::new(
-                secret.clone(),
-                server_secret,
-                cfg.token_validity_hours,
-            )
-        }
-    );
+    let authenticator = get_config().shared_secret.as_ref().map(|secret| {
+        SharedSecretAuthenticator::new(secret.clone(), server_secret, cfg.token_validity_hours)
+    });
     let transcoding = TranscodingDetails {
         transcodings: Arc::new(AtomicUsize::new(0)),
         max_transcodings: cfg.transcoding.max_parallel_processes,
     };
-    let svc_factory = ServiceFactory::new(
-        authenticator,
-        Search::new(),
-        transcoding
-    );
-    
+    let svc_factory = ServiceFactory::new(authenticator, Search::new(), transcoding);
+
     let addr = cfg.listen;
     let start_server = async move {
         let server: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> =
@@ -104,9 +96,10 @@ fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
                 None => {
                     let server = HttpServer::bind(&addr).serve(make_service_fn(
                         move |conn: &hyper::server::conn::AddrStream| {
-                        let remote_addr = conn.remote_addr();
-                        svc_factory.create(Some(remote_addr))
-                    }));
+                            let remote_addr = conn.remote_addr();
+                            svc_factory.create(Some(remote_addr))
+                        },
+                    ));
                     info!("Server listening on {}{}", &addr, get_url_path!());
                     Box::pin(server.map_err(|e| e.into()))
                 }
@@ -120,7 +113,8 @@ fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
                                 .context("TLS handshake")?;
                             let server = HttpServer::builder(incoming)
                                 .serve(make_service_fn(move |conn: &TlsStream<TcpStream>| {
-                                    let remote_addr = conn.get_ref().get_ref().get_ref().peer_addr().ok();
+                                    let remote_addr =
+                                        conn.get_ref().get_ref().get_ref().peer_addr().ok();
                                     svc_factory.create(remote_addr)
                                 }))
                                 .await;

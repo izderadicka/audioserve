@@ -14,15 +14,15 @@ use futures::{future, TryFutureExt};
 use headers::{
     AccessControlAllowCredentials, AccessControlAllowOrigin, HeaderMapExt, Origin, Range,
 };
-use hyper::{Body, Method, Request, Response, StatusCode, body::HttpBody, service::Service};
+use hyper::{body::HttpBody, service::Service, Body, Method, Request, Response, StatusCode};
 use percent_encoding::percent_decode;
 use regex::Regex;
-use std::{collections::HashMap, convert::Infallible, net::SocketAddr};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::{borrow::Cow, task::Poll};
+use std::{collections::HashMap, convert::Infallible, net::SocketAddr};
 use url::form_urlencoded;
 
 pub mod audio_folder;
@@ -43,11 +43,15 @@ type Counter = Arc<AtomicUsize>;
 pub struct RequestWrapper {
     request: Request<Body>,
     path: String,
-    remote_addr: Option<SocketAddr>
+    remote_addr: Option<SocketAddr>,
 }
 
 impl RequestWrapper {
-    pub fn new(request: Request<Body>, path_prefix: Option<&str>, remote_addr: Option<SocketAddr>) -> error::Result<Self> {
+    pub fn new(
+        request: Request<Body>,
+        path_prefix: Option<&str>,
+        remote_addr: Option<SocketAddr>,
+    ) -> error::Result<Self> {
         let path = match percent_decode(request.uri().path().as_bytes()).decode_utf8() {
             Ok(s) => s.into_owned(),
             Err(e) => {
@@ -75,7 +79,11 @@ impl RequestWrapper {
             },
             None => path,
         };
-        Ok(RequestWrapper { request, path, remote_addr })
+        Ok(RequestWrapper {
+            request,
+            path,
+            remote_addr,
+        })
     }
 
     pub fn path(&self) -> &str {
@@ -110,10 +118,8 @@ impl RequestWrapper {
                 Ok(buf.into())
             }
             Some(Err(e)) => return Err(e),
-            None => Ok(Bytes::new())
+            None => Ok(Bytes::new()),
         }
-
-       
     }
 
     pub fn into_request(self) -> Request<Body> {
@@ -139,27 +145,29 @@ pub struct ServiceFactory<T> {
     transcoding: TranscodingDetails,
 }
 
-impl <T> ServiceFactory<T> {
-    pub fn new<A>(auth: Option<A>, search: Search<String>, transcoding: TranscodingDetails) -> Self 
-    where A: Authenticator<Credentials = T> + 'static
+impl<T> ServiceFactory<T> {
+    pub fn new<A>(auth: Option<A>, search: Search<String>, transcoding: TranscodingDetails) -> Self
+    where
+        A: Authenticator<Credentials = T> + 'static,
     {
         ServiceFactory {
-            authenticator: auth.map(|a| Arc::new(Box::new(a) as Box<dyn Authenticator<Credentials = T>>)),
+            authenticator: auth
+                .map(|a| Arc::new(Box::new(a) as Box<dyn Authenticator<Credentials = T>>)),
             search,
-            transcoding
+            transcoding,
         }
     }
 
-
-    pub fn create(&self, remote_addr: Option<SocketAddr>) -> impl Future<Output=Result<FileSendService<T>, Infallible>>{
-        future::ok(
-            FileSendService {
-                authenticator: self.authenticator.clone(),
-                search: self.search.clone(),
-                transcoding: self.transcoding.clone(),
-                remote_addr
-            }
-        )
+    pub fn create(
+        &self,
+        remote_addr: Option<SocketAddr>,
+    ) -> impl Future<Output = Result<FileSendService<T>, Infallible>> {
+        future::ok(FileSendService {
+            authenticator: self.authenticator.clone(),
+            search: self.search.clone(),
+            transcoding: self.transcoding.clone(),
+            remote_addr,
+        })
     }
 }
 
@@ -168,7 +176,7 @@ pub struct FileSendService<T> {
     pub authenticator: Option<Arc<Box<dyn Authenticator<Credentials = T>>>>,
     pub search: Search<String>,
     pub transcoding: TranscodingDetails,
-    pub remote_addr: Option<SocketAddr>
+    pub remote_addr: Option<SocketAddr>,
 }
 
 // use only on checked prefixes
@@ -208,7 +216,11 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        let req = match RequestWrapper::new(req, get_config().url_path_prefix.as_deref(), self.remote_addr) {
+        let req = match RequestWrapper::new(
+            req,
+            get_config().url_path_prefix.as_deref(),
+            self.remote_addr,
+        ) {
             Ok(r) => r,
             Err(_) => return short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE),
         };
