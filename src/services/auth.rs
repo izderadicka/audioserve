@@ -65,16 +65,16 @@ const ACCESS_DENIED: &str = "Access denied";
 
 impl Authenticator for SharedSecretAuthenticator {
     type Credentials = ();
-    fn authenticate(&self, req: RequestWrapper) -> AuthFuture<()> {
+    fn authenticate(&self, mut req: RequestWrapper) -> AuthFuture<()> {
         fn deny() -> AuthResult<()> {
             AuthResult::Rejected(short_response(StatusCode::UNAUTHORIZED, ACCESS_DENIED))
         }
         // this is part where client can authenticate itself and get token
         if req.method() == Method::POST && req.path() == "/authenticate" {
             debug!("Authentication request");
-            let auth = self.secrets.clone(); // TODO: auth need to be 'static - is there better way?
+            let auth = self.secrets.clone();
             return Box::pin(async move {
-                match hyper::body::to_bytes(req.into_body()).await {
+                match req.body_bytes().await {
                     Err(e) => bail!(e),
                     Ok(b) => {
                         let params = form_urlencoded::parse(b.as_ref())
@@ -101,9 +101,11 @@ impl Authenticator for SharedSecretAuthenticator {
 
                                 Ok(AuthResult::LoggedIn(resp.body(token.into()).unwrap()))
                             } else {
+                                error!("Invalid authentication: invalid shared secret, client: {:?}", req.remote_addr());
                                 Ok(deny())
                             }
                         } else {
+                            error!("Invalid authentication: missing shared secret, client: {:?}", req.remote_addr());
                             Ok(deny())
                         }
                     }
@@ -122,7 +124,12 @@ impl Authenticator for SharedSecretAuthenticator {
                     .and_then(|c| c.get(COOKIE_NAME).map(borrow::ToOwned::to_owned));
             }
 
-            if token.is_none() || !self.secrets.token_ok(&token.unwrap()) {
+            if token.is_none()  {
+                error!("Invalid access: missing token, client: {:?}", req.remote_addr());
+                return Box::pin(future::ok(deny()));
+            }
+            if !self.secrets.token_ok(&token.unwrap()) {
+                error!("Invalid access: invalid token, client: {:?}", req.remote_addr());
                 return Box::pin(future::ok(deny()));
             }
         }

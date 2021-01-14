@@ -40,6 +40,7 @@ pub fn short_response(status: StatusCode, msg: &'static str) -> Response {
     HyperResponse::builder()
         .status(status)
         .typed_header(ContentLength(msg.len() as u64))
+        .typed_header(ContentType::text())
         .body(msg.into())
         .unwrap()
 }

@@ -8,16 +8,16 @@ use self::transcode::QualityLevel;
 use self::types::FoldersOrdering;
 use crate::config::get_config;
 use crate::{error, util::header2header};
+use bytes::{Bytes, BytesMut};
 use futures::prelude::*;
 use futures::{future, TryFutureExt};
 use headers::{
     AccessControlAllowCredentials, AccessControlAllowOrigin, HeaderMapExt, Origin, Range,
 };
-use hyper::service::Service;
-use hyper::{Body, Method, Request, Response, StatusCode};
+use hyper::{Body, Method, Request, Response, StatusCode, body::HttpBody, service::Service};
 use percent_encoding::percent_decode;
 use regex::Regex;
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::Infallible, net::SocketAddr};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
@@ -43,10 +43,11 @@ type Counter = Arc<AtomicUsize>;
 pub struct RequestWrapper {
     request: Request<Body>,
     path: String,
+    remote_addr: Option<SocketAddr>
 }
 
 impl RequestWrapper {
-    pub fn new(request: Request<Body>, path_prefix: Option<&str>) -> error::Result<Self> {
+    pub fn new(request: Request<Body>, path_prefix: Option<&str>, remote_addr: Option<SocketAddr>) -> error::Result<Self> {
         let path = match percent_decode(request.uri().path().as_bytes()).decode_utf8() {
             Ok(s) => s.into_owned(),
             Err(e) => {
@@ -74,11 +75,15 @@ impl RequestWrapper {
             },
             None => path,
         };
-        Ok(RequestWrapper { request, path })
+        Ok(RequestWrapper { request, path, remote_addr })
     }
 
     pub fn path(&self) -> &str {
         self.path.as_str()
+    }
+
+    pub fn remote_addr(&self) -> Option<SocketAddr> {
+        self.remote_addr
     }
 
     pub fn headers(&self) -> &hyper::HeaderMap {
@@ -91,6 +96,24 @@ impl RequestWrapper {
 
     pub fn into_body(self) -> Body {
         self.request.into_body()
+    }
+
+    pub async fn body_bytes(&mut self) -> Result<Bytes, hyper::Error> {
+        let first = self.request.body_mut().data().await;
+        match first {
+            Some(Ok(data)) => {
+                let mut buf = BytesMut::from(&data[..]);
+                while let Some(res) = self.request.body_mut().data().await {
+                    let next = res?;
+                    buf.extend_from_slice(&next);
+                }
+                Ok(buf.into())
+            }
+            Some(Err(e)) => return Err(e),
+            None => Ok(Bytes::new())
+        }
+
+       
     }
 
     pub fn into_request(self) -> Request<Body> {
@@ -110,11 +133,42 @@ pub struct TranscodingDetails {
     pub max_transcodings: u32,
 }
 
+pub struct ServiceFactory<T> {
+    authenticator: Option<Arc<Box<dyn Authenticator<Credentials = T>>>>,
+    search: Search<String>,
+    transcoding: TranscodingDetails,
+}
+
+impl <T> ServiceFactory<T> {
+    pub fn new<A>(auth: Option<A>, search: Search<String>, transcoding: TranscodingDetails) -> Self 
+    where A: Authenticator<Credentials = T> + 'static
+    {
+        ServiceFactory {
+            authenticator: auth.map(|a| Arc::new(Box::new(a) as Box<dyn Authenticator<Credentials = T>>)),
+            search,
+            transcoding
+        }
+    }
+
+
+    pub fn create(&self, remote_addr: Option<SocketAddr>) -> impl Future<Output=Result<FileSendService<T>, Infallible>>{
+        future::ok(
+            FileSendService {
+                authenticator: self.authenticator.clone(),
+                search: self.search.clone(),
+                transcoding: self.transcoding.clone(),
+                remote_addr
+            }
+        )
+    }
+}
+
 #[derive(Clone)]
 pub struct FileSendService<T> {
     pub authenticator: Option<Arc<Box<dyn Authenticator<Credentials = T>>>>,
     pub search: Search<String>,
     pub transcoding: TranscodingDetails,
+    pub remote_addr: Option<SocketAddr>
 }
 
 // use only on checked prefixes
@@ -154,7 +208,7 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        let req = match RequestWrapper::new(req, get_config().url_path_prefix.as_deref()) {
+        let req = match RequestWrapper::new(req, get_config().url_path_prefix.as_deref(), self.remote_addr) {
             Ok(r) => r,
             Err(_) => return short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE),
         };

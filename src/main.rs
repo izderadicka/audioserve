@@ -10,10 +10,10 @@ use error::{bail, Context, Error};
 use futures::prelude::*;
 use hyper::{service::make_service_fn, Server as HttpServer};
 use ring::rand::{SecureRandom, SystemRandom};
-use services::auth::SharedSecretAuthenticator;
-use services::search::Search;
-use services::{FileSendService, TranscodingDetails};
-use std::fs::File;
+use services::{ServiceFactory, TranscodingDetails, auth::SharedSecretAuthenticator, search::Search};
+use tokio::net::TcpStream;
+use tokio_native_tls::TlsStream;
+use std::{fs::File};
 use std::io::{self, Read, Write};
 use std::path::Path;
 use std::pin::Pin;
@@ -78,29 +78,34 @@ macro_rules! get_url_path {
 
 fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
     let cfg = get_config();
-    let svc = FileSendService {
-        authenticator: get_config().shared_secret.as_ref().map(
-            |secret| -> Arc<Box<dyn services::auth::Authenticator<Credentials = ()>>> {
-                Arc::new(Box::new(SharedSecretAuthenticator::new(
-                    secret.clone(),
-                    server_secret,
-                    cfg.token_validity_hours,
-                )))
-            },
-        ),
-        search: Search::new(),
-        transcoding: TranscodingDetails {
-            transcodings: Arc::new(AtomicUsize::new(0)),
-            max_transcodings: cfg.transcoding.max_parallel_processes,
-        },
+    let authenticator = get_config().shared_secret.as_ref().map(
+        |secret| {
+            SharedSecretAuthenticator::new(
+                secret.clone(),
+                server_secret,
+                cfg.token_validity_hours,
+            )
+        }
+    );
+    let transcoding = TranscodingDetails {
+        transcodings: Arc::new(AtomicUsize::new(0)),
+        max_transcodings: cfg.transcoding.max_parallel_processes,
     };
+    let svc_factory = ServiceFactory::new(
+        authenticator,
+        Search::new(),
+        transcoding
+    );
+    
     let addr = cfg.listen;
     let start_server = async move {
         let server: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> =
             match get_config().ssl.as_ref() {
                 None => {
-                    let server = HttpServer::bind(&addr).serve(make_service_fn(move |_| {
-                        future::ok::<_, error::Error>(svc.clone())
+                    let server = HttpServer::bind(&addr).serve(make_service_fn(
+                        move |conn: &hyper::server::conn::AddrStream| {
+                        let remote_addr = conn.remote_addr();
+                        svc_factory.create(Some(remote_addr))
                     }));
                     info!("Server listening on {}{}", &addr, get_url_path!());
                     Box::pin(server.map_err(|e| e.into()))
@@ -114,8 +119,9 @@ fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
                                 .await
                                 .context("TLS handshake")?;
                             let server = HttpServer::builder(incoming)
-                                .serve(make_service_fn(move |_| {
-                                    future::ok::<_, error::Error>(svc.clone())
+                                .serve(make_service_fn(move |conn: &TlsStream<TcpStream>| {
+                                    let remote_addr = conn.get_ref().get_ref().get_ref().peer_addr().ok();
+                                    svc_factory.create(remote_addr)
                                 }))
                                 .await;
 
