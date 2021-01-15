@@ -102,6 +102,7 @@ impl RequestWrapper {
         self.request.method()
     }
 
+    #[allow(dead_code)]
     pub fn into_body(self) -> Body {
         self.request.into_body()
     }
@@ -122,6 +123,7 @@ impl RequestWrapper {
         }
     }
 
+    #[allow(dead_code)]
     pub fn into_request(self) -> Request<Body> {
         self.request
     }

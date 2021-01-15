@@ -325,11 +325,7 @@ impl Transcoder {
         use futures::channel::mpsc;
         use std::io;
 
-        let is_transcoded = if let AudioFilePath::Transcoded(_) = file {
-            true
-        } else {
-            false
-        };
+        let is_transcoded = matches!(file, AudioFilePath::Transcoded(_));
         if is_transcoded || seek.is_some() || get_config().transcoding.cache.disabled {
             debug!("Shoud not add to cache as is already transcoded, seeking or cache is disabled");
             return Box::pin(future::ready(
@@ -404,7 +400,7 @@ impl Transcoder {
                             }
                         };
                         tokio::spawn(f);
-                        Box::pin(rx.map(|i| Ok(i))) as TranscodedStream
+                        Box::pin(rx.map(Ok)) as TranscodedStream
                     }),
             ),
         });

@@ -20,8 +20,6 @@ use std::pin::Pin;
 use std::process;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
-use tokio::net::TcpStream;
-use tokio_native_tls::TlsStream;
 
 mod config;
 mod error;
@@ -106,6 +104,8 @@ fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
                 Some(ssl) => {
                     #[cfg(feature = "tls")]
                     {
+                        use tokio::net::TcpStream;
+                        use tokio_native_tls::TlsStream;
                         info!("Server listening on {}{} with TLS", &addr, get_url_path!());
                         let create_server = async move {
                             let incoming = tls::tls_acceptor(&addr, &ssl)

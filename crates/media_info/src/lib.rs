@@ -57,7 +57,7 @@ impl Dictionary {
             if res.is_null() {
                 return None;
             }
-            return Some(string_from_ptr_lossy((*res).value));
+            Some(string_from_ptr_lossy((*res).value))
         }
     }
 
@@ -175,7 +175,7 @@ impl MediaFile {
     pub fn duration(&self) -> u64 {
         let d = unsafe { (*self.ctx).duration } / 1_000;
         if d < 0 {
-            return 0;
+            0
         } else {
             d as u64
         }
@@ -186,7 +186,7 @@ impl MediaFile {
         let b = unsafe { (*self.ctx).bit_rate } / 1000;
 
         if b < 0 {
-            return 0;
+            0
         } else {
             b as u32
         }

@@ -8,6 +8,7 @@ edition = "2018"
 members = ["crates/*"]
 
 [dependencies]
+bytes = "1.0"
 env_logger = "0.8"
 log = {version="0.4", features = ["release_max_level_info"]}
 hyper = {version="0.14", features = ["full"]}
@@ -43,8 +44,6 @@ native-tls = {version="0.2", optional=true}
 
 cachedirtree = {path="crates/cachedirtree", optional=true}
 
-bytes = {version="1.0", optional=true}
-
 tokio-util = {version="0.6", optional=true}
 
 media_info = {path="crates/media_info"}
@@ -70,7 +69,7 @@ default = ["tls", "symlinks","search-cache", "folder-download", "shared-position
 tls=["tokio-native-tls", "native-tls"]
 symlinks=["cachedirtree/symlinks"]
 search-cache=["cachedirtree"]
-transcoding-cache=["simple-file-cache", "bytes", "tokio-util"]
+transcoding-cache=["simple-file-cache", "tokio-util"]
 folder-download = ["async-tar"]
 static = ["media_info/static"]
 partially-static = ["media_info/partially-static"]
