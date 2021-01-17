@@ -16,12 +16,13 @@ use headers::{
 };
 use hyper::{body::HttpBody, service::Service, Body, Method, Request, Response, StatusCode};
 use percent_encoding::percent_decode;
+use proxy_headers::XForwardedFor;
 use regex::Regex;
-use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::{borrow::Cow, task::Poll};
 use std::{collections::HashMap, convert::Infallible, net::SocketAddr};
+use std::{fmt::Display, pin::Pin};
 use std::{
     net::IpAddr,
     path::{Path, PathBuf},
@@ -43,6 +44,30 @@ const APP_STATIC_FILES_CACHE_AGE: u32 = 30 * 24 * 3600;
 const FOLDER_INFO_FILES_CACHE_AGE: u32 = 24 * 3600;
 
 type Counter = Arc<AtomicUsize>;
+
+#[derive(Debug)]
+pub enum RemoteIpAddr {
+    Direct(IpAddr),
+    Proxied(IpAddr),
+}
+
+impl AsRef<IpAddr> for RemoteIpAddr {
+    fn as_ref(&self) -> &IpAddr {
+        match self {
+            RemoteIpAddr::Direct(a) => a,
+            RemoteIpAddr::Proxied(a) => a,
+        }
+    }
+}
+
+impl Display for RemoteIpAddr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RemoteIpAddr::Direct(a) => a.fmt(f),
+            RemoteIpAddr::Proxied(a) => write!(f, "Proxied: {}", a),
+        }
+    }
+}
 
 pub struct RequestWrapper {
     request: Request<Body>,
@@ -101,11 +126,12 @@ impl RequestWrapper {
         self.path.as_str()
     }
 
-    pub fn remote_addr(&self) -> Option<IpAddr> {
-        // if self.is_behind_proxy {
-        //     self.request.headers().get("x-")
-        // }
-        self.remote_addr
+    pub fn remote_addr(&self) -> Option<RemoteIpAddr> {
+        if self.is_behind_proxy {
+            let xfwd: Option<XForwardedFor> = self.request.headers().typed_get();
+            return xfwd.map(|h| RemoteIpAddr::Proxied(h.client().clone()));
+        }
+        self.remote_addr.map(RemoteIpAddr::Direct)
     }
 
     pub fn headers(&self) -> &hyper::HeaderMap {
