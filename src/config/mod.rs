@@ -261,7 +261,7 @@ pub struct Config {
     pub disable_folder_download: bool,
     pub chapters: ChaptersSize,
     pub positions_file: PathBuf,
-    pub behind_proxy: bool
+    pub behind_proxy: bool,
 }
 
 impl Config {
@@ -398,7 +398,7 @@ impl Default for Config {
             disable_folder_download: false,
             chapters: ChaptersSize::default(),
             positions_file: data_base_dir.join("audioserve.positions"),
-            behind_proxy: false
+            behind_proxy: false,
         }
     }
 }

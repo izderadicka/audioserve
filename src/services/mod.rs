@@ -17,12 +17,15 @@ use headers::{
 use hyper::{body::HttpBody, service::Service, Body, Method, Request, Response, StatusCode};
 use percent_encoding::percent_decode;
 use regex::Regex;
-use std::{net::IpAddr, path::{Path, PathBuf}};
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::{borrow::Cow, task::Poll};
 use std::{collections::HashMap, convert::Infallible, net::SocketAddr};
+use std::{
+    net::IpAddr,
+    path::{Path, PathBuf},
+};
 use url::form_urlencoded;
 
 pub mod audio_folder;
@@ -30,11 +33,11 @@ pub mod audio_meta;
 pub mod auth;
 #[cfg(feature = "shared-positions")]
 pub mod position;
+mod proxy_headers;
 pub mod search;
 mod subs;
 pub mod transcode;
 mod types;
-mod proxy_headers;
 
 const APP_STATIC_FILES_CACHE_AGE: u32 = 30 * 24 * 3600;
 const FOLDER_INFO_FILES_CACHE_AGE: u32 = 24 * 3600;
@@ -47,7 +50,7 @@ pub struct RequestWrapper {
     remote_addr: Option<IpAddr>,
     #[allow(dead_code)]
     is_ssl: bool,
-    is_behind_proxy: bool
+    is_behind_proxy: bool,
 }
 
 impl RequestWrapper {
@@ -90,7 +93,7 @@ impl RequestWrapper {
             path,
             remote_addr,
             is_ssl,
-            is_behind_proxy
+            is_behind_proxy,
         })
     }
 
@@ -174,14 +177,14 @@ impl<T> ServiceFactory<T> {
     pub fn create(
         &self,
         remote_addr: Option<SocketAddr>,
-        is_ssl: bool
+        is_ssl: bool,
     ) -> impl Future<Output = Result<FileSendService<T>, Infallible>> {
         future::ok(FileSendService {
             authenticator: self.authenticator.clone(),
             search: self.search.clone(),
             transcoding: self.transcoding.clone(),
             remote_addr,
-            is_ssl
+            is_ssl,
         })
     }
 }
@@ -192,7 +195,7 @@ pub struct FileSendService<T> {
     pub search: Search<String>,
     pub transcoding: TranscodingDetails,
     pub remote_addr: Option<SocketAddr>,
-    pub is_ssl: bool
+    pub is_ssl: bool,
 }
 
 // use only on checked prefixes
@@ -236,7 +239,7 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
             req,
             get_config().url_path_prefix.as_deref(),
             self.remote_addr.map(|a| a.ip()),
-            self.is_ssl
+            self.is_ssl,
         ) {
             Ok(r) => r,
             Err(_) => return short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE),

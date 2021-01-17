@@ -1,4 +1,8 @@
-use std::{fmt::Display, iter, net::{AddrParseError, IpAddr, Ipv6Addr}};
+use std::{
+    fmt::Display,
+    iter,
+    net::{AddrParseError, IpAddr, Ipv6Addr},
+};
 
 use headers::{Header, HeaderName, HeaderValue};
 use hyper::http::header;
@@ -9,8 +13,7 @@ lazy_static! {
 
 enum AddrError {
     InvalidlyQuoted,
-    InvalidAddress
-
+    InvalidAddress,
 }
 
 impl From<AddrError> for headers::Error {
@@ -26,13 +29,12 @@ impl From<AddrParseError> for AddrError {
 }
 
 // assumes that str is acsii, other can panic, but this should be assured by HeaderValue
-fn unquote_str(s:&str, start: char, end: char) -> Result<Option<&str>, AddrError> {
+fn unquote_str(s: &str, start: char, end: char) -> Result<Option<&str>, AddrError> {
     if s.starts_with(start) {
-        if s.len()>1 && s.ends_with(end) {
-            return Ok(Some(&s[1..s.len()-1]))
-
+        if s.len() > 1 && s.ends_with(end) {
+            return Ok(Some(&s[1..s.len() - 1]));
         } else {
-            return Err(AddrError::InvalidlyQuoted)
+            return Err(AddrError::InvalidlyQuoted);
         }
     }
     Ok(None)
@@ -40,7 +42,7 @@ fn unquote_str(s:&str, start: char, end: char) -> Result<Option<&str>, AddrError
 
 fn parse_ip(s: &str) -> Result<IpAddr, AddrError> {
     if let Some(quoted) = unquote_str(s, '"', '"')? {
-        if let Some(addr) = unquote_str(quoted, '[',']')? {
+        if let Some(addr) = unquote_str(quoted, '[', ']')? {
             let ip6: Ipv6Addr = addr.parse()?;
             Ok(IpAddr::V6(ip6))
         } else {
@@ -55,16 +57,19 @@ fn parse_ip(s: &str) -> Result<IpAddr, AddrError> {
 pub enum NodeName {
     Unknown,
     Obfuscated(String),
-    Addr(IpAddr)
-
+    Addr(IpAddr),
 }
 
 impl Display for NodeName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            NodeName::Unknown => {write!(f, "unknown")}
-            NodeName::Obfuscated(s) => {f.write_str(s)}
-            NodeName::Addr(a) => {write!(f, "{}", a)}
+            NodeName::Unknown => {
+                write!(f, "unknown")
+            }
+            NodeName::Obfuscated(s) => f.write_str(s),
+            NodeName::Addr(a) => {
+                write!(f, "{}", a)
+            }
         }
     }
 }
@@ -72,17 +77,17 @@ impl Display for NodeName {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct NodeIdentifier {
     name: NodeName,
-    port: Option<u16>
+    port: Option<u16>,
 }
 
 impl Display for NodeIdentifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.port {
-            None => write!(f,  "{}", self.name),
-            Some(port) => match  self.name {
+            None => write!(f, "{}", self.name),
+            Some(port) => match self.name {
                 NodeName::Addr(IpAddr::V6(a)) => write!(f, "[{}]:{}", a, port),
-                _ => write!(f, "{}:{}", self.name, port)
-            }
+                _ => write!(f, "{}:{}", self.name, port),
+            },
         }
     }
 }
@@ -94,10 +99,13 @@ pub struct XForwardedFor {
 
 impl XForwardedFor {
     pub fn client(&self) -> &IpAddr {
-        &self.ips.get(0).expect("at least one record is alway present")
+        &self
+            .ips
+            .get(0)
+            .expect("at least one record is alway present")
     }
 
-    pub fn proxies(&self) -> impl Iterator<Item=&IpAddr> {
+    pub fn proxies(&self) -> impl Iterator<Item = &IpAddr> {
         self.ips.iter().skip(1)
     }
 }
@@ -114,31 +122,33 @@ impl Header for XForwardedFor {
     {
         let mut ips = Vec::new();
         for val in values {
-        let parts = val
-            .to_str()
-            .map_err(|_| headers::Error::invalid())?
-            .split(",");
-        let addrs = parts.map(|p| parse_ip(p.trim()));
-        for addr in addrs {
-            match addr {
-                Ok(a) => ips.push(a),
-                Err(_) => return Err(headers::Error::invalid())
+            let parts = val
+                .to_str()
+                .map_err(|_| headers::Error::invalid())?
+                .split(",");
+            let addrs = parts.map(|p| parse_ip(p.trim()));
+            for addr in addrs {
+                match addr {
+                    Ok(a) => ips.push(a),
+                    Err(_) => return Err(headers::Error::invalid()),
+                }
             }
-        }
         }
 
         if ips.is_empty() {
-            return Err(headers::Error::invalid())
+            return Err(headers::Error::invalid());
         }
 
-        Ok(XForwardedFor {
-            ips
-        })
+        Ok(XForwardedFor { ips })
     }
 
     fn encode<E: Extend<headers::HeaderValue>>(&self, values: &mut E) {
-        
-        let s = self.ips.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", ");
+        let s = self
+            .ips
+            .iter()
+            .map(|a| a.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
         values.extend(iter::once(
             HeaderValue::from_maybe_shared(s)
                 .expect("BUG: ips should be always valid header value"),
@@ -146,9 +156,8 @@ impl Header for XForwardedFor {
     }
 }
 
-#[cfg(test)] 
-mod test
-{
+#[cfg(test)]
+mod test {
     use std::net::Ipv6Addr;
 
     use super::*;
@@ -169,7 +178,6 @@ mod test
 
         let h1 = value_to_header(header1).unwrap();
         assert_eq!(h1.client(), &header1.parse::<IpAddr>().unwrap());
-
 
         let h2 = value_to_header(header2).unwrap();
         assert_eq!(h2.client(), &header2.parse::<IpAddr>().unwrap());
@@ -193,8 +201,5 @@ mod test
         h.encode(&mut values);
         let header2 = values[0].to_str().unwrap();
         assert_eq!(header, header2);
-
-
     }
-
 }
