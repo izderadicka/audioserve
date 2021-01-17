@@ -232,6 +232,10 @@ fn create_parser<'a>() -> Parser<'a> {
             .long("t-cache-save-often")
             .help("Save additions to cache often, after each addition, this is normaly not necessary")
         )
+        .arg(Arg::with_name("behind-proxy")
+        .long("behind-proxy")
+        .help("Informs program that it is behind remote proxy, now used only for logging (to get true remote client ip)")
+        )
     }
 
     parser
@@ -433,6 +437,10 @@ where
     {
         config.disable_folder_download = true
     };
+
+    if is_present_or_env("behind-proxy", "AUDIOSERVE_BEHIND_PROXY") {
+        config.behind_proxy = true;
+    }
 
     if let Some(d) = args.value_of("chapters-from-duration") {
         config.chapters.from_duration = d.parse().unwrap()

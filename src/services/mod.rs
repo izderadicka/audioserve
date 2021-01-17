@@ -17,7 +17,7 @@ use headers::{
 use hyper::{body::HttpBody, service::Service, Body, Method, Request, Response, StatusCode};
 use percent_encoding::percent_decode;
 use regex::Regex;
-use std::path::{Path, PathBuf};
+use std::{net::IpAddr, path::{Path, PathBuf}};
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
@@ -34,6 +34,7 @@ pub mod search;
 mod subs;
 pub mod transcode;
 mod types;
+mod proxy_headers;
 
 const APP_STATIC_FILES_CACHE_AGE: u32 = 30 * 24 * 3600;
 const FOLDER_INFO_FILES_CACHE_AGE: u32 = 24 * 3600;
@@ -43,14 +44,18 @@ type Counter = Arc<AtomicUsize>;
 pub struct RequestWrapper {
     request: Request<Body>,
     path: String,
-    remote_addr: Option<SocketAddr>,
+    remote_addr: Option<IpAddr>,
+    #[allow(dead_code)]
+    is_ssl: bool,
+    is_behind_proxy: bool
 }
 
 impl RequestWrapper {
     pub fn new(
         request: Request<Body>,
         path_prefix: Option<&str>,
-        remote_addr: Option<SocketAddr>,
+        remote_addr: Option<IpAddr>,
+        is_ssl: bool,
     ) -> error::Result<Self> {
         let path = match percent_decode(request.uri().path().as_bytes()).decode_utf8() {
             Ok(s) => s.into_owned(),
@@ -79,10 +84,13 @@ impl RequestWrapper {
             },
             None => path,
         };
+        let is_behind_proxy = get_config().behind_proxy;
         Ok(RequestWrapper {
             request,
             path,
             remote_addr,
+            is_ssl,
+            is_behind_proxy
         })
     }
 
@@ -90,7 +98,10 @@ impl RequestWrapper {
         self.path.as_str()
     }
 
-    pub fn remote_addr(&self) -> Option<SocketAddr> {
+    pub fn remote_addr(&self) -> Option<IpAddr> {
+        // if self.is_behind_proxy {
+        //     self.request.headers().get("x-")
+        // }
         self.remote_addr
     }
 
@@ -163,12 +174,14 @@ impl<T> ServiceFactory<T> {
     pub fn create(
         &self,
         remote_addr: Option<SocketAddr>,
+        is_ssl: bool
     ) -> impl Future<Output = Result<FileSendService<T>, Infallible>> {
         future::ok(FileSendService {
             authenticator: self.authenticator.clone(),
             search: self.search.clone(),
             transcoding: self.transcoding.clone(),
             remote_addr,
+            is_ssl
         })
     }
 }
@@ -179,6 +192,7 @@ pub struct FileSendService<T> {
     pub search: Search<String>,
     pub transcoding: TranscodingDetails,
     pub remote_addr: Option<SocketAddr>,
+    pub is_ssl: bool
 }
 
 // use only on checked prefixes
@@ -221,7 +235,8 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
         let req = match RequestWrapper::new(
             req,
             get_config().url_path_prefix.as_deref(),
-            self.remote_addr,
+            self.remote_addr.map(|a| a.ip()),
+            self.is_ssl
         ) {
             Ok(r) => r,
             Err(_) => return short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE),

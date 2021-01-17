@@ -95,7 +95,7 @@ fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
                     let server = HttpServer::bind(&addr).serve(make_service_fn(
                         move |conn: &hyper::server::conn::AddrStream| {
                             let remote_addr = conn.remote_addr();
-                            svc_factory.create(Some(remote_addr))
+                            svc_factory.create(Some(remote_addr), false)
                         },
                     ));
                     info!("Server listening on {}{}", &addr, get_url_path!());
@@ -115,7 +115,7 @@ fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
                                 .serve(make_service_fn(move |conn: &TlsStream<TcpStream>| {
                                     let remote_addr =
                                         conn.get_ref().get_ref().get_ref().peer_addr().ok();
-                                    svc_factory.create(remote_addr)
+                                    svc_factory.create(remote_addr, true)
                                 }))
                                 .await;
 
