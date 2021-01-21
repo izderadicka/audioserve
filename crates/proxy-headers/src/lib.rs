@@ -3,7 +3,13 @@ use http::header;
 use lazy_static::lazy_static;
 use log::{error, warn};
 use parser::{all_string, elements, full_string, quoted_string, values_list};
-use std::{borrow::Cow, fmt::Display, iter, net::{AddrParseError, IpAddr, Ipv6Addr}, str::{FromStr, Utf8Error}};
+use std::{
+    borrow::Cow,
+    fmt::Display,
+    iter,
+    net::{AddrParseError, IpAddr, Ipv6Addr},
+    str::{FromStr, Utf8Error},
+};
 
 mod parser;
 
@@ -79,12 +85,11 @@ impl Display for $t {
     }
 }
 )*
-        
+
     };
 }
 
 string_newtype!(Obfuscated, Host, Protocol);
-
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum NodeName {
@@ -117,7 +122,7 @@ impl Display for Port {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Port::Real(p) => p.fmt(f),
-            Port::Obfuscated(o) => o.fmt(f)
+            Port::Obfuscated(o) => o.fmt(f),
         }
     }
 }
@@ -140,19 +145,16 @@ impl Display for NodeIdentifier {
     }
 }
 
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct ForwardNode {
     fwd_for: Option<NodeIdentifier>,
     fwd_by: Option<NodeIdentifier>,
     fwd_host: Option<Host>,
-    fwd_protocol: Option<Protocol>
-    
-
+    fwd_protocol: Option<Protocol>,
 }
 
 pub struct Forwarded {
-    nodes: Vec<ForwardNode>
+    nodes: Vec<ForwardNode>,
 }
 
 impl Header for Forwarded {
@@ -163,7 +165,8 @@ impl Header for Forwarded {
     fn decode<'i, I>(values: &mut I) -> Result<Self, headers::Error>
     where
         Self: Sized,
-        I: Iterator<Item = &'i HeaderValue> {
+        I: Iterator<Item = &'i HeaderValue>,
+    {
         let mut nodes = Vec::new();
 
         for v in values {
@@ -177,11 +180,11 @@ impl Header for Forwarded {
             }
 
             for elem in elements {
-                let mut node  = ForwardNode {
+                let mut node = ForwardNode {
                     fwd_for: None,
                     fwd_by: None,
                     fwd_host: None,
-                    fwd_protocol: None
+                    fwd_protocol: None,
                 };
                 for (key, value) in elem {
                     match &key.to_ascii_lowercase()[..] {
@@ -190,15 +193,13 @@ impl Header for Forwarded {
                             let id = if n.starts_with('[') {
                                 // this should be IPv6
                                 todo!()
-                            } else if n.starts_with('_'){
+                            } else if n.starts_with('_') {
                                 // this should be obfuscated identifier
                                 NodeName::Obfuscated(Obfuscated(n.into()))
-                                
                             } else if n.to_ascii_lowercase() == "unknown" {
                                 // unknown
                                 NodeName::Unknown
-                            }
-                            else {
+                            } else {
                                 // or default is IPv4
                                 let addr: IpAddr = parse_ip(n.as_bytes()).map_err(|e| {
                                     error!("Invalid address {:?}", e);
@@ -208,32 +209,27 @@ impl Header for Forwarded {
                             };
 
                             if node.fwd_for.is_none() {
-                                node.fwd_for = Some(NodeIdentifier{name: id, port: None})
+                                node.fwd_for = Some(NodeIdentifier {
+                                    name: id,
+                                    port: None,
+                                })
                             } else {
                                 error!("Duplicate key for");
-                                return Err(headers::Error::invalid())
+                                return Err(headers::Error::invalid());
                             }
-
-
-
                         }
-                        b"by" => {
-
-                        }
+                        b"by" => {}
                         b"host" => {
                             let host = full_string(&value, parser::host)?;
                             if node.fwd_host.is_none() {
                                 node.fwd_host = Some(Host(host))
                             } else {
                                 error!("Duplicate host key");
-                                return Err(headers::Error::invalid())
+                                return Err(headers::Error::invalid());
                             }
-
                         }
-                        b"protocol" => {
-
-                        }
-                        other => warn!("Unknown key in Forwarded node {:?} ", other)
+                        b"protocol" => {}
+                        other => warn!("Unknown key in Forwarded node {:?} ", other),
                     }
                 }
 
@@ -246,7 +242,7 @@ impl Header for Forwarded {
             return Err(headers::Error::invalid());
         }
 
-        Ok(Forwarded{nodes})
+        Ok(Forwarded { nodes })
     }
 
     fn encode<E: Extend<HeaderValue>>(&self, _values: &mut E) {
@@ -340,14 +336,15 @@ mod test {
             r#"for=192.0.2.43,for=198.51.100.17;by=203.0.113.60;proto=http;host=example.com"#,
             r#"for=192.0.2.43, for="[2001:db8:cafe::17]", for=unknown"#,
             r#"for=_hidden, for=_SEVKISEK"#,
-            r#"Forwarded: For="[2001:db8:cafe::17]:4711", For=192.0.2.43:47011"#
+            r#"Forwarded: For="[2001:db8:cafe::17]:4711", For=192.0.2.43:47011"#,
         ];
 
-        for (n,h) in headers.into_iter().enumerate() {
-            let v = HeaderValue::from_str(h).expect(&format!("Cannot create header value for #{}", n));
+        for (n, h) in headers.into_iter().enumerate() {
+            let v =
+                HeaderValue::from_str(h).expect(&format!("Cannot create header value for #{}", n));
             let mut i = iter::once(&v);
-            let fwd = Forwarded::decode(&mut i).expect(&format!("Failed decode header {}: {}",n, headers[n]));
-
+            let fwd = Forwarded::decode(&mut i)
+                .expect(&format!("Failed decode header {}: {}", n, headers[n]));
         }
     }
 

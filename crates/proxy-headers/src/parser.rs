@@ -1,6 +1,14 @@
 use std::{borrow::Cow, str::Utf8Error, string::FromUtf8Error};
 
-use nom::{IResult, branch::alt, bytes::complete::{escaped_transform, tag, take_while, take_while1, take_while_m_n}, character::{complete::space0, is_alphanumeric}, combinator::{cut, map, rest}, multi::separated_list1, sequence::{preceded, separated_pair, terminated, tuple}};
+use nom::{
+    branch::alt,
+    bytes::complete::{escaped_transform, tag, take_while, take_while1, take_while_m_n},
+    character::{complete::space0, is_alphanumeric},
+    combinator::{cut, map, rest},
+    multi::separated_list1,
+    sequence::{preceded, separated_pair, terminated, tuple},
+    IResult,
+};
 
 pub type Error<'a> = nom::error::Error<&'a [u8]>;
 
@@ -19,16 +27,21 @@ macro_rules! def_set {
             }
 
         )*
-        
+
     };
 }
 
-def_set!(token = TOKEN_CHARS, obs = OBS_CHARS, scheme = SCHEME_CHARS, host = HOST_CHARS);
+def_set!(
+    token = TOKEN_CHARS,
+    obs = OBS_CHARS,
+    scheme = SCHEME_CHARS,
+    host = HOST_CHARS
+);
 
 #[derive(Debug)]
 pub struct StringError;
 
-impl <E> From<nom::Err<E>> for StringError {
+impl<E> From<nom::Err<E>> for StringError {
     fn from(_: nom::Err<E>) -> Self {
         StringError
     }
@@ -46,24 +59,26 @@ impl From<Utf8Error> for StringError {
     }
 }
 
-pub fn full_string<T, P>(i: &T, mut p: P) -> Result<String, StringError> 
-where T: AsRef<[u8]>,
+pub fn full_string<T, P>(i: &T, mut p: P) -> Result<String, StringError>
+where
+    T: AsRef<[u8]>,
 
-    P: FnMut(&[u8]) -> IResult<&[u8], &[u8]>
+    P: FnMut(&[u8]) -> IResult<&[u8], &[u8]>,
 {
     let (left, res) = p(i.as_ref())?;
-    if ! left.is_empty() { return Err(StringError)}
+    if !left.is_empty() {
+        return Err(StringError);
+    }
     String::from_utf8(res.into()).map_err(Into::into)
 }
 
-pub fn all_string<T>(i: &T) -> Result<&str, StringError> 
-where T: AsRef<[u8]>
-
+pub fn all_string<T>(i: &T) -> Result<&str, StringError>
+where
+    T: AsRef<[u8]>,
 {
     let (_left, res) = rest::<_, nom::error::Error<_>>(i.as_ref())?;
     std::str::from_utf8(res).map_err(Into::into)
 }
-
 
 pub fn quoted_string(input: &[u8]) -> IResult<&[u8], Vec<u8>> {
     let escaped = escaped_transform(
@@ -94,9 +109,7 @@ fn is_escapable(c: u8) -> bool {
 }
 
 pub fn value(input: &[u8]) -> IResult<&[u8], Cow<[u8]>> {
-    alt((map(token, Cow::Borrowed), 
-        map(quoted_string, Cow::Owned)))
-    (input)
+    alt((map(token, Cow::Borrowed), map(quoted_string, Cow::Owned)))(input)
 }
 
 pub fn values_list(input: &[u8]) -> IResult<&[u8], Vec<Cow<[u8]>>> {
