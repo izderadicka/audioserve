@@ -13,6 +13,7 @@ env_logger = "0.8"
 log = {version="0.4", features = ["release_max_level_info"]}
 hyper = {version="0.14", features = ["full"]}
 headers = "0.3"
+nom = "6"
 futures = "0.3"
 mime = "0.3"
 mime_guess = "2.0"
@@ -48,6 +49,8 @@ tokio-util = {version="0.6", optional=true}
 
 media_info = {path="crates/media_info"}
 
+proxy-headers = {path="crates/proxy-headers", optional=true}
+
 [dependencies.simple-file-cache]
 path="crates/file-cache"
 features=["asynch"]
@@ -66,14 +69,21 @@ nix = "0.19"
 
 [features]
 default = ["tls", "symlinks","search-cache", "folder-download", "shared-positions"]
+# default
 tls=["tokio-native-tls", "native-tls"]
 symlinks=["cachedirtree/symlinks"]
 search-cache=["cachedirtree"]
-transcoding-cache=["simple-file-cache", "tokio-util"]
 folder-download = ["async-tar"]
-static = ["media_info/static"]
-partially-static = ["media_info/partially-static"]
 shared-positions = ["websock"]
+# non-default
+transcoding-cache=["simple-file-cache", "tokio-util"]
+behind-proxy = ["proxy-headers"]
+# for static compilation only
+partially-static = ["media_info/partially-static"]
+static = ["media_info/static"]
+
+
+
 
 [profile.release]
 lto = true

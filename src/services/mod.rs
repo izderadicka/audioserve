@@ -16,7 +16,6 @@ use headers::{
 };
 use hyper::{body::HttpBody, service::Service, Body, Method, Request, Response, StatusCode};
 use percent_encoding::percent_decode;
-use proxy_headers::XForwardedFor;
 use regex::Regex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
@@ -34,7 +33,6 @@ pub mod audio_meta;
 pub mod auth;
 #[cfg(feature = "shared-positions")]
 pub mod position;
-mod proxy_headers;
 pub mod search;
 mod subs;
 pub mod transcode;
@@ -48,6 +46,7 @@ type Counter = Arc<AtomicUsize>;
 #[derive(Debug)]
 pub enum RemoteIpAddr {
     Direct(IpAddr),
+    #[allow(dead_code)]
     Proxied(IpAddr),
 }
 
@@ -75,6 +74,7 @@ pub struct RequestWrapper {
     remote_addr: Option<IpAddr>,
     #[allow(dead_code)]
     is_ssl: bool,
+    #[allow(dead_code)]
     is_behind_proxy: bool,
 }
 
@@ -127,8 +127,9 @@ impl RequestWrapper {
     }
 
     pub fn remote_addr(&self) -> Option<RemoteIpAddr> {
+        #[cfg(feature="behind-proxy")]
         if self.is_behind_proxy {
-            let xfwd: Option<XForwardedFor> = self.request.headers().typed_get();
+            let xfwd: Option<proxy_headers::XForwardedFor> = self.request.headers().typed_get();
             return xfwd.map(|h| RemoteIpAddr::Proxied(h.client().clone()));
         }
         self.remote_addr.map(RemoteIpAddr::Direct)

@@ -299,6 +299,7 @@ Feature | Description | Default | Program options
 | folder-download | Enables API endpoint to download content of a folder in tar archive | Yes | Can be disabled with argument --disable-folder-download
 | shared-positions | Clients can share recent playback positions via simple websocket API | Yes |
 | transcoding-cache | Cache to save transcoded files for fast next use | No | Can be disabled by --t-cache-disable and modified by --t-cache-dir --t-cache-size --t-cache-max-files
+| behind-proxy | Enable logging of client address from proxy headers | No | Enables argument --behind-proxy which should be use to log client address from headers provided by reverse proxy
 | static | Enables fully static build of audioserve. Check above notes for static build | No |
 | partially-static | Statically links libavformat (and related).Enables to run audioserve on systems, which do not have required version of libavformat| No |
 

@@ -147,11 +147,14 @@ fn create_parser<'a>() -> Parser<'a> {
         .validator(is_valid_url_path_prefix)
         .env("AUDIOSERVE_URL_PATH_PREFIX")
         .help("Base URL is a fixed path that is before audioserve path part, must start with / and not end with /  [default: none]")
-            )
-        .arg(Arg::with_name("behind-proxy")
-            .long("behind-proxy")
-            .help("Informs program that it is behind remote proxy, now used only for logging (to get true remote client ip)")
             );
+
+    if cfg!(feature = "behind-proxy") {
+        parser = parser.arg(Arg::with_name("behind-proxy")
+        .long("behind-proxy")
+        .help("Informs program that it is behind remote proxy, now used only for logging (to get true remote client ip)")
+        )
+    }
 
     if cfg!(feature = "folder-download") {
         parser = parser.arg(
