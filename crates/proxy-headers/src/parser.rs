@@ -13,7 +13,7 @@ use nom::{
 pub type Error<'a> = nom::error::Error<&'a [u8]>;
 
 const QUOTE: &[u8] = b"\"";
-const TOKEN_CHARS: &[u8] = b"!#$%&'*+-. /^_`|~:"; // we also add : to token - for XForwardedFor compatibility
+const TOKEN_CHARS: &[u8] = b"!#$%&'*+-.^_`|~:"; // we also add : to token - for XForwardedFor compatibility
 const OBS_CHARS: &[u8] = b"._-";
 const SCHEME_CHARS: &[u8] = b"+-.";
 const HOST_CHARS: &[u8] = b"-.:"; // TODO I had problem to track down what exactly is allowed for host in RFC7230, so let's keep it now conservative
@@ -217,6 +217,11 @@ mod tests {
 
         let quoted = br#""usak kulisak""#;
         let r = token(quoted);
-        assert!(r.is_err())
+        assert!(r.is_err());
+
+        let spaced = b"aaa bbb";
+        let (left, t) = token(spaced).unwrap();
+        assert_eq!(left, b" bbb");
+        assert_eq!(t, b"aaa");
     }
 }

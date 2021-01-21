@@ -1,14 +1,12 @@
 use headers::{Header, HeaderName, HeaderValue};
-use http::header;
 use lazy_static::lazy_static;
 use log::{error, warn};
-use parser::{all_string, elements, full_string, quoted_string, values_list};
+use parser::{all_string, elements, full_string, values_list};
 use std::{
-    borrow::Cow,
     fmt::Display,
     iter,
-    net::{AddrParseError, IpAddr, Ipv6Addr},
-    str::{FromStr, Utf8Error},
+    net::{AddrParseError, IpAddr, Ipv6Addr, SocketAddr, SocketAddrV6},
+    str::Utf8Error,
 };
 
 mod parser;
@@ -18,35 +16,36 @@ lazy_static! {
 }
 
 #[derive(Debug)]
-pub enum AddrError {
+pub enum AddrError<'a> {
     InvalidlyQuoted,
     InvalidAddress,
     InvalidIdentity,
     InvalidString(Utf8Error),
-    ParserError,
+    ParserError(parser::Error<'a>),
+    SocketInsteadIp,
 }
 
-impl From<AddrError> for headers::Error {
+impl<'a> From<AddrError<'a>> for headers::Error {
     fn from(_: AddrError) -> Self {
         headers::Error::invalid()
     }
 }
 
-impl From<AddrParseError> for AddrError {
+impl<'a> From<AddrParseError> for AddrError<'a> {
     fn from(_: AddrParseError) -> Self {
         AddrError::InvalidAddress
     }
 }
 
-impl From<Utf8Error> for AddrError {
+impl<'a> From<Utf8Error> for AddrError<'a> {
     fn from(e: Utf8Error) -> Self {
         AddrError::InvalidString(e)
     }
 }
 
-impl<'a> From<parser::Error<'a>> for AddrError {
-    fn from(_: parser::Error<'a>) -> Self {
-        AddrError::ParserError
+impl<'a> From<parser::Error<'a>> for AddrError<'a> {
+    fn from(e: parser::Error<'a>) -> Self {
+        AddrError::ParserError(e)
     }
 }
 
@@ -56,14 +55,71 @@ impl From<parser::StringError> for headers::Error {
     }
 }
 
-fn parse_ip(addr: &[u8]) -> Result<IpAddr, AddrError> {
-    let s = std::str::from_utf8(addr)?;
-    if s.starts_with('[') && s.ends_with(']') {
-        // thanks to previous test it's guaranteed that string
-        let ip6: Ipv6Addr = s[1..s.len() - 1].parse()?;
-        Ok(IpAddr::V6(ip6))
+enum IpOrSocket {
+    Ip(IpAddr),
+    Socket(SocketAddr),
+    SocketWithObfuscatedPort(IpAddr, Obfuscated),
+}
+
+impl From<IpOrSocket> for IpAddr {
+    fn from(addr: IpOrSocket) -> Self {
+        match addr {
+            IpOrSocket::Ip(addr) => addr,
+            IpOrSocket::Socket(s) => s.ip(),
+            IpOrSocket::SocketWithObfuscatedPort(addr, _) => addr,
+        }
+    }
+}
+
+impl From<IpOrSocket> for NodeIdentifier {
+    fn from(addr: IpOrSocket) -> Self {
+        match addr {
+            IpOrSocket::Ip(addr) => NodeIdentifier {
+                name: NodeName::Addr(addr),
+                port: None,
+            },
+            IpOrSocket::Socket(addr) => NodeIdentifier {
+                name: NodeName::Addr(addr.ip()),
+                port: Some(Port::Real(addr.port())),
+            },
+            IpOrSocket::SocketWithObfuscatedPort(addr, o) => NodeIdentifier {
+                name: NodeName::Addr(addr),
+                port: Some(Port::Obfuscated(o)),
+            },
+        }
+    }
+}
+
+impl IpOrSocket {
+    fn to_ip_only<'a>(self) -> Result<IpAddr, AddrError<'a>> {
+        match self {
+            IpOrSocket::Ip(addr) => Ok(addr),
+            _ => Err(AddrError::SocketInsteadIp),
+        }
+    }
+}
+fn parse_ip(s: &str) -> Result<IpOrSocket, AddrError> {
+    if s.starts_with('[') {
+        if s.ends_with(']') {
+            // this should be IPv6 address
+            // thanks to previous test it's guaranteed that indexes are on ut8 boundaries
+            let ip6: Ipv6Addr = s[1..s.len() - 1].parse()?;
+            Ok(IpOrSocket::Ip(IpAddr::V6(ip6)))
+        } else {
+            //it still can be IPv6 socket address
+            match s.parse::<SocketAddrV6>() {
+                Ok(a) => Ok(IpOrSocket::Socket(SocketAddr::V6(a))),
+                Err(_e) => {
+                    return Err(AddrError::InvalidAddress);
+                    //TBD:  It can have obfuscated port
+                }
+            }
+        }
     } else {
-        s.parse().map_err(AddrError::from)
+        s.parse::<IpAddr>()
+            .map(|addr| IpOrSocket::Ip(addr))
+            .or_else(|_| s.parse::<SocketAddr>().map(|a| IpOrSocket::Socket(a)))
+            .map_err(AddrError::from)
     }
 }
 
@@ -105,14 +161,12 @@ impl Display for NodeName {
                 write!(f, "unknown")
             }
             NodeName::Obfuscated(s) => f.write_str(s.as_ref()),
-            NodeName::Addr(a) => {
-                write!(f, "{}", a)
-            }
+            NodeName::Addr(a) => a.fmt(f),
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Port {
     Real(u16),
     Obfuscated(Obfuscated),
@@ -129,13 +183,13 @@ impl Display for Port {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct NodeIdentifier {
-    name: NodeName,
-    port: Option<u16>,
+    pub name: NodeName,
+    pub port: Option<Port>,
 }
 
 impl Display for NodeIdentifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.port {
+        match self.port.as_ref() {
             None => write!(f, "{}", self.name),
             Some(port) => match self.name {
                 NodeName::Addr(IpAddr::V6(a)) => write!(f, "[{}]:{}", a, port),
@@ -145,16 +199,35 @@ impl Display for NodeIdentifier {
     }
 }
 
+impl NodeIdentifier {
+    pub fn ip(&self) -> Option<&IpAddr> {
+        match self.name {
+            NodeName::Unknown => None,
+            NodeName::Obfuscated(_) => None,
+            NodeName::Addr(ref a) => Some(a),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct ForwardNode {
-    fwd_for: Option<NodeIdentifier>,
-    fwd_by: Option<NodeIdentifier>,
-    fwd_host: Option<Host>,
-    fwd_protocol: Option<Protocol>,
+    pub fwd_for: Option<NodeIdentifier>,
+    pub fwd_by: Option<NodeIdentifier>,
+    pub fwd_host: Option<Host>,
+    pub fwd_protocol: Option<Protocol>,
 }
 
 pub struct Forwarded {
     nodes: Vec<ForwardNode>,
+}
+
+impl Forwarded {
+    pub fn client(&self) -> Option<&IpAddr> {
+        self.nodes
+            .get(0)
+            .and_then(|n| n.fwd_for.as_ref())
+            .and_then(|i| i.ip())
+    }
 }
 
 impl Header for Forwarded {
@@ -189,30 +262,36 @@ impl Header for Forwarded {
                 for (key, value) in elem {
                     match &key.to_ascii_lowercase()[..] {
                         b"for" => {
-                            let n = all_string(&value)?;
-                            let id = if n.starts_with('[') {
-                                // this should be IPv6
-                                todo!()
-                            } else if n.starts_with('_') {
+                            let id = if value.starts_with(b"_") {
                                 // this should be obfuscated identifier
-                                NodeName::Obfuscated(Obfuscated(n.into()))
-                            } else if n.to_ascii_lowercase() == "unknown" {
+                                let o = full_string(&value, parser::obs).map_err(|_| {
+                                    error!("Invalid obfuscated id: {:?}", value);
+                                    headers::Error::invalid()
+                                })?;
+                                NodeIdentifier {
+                                    name: NodeName::Obfuscated(Obfuscated(o)),
+                                    port: None,
+                                }
+                            } else if value.to_ascii_lowercase() == b"unknown" {
                                 // unknown
-                                NodeName::Unknown
+                                NodeIdentifier {
+                                    name: NodeName::Unknown,
+                                    port: None,
+                                }
                             } else {
-                                // or default is IPv4
-                                let addr: IpAddr = parse_ip(n.as_bytes()).map_err(|e| {
+                                // or default is IP/Socket address
+                                let n = all_string(&value).map_err(|_| {
+                                    error!("from key value is not valid string");
+                                    headers::Error::invalid()
+                                })?;
+                                parse_ip(n).map(Into::into).map_err(|e| {
                                     error!("Invalid address {:?}", e);
                                     e
-                                })?;
-                                NodeName::Addr(addr)
+                                })?
                             };
 
                             if node.fwd_for.is_none() {
-                                node.fwd_for = Some(NodeIdentifier {
-                                    name: id,
-                                    port: None,
-                                })
+                                node.fwd_for = Some(id);
                             } else {
                                 error!("Duplicate key for");
                                 return Err(headers::Error::invalid());
@@ -220,7 +299,10 @@ impl Header for Forwarded {
                         }
                         b"by" => {}
                         b"host" => {
-                            let host = full_string(&value, parser::host)?;
+                            let host = full_string(&value, parser::host).map_err(|_| {
+                                error!("Invalid host value in Forwarded header");
+                                headers::Error::invalid()
+                            })?;
                             if node.fwd_host.is_none() {
                                 node.fwd_host = Some(Host(host))
                             } else {
@@ -228,7 +310,18 @@ impl Header for Forwarded {
                                 return Err(headers::Error::invalid());
                             }
                         }
-                        b"protocol" => {}
+                        b"proto" => {
+                            let proto = full_string(&value, parser::scheme).map_err(|_| {
+                                error!("Invalid proto value in Forwarded header");
+                                headers::Error::invalid()
+                            })?;
+                            if node.fwd_protocol.is_none() {
+                                node.fwd_protocol = Some(Protocol(proto))
+                            } else {
+                                error!("Duplicate proto key");
+                                return Err(headers::Error::invalid());
+                            }
+                        }
                         other => warn!("Unknown key in Forwarded node {:?} ", other),
                     }
                 }
@@ -288,8 +381,13 @@ impl Header for XForwardedFor {
                 error!("Unparsed part of header {:?}", left);
                 headers::Error::invalid();
             }
-            let addrs = parts.into_iter().map(|p| parse_ip(p.as_ref()));
-            for addr in addrs {
+
+            for p in parts {
+                let s = std::str::from_utf8(p.as_ref()).map_err(|e| {
+                    error!("Invalid string {}", e);
+                    headers::Error::invalid()
+                })?;
+                let addr = parse_ip(s).and_then(|a| a.to_ip_only());
                 match addr {
                     Ok(a) => ips.push(a),
                     Err(e) => {
@@ -336,7 +434,7 @@ mod test {
             r#"for=192.0.2.43,for=198.51.100.17;by=203.0.113.60;proto=http;host=example.com"#,
             r#"for=192.0.2.43, for="[2001:db8:cafe::17]", for=unknown"#,
             r#"for=_hidden, for=_SEVKISEK"#,
-            r#"Forwarded: For="[2001:db8:cafe::17]:4711", For=192.0.2.43:47011"#,
+            r#"For="[2001:db8:cafe::17]:4711", For=192.0.2.43:47011"#,
         ];
 
         for (n, h) in headers.into_iter().enumerate() {
@@ -345,6 +443,31 @@ mod test {
             let mut i = iter::once(&v);
             let fwd = Forwarded::decode(&mut i)
                 .expect(&format!("Failed decode header {}: {}", n, headers[n]));
+            match n {
+                0 => {
+                    assert_eq!(fwd.nodes.len(), 1, "first case has just one node");
+                    assert_eq!(fwd.client().unwrap(), &IpAddr::from([123, 34, 167, 89]));
+                }
+                1 => {
+                    assert_eq!(fwd.nodes.len(), 2, "second case has two nodes");
+                    assert_eq!(fwd.client().unwrap(), &IpAddr::from([192, 0, 2, 43]));
+                    assert_eq!(
+                        fwd.nodes[1].fwd_for,
+                        Some(NodeIdentifier {
+                            name: NodeName::Addr("2001:db8:cafe::17".parse().unwrap()),
+                            port: None
+                        })
+                    );
+                }
+                2 => {
+                    assert_eq!(fwd.nodes.len(), 2, "third case has two nodes");
+                    let n = &fwd.nodes[1];
+                    assert_eq!(n.fwd_protocol.as_ref().unwrap().as_ref(), "http");
+                    assert_eq!(n.fwd_host.as_ref().unwrap().as_ref(), "example.com");
+                }
+
+                _ => {}
+            }
         }
     }
 
