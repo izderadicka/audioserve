@@ -2,7 +2,7 @@ use std::{borrow::Cow, str::Utf8Error, string::FromUtf8Error};
 
 use nom::{
     branch::alt,
-    bytes::complete::{escaped_transform, tag, take_while, take_while1, take_while_m_n},
+    bytes::complete::{escaped_transform, tag, take_while1, take_while_m_n},
     character::{complete::space0, is_alphanumeric},
     combinator::{cut, map, rest},
     multi::separated_list1,
@@ -82,14 +82,14 @@ where
 
 pub fn quoted_string(input: &[u8]) -> IResult<&[u8], Vec<u8>> {
     let escaped = escaped_transform(
-        take_while1(is_quoated_text),
+        take_while1(is_quoted_text),
         '\\',
         take_while_m_n(1, 1, is_escapable),
     );
     preceded(tag(QUOTE), cut(terminated(escaped, tag(QUOTE))))(input)
 }
 
-fn is_quoated_text(c: u8) -> bool {
+fn is_quoted_text(c: u8) -> bool {
     // RFC 7230 qdtext         = HTAB / SP /%x21 / %x23-5B / %x5D-7E / obs-text
     // obs-text       = %x80-FF
     // but / and "  can be only escaped
@@ -159,13 +159,13 @@ mod tests {
 
     #[test]
     fn test_quoted_chars() {
-        assert!(is_quoated_text(b'a'));
-        assert!(!is_quoated_text(b'\\'));
-        assert!(!is_quoated_text(b'"'));
+        assert!(is_quoted_text(b'a'));
+        assert!(!is_quoted_text(b'\\'));
+        assert!(!is_quoted_text(b'"'));
     }
 
     #[test]
-    fn test_multiple_elemets() {
+    fn test_multiple_elements() {
         let m = "a=b,c=d,  e=f;g=h";
         let (left, es) = elements(m.as_bytes()).unwrap();
         assert!(left.is_empty());

@@ -12,7 +12,7 @@ use std::{
 mod parser;
 
 lazy_static! {
-    static ref X_FORWARED_FOR: HeaderName = HeaderName::from_static("x-forwarded-for");
+    static ref X_FORWARDED_FOR: HeaderName = HeaderName::from_static("x-forwarded-for");
 }
 
 #[derive(Debug)]
@@ -58,6 +58,7 @@ impl From<parser::StringError> for headers::Error {
 enum IpOrSocket {
     Ip(IpAddr),
     Socket(SocketAddr),
+    #[allow(dead_code)] //TODO: support for obfuscated ports
     SocketWithObfuscatedPort(IpAddr, Obfuscated),
 }
 
@@ -166,7 +167,7 @@ impl Display for NodeName {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Port {
     Real(u16),
     Obfuscated(Obfuscated),
@@ -202,9 +203,15 @@ impl Display for NodeIdentifier {
 impl NodeIdentifier {
     pub fn ip(&self) -> Option<&IpAddr> {
         match self.name {
-            NodeName::Unknown => None,
-            NodeName::Obfuscated(_) => None,
             NodeName::Addr(ref a) => Some(a),
+            _ => None,
+        }
+    }
+
+    pub fn port(&self) -> Option<u16> {
+        match self.port {
+            Some(Port::Real(p)) => Some(p),
+            _ => None,
         }
     }
 }
@@ -227,6 +234,12 @@ impl Forwarded {
             .get(0)
             .and_then(|n| n.fwd_for.as_ref())
             .and_then(|i| i.ip())
+    }
+    pub fn client_port(&self) -> Option<u16> {
+        self.nodes
+            .get(0)
+            .and_then(|n| n.fwd_for.as_ref())
+            .and_then(|i| i.port())
     }
 }
 
@@ -363,7 +376,7 @@ impl XForwardedFor {
 
 impl Header for XForwardedFor {
     fn name() -> &'static HeaderName {
-        &X_FORWARED_FOR
+        &X_FORWARDED_FOR
     }
 
     fn decode<'i, I>(values: &mut I) -> Result<Self, headers::Error>
@@ -423,6 +436,8 @@ impl Header for XForwardedFor {
 mod test {
     use std::net::Ipv6Addr;
 
+    use log::debug;
+
     use super::*;
 
     #[test]
@@ -465,7 +480,44 @@ mod test {
                     assert_eq!(n.fwd_protocol.as_ref().unwrap().as_ref(), "http");
                     assert_eq!(n.fwd_host.as_ref().unwrap().as_ref(), "example.com");
                 }
-
+                3 => {
+                    assert_eq!(fwd.nodes.len(), 3, "fourth case has three nodes");
+                    let n = &fwd.nodes[2];
+                    debug!("Third node {:?}", n);
+                    assert!(matches!(
+                        n.fwd_for,
+                        Some(NodeIdentifier {
+                            name: NodeName::Unknown,
+                            port: None
+                        })
+                    ));
+                }
+                4 => {
+                    assert_eq!(fwd.nodes.len(), 2, "fifth case has two nodes");
+                    let n = &fwd.nodes[1];
+                    assert_eq!(
+                        n.fwd_for.as_ref().unwrap().name,
+                        NodeName::Obfuscated(Obfuscated("_SEVKISEK".into()))
+                    )
+                }
+                5 => {
+                    assert_eq!(fwd.nodes.len(), 2, "sixth case has two nodes");
+                    let p = |idx: usize| {
+                        fwd.nodes[idx]
+                            .fwd_for
+                            .as_ref()
+                            .unwrap()
+                            .port
+                            .as_ref()
+                            .unwrap()
+                            .clone()
+                    };
+                    assert_eq!(p(0), Port::Real(4711));
+                    assert_eq!(p(1), Port::Real(47011));
+                    let addr: IpAddr = "2001:db8:cafe::17".parse().unwrap();
+                    assert_eq!(fwd.client(), Some(&addr));
+                    assert_eq!(fwd.client_port(), Some(4711));
+                }
                 _ => {}
             }
         }

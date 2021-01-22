@@ -11,8 +11,8 @@ before_script:
   - rustup component add rustfmt
 script:
   - cargo fmt --all -- --check
-  - cargo test --verbose --features partially-static,transcoding-cache
-  - cargo test --verbose --no-default-features --features partially-static --workspace
+  - cargo test --features partially-static,transcoding-cache,behind-proxy
+  - cargo test --no-default-features --features partially-static --workspace
   - if [[ "$TRAVIS_RUST_VERSION" = "stable" ]]; then cargo test --features partially-static,transcoding-cache  --test test_binary -- --ignored; fi
 matrix:
   fast_finish: true

@@ -129,8 +129,18 @@ impl RequestWrapper {
     pub fn remote_addr(&self) -> Option<RemoteIpAddr> {
         #[cfg(feature = "behind-proxy")]
         if self.is_behind_proxy {
-            let xfwd: Option<proxy_headers::XForwardedFor> = self.request.headers().typed_get();
-            return xfwd.map(|h| RemoteIpAddr::Proxied(h.client().clone()));
+            return self
+                .request
+                .headers()
+                .typed_get::<proxy_headers::Forwarded>()
+                .and_then(|fwd| fwd.client().map(|c| c.clone()))
+                .map(|addr| RemoteIpAddr::Proxied(addr))
+                .or_else(|| {
+                    self.request
+                        .headers()
+                        .typed_get::<proxy_headers::XForwardedFor>()
+                        .map(|xfwd| RemoteIpAddr::Proxied(*xfwd.client()))
+                });
         }
         self.remote_addr.map(RemoteIpAddr::Direct)
     }

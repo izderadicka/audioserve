@@ -75,6 +75,8 @@ Often best way how to deploy audioserve is behind reverse proxy, which terminate
 
 Another gotcha for reverse proxy might be usage of last [playback position](#sharing-playback-positions-between-clients) feature, which requires websocket connection and some special configuration for that might be needed in reverse proxy.
 
+Also there is optional feature `behind-proxy`, which enables argument `--behind-proxy`, is used only for logging real client ip address - if used client ip address is taken from `Forwarded` (preferred) or `X-Forwarded-For` HTTP headers provided by reverse proxy.
+
 You can check some reverse proxy configurations in [reverse_proxy.md](./docs/reverse_proxy.md) (If you have successful configuration of reverse proxy please share via PR).
 
 Performance
