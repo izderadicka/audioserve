@@ -91,7 +91,7 @@ impl Authenticator for SharedSecretAuthenticator {
                                     .header(
                                         SET_COOKIE,
                                         format!(
-                                            "{}={}; Max-Age={}",
+                                            "{}={}; Max-Age={}; SameSite=Lax",
                                             COOKIE_NAME,
                                             token,
                                             10 * 365 * 24 * 3600
