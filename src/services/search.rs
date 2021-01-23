@@ -123,7 +123,7 @@ impl FoldersSearch {
                     }
                 }
             }
-        };
+        }
         let base_path = base_dir.as_ref();
         let allow_symlinks = get_config().allow_symlinks;
         search_recursive(base_path, base_path, &mut recents, allow_symlinks, limit);

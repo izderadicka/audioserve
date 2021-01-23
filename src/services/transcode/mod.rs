@@ -361,7 +361,7 @@ impl Transcoder {
                             ) -> Pin<Box<dyn Future<Output = Result<I, E>> + 'static + Send>>
                             {
                                 Box::pin(f)
-                            };
+                            }
 
                             match res {
                                 Ok(()) => Box::pin(
