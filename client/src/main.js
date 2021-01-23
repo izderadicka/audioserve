@@ -601,6 +601,8 @@ $(function () {
         evt.preventDefault();
         let secret = $("#secret-input").val();
         let group = $("#group-input").val();
+        const failedAlert = $("#login-failed-alert");
+        failedAlert.hide();
         window.localStorage.setItem("audioserve_group", group);
         login(secret)
             .then(data => {
@@ -609,7 +611,13 @@ $(function () {
                     $("#login-dialog").modal("hide");
                 });
             })
-            .catch(err => console.error("Login failed", err));
+            .catch(err => {
+                console.error("Login failed", err);
+                failedAlert.show();
+            })
+            .finally(() => {
+                $("#secret-input").val("");
+            });
 
     });
 
@@ -730,6 +738,12 @@ $(function () {
     $("#position-sync-btn").on('click', (evt) => {
         evt.stopPropagation();
         checkRecent();
+    });
+
+    $("#login-dialog").on('hidden.bs.modal', (evt) => {
+        // reset login dialog after hidden
+        $("#secret-input").val("");
+        $("#login-failed-alert").hide();
     });
 
     const reloadCurrentFolder = (fromHistory, resetPlayer) => {
