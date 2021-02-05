@@ -26,7 +26,7 @@ Salted shared secret is calculated as:
 
 * shared secret is encoded as UTF-8 bytes
 * client generates 32 random bytes
-* secret is concatated with random bytes (secret+random_bytes)
+* secret is concatenated with random bytes (secret+random_bytes)
 * these bytes are hashed with SHA-256
 * random bytes are encoded with base64 encoding
 * hash is encoded with base64 encoding

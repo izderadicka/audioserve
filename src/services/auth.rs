@@ -132,14 +132,16 @@ impl Authenticator for SharedSecretAuthenticator {
 
             if token.is_none() {
                 error!(
-                    "Invalid access: missing token, client: {:?}",
+                    "Invalid access: missing token on path {}, client: {:?}",
+                    req.path(),
                     req.remote_addr()
                 );
                 return Box::pin(future::ok(deny()));
             }
             if !self.secrets.token_ok(&token.unwrap()) {
                 error!(
-                    "Invalid access: invalid token, client: {:?}",
+                    "Invalid access: invalid token on path {}, client: {:?}",
+                    req.path(),
                     req.remote_addr()
                 );
                 return Box::pin(future::ok(deny()));
@@ -157,10 +159,19 @@ impl Secrets {
     fn auth_token_ok(&self, token: &str) -> bool {
         let parts = token
             .split('|')
-            .map(|s| BASE64.decode(s.as_bytes()))
-            .filter_map(Result::ok)
+            .filter_map(|s| match BASE64.decode(s.as_bytes()) {
+                Ok(x) => Some(x),
+                Err(e) => {
+                    error!("Invalid base64 in authentication token {} in string {}", e, s);
+                    None
+                }
+            })
             .collect::<Vec<_>>();
         if parts.len() == 2 {
+            if parts[0].len() != 32 {
+                error!("Random salt must be 32 bytes");
+                return false
+            }
             let mut hash2 = self.shared_secret.clone().into_bytes();
             let hash = &parts[1];
             hash2.extend(&parts[0]);
@@ -289,6 +300,9 @@ impl ::std::str::FromStr for Token {
 
 #[cfg(test)]
 mod tests {
+    use borrow::Cow;
+    use hyper::Request;
+    use crate::config::init::init_default_config;
     use super::*;
 
     #[test]
@@ -303,5 +317,97 @@ mod tests {
         assert!(new_token.is_valid(b"my big secret"));
         assert!(!new_token.is_valid(b"wrong secret"));
         assert!(new_token.validity() - now() <= 24 * 3600);
+    }
+
+    fn build_request(body: impl Into<Body>) -> RequestWrapper {
+        let b = body.into();
+        let req = Request::builder()
+        .method(Method::POST)
+        .uri("/authenticate")
+        .body(b).unwrap();
+        
+        RequestWrapper::new(req, None, None, false).unwrap()
+    }
+
+    fn build_authenticated_request(token: &str) -> RequestWrapper {
+        let req = Request::builder()
+        .method(Method::GET)
+        .uri("/neco")
+        .header("Authorization", format!("Bearer {}", token))
+        .body(Body::from("Hey"))
+        .unwrap();
+
+        RequestWrapper::new(req, None, None, false).unwrap()
+
+    }
+
+    fn shared_secret(sec: &str) -> String {
+        let mut salt = [0u8;32];
+        let rng= SystemRandom::new();
+        rng.fill(&mut salt).expect("cannot generate random number");
+        let mut res = BASE64.encode(&salt);
+        res.push('|');
+        let mut hash:Vec<u8> = sec.into(); 
+        hash.extend(&salt);
+        let hash = digest(&SHA256, &hash);
+        res.push_str(&BASE64.encode(hash.as_ref()));
+        res
+
+    }
+
+    fn shared_secret_form(sec:&str) -> String {
+        let ss = shared_secret(sec);
+        let encoded_ss: Cow<str> = percent_encoding::percent_encode(ss.as_bytes(), percent_encoding::NON_ALPHANUMERIC).into();
+        "secret=".to_string()+encoded_ss.as_ref()
+    }
+
+    #[tokio::test]
+    async fn test_authenticator_login() {
+        env_logger::try_init().ok();
+        let invalid_secret = "secret=aaaaa";
+        let shared = "kulisak";
+        init_default_config();
+        
+        let ss = shared_secret_form(shared);
+        let aut = SharedSecretAuthenticator::new(shared.into(), (&b"123456"[..]).into(), 24);
+        let req = build_request(ss);
+        let res = aut.authenticate(req).await.expect("authentication procedure internal error");
+
+        if let AuthResult::LoggedIn(res) = res {
+            assert_eq!(res.status(), StatusCode::OK);
+            let token = res.into_body()
+            .filter_map(|x| future::ready(x.ok()))
+            .map(|x| x.to_vec())
+            .concat()
+            .await;
+            let token = String::from_utf8(token).expect("token is string");
+            assert!(token.len()>64);
+            let req = build_authenticated_request(&token);
+
+            let res = aut.authenticate(req).await.expect("authentication procedure internal error");
+
+            if let AuthResult::Authenticated{request, ..} = res {
+                info!("token {:?} is OK", request.headers().get("Authorization"))
+            } else {
+                panic!("Token authentication failed")
+            }
+            
+        } else {
+            panic!("Authentication should succeed")
+        }
+
+
+        let wrap = build_request(invalid_secret);
+
+        let res = aut.authenticate(wrap).await.expect("authentication procedure internal error");
+
+        if let AuthResult::Rejected(res) = res {
+            assert_eq!(res.status(), StatusCode::UNAUTHORIZED)
+
+        } else {
+            panic!("Authentication should fail");
+        }
+
+        
     }
 }

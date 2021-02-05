@@ -427,33 +427,27 @@ pub mod init {
     /// as tests are run concurrently it requires also some synchronication
     use super::{Config, BASE_DATA_DIR, CONFIG};
     use std::path::PathBuf;
-    use std::sync::Mutex;
-    lazy_static! {
-        static ref GUARD: Mutex<bool> = Mutex::new(false);
-    }
+    use std::sync::Once;
+    static INIT: Once = Once::new();
     /// this default config is used only for testing
     pub fn init_default_config() {
-        let mut l = GUARD.lock().unwrap();
-        unsafe {
-            if BASE_DATA_DIR.is_some() {
-                return;
-            }
+        INIT.call_once(|| {
             let base_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-            BASE_DATA_DIR = Some(base_dir);
-        }
-
-        let config = Config::default();
-        unsafe {
-            CONFIG = Some(config);
-        }
-        *l = true
+            unsafe {
+                BASE_DATA_DIR = Some(base_dir);
+            }
+            let config = Config::default();
+            unsafe {
+                CONFIG = Some(config);
+            }
+        });
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::init::init_default_config;
     use super::*;
-    use crate::config::init::init_default_config;
     #[test]
     fn test_default_serialize() {
         init_default_config();
