@@ -87,11 +87,14 @@ impl RequestWrapper {
     ) -> error::Result<Self> {
         let path = match percent_decode(request.uri().path().as_bytes()).decode_utf8() {
             Ok(s) => s.into_owned(),
-            Err(e) => {
-                error!("Decoded path {} is not UTF8: {}", request.uri().path(), e);
-                return Err(error::Error::msg("Invalid path encoding"));
-            }
+            Err(e) => return Err(error::Error::msg(format!("Invalid path encoding, not UTF-8: {}", e))),
         };
+        //Check for unwanted path segments - e.g. ., .., .anything - so we do not want special directories and hidden directories and files
+        let mut segments = path.split('/');
+        if segments.any(|s| s.starts_with(".")) {
+            return Err(error::Error::msg("Illegal path, contains either special directories or hidden name"))
+        }
+        
         let path = match path_prefix {
             Some(p) => match crate::util::strip_prefix_of(p, &path) {
                 //TODO: later replace with new std function strip_prefix
@@ -279,7 +282,10 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
             self.is_ssl,
         ) {
             Ok(r) => r,
-            Err(_) => return short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE),
+            Err(e) => {
+                error!("Request URL error: {}", e);
+                return short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
+            }
         };
         //static files
         if req.path() == "/" {
