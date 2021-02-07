@@ -144,6 +144,9 @@ fn serve_file_transcoded_checked(
 ) -> ResponseFuture {
     let counter = transcoding.transcodings;
 
+    // TODO: This is not correct - atomic load and increase should be done together as check and replace
+    // however it does not matter much - basic limitation is achieve though not exact
+    // to fix we can increment here too , but then need to assure that decrement is also on fail paths
     let running_transcodings: u32 = counter.load(Ordering::SeqCst) as u32;
     if running_transcodings >= transcoding.max_transcodings {
         warn!("Max transcodings reached {}", transcoding.max_transcodings);
