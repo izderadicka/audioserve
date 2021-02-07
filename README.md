@@ -62,7 +62,7 @@ The only file where it needs to write is a file were it keeps its secret key for
 Authentication is done by shared secret phrase (supplied to server on command line or more securely via environment variable), which clients must know.
 Shared secret phrase is never sent in plain (it's sent as salted hash). If correct shared secret hash is provided by client, sever generates a token, using its secret key, which is then used for individual requests authentication.  Token then can be used in cookie or HTTP Authorization header (Bearer method).
 Token validity period is one year by default, but can be set with command line argument, but system generally expects token validity to be at least 10 days.
-As the token can be used to steal the session, https is recommended (TLS support is build in, but reverse proxy is probably better solution).
+As the token can be used to steal the session, https is recommended (TLS support is build in, but reverse proxy is probably better solution). If you want to change shared secret also delete server secret (it will invalidate all issued tokens) - stop audioserve, delete `~/.audioserve/audioserve.secret` and restart audioserve with new shared secret.
 
 Authentication is used to access all URLs except web client static files (`/index.html` and `/bundle.js`).
 

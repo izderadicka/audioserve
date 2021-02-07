@@ -20,6 +20,14 @@ pub fn is_number(v: String) -> ValidatorResult {
     Ok(())
 }
 
+pub fn is_positive_number(v: String) -> ValidatorResult {
+    let x: u32 = v.parse().map_err(|_| format!("{} is not a number", v))?;
+    if x < 1 {
+        return Err("Number must be positive".into());
+    }
+    Ok(())
+}
+
 pub fn is_existing_dir(p: &OsStr) -> Result<(), OsString> {
     let p = Path::new(p);
     if !p.is_dir() {
