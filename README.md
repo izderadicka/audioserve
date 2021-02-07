@@ -1,6 +1,8 @@
 Audioserve
 ==========
 
+**!!PLEASE UPDATE TO v0.15.0 (or newer) DUE TO IMPORTANT SECURITY FIX!!**
+
 [![Build Status](https://travis-ci.org/izderadicka/audioserve.svg?branch=master)](https://travis-ci.org/izderadicka/audioserve)
 
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalistic design.
@@ -8,6 +10,8 @@ Simple personal server to serve audio files from directories. Intended primarily
 Server is in Rust,  default web client (HTML5 + Javascript) is intended for modern browsers (latest Firefox or Chrome) and is integrated with the server. There is also [Android client](https://github.com/izderadicka/audioserve-android) and API for custom clients.
 
 For some background and video demo check this article [Audioserve Audiobooks Server - Stupidly Simple or Simply Stupid?](http://zderadicka.eu/audioserve-audiobooks-server-stupidly-simple-or-simply-stupid)
+
+If you will install audioserve and make it available on Internet do not [underestimate security](#security-best-practices).
 
 Media Library
 -------------
@@ -51,12 +55,16 @@ After you have several active devices with same group name, you'll be notified w
 Security
 --------
 
-Audioserve is not writing anything to your media library, so read only access is OK.  The only file where it needs to write is a file were it keeps its secret key for authentication (by default in `~/.audioserve/audioserve.secret`, but it can be specified by command line argument). And optionaly it writes files to transcoding cache ([see below](#transcoding-cache)) and positions file.
+Audioserve is not writing anything to your media library, so read only access is OK. However you should assume that any file in publish media directories can be accessible via audioserve API (thought recently name starting with . (hidden files/directories) are blocked) so basically to anybody who can obtain shared secret (or in case you use `--no-authentication` then to anybody).
+
+The only file where it needs to write is a file were it keeps its secret key for authentication (by default in `~/.audioserve/audioserve.secret`, but it can be specified by command line argument). And optionaly it writes files to transcoding cache ([see below](#transcoding-cache)) and positions file.
 
 Authentication is done by shared secret phrase (supplied to server on command line or more securely via environment variable), which clients must know.
 Shared secret phrase is never sent in plain (it's sent as salted hash). If correct shared secret hash is provided by client, sever generates a token, using its secret key, which is then used for individual requests authentication.  Token then can be used in cookie or HTTP Authorization header (Bearer method).
 Token validity period is one year by default, but can be set with command line argument, but system generally expects token validity to be at least 10 days.
-As the token can be used to steal the session, https is recommended (TLS support is build in).
+As the token can be used to steal the session, https is recommended (TLS support is build in, but reverse proxy is probably better solution).
+
+Authentication is used to access all URLs except web client static files (`/index.html` and `/bundle.js`).
 
 ### TLS/SSL
 
@@ -79,12 +87,22 @@ Also there is optional feature `behind-proxy`, which enables argument `--behind-
 
 You can check some reverse proxy configurations in [reverse_proxy.md](./docs/reverse_proxy.md) (If you have successful configuration of reverse proxy please share via PR).
 
+### Security Best Practices
+
+- Always SSL/TLS - ideally behind well proven reverse proxy (I'm using nginx) (audioserve has support for SSL/TLS, but reverse proxy is probably more solid, plus can provide additional safeguards)
+- Set solid shared secret 10+ different character types ... (to prevent guessing and brute force attacks), do not run on Internet with `no-authentication` - it's for testing only
+- Never run audioserve as root
+- Never put any secret information into media directories - all content of these directories is potentially accessible via Web API.
+- Running in dedicated container also improves security 
+- Optionally use your reverse proxy features like URL blocking, rate limiting etc. for additional security
+- It's good to check logs from time to time - audioserve by default logs errors (including invalid access attempt) to stderr (which can be easily redirected to file), access log of reverse proxy is also useful 
+
 Performance
 -----------
 
-Audioserve is inteded to serve personal audio collections of moderate sizes. For sake of simplicity it does not provide any large scale perfomance optimalizations.  It's fine to serve couple of users from collections of couple of thousands audiobooks, if they are reasonably organized. That's it, if you're looking for solution for thousands or millions of users, look elsewere. To compensate for this audioserve is very lightweight and by itself takes minimum of system resources.
+Audioserve is intended to serve personal audio collections of moderate sizes. For sake of simplicity it does not provide any large scale performance optimizations.  It's fine to serve couple of users from collections of couple of thousands audiobooks, if they are reasonably organized. That's it, if you're looking for solution for thousands or millions of users, look elsewhere. To compensate for this audioserve is very lightweight and by itself takes minimum of system resources.
 
-Browsing of collections is limited by speed of the file system. As directory listing needs to read audio files metadata (duration and bitrate, eventually chapters), folders with too many files (> 200) will be slow to open. Search is done by walking through collection directory structure, it can be slow - especially the first search (subsequent searches are much, much faster, as directory structure from previous search is cached by OS for some time). Recent audioserve versions provide optional seach cache, to speed up search significantly - [see below](#search-cache).
+Browsing of collections is limited by speed of the file system. As directory listing needs to read audio files metadata (duration and bitrate, eventually chapters), folders with too many files (> 200) will be slow to open. Search is done by walking through collection directory structure, it can be slow - especially the first search (subsequent searches are much, much faster, as directory structure from previous search is cached by OS for some time). Recent audioserve versions provide optional search cache, to speed up search significantly - [see below](#search-cache).
 
 But true limiting factor is transcoding - as it's quite CPU intensive. Normally you should run only a handful of transcodings in parallel, not much then 2x - 4x more then number of cores in the machine. For certain usage scenarios enabling of [transcoding cache](#transcoding-cache) can help a bit.
 
@@ -182,7 +200,7 @@ Installation
 
 ### Docker Image
 
-Easiest way how to test audioserve is to run it as docker container with prebuild [Docker image](https://cloud.docker.com/u/izderadicka/repository/docker/izderadicka/audioserve) (from Docker Hub):
+Easiest way how to test audioserve (but do not use `--no-authentication` in production) is to run it as docker container with prebuild [Docker image](https://cloud.docker.com/u/izderadicka/repository/docker/izderadicka/audioserve) (from Docker Hub):
 
     docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve --no-authentication /audiobooks
 

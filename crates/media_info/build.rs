@@ -16,7 +16,8 @@ fn main() {
             let rc = process::Command::new("./build_ffmpeg.sh")
                 .arg(&out_dir)
                 .env("FFMPEG_VERSION", FFMPEG_VERSION)
-                .stdout(fflog)
+                .stdout(fflog.try_clone().expect("Cannot clone file"))
+                .stderr(fflog)
                 .status()
                 .expect("cannot run ffmpeg build script");
             if !rc.success() {

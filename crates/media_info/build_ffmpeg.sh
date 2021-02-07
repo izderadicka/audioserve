@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -x -e
 if [[ -n "$1" ]]; then
   cd "$1"
 fi
@@ -9,7 +9,6 @@ if [[ -z "$FFMPEG_VERSION" ]]; then
   exit 2
 fi
 
-set -e
 wget https://www.ffmpeg.org/releases/$FFMPEG_VERSION.tar.xz
 tar xvf $FFMPEG_VERSION.tar.xz 
 rm $FFMPEG_VERSION.tar.xz
