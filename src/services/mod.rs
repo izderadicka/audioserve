@@ -1,4 +1,3 @@
-use self::auth::{AuthResult, Authenticator};
 use self::search::Search;
 use self::subs::{
     collections_list, download_folder, get_folder, recent, search, send_file, send_file_simple,
@@ -6,6 +5,10 @@ use self::subs::{
 };
 use self::transcode::QualityLevel;
 use self::types::FoldersOrdering;
+use self::{
+    auth::{AuthResult, Authenticator},
+    subs::short_response,
+};
 use crate::config::get_config;
 use crate::{error, util::header2header};
 use bytes::{Bytes, BytesMut};
@@ -15,6 +18,7 @@ use headers::{
     AccessControlAllowCredentials, AccessControlAllowOrigin, HeaderMapExt, Origin, Range,
 };
 use hyper::{body::HttpBody, service::Service, Body, Method, Request, Response, StatusCode};
+use leaky_cauldron::Leaky;
 use percent_encoding::percent_decode;
 use regex::Regex;
 use std::sync::atomic::AtomicUsize;
@@ -204,18 +208,25 @@ pub struct TranscodingDetails {
 
 pub struct ServiceFactory<T> {
     authenticator: Option<Arc<Box<dyn Authenticator<Credentials = T>>>>,
+    rate_limitter: Option<Arc<Leaky>>,
     search: Search<String>,
     transcoding: TranscodingDetails,
 }
 
 impl<T> ServiceFactory<T> {
-    pub fn new<A>(auth: Option<A>, search: Search<String>, transcoding: TranscodingDetails) -> Self
+    pub fn new<A>(
+        auth: Option<A>,
+        search: Search<String>,
+        transcoding: TranscodingDetails,
+        rate_limit: Option<f32>,
+    ) -> Self
     where
         A: Authenticator<Credentials = T> + 'static,
     {
         ServiceFactory {
             authenticator: auth
                 .map(|a| Arc::new(Box::new(a) as Box<dyn Authenticator<Credentials = T>>)),
+            rate_limitter: rate_limit.map(|l| Arc::new(Leaky::new(l))),
             search,
             transcoding,
         }
@@ -228,6 +239,7 @@ impl<T> ServiceFactory<T> {
     ) -> impl Future<Output = Result<FileSendService<T>, Infallible>> {
         future::ok(FileSendService {
             authenticator: self.authenticator.clone(),
+            rate_limitter: self.rate_limitter.clone(),
             search: self.search.clone(),
             transcoding: self.transcoding.clone(),
             remote_addr,
@@ -239,6 +251,7 @@ impl<T> ServiceFactory<T> {
 #[derive(Clone)]
 pub struct FileSendService<T> {
     pub authenticator: Option<Arc<Box<dyn Authenticator<Credentials = T>>>>,
+    pub rate_limitter: Option<Arc<Leaky>>,
     pub search: Search<String>,
     pub transcoding: TranscodingDetails,
     pub remote_addr: Option<SocketAddr>,
@@ -282,14 +295,16 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        // Limit rate of requests in configured
-        // if let Some(limiter) = self.choke.as_ref() {
-        //     if let Err(_) = limiter.start_one() {
-        //         return Box::pin(future::ok(AuthResult::Rejected(
-        //             short_response(StatusCode::TOO_MANY_REQUESTS, "Too many requests"))));
-        //     }
-
-        // }
+        //Limit rate of requests in configured
+        if let Some(limiter) = self.rate_limitter.as_ref() {
+            if let Err(_) = limiter.start_one() {
+                debug!("Rejecting request due to rate limit");
+                return Box::pin(future::ok(short_response(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    "Too many requests",
+                )));
+            }
+        }
 
         let req = match RequestWrapper::new(
             req,
