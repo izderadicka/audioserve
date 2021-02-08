@@ -78,17 +78,18 @@ macro_rules! get_url_path {
 
 fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
     let cfg = get_config();
-    let authenticator = get_config().shared_secret.as_ref().map(|secret| {
-        SharedSecretAuthenticator::new(secret.clone(), server_secret, cfg.token_validity_hours)
-    });
-    let transcoding = TranscodingDetails {
-        transcodings: Arc::new(AtomicUsize::new(0)),
-        max_transcodings: cfg.transcoding.max_parallel_processes,
-    };
-    let svc_factory = ServiceFactory::new(authenticator, Search::new(), transcoding);
 
     let addr = cfg.listen;
     let start_server = async move {
+        let authenticator = get_config().shared_secret.as_ref().map(|secret| {
+            SharedSecretAuthenticator::new(secret.clone(), server_secret, cfg.token_validity_hours)
+        });
+        let transcoding = TranscodingDetails {
+            transcodings: Arc::new(AtomicUsize::new(0)),
+            max_transcodings: cfg.transcoding.max_parallel_processes,
+        };
+        let svc_factory = ServiceFactory::new(authenticator, Search::new(), transcoding);
+
         let server: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> =
             match get_config().ssl.as_ref() {
                 None => {

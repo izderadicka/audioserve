@@ -45,6 +45,8 @@ native-tls = {version="0.2", optional=true}
 
 cachedirtree = {path="crates/cachedirtree", optional=true}
 
+leaky-cauldron = {path="crates/leaky-cauldron"}
+
 tokio-util = {version="0.6", optional=true}
 
 media_info = {path="crates/media_info"}

@@ -13,12 +13,13 @@ use ring::{
     digest::{digest, SHA256},
     hmac,
 };
-use std::borrow;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::{borrow, time::Duration};
 use thiserror::Error;
+use tokio::time::sleep;
 use url::form_urlencoded;
 
 pub enum AuthResult<T> {
@@ -105,6 +106,9 @@ impl Authenticator for SharedSecretAuthenticator {
                                     "Invalid authentication: invalid shared secret, client: {:?}",
                                     req.remote_addr()
                                 );
+                                // Let's not return failure immediately, because somebody is using wrong shared secret
+                                // Legitimate user can wait a bit, but for brute force attack it can be advantage not to reply quickly
+                                sleep(Duration::from_millis(500)).await;
                                 Ok(deny())
                             }
                         } else {

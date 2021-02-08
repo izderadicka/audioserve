@@ -20,10 +20,10 @@ pub fn is_number(v: String) -> ValidatorResult {
     Ok(())
 }
 
-pub fn is_positive_number(v: String) -> ValidatorResult {
-    let x: u32 = v.parse().map_err(|_| format!("{} is not a number", v))?;
-    if x < 1 {
-        return Err("Number must be positive".into());
+pub fn is_positive_float(v: String) -> ValidatorResult {
+    let x: f32 = v.parse().map_err(|_| format!("{} is not a number", v))?;
+    if x < 1e-18 {
+        return Err("Number should be bigger then 0 at least by small bit".into());
     }
     Ok(())
 }

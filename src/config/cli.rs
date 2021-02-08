@@ -76,12 +76,12 @@ fn create_parser<'a>() -> Parser<'a> {
             .env("AUDIOSERVE_SHARED_SECRET")
             .help("Shared secret for client authentication")
             )
-        .arg(Arg::with_name("limit-authentication-rate")
-            .long("limit-authentication-rate")
-            .env("AUDIOSERVE_LIMIT_AUTHENTICATION_RATE")
+        .arg(Arg::with_name("limit-rate")
+            .long("limit-rate")
+            .env("AUDIOSERVE_LIMIT_RATE")
             .takes_value(true)
-            .validator(is_positive_number)
-            .help("Limits number of authentication request to x req/sec. Can help a bit against brute force on shared secret")
+            .validator(is_positive_float)
+            .help("Limits number of http request to x req/sec. Assures that resources are not exhausted in case of DDoS (but will also limit you). It's bit experimental now.")
             )
         .arg(Arg::with_name("shared-secret-file")
             .long("shared-secret-file")
@@ -367,9 +367,7 @@ where
         config.set_shared_secret_from_file(file)?
     };
 
-    config.limit_authentication_rate = args
-        .value_of("limit-authentication-rate")
-        .and_then(|s| s.parse().ok());
+    config.limit_rate = args.value_of("limit-rate").and_then(|s| s.parse().ok());
 
     if let Some(n) = args.value_of("transcoding-max-parallel-processes") {
         config.transcoding.max_parallel_processes = n.parse().unwrap()

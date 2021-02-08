@@ -282,6 +282,15 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
+        // Limit rate of requests in configured
+        // if let Some(limiter) = self.choke.as_ref() {
+        //     if let Err(_) = limiter.start_one() {
+        //         return Box::pin(future::ok(AuthResult::Rejected(
+        //             short_response(StatusCode::TOO_MANY_REQUESTS, "Too many requests"))));
+        //     }
+
+        // }
+
         let req = match RequestWrapper::new(
             req,
             get_config().url_path_prefix.as_deref(),
