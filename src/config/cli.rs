@@ -367,7 +367,9 @@ where
         config.set_shared_secret_from_file(file)?
     };
 
-    config.limit_rate = args.value_of("limit-rate").and_then(|s| s.parse().ok());
+    if let Some(r) = args.value_of("limit-rate").and_then(|s| s.parse().ok()) {
+        config.limit_rate = Some(r)
+    }
 
     if let Some(n) = args.value_of("transcoding-max-parallel-processes") {
         config.transcoding.max_parallel_processes = n.parse().unwrap()
