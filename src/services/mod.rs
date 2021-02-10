@@ -1,14 +1,11 @@
+use self::auth::{AuthResult, Authenticator};
 use self::search::Search;
 use self::subs::{
     collections_list, download_folder, get_folder, recent, search, send_file, send_file_simple,
-    short_response_boxed, transcodings_list, ResponseFuture, NOT_FOUND_MESSAGE,
+    transcodings_list, ResponseFuture,
 };
 use self::transcode::QualityLevel;
 use self::types::FoldersOrdering;
-use self::{
-    auth::{AuthResult, Authenticator},
-    subs::short_response,
-};
 use crate::config::get_config;
 use crate::{error, util::header2header};
 use bytes::{Bytes, BytesMut};
@@ -37,6 +34,7 @@ pub mod audio_meta;
 pub mod auth;
 #[cfg(feature = "shared-positions")]
 pub mod position;
+pub mod resp;
 pub mod search;
 mod subs;
 pub mod transcode;
@@ -299,10 +297,7 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
         if let Some(limiter) = self.rate_limitter.as_ref() {
             if let Err(_) = limiter.start_one() {
                 debug!("Rejecting request due to rate limit");
-                return Box::pin(future::ok(short_response(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    "Too many requests",
-                )));
+                return resp::fut(resp::too_many_requests);
             }
         }
 
@@ -315,7 +310,7 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
             Ok(r) => r,
             Err(e) => {
                 error!("Request URL error: {}", e);
-                return short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE);
+                return resp::fut(resp::not_found);
             }
         };
         //static files
@@ -382,7 +377,7 @@ impl<C> FileSendService<C> {
                         Ok(r) => r,
                         Err(_) => {
                             error!("Invalid collection number");
-                            return short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE);
+                            return resp::fut(resp::not_found);
                         }
                     };
 
@@ -409,7 +404,7 @@ impl<C> FileSendService<C> {
                             search(colllection_index, searcher, search_string.into_owned(), ord)
                         } else {
                             error!("q parameter is missing in search");
-                            short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
+                            resp::fut(resp::not_found)
                         }
                     } else if path.starts_with("/recent") {
                         recent(colllection_index, searcher)
@@ -427,12 +422,12 @@ impl<C> FileSendService<C> {
                         )
                     } else {
                         error!("Invalid path requested {}", path);
-                        short_response_boxed(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
+                        resp::fut(resp::not_found)
                     }
                 }
             }
 
-            _ => short_response_boxed(StatusCode::METHOD_NOT_ALLOWED, "Method not supported"),
+            _ => resp::fut(resp::method_not_supported),
         }
     }
 
@@ -454,13 +449,17 @@ impl<C> FileSendService<C> {
             Some(bytes_ranges) => {
                 if bytes_ranges.is_empty() {
                     error!("Range without data");
-                    return short_response_boxed(StatusCode::BAD_REQUEST, "One range is required");
+                    return resp::fut(|| {
+                        resp::short_response(StatusCode::BAD_REQUEST, "One range is required")
+                    });
                 } else if bytes_ranges.len() > 1 {
                     error!("Range with multiple ranges is not supported");
-                    return short_response_boxed(
-                        StatusCode::NOT_IMPLEMENTED,
-                        "Do not support muptiple ranges",
-                    );
+                    return resp::fut(|| {
+                        resp::short_response(
+                            StatusCode::NOT_IMPLEMENTED,
+                            "Do not support muptiple ranges",
+                        )
+                    });
                 } else {
                     Some(bytes_ranges[0])
                 }

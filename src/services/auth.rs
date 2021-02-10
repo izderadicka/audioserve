@@ -1,4 +1,3 @@
-use super::subs::short_response;
 use crate::error::{bail, Result};
 use crate::services::RequestWrapper;
 use crate::util::ResponseBuilderExt;
@@ -7,7 +6,7 @@ use futures::{future, prelude::*};
 use headers::authorization::Bearer;
 use headers::{Authorization, ContentLength, ContentType, Cookie, HeaderMapExt};
 use hyper::header::SET_COOKIE;
-use hyper::{Body, Method, Response, StatusCode};
+use hyper::{Body, Method, Response};
 use ring::rand::{SecureRandom, SystemRandom};
 use ring::{
     digest::{digest, SHA256},
@@ -21,6 +20,8 @@ use std::{borrow, time::Duration};
 use thiserror::Error;
 use tokio::time::sleep;
 use url::form_urlencoded;
+
+use super::resp;
 
 pub enum AuthResult<T> {
     Authenticated {
@@ -62,13 +63,12 @@ impl SharedSecretAuthenticator {
 }
 
 const COOKIE_NAME: &str = "audioserve_token";
-const ACCESS_DENIED: &str = "Access denied";
 
 impl Authenticator for SharedSecretAuthenticator {
     type Credentials = ();
     fn authenticate(&self, mut req: RequestWrapper) -> AuthFuture<()> {
         fn deny() -> AuthResult<()> {
-            AuthResult::Rejected(short_response(StatusCode::UNAUTHORIZED, ACCESS_DENIED))
+            AuthResult::Rejected(resp::deny())
         }
         // this is part where client can authenticate itself and get token
         if req.method() == Method::POST && req.path() == "/authenticate" {
@@ -310,7 +310,7 @@ mod tests {
     use super::*;
     use crate::config::init::init_default_config;
     use borrow::Cow;
-    use hyper::Request;
+    use hyper::{Request, StatusCode};
 
     #[test]
     fn test_token() {

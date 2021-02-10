@@ -1,4 +1,3 @@
-use super::audio_folder::list_dir;
 #[cfg(feature = "folder-download")]
 use super::audio_folder::list_dir_files_only;
 use super::audio_folder::parse_chapter_path;
@@ -6,6 +5,7 @@ use super::search::{Search, SearchTrait};
 use super::transcode::{guess_format, AudioFilePath, QualityLevel, TimeSpan};
 use super::types::*;
 use super::Counter;
+use super::{audio_folder::list_dir, resp};
 use crate::config::get_config;
 use crate::error::{Error, Result};
 use crate::util::{
@@ -28,26 +28,8 @@ use tokio::io::{AsyncRead, AsyncSeekExt, ReadBuf};
 use tokio::task::spawn_blocking as blocking;
 
 pub type ByteRange = (Bound<u64>, Bound<u64>);
-
-pub const NOT_FOUND_MESSAGE: &str = "Not Found";
-const SEVER_ERROR_TRANSCODING: &str = "Server error during transcoding process";
-
 type Response = HyperResponse<Body>;
-
 pub type ResponseFuture = Pin<Box<dyn Future<Output = Result<Response, Error>> + Send>>;
-
-pub fn short_response(status: StatusCode, msg: &'static str) -> Response {
-    HyperResponse::builder()
-        .status(status)
-        .typed_header(ContentLength(msg.len() as u64))
-        .typed_header(ContentType::text())
-        .body(msg.into())
-        .unwrap()
-}
-
-pub fn short_response_boxed(status: StatusCode, msg: &'static str) -> ResponseFuture {
-    Box::pin(future::ok(short_response(status, msg)))
-}
 
 #[cfg(not(feature = "transcoding-cache"))]
 fn serve_file_cached_or_transcoded(
@@ -150,7 +132,7 @@ fn serve_file_transcoded_checked(
     let running_transcodings: u32 = counter.load(Ordering::SeqCst) as u32;
     if running_transcodings >= transcoding.max_transcodings {
         warn!("Max transcodings reached {}", transcoding.max_transcodings);
-        short_response_boxed(StatusCode::SERVICE_UNAVAILABLE, "Max transcodings reached")
+        resp::fut(resp::too_many_requests)
     } else {
         debug!(
             "Sendig file {:?} transcoded - remaining slots {}/{}",
@@ -189,10 +171,7 @@ fn serve_file_transcoded(
             ),
             Err(e) => {
                 error!("Cannot create transcoded stream, error: {}", e);
-                future::ok(short_response(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    SEVER_ERROR_TRANSCODING,
-                ))
+                future::ok(resp::internal_error())
             }
         });
     Box::pin(fut)
@@ -324,7 +303,7 @@ fn serve_file_from_fs(
             }
             Err(e) => {
                 error!("Error when sending file {:?} : {}", filename, e);
-                Ok(short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE))
+                Ok(resp::not_found())
             }
         }
     };
@@ -387,7 +366,7 @@ pub fn get_folder(
         blocking(move || list_dir(&base_path, &folder_path, ordering))
             .map_ok(|res| match res {
                 Ok(folder) => json_response(&folder),
-                Err(_) => short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE),
+                Err(_) => resp::not_found(),
             })
             .map_err(Error::new),
     )
@@ -439,7 +418,7 @@ pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> Respon
                         }
                         Err(e) => {
                             error!("Cannot list download dir: {}", e);
-                            short_response(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE)
+                            resp::not_found()
                         }
                     })
                     .map_err(|e| {
