@@ -1,31 +1,38 @@
 #[cfg(feature = "folder-download")]
 use super::audio_folder::list_dir_files_only;
-use super::audio_folder::parse_chapter_path;
-use super::search::{Search, SearchTrait};
-use super::transcode::{guess_format, AudioFilePath, QualityLevel, TimeSpan};
-use super::types::*;
-use super::Counter;
-use super::{audio_folder::list_dir, resp};
-use crate::config::get_config;
-use crate::error::{Error, Result};
-use crate::util::{
-    checked_dec, guess_mime_type, into_range_bounds, to_satisfiable_range, ResponseBuilderExt,
+use super::{
+    audio_folder::{list_dir, parse_chapter_path},
+    resp,
+    search::{Search, SearchTrait},
+    transcode::{guess_format, AudioFilePath, QualityLevel, TimeSpan},
+    types::*,
+    Counter,
+};
+use crate::{
+    config::get_config,
+    error::{Error, Result},
+    util::{
+        checked_dec, guess_mime_type, into_range_bounds, to_satisfiable_range, ResponseBuilderExt,
+    },
 };
 use futures::prelude::*;
 use futures::{future, ready, Stream};
 use headers::{AcceptRanges, CacheControl, ContentLength, ContentRange, ContentType, LastModified};
 #[cfg(feature = "folder-download")]
-use hyper::header::CONTENT_DISPOSITION;
-use hyper::{Body, Response as HyperResponse, StatusCode};
-use std::collections::Bound;
-use std::ffi::OsStr;
-use std::io::{self, SeekFrom};
-use std::path::{Path, PathBuf};
-use std::pin::Pin;
-use std::sync::atomic::Ordering;
-use std::task::{Context, Poll};
-use tokio::io::{AsyncRead, AsyncSeekExt, ReadBuf};
-use tokio::task::spawn_blocking as blocking;
+use hyper::{header::CONTENT_DISPOSITION, Body, Response as HyperResponse, StatusCode};
+use std::{
+    collections::Bound,
+    ffi::OsStr,
+    io::{self, SeekFrom},
+    path::{Path, PathBuf},
+    pin::Pin,
+    sync::atomic::Ordering,
+    task::{Context, Poll},
+};
+use tokio::{
+    io::{AsyncRead, AsyncSeekExt, ReadBuf},
+    task::spawn_blocking as blocking,
+};
 
 pub type ByteRange = (Bound<u64>, Bound<u64>);
 type Response = HyperResponse<Body>;

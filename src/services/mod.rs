@@ -18,14 +18,17 @@ use hyper::{body::HttpBody, service::Service, Body, Method, Request, Response};
 use leaky_cauldron::Leaky;
 use percent_encoding::percent_decode;
 use regex::Regex;
-use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
-use std::{borrow::Cow, task::Poll};
-use std::{collections::HashMap, convert::Infallible, net::SocketAddr};
-use std::{fmt::Display, pin::Pin};
 use std::{
+    borrow::Cow,
+    collections::HashMap,
+    convert::Infallible,
+    fmt::Display,
     net::IpAddr,
+    net::SocketAddr,
     path::{Path, PathBuf},
+    pin::Pin,
+    sync::{atomic::AtomicUsize, Arc},
+    task::Poll,
 };
 use url::form_urlencoded;
 
