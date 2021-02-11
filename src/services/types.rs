@@ -155,7 +155,7 @@ impl From<TranscodingFormat> for TranscodingSummary {
 
 #[derive(Debug, Serialize)]
 pub struct Transcodings {
-    pub max_transcodings: u32,
+    pub max_transcodings: usize,
     pub low: TranscodingSummary,
     pub medium: TranscodingSummary,
     pub high: TranscodingSummary,

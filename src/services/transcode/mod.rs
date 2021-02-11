@@ -347,7 +347,6 @@ impl Transcoder {
                     self.transcode_inner(file, seek, span, counter)
                         .map(|(stream, f)| {
                             tokio::spawn(f);
-
                             Box::pin(stream) as TranscodedStream
                         }),
                 )
@@ -426,11 +425,9 @@ impl Transcoder {
             }
             _ => self.build_command(file.as_ref(), seek, span),
         };
-        let counter2 = counter.clone();
         match cmd.spawn() {
             Ok(mut child) => {
                 if let Some(out) = child.stdout.take() {
-                    counter.fetch_add(1, Ordering::SeqCst);
                     let start = Instant::now();
                     let stream = ChunkStream::new(out);
                     let pid = child.id();
@@ -444,7 +441,7 @@ impl Transcoder {
                         )
                         .await;
 
-                        counter2.fetch_sub(1, Ordering::SeqCst);
+                        counter.fetch_sub(1, Ordering::SeqCst);
                         match res {
                             Ok(res) => match res {
                                 Ok(res) => {
@@ -490,6 +487,7 @@ impl Transcoder {
                 }
             }
             Err(e) => {
+                counter.fetch_sub(1, Ordering::SeqCst);
                 error!("Cannot spawn child process: {:?}", e);
                 bail!("Cannot spawn child");
             }

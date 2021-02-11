@@ -204,7 +204,7 @@ impl RequestWrapper {
 #[derive(Clone)]
 pub struct TranscodingDetails {
     pub transcodings: Counter,
-    pub max_transcodings: u32,
+    pub max_transcodings: usize,
 }
 
 pub struct ServiceFactory<T> {

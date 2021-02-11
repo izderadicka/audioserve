@@ -90,7 +90,7 @@ impl TranscodingCacheConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct TranscodingConfig {
-    pub max_parallel_processes: u32,
+    pub max_parallel_processes: usize,
     pub max_runtime_hours: u32,
     #[cfg(feature = "transcoding-cache")]
     pub cache: TranscodingCacheConfig,
@@ -102,7 +102,7 @@ pub struct TranscodingConfig {
 impl Default for TranscodingConfig {
     fn default() -> Self {
         TranscodingConfig {
-            max_parallel_processes: (2 * num_cpus::get()) as u32,
+            max_parallel_processes: (2 * num_cpus::get()),
             max_runtime_hours: 24,
             #[cfg(feature = "transcoding-cache")]
             cache: TranscodingCacheConfig::default(),

@@ -133,23 +133,34 @@ fn serve_file_transcoded_checked(
     transcoding_quality: QualityLevel,
 ) -> ResponseFuture {
     let counter = transcoding.transcodings;
+    let mut running_transcodings = counter.load(Ordering::SeqCst);
+    loop {
+        if running_transcodings >= transcoding.max_transcodings {
+            warn!("Max transcodings reached {}", transcoding.max_transcodings);
+            return resp::fut(resp::too_many_requests);
+        }
 
-    // TODO: This is not correct - atomic load and increase should be done together as check and replace
-    // however it does not matter much - basic limitation is achieve though not exact
-    // to fix we can increment here too , but then need to assure that decrement is also on fail paths
-    let running_transcodings: u32 = counter.load(Ordering::SeqCst) as u32;
-    if running_transcodings >= transcoding.max_transcodings {
-        warn!("Max transcodings reached {}", transcoding.max_transcodings);
-        resp::fut(resp::too_many_requests)
-    } else {
-        debug!(
-            "Sendig file {:?} transcoded - remaining slots {}/{}",
-            &full_path,
-            transcoding.max_transcodings - running_transcodings - 1,
-            transcoding.max_transcodings
-        );
-        serve_file_transcoded(full_path, seek, span, transcoding_quality, &counter)
+        match counter.compare_exchange(
+            running_transcodings,
+            running_transcodings + 1,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(_) => {
+                running_transcodings = running_transcodings + 1;
+                break;
+            }
+            Err(curr) => running_transcodings = curr,
+        }
     }
+
+    debug!(
+        "Sendig file {:?} transcoded - remaining slots {}/{}",
+        &full_path,
+        transcoding.max_transcodings - running_transcodings,
+        transcoding.max_transcodings
+    );
+    serve_file_transcoded(full_path, seek, span, transcoding_quality, counter)
 }
 
 fn serve_file_transcoded(
@@ -157,7 +168,7 @@ fn serve_file_transcoded(
     seek: Option<f32>,
     span: Option<TimeSpan>,
     transcoding_quality: QualityLevel,
-    counter: &Counter,
+    counter: Counter,
 ) -> ResponseFuture {
     let transcoder = get_config().transcoder(transcoding_quality);
     let params = transcoder.transcoding_params();
@@ -179,6 +190,7 @@ fn serve_file_transcoded(
             ),
             Err(e) => {
                 error!("Cannot create transcoded stream, error: {}", e);
+                counter.fetch_sub(1, Ordering::SeqCst);
                 future::ok(resp::internal_error())
             }
         });
