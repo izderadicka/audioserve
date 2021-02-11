@@ -19,7 +19,8 @@ use futures::prelude::*;
 use futures::{future, ready, Stream};
 use headers::{AcceptRanges, CacheControl, ContentLength, ContentRange, ContentType, LastModified};
 #[cfg(feature = "folder-download")]
-use hyper::{header::CONTENT_DISPOSITION, Body, Response as HyperResponse, StatusCode};
+use hyper::header::CONTENT_DISPOSITION;
+use hyper::{Body, Response as HyperResponse, StatusCode};
 use std::{
     collections::Bound,
     ffi::OsStr,
