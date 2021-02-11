@@ -14,7 +14,7 @@ use futures::{future, TryFutureExt};
 use headers::{
     AccessControlAllowCredentials, AccessControlAllowOrigin, HeaderMapExt, Origin, Range,
 };
-use hyper::{body::HttpBody, service::Service, Body, Method, Request, Response, StatusCode};
+use hyper::{body::HttpBody, service::Service, Body, Method, Request, Response};
 use leaky_cauldron::Leaky;
 use percent_encoding::percent_decode;
 use regex::Regex;
@@ -448,18 +448,11 @@ impl<C> FileSendService<C> {
         let bytes_range = match range.map(|r| r.iter().collect::<Vec<_>>()) {
             Some(bytes_ranges) => {
                 if bytes_ranges.is_empty() {
-                    error!("Range without data");
-                    return resp::fut(|| {
-                        resp::short_response(StatusCode::BAD_REQUEST, "One range is required")
-                    });
+                    error!("Range header without range bytes");
+                    return resp::fut(resp::bad_request);
                 } else if bytes_ranges.len() > 1 {
                     error!("Range with multiple ranges is not supported");
-                    return resp::fut(|| {
-                        resp::short_response(
-                            StatusCode::NOT_IMPLEMENTED,
-                            "Do not support muptiple ranges",
-                        )
-                    });
+                    return resp::fut(resp::not_implemented);
                 } else {
                     Some(bytes_ranges[0])
                 }
