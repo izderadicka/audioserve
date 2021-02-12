@@ -191,7 +191,7 @@ fn main() {
     {
         use crate::services::transcode::cache::get_cache;
         if get_config().transcoding.cache.disabled {
-            info!("Trascoding cache is disabled")
+            info!("Transcoding cache is disabled")
         } else {
             let c = get_cache();
             info!(
@@ -223,10 +223,12 @@ fn main() {
 
     #[cfg(feature = "transcoding-cache")]
     {
-        debug!("Saving transcoding cache");
-        use crate::services::transcode::cache::get_cache;
-        if let Err(e) = get_cache().save_index_blocking() {
-            error!("Error saving transcoding cache index {}", e);
+        if !get_config().transcoding.cache.disabled {
+            debug!("Saving transcoding cache");
+            use crate::services::transcode::cache::get_cache;
+            if let Err(e) = get_cache().save_index_blocking() {
+                error!("Error saving transcoding cache index {}", e);
+            }
         }
     }
 
