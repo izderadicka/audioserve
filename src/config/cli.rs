@@ -221,7 +221,7 @@ fn create_parser<'a>() -> Parser<'a> {
             .takes_value(true)
             .env("AUDIOSERVE_T_CACHE_DIR")
             .validator_os(parent_dir_exists)
-            .help("Directory for transcoding cache [default is 'audioserve-cache' under system wide temp dirrectory]")
+            .help("Directory for transcoding cache [default is ~/.audioserve/audioserve-cache]")
         ).arg(
             Arg::with_name("t-cache-size")
             .long("t-cache-size")
@@ -239,12 +239,13 @@ fn create_parser<'a>() -> Parser<'a> {
         ).arg(
             Arg::with_name("t-cache-disable")
             .long("t-cache-disable")
+            .conflicts_with_all(&["t-cache-save-often", "t-cache-max-files", "t-cache-size", "t-cache-dir"])
             .help("Transaction cache is disabled. If you want to completely get rid of it, compile without 'transcoding-cache'")
             )
         .arg(
             Arg::with_name("t-cache-save-often")
             .long("t-cache-save-often")
-            .help("Save additions to cache often, after each addition, this is normaly not necessary")
+            .help("Save additions to cache often, after each addition, this is normally not necessary")
         )
     }
 
@@ -561,7 +562,6 @@ mod test {
             "999",
             "--t-cache-max-files",
             "999",
-            "--t-cache-disable",
             "--t-cache-save-often",
             "test_data",
         ])
@@ -570,7 +570,7 @@ mod test {
         assert_eq!(PathBuf::from("test_data"), c.transcoding.cache.root_dir);
         assert_eq!(999, c.transcoding.cache.max_size);
         assert_eq!(999, c.transcoding.cache.max_files);
-        assert!(c.transcoding.cache.disabled);
+        assert!(!c.transcoding.cache.disabled);
         assert!(c.transcoding.cache.save_often);
     }
 

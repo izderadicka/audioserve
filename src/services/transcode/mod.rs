@@ -337,10 +337,9 @@ impl Transcoder {
             ));
         }
 
-        let cache = get_cache();
         //TODO: this is ugly -  unify either we will use Path or OsStr!
         let key = cache_key(file.as_ref().as_ref(), quality, span);
-        let fut = cache.add(key).then(move |res| match res {
+        let fut = get_cache().add(key).then(move |res| match res {
             Err(e) => {
                 warn!("Cannot create cache entry: {}", e);
                 future::ready(
@@ -355,34 +354,25 @@ impl Transcoder {
                 self.transcode_inner(file, seek, span, counter)
                     .map(|(mut stream, f)| {
                         tokio::spawn(f.then(|res| {
-                            fn box_me<I, E, F: Future<Output = Result<I, E>> + 'static + Send>(
-                                f: F,
-                            ) -> Pin<Box<dyn Future<Output = Result<I, E>> + 'static + Send>>
-                            {
-                                Box::pin(f)
-                            }
-
                             match res {
-                                Ok(()) => Box::pin(
-                                    cache_finish
-                                        .commit()
-                                        .map_err(|e| error!("Error in cache: {}", e))
-                                        .and_then(|_| {
-                                            debug!("Added to cache");
-                                            if false {
-                                                box_me(get_cache().save_index().map_err(|e| {
-                                                    error!("Error when saving cache index: {}", e)
-                                                }))
-                                            } else {
-                                                box_me(future::ok(()))
-                                            }
-                                        }),
-                                ),
-                                Err(()) => box_me(
-                                    cache_finish
-                                        .roll_back()
-                                        .map_err(|e| error!("Error in cache: {}", e)),
-                                ),
+                                Ok(()) => cache_finish
+                                    .commit()
+                                    .map_err(|e| error!("Error in cache: {}", e))
+                                    .and_then(|_| {
+                                        debug!("Added to cache");
+                                        if get_config().transcoding.cache.save_often {
+                                            tokio::spawn(get_cache().save_index().map_err(|e| {
+                                                error!("Error when saving cache index: {}", e)
+                                            }));
+                                        }
+                                        future::ok(())
+                                    })
+                                    .boxed(),
+
+                                Err(()) => cache_finish
+                                    .roll_back()
+                                    .map_err(|e| error!("Error in cache: {}", e))
+                                    .boxed(),
                             }
                         }));
                         let cache_sink = tokio_util::codec::FramedWrite::new(
