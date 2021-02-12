@@ -136,7 +136,10 @@ fn serve_file_transcoded_checked(
     let mut running_transcodings = counter.load(Ordering::SeqCst);
     loop {
         if running_transcodings >= transcoding.max_transcodings {
-            warn!("Max transcodings reached {}", transcoding.max_transcodings);
+            warn!(
+                "Max transcodings reached {}/{}",
+                running_transcodings, transcoding.max_transcodings
+            );
             return resp::fut(resp::too_many_requests);
         }
 
@@ -190,7 +193,6 @@ fn serve_file_transcoded(
             ),
             Err(e) => {
                 error!("Cannot create transcoded stream, error: {}", e);
-                counter.fetch_sub(1, Ordering::SeqCst);
                 future::ok(resp::internal_error())
             }
         });

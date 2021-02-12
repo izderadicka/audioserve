@@ -472,8 +472,9 @@ impl Transcoder {
                     };
                     Ok((stream, fut))
                 } else {
-                    error!("Cannot get stdout");
-                    bail!("Cannot get stdout");
+                    counter.fetch_sub(1, Ordering::SeqCst);
+                    error!("Cannot get child process stdout");
+                    bail!("Cannot get child process stdout");
                 }
             }
             Err(e) => {
