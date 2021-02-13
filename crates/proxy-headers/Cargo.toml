@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 nom = "6"
+funty = "=1.1.0" # temporary workaround for bitvec compilation error
 headers = "0.3"
 http = "0.2"
 lazy_static = "1.4"
