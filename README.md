@@ -41,7 +41,7 @@ By default symbolic(soft) links are not followed in the collections directory (b
 Recently better support for .m4b (one file with chapters metadata) and similar was added. Such file is presented as a folder, which contains chapters. Also long audiofile without chapters meta, can be split into equaly sized parts/chapters (this has a slight disadvantage as split can be in middle of word). To enable later use `--chapters-from-duration` to set a limit, from which it should be used, and `chapters-duration` to set a duration of a part. Also for large files, which do not have chapters metadata, you can easily supply them in a separate file, with same name as the audio file but with additional extenssion `.chapters` - so it looks like `your_audiobook.mp3.chapters`. This file is simple CSV file (with header), where first column is chapter title, second is chapter start time, third (and last) is the chapter end time.  Time is either in seconds (like `23.836`) or in `HH:MM:SS.mmm` format (like `02:35:23.386`).
 
 There are some small glitches with this approach - search still works on directories only and cover and description metadata are yet not working (plan is to extract them from the audio file metadata). Apart of that chapters behaves like other audio files - can be transcoded to lower bitrates, seeked within etc.
-Also beware that web client will often load same part of chapter again if you're seeking within it (especially Firefox with m4b), so it's definitelly not bandwidth optimal (similar issue appears when often seeking in trancoded file).
+Also beware that web client will often load same part of chapter again if you're seeking within it (especially Firefox with m4b), so it's definitely not bandwidth optimal (similar issue appears when often seeking in transcoded file).
 
 Sharing playback positions between clients
 -----------------------------------------
@@ -87,15 +87,25 @@ Also there is optional feature `behind-proxy`, which enables argument `--behind-
 
 You can check some reverse proxy configurations in [reverse_proxy.md](./docs/reverse_proxy.md) (If you have successful configuration of reverse proxy please share via PR).
 
+### Limit Requests Rate
+
+Normally you'd allow audioserve to serve as much requests as it can handle, but if you like to protect yourself against DDoS (Distributed Denial of Service) attack (consider now much it's probable and serious in your case) you should consider limiting rate of requests handling. 
+
+If audioserve is behind reverse proxy you can use rate limiting option of proxy server ([like this one for nginx](https://www.nginx.com/blog/rate-limiting-nginx/)).  Audioserve also has argument `--limit-rate n`, which turns on simple (it's global, not per remote address) rate limiting on all incoming HTTP requests to maximum of n request per second (approximately), for requests over the limit audioserve return 429 - Too Many Requests HTTP status code. As this is overall limit it will not protect legal users, as they will also see rejected requests, but it will just protect host from extensive use of resources.
+
+Number of parallel transcodings (transcodings are most resource intensive tasks) is limited by `--transcoding-max-parallel-processes`, which is 2 * number of CPU cores by default. This is different then limit-rate, as it guards number of transcodings that run concurrently.
+
 ### Security Best Practices
 
 - Always SSL/TLS - ideally behind well proven reverse proxy (I'm using nginx) (audioserve has support for SSL/TLS, but reverse proxy is probably more solid, plus can provide additional safeguards)
 - Set solid shared secret 10+ different character types ... (to prevent guessing and brute force attacks), do not run on Internet with `no-authentication` - it's for testing only
 - Never run audioserve as root
 - Never put any secret information into media directories - all content of these directories is potentially accessible via Web API.
-- Running in dedicated container also improves security 
+- Running in dedicated container also improves security
+- if using remote proxy limit listening (`--listen` argument) interface of audioserve to one reachable by remote proxy only (for instance if they are on same server use `--listen 127.0.0.1:3000`)
 - Optionally use your reverse proxy features like URL blocking, rate limiting etc. for additional security
-- It's good to check logs from time to time - audioserve by default logs errors (including invalid access attempt) to stderr (which can be easily redirected to file), access log of reverse proxy is also useful 
+- It's good to check logs from time to time - audioserve by default logs errors (including invalid access attempt) to stderr (which can be easily redirected to file), access log of reverse proxy is also useful
+- Change shared secret (ideally in some larger (months) regular intervals, but it bit annoying), but for sure change in case you suspect it has been breached - always also delete server secret file.
 
 Performance
 -----------
