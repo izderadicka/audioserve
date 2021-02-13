@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 
 hyper = "0.14"
-tokio = {version="1.0", features=["rt-multi-thread"]}
+tokio = {version="1.2", features=["rt-multi-thread"]}
 futures = "0.3"
 log = {version="0.4", features=["max_level_debug"]}
 tokio-tungstenite = "0.13"
@@ -17,4 +17,4 @@ headers = "0.3"
 [dev-dependencies]
 env_logger = "0.8"
 hyper = {version="0.14", features=["server", "http1", "http2", "tcp"]}
-tokio = {version="1.0", features=["macros", "io-util", "fs"]}
+tokio = {version="1.2", features=["macros", "io-util", "fs"]}

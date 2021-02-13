@@ -7,10 +7,10 @@ edition = "2018"
 [dependencies]
 tar="0.4"
 futures="0.3"
-tokio={version="1.0", features=["fs"]}
+tokio={version="1.2", features=["fs"]}
 
 [dev-dependencies]
-tempfile="3.1"
+tempfile="3.2"
 tokio-util = {version="0.6", features=["codec"]}
-tokio={version="1.0", features=["macros", "rt"]}
+tokio={version="1.2", features=["macros", "rt"]}
 
