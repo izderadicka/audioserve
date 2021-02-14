@@ -133,6 +133,12 @@
     left: -5px;
     top: -8px;
   }
+
+  .audio-player .extra-buttons {
+    display: flex;
+    width: 60px;
+    justify-content: space-between;
+  }
   
   .audio-player svg, .audio-player img {
     display: block;
@@ -156,3 +162,18 @@
       transform: rotateZ(1turn);
     }
   }
+
+  @media (max-width: 480px) {
+  .audio-player .extra-buttons {
+    display: flex;
+    width: 70px;
+    justify-content: space-between;
+    position: absolute;
+    bottom: 64px;
+    right: 16px;
+    background-color: #2222;
+    padding: 5px;
+    border-radius: 7px;
+    z-index: 9999;
+  }
+}

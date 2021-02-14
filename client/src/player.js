@@ -106,6 +106,7 @@ class ControlButton {
 
         pinVolume.addEventListener("touchstart", (event) => {
             if (event.changedTouches.length == 1 && event.targetTouches.length == 1) {
+                event.preventDefault();
                 let touch = event.changedTouches[0];
                 this._currentlyDragged = touch.target;
                 let touchId = touch.identifier;
@@ -184,6 +185,18 @@ class VolumeButton extends ControlButton {
 
 }
 
+class SpeedButton extends ControlButton {
+
+    updateSpeed(speed) {
+        this.value = speed/4;
+    }
+
+    scaleValue(v) {
+        return v * 4;
+    }
+
+}
+
 export class AudioPlayer {
     // Most of code copied from https://codepen.io/gregh/pen/NdVvbm
 
@@ -205,6 +218,10 @@ export class AudioPlayer {
         this._volumeBtn = new VolumeButton(audioPlayer.querySelector("#volume-btn"), (volume) => {
             this._player.volume = volume;
         });
+        this._speedBtn = new SpeedButton(audioPlayer.querySelector("#speed-btn"), (speed) => {
+            this._player.playbackRate = speed;
+        });
+    
         
         this._currentTime = audioPlayer.querySelector('.current-time');
         this._totalTime = audioPlayer.querySelector('.total-time');
@@ -349,6 +366,7 @@ export class AudioPlayer {
 
         this._player.addEventListener('timeupdate', this._updateProgress.bind(this));
         this._player.addEventListener('volumechange', this._updateVolume.bind(this));
+        this._player.addEventListener('ratechange', this._updateSpeed.bind(this));
         this._player.addEventListener('durationchange', this._updateTotal.bind(this));
         this._player.addEventListener('loadedmetadata', (evt) => {
             if (isFinite(this._player.duration) && this._player.duration > 0) {
@@ -458,6 +476,10 @@ export class AudioPlayer {
 
     _updateVolume() {
         this._volumeBtn.updateVolume(this._player.volume);
+    }
+
+    _updateSpeed() {
+        this._speedBtn.updateSpeed(this._player.playbackRate);
     }
 
     getTotalTime() {
