@@ -36,6 +36,154 @@ function isHidden(el) {
     return (style.display === 'none')
 }
 
+function  touchToEvent (touch, type) {
+    return {
+        target: touch.target,
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        type: type
+    };
+};
+
+
+function getCoefficient(event, dragged) {
+    const getRangeBox = () => {
+        let rangeBox = event.target;
+        if (event.type == 'click' && event.target.classList.contains('pin')) {
+            rangeBox = event.target.parentElement.parentElement;
+        }
+        if (dragged && (event.type == 'mousemove' || event.type == 'mouseup')) {
+            rangeBox = dragged.parentElement.parentElement;
+        }
+        return rangeBox;
+    };
+
+    let slider = getRangeBox();
+    let rect = slider.getBoundingClientRect();
+    let K = 0;
+    if (slider.dataset.direction == 'horizontal') {
+
+        let offsetX = event.clientX - slider.offsetLeft;
+        let width = slider.clientWidth;
+        K = offsetX / width;
+        K = K < 0 ? 0 : K > 1 ? 1 : K;
+
+    } else if (slider.dataset.direction == 'vertical') {
+
+        let height = slider.clientHeight;
+        let offsetY = event.clientY - rect.top;
+        K = 1 - offsetY / height;
+        K = K < 0 ? 0 : K > 1 ? 1 : K;
+
+    }
+    return K;
+}
+
+class ControlButton {
+    constructor(rootElem, changeListener) {
+        this.rootElem = rootElem;
+        this._value = 0;
+        this._changeListener = changeListener;
+        this._currentlyDragged = null;
+        let volumeControls = rootElem.querySelector('.volume-controls');
+        this._volumeProgress = volumeControls.querySelector('.slider .progress');
+        let volumeBtn = rootElem.querySelector('.volume-btn');
+        let sliderVolume = rootElem.querySelector(".volume .slider");
+        let pinVolume = sliderVolume.querySelector(".pin");
+        this._icon = rootElem.querySelector('#speaker');
+
+        pinVolume.addEventListener('mousedown', (event) => {
+
+            this._currentlyDragged = event.target;
+            let handler = this._onChange.bind(this);
+            window.addEventListener('mousemove', handler, false);
+
+            window.addEventListener('mouseup', () => {
+                this._currentlyDragged = false;
+                window.removeEventListener('mousemove', handler, false);
+            }, { once: true });
+        });
+
+        pinVolume.addEventListener("touchstart", (event) => {
+            if (event.changedTouches.length == 1 && event.targetTouches.length == 1) {
+                let touch = event.changedTouches[0];
+                this._currentlyDragged = touch.target;
+                let touchId = touch.identifier;
+
+                let myTouch = (event) => {
+                    for (let i = 0; i < event.changedTouches.length; i++) {
+                        let t = event.changedTouches.item(i);
+                        if (t.identifier === touch.identifier) return t;
+                    }
+                };
+
+                let handler = (event) => {
+                    let t = myTouch(event);
+                    if (t) {
+                        let evt = touchToEvent(t, "mousemove");
+                        this._onChange(evt);
+                    }
+                };
+                window.addEventListener("touchmove", handler);
+                window.addEventListener("touchend", (event) => {
+                    let t = myTouch(event);
+                    if (t) {
+                        this._currentlyDragged = false;
+                        window.removeEventListener("touchmove", handler);
+                    }
+
+                }, { once: true });
+            }
+        }, { passive: true });
+
+        sliderVolume.addEventListener('click', this._onChange.bind(this));
+
+        volumeBtn.addEventListener('click', () => {
+            volumeBtn.classList.toggle('open');
+            volumeControls.classList.toggle('hidden');
+        }
+        );
+    }
+
+    _onChange(event) {
+        let newValue = getCoefficient(event, this._currentlyDragged);
+        if (newValue != this.value) {
+            this._value = newValue;
+            let scaledValue = this.scaleValue(newValue);
+            this._changeListener(scaledValue);
+        }
+
+    }
+
+    scaleValue(v) {
+        return v;
+    }
+
+    get value() {
+        return this._value
+    }
+
+    set value(v) {
+        this._volumeProgress.style.height = v * 100 + '%';
+    }
+
+}
+
+class VolumeButton extends ControlButton {
+
+    updateVolume(volume) {
+        this.value =volume;
+        if (volume >= 0.5) {
+            this._icon.attributes.d.value = VOLUME_FULL;
+        } else if (volume < 0.5 && volume > 0.05) {
+            this._icon.attributes.d.value = VOLUME_MED;
+        } else if (volume <= 0.05) {
+            this._icon.attributes.d.value = VOLUME_LOW;
+        }
+    }
+
+}
+
 export class AudioPlayer {
     // Most of code copied from https://codepen.io/gregh/pen/NdVvbm
 
@@ -48,29 +196,25 @@ export class AudioPlayer {
 
         let audioPlayer = document.querySelector('.audio-player');
         this._rootElem = audioPlayer;
+        this._player = audioPlayer.querySelector('audio');
 
         this._playPause = audioPlayer.querySelector('#playPause');
         this._playpauseBtn = audioPlayer.querySelector('.play-pause-btn');
         this._loading = audioPlayer.querySelector('.loading');
         this._progress = audioPlayer.querySelector('.progress');
-        let volumeControls = audioPlayer.querySelector('.volume-controls');
-        this._volumeProgress = volumeControls.querySelector('.slider .progress');
-        this._player = audioPlayer.querySelector('audio');
+        this._volumeBtn = new VolumeButton(audioPlayer.querySelector("#volume-btn"), (volume) => {
+            this._player.volume = volume;
+        });
+        
         this._currentTime = audioPlayer.querySelector('.current-time');
         this._totalTime = audioPlayer.querySelector('.total-time');
-        this._speaker = audioPlayer.querySelector('#speaker');
         this._cacheIndicator = audioPlayer.querySelector('.player-cache');
         this._currentlyDragged = null;
         this._isChrome = !!window.chrome; // Chrome requires some tweaks
         this._rewind_step = JUMP_STEP_SHORT;
 
-
-        let volumeBtn = audioPlayer.querySelector('.volume-btn');
         let sliderTime = audioPlayer.querySelector(".controls .slider");
-        let sliderVolume = audioPlayer.querySelector(".volume .slider");
         let pinTime = sliderTime.querySelector(".pin");
-        let pinVolume = sliderVolume.querySelector(".pin");
-
 
         pinTime.addEventListener('mousedown', (event) => {
 
@@ -84,16 +228,6 @@ export class AudioPlayer {
                 evt.stopImmediatePropagation();
             }, { once: true });
         });
-
-        let touchToEvent = (touch, type) => {
-            return {
-                target: touch.target,
-                clientX: touch.clientX,
-                clientY: touch.clientY,
-                type: type
-            };
-        };
-
 
         window.addEventListener("touchcancel", () => {
             debug("touch canceled");
@@ -138,64 +272,14 @@ export class AudioPlayer {
             }
         }, { passive: true });
 
-        pinVolume.addEventListener('mousedown', (event) => {
-
-            this._currentlyDragged = event.target;
-            let handler = this._onChangeVolume.bind(this);
-            window.addEventListener('mousemove', handler, false);
-
-            window.addEventListener('mouseup', () => {
-                this._currentlyDragged = false;
-                window.removeEventListener('mousemove', handler, false);
-            }, { once: true });
-        });
-
-        pinVolume.addEventListener("touchstart", (event) => {
-            if (event.changedTouches.length == 1 && event.targetTouches.length == 1) {
-                let touch = event.changedTouches[0];
-                this._currentlyDragged = touch.target;
-                let touchId = touch.identifier;
-
-                let myTouch = (event) => {
-                    for (let i = 0; i < event.changedTouches.length; i++) {
-                        let t = event.changedTouches.item(i);
-                        if (t.identifier === touch.identifier) return t;
-                    }
-                };
-
-                let handler = (event) => {
-                    let t = myTouch(event);
-                    if (t) {
-                        let evt = touchToEvent(t, "mousemove");
-                        this._onChangeVolume(evt);
-                    }
-                };
-                window.addEventListener("touchmove", handler);
-                window.addEventListener("touchend", (event) => {
-                    let t = myTouch(event);
-                    if (t) {
-                        this._currentlyDragged = false;
-                        window.removeEventListener("touchmove", handler);
-                    }
-
-                }, { once: true });
-            }
-        }, { passive: true });
-
+        
         sliderTime.addEventListener('click', (evt) => {
             if (!this._currentlyDragged && !evt.target.className.includes("cache")) {
                 this._onMoveSlider(evt, true);
             }
         });
 
-        sliderVolume.addEventListener('click', this._onChangeVolume.bind(this));
-
         this._playpauseBtn.addEventListener('click', this.togglePlay.bind(this));
-        volumeBtn.addEventListener('click', () => {
-            volumeBtn.classList.toggle('open');
-            volumeControls.classList.toggle('hidden');
-        }
-        );
 
         this.initPlayer();
 
@@ -373,48 +457,7 @@ export class AudioPlayer {
     }
 
     _updateVolume() {
-        this._volumeProgress.style.height = this._player.volume * 100 + '%';
-        if (this._player.volume >= 0.5) {
-            this._speaker.attributes.d.value = VOLUME_FULL;
-        } else if (this._player.volume < 0.5 && this._player.volume > 0.05) {
-            this._speaker.attributes.d.value = VOLUME_MED;
-        } else if (this._player.volume <= 0.05) {
-            this._speaker.attributes.d.value = VOLUME_LOW;
-        }
-    }
-
-    _getRangeBox(event) {
-        let rangeBox = event.target;
-        let el = this._currentlyDragged;
-        if (event.type == 'click' && event.target.classList.contains('pin')) {
-            rangeBox = event.target.parentElement.parentElement;
-        }
-        if (el && (event.type == 'mousemove' || event.type == 'mouseup')) {
-            rangeBox = el.parentElement.parentElement;
-        }
-        return rangeBox;
-    }
-
-    _getCoefficient(event) {
-        let slider = this._getRangeBox(event);
-        let rect = slider.getBoundingClientRect();
-        let K = 0;
-        if (slider.dataset.direction == 'horizontal') {
-
-            let offsetX = event.clientX - slider.offsetLeft;
-            let width = slider.clientWidth;
-            K = offsetX / width;
-            K = K < 0 ? 0 : K > 1 ? 1 : K;
-
-        } else if (slider.dataset.direction == 'vertical') {
-
-            let height = slider.clientHeight;
-            let offsetY = event.clientY - rect.top;
-            K = 1 - offsetY / height;
-            K = K < 0 ? 0 : K > 1 ? 1 : K;
-
-        }
-        return K;
+        this._volumeBtn.updateVolume(this._player.volume);
     }
 
     getTotalTime() {
@@ -427,7 +470,7 @@ export class AudioPlayer {
 
     _onMoveSlider(event, jump = false) {
 
-        let k = this._getCoefficient(event);
+        let k = getCoefficient(event, this._currentlyDragged);
         let currentTime = this.getTotalTime() * k;
         let percent = k * 100;
         this._progress.style.width = percent + '%';
@@ -436,12 +479,6 @@ export class AudioPlayer {
             this.jumpToTime(currentTime);
         }
     }
-
-    _onChangeVolume(event) {
-        this._player.volume = this._getCoefficient(event);
-
-    }
-
 
     _showPlay() {
         this._playpauseBtn.style.display = 'block';
