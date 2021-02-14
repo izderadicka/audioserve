@@ -377,7 +377,7 @@ $(function () {
                 item.text(segments[i]);
             } else {
                 let partPath = segments.slice(0, i + 1).join('/');
-                item.append($(`<a href="${partPath}">${segments[i]}</a></li>`));
+                item.append($(`<a href="#${partPath}">${segments[i]}</a></li>`));
             }
             bc.append(item);
         }
@@ -536,8 +536,12 @@ $(function () {
     });
 
     $("#breadcrumb").on("click", "li.breadcrumb-item a", evt => {
-        loadFolder($(evt.target).attr("href"));
         evt.preventDefault();
+        let path = $(evt.target).attr("href");
+        if (path.startsWith("#")) {
+            path = path.slice(1);
+        }
+        loadFolder(path);
     });
 
     $("#files").on("click", "a.list-group-item-action", evt => {
@@ -748,8 +752,12 @@ $(function () {
 
     const reloadCurrentFolder = (fromHistory, resetPlayer) => {
         if (resetPlayer) clearPlayer();
-        loadFolder(window.localStorage.getItem("audioserve_folder") ||
-            "", fromHistory);
+        let folder = window.localStorage.getItem("audioserve_folder") ||"";
+        if (!fromHistory && location.hash && location.hash.length>1) {
+            folder = decodeURIComponent(location.hash.slice(1));
+            location.hash = "";
+        }
+        loadFolder(folder, fromHistory);
     };
 
     loadCollections().then(() => {

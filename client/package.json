@@ -8,7 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack --config webpack.prod.js",
     "watch": "webpack --progress --watch --config webpack.dev.js",
-    "start": "webpack serve --config webpack.dev.js",
+    "serve": "webpack serve --config webpack.dev.js",
     "lint": "jshint src/*.js"
   },
   "keywords": [],

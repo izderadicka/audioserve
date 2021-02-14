@@ -9,11 +9,11 @@ body {
 
 #main {
     overflow-y: scroll;
-    height: calc(100% - 61px);
+    height: calc(100% - 69px);
 }
 
 #player {
-    height: 56px;
+    height: 68px;
     padding-top: 5px;
 }
 
