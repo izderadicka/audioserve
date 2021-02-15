@@ -179,6 +179,12 @@
     background-color: #dddddde8;
     padding: 5px;
     border-radius: 7px;
-    z-index: 9999;
+    z-index: 999;
+  }
+
+  @media (max-height: 480px) {
+    .audio-player .extra-buttons {
+      display: none !important
+    }
   }
 }
