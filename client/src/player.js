@@ -117,7 +117,6 @@ class ControlButton {
 
         pinVolume.addEventListener("touchstart", (event) => {
             if (event.changedTouches.length == 1 && event.targetTouches.length == 1) {
-                event.preventDefault();
                 let touch = event.changedTouches[0];
                 this._currentlyDragged = touch.target;
                 let touchId = touch.identifier;
@@ -130,13 +129,14 @@ class ControlButton {
                 };
 
                 let handler = (event) => {
+                    event.preventDefault();
                     let t = myTouch(event);
                     if (t) {
                         let evt = touchToEvent(t, "mousemove");
                         this._onChange(evt);
                     }
                 };
-                window.addEventListener("touchmove", handler);
+                window.addEventListener("touchmove", handler, {"passive": false});
                 window.addEventListener("touchend", (event) => {
                     let t = myTouch(event);
                     if (t) {
@@ -234,9 +234,9 @@ class SpeedButton extends ControlButton {
         }
         else if (speed >= 0.5 && speed < 0.9) {
             spd(SPEED_2);
-        } else if ( speed >= 0.9 && speed < 1.1) {
+        } else if ( speed >= 0.9 && speed < 1.2) {
             spd(SPEED_3);
-        } else if ( speed >= 1.1 && speed < 2.0) {
+        } else if ( speed >= 1.2 && speed < 2.1) {
             spd(SPEED_4);
         } else {
             spd(SPEED_5);
