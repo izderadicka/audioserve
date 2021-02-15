@@ -99,13 +99,18 @@
   .audio-player .volume .volume-btn {
     cursor: pointer;
   }
+
+  .audio-player .digits {
+    color: white;
+    font-weight: bold;
+  }
   .audio-player .volume .volume-btn.open path {
     fill: #0275d8;
   }
   .audio-player .volume .volume-controls {
     z-index: 99;
-    width: 30px;
-    height: 135px;
+    width: 32px;
+    height: 165px;
     background-color: rgba(0, 0, 0, 0.8);
     border-radius: 7px;
     position: absolute;
@@ -136,7 +141,7 @@
 
   .audio-player .extra-buttons {
     display: flex;
-    width: 60px;
+    width: 64px;
     justify-content: space-between;
   }
   

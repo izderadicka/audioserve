@@ -22,6 +22,12 @@ export function formatTime(dur) {
     }
 }
 
+const SPEED_1 = "rotate(-129.65699,249.48283,324.49355)";
+const SPEED_2 = "rotate(-83.345203,249.48283,324.49355)";
+const SPEED_3 = "rotate(-44.27031,249.48283,324.49355)";
+const SPEED_4 = "";
+const SPEED_5 = "rotate(39.786055,249.48283,324.49355)";
+
 const VOLUME_FULL = 'M14.667 0v2.747c3.853 1.146 6.666 4.72 6.666 8.946 0 4.227-2.813 7.787-6.666 8.934v2.76C20 22.173 24 17.4 24 11.693 24 5.987 20 1.213 14.667 0zM18 11.693c0-2.36-1.333-4.386-3.333-5.373v10.707c2-.947 3.333-2.987 3.333-5.334zm-18-4v8h5.333L12 22.36V1.027L5.333 7.693H0z';
 const VOLUME_MED = 'M0 7.667v8h5.333L12 22.333V1L5.333 7.667M17.333 11.373C17.333 9.013 16 6.987 14 6v10.707c2-.947 3.333-2.987 3.333-5.334z';
 const VOLUME_LOW = 'M0 7.667v8h5.333L12 22.333V1L5.333 7.667';
@@ -82,7 +88,7 @@ function getCoefficient(event, dragged) {
 class ControlButton {
     constructor(rootElem, changeListener) {
         this.rootElem = rootElem;
-        this._value = 0;
+        this._value = null;
         this._changeListener = changeListener;
         this._currentlyDragged = null;
         let volumeControls = rootElem.querySelector('.volume-controls');
@@ -91,6 +97,11 @@ class ControlButton {
         let sliderVolume = rootElem.querySelector(".volume .slider");
         let pinVolume = sliderVolume.querySelector(".pin");
         this._icon = rootElem.querySelector('#speaker');
+        this._digits = volumeControls.querySelector(".digits");
+
+        this._digits.addEventListener('click', () => {
+            this._doChange(1.0);
+        });
 
         pinVolume.addEventListener('mousedown', (event) => {
 
@@ -148,15 +159,26 @@ class ControlButton {
 
     _onChange(event) {
         let newValue = getCoefficient(event, this._currentlyDragged);
-        if (newValue != this.value) {
-            this._value = newValue;
-            let scaledValue = this.scaleValue(newValue);
+        let scaledValue = this.scaleValue(newValue);
+        this._doChange(scaledValue);
+    }
+
+    _doChange(scaledValue) {
+        if (scaledValue != this.value) {
+            this._value = scaledValue;
             this._changeListener(scaledValue);
         }
+    }
 
+    formatDigits(v) {
+        return v.toFixed(1);
     }
 
     scaleValue(v) {
+        return v;
+    }
+
+    scaleValueInverse(v) {
         return v;
     }
 
@@ -165,7 +187,10 @@ class ControlButton {
     }
 
     set value(v) {
-        this._volumeProgress.style.height = v * 100 + '%';
+        const progress = this.scaleValueInverse(v) * 100;
+        this._volumeProgress.style.height = progress + '%';
+        this._digits.innerText = this.formatDigits(v);
+        this._value = v; 
     }
 
 }
@@ -183,16 +208,47 @@ class VolumeButton extends ControlButton {
         }
     }
 
+    formatDigits(v) {
+        return (100*v).toFixed(0)
+    }
+
+    scaleValue(v) {
+        return Math.pow(v,2)
+    }
+
+    scaleValueInverse(v) {
+        return Math.sqrt(v)
+    }
+
 }
 
 class SpeedButton extends ControlButton {
 
     updateSpeed(speed) {
-        this.value = speed/4;
+        this.value = speed;
+        const spd = (s) => {
+            this._icon.attributes.transform.value = s;
+        };
+        if (speed < 0.5) {
+            spd(SPEED_1);
+        }
+        else if (speed >= 0.5 && speed < 0.9) {
+            spd(SPEED_2);
+        } else if ( speed >= 0.9 && speed < 1.1) {
+            spd(SPEED_3);
+        } else if ( speed >= 1.1 && speed < 2.0) {
+            spd(SPEED_4);
+        } else {
+            spd(SPEED_5);
+        }
     }
 
     scaleValue(v) {
-        return v * 4;
+        return Math.round(10 * (v * 2.7 + 0.3))/ 10;
+    }
+
+    scaleValueInverse(v) {
+        return (v - 0.3) / 2.7;
     }
 
 }
@@ -217,10 +273,16 @@ export class AudioPlayer {
         this._progress = audioPlayer.querySelector('.progress');
         this._volumeBtn = new VolumeButton(audioPlayer.querySelector("#volume-btn"), (volume) => {
             this._player.volume = volume;
+            localStorage.setItem('audioserve_volume', volume);
         });
+        let vol = parseFloat(localStorage.getItem('audioserve_volume')) || 1.0;
+        this._volumeBtn.updateVolume(vol);
+        this._player.volume = vol;
         this._speedBtn = new SpeedButton(audioPlayer.querySelector("#speed-btn"), (speed) => {
             this._player.playbackRate = speed;
+            localStorage.setItem('audioserve_speed', speed);
         });
+        this._speedBtn.updateSpeed(parseFloat(localStorage.getItem('audioserve_speed')) || 1.0);
     
         
         this._currentTime = audioPlayer.querySelector('.current-time');
@@ -388,7 +450,11 @@ export class AudioPlayer {
             debug("Track ended");
         });
         this._player.addEventListener('pause', (evt) => this._displayPlay());
-        this._player.addEventListener('playing', (evt) => this._displayPause());
+        this._player.addEventListener('playing', (evt) => {
+            this._displayPause();
+            // set stored playback speed
+            this._player.playbackRate = parseFloat(localStorage.getItem('audioserve_speed')) || 1.0;
+        });
 
         let state = this._player.readyState;
         if (state > 1) this._updateTotal();
