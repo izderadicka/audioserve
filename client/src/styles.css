@@ -9,12 +9,14 @@ body {
 
 #main {
     overflow-y: scroll;
-    height: calc(100% - 69px);
+    height: calc(100% - 62px);
 }
 
 #player {
-    height: 68px;
-    padding-top: 5px;
+    height: 61px;
+    border-top: 5px solid;
+    border-image-source: linear-gradient(to bottom, rgb(254, 254, 254), rgb(232, 232, 232));
+    border-image-slice: 100;
 }
 
 #player audio {
