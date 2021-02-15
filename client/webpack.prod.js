@@ -3,6 +3,7 @@ const { merge } = require("webpack-merge");
 const common = require("./webpack.common.js");
 const TerserPlugin = require("terser-webpack-plugin");
 const { map } = require('jquery');
+const PACKAGE = require('./package.json');
 
 module.exports = merge(common, {
   // devtool: 'source-map',
@@ -13,7 +14,8 @@ module.exports = merge(common, {
   },
   plugins: [
     new webpack.DefinePlugin({
-      AUDIOSERVE_DEVELOPMENT: JSON.stringify(false)
+      AUDIOSERVE_DEVELOPMENT: JSON.stringify(false),
+      AUDIOSERVE_VERSION: JSON.stringify(PACKAGE.version)
     })
   ]
 

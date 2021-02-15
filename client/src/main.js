@@ -17,6 +17,7 @@ $(function () {
     if (AUDIOSERVE_DEVELOPMENT) {
         baseUrl = `${window.location.protocol}//${window.location.hostname}:${config.DEVELOPMENT_PORT}`;
     } else {
+        console.log(`Running audioserve web client version ${AUDIOSERVE_VERSION}`);
         baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname.length > 1 ? window.location.pathname : ""}`;
         if (baseUrl.endsWith('/')) {
             baseUrl = baseUrl.substr(0, baseUrl.length-1);
@@ -374,11 +375,9 @@ $(function () {
             let item = $('<li class="breadcrumb-item">');
             if (i == segments.length - 1) {
                 item.addClass("active");
-                item.text(segments[i]);
-            } else {
-                let partPath = segments.slice(0, i + 1).join('/');
-                item.append($(`<a href="#${partPath}">${segments[i]}</a></li>`));
-            }
+            } 
+            let partPath = segments.slice(0, i + 1).join('/');
+            item.append($(`<a href="#${partPath}">${segments[i]}</a></li>`));
             bc.append(item);
         }
 
