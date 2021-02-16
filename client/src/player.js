@@ -402,7 +402,12 @@ export class AudioPlayer {
                 return false;
 
             }
-        })
+        });
+
+        window.addEventListener("resize", () => {
+            debug("window resized");
+            this._updateCacheIndicator();
+        });
     }
 
     initPlayer() {
