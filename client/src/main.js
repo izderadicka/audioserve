@@ -24,13 +24,17 @@ $(function () {
         }
     }
 
+    const isApple = () => {
+        return navigator.userAgent.indexOf("iPhone") > 0 || navigator.userAgent.indexOf("iPad") > 0
+    }
+
 
     let collectionUrl = baseUrl;
     let collections = [];
     let pendingCall = null;
     let pendingSpinner = null;
     let transcodingLimit = 58;
-    let transcoding = "m";
+    let transcoding = isApple() ? "0":"m"; //Do not select default transcoding for Apple devices
     let ordering = "a";
     let transcodingLimits = { l: 38, m: 56, h: 76 };
     let restoredPosition = false;
