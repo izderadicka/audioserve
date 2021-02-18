@@ -34,26 +34,26 @@ fn base_data_dir() -> &'static PathBuf {
     }
 }
 
-#[cfg(feature= "folder-download")]
+#[cfg(feature = "folder-download")]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum DownloadFormat {
     Tar,
-    Zip
+    Zip,
 }
 
-#[cfg(feature= "folder-download")]
+#[cfg(feature = "folder-download")]
 impl DownloadFormat {
     pub fn extension(&self) -> &'static str {
         match self {
             DownloadFormat::Tar => ".tar",
-            DownloadFormat::Zip => ".zip"
+            DownloadFormat::Zip => ".zip",
         }
     }
 
     pub fn mime(&self) -> Mime {
         match self {
             DownloadFormat::Tar => "application/x-tar".parse().unwrap(),
-            DownloadFormat::Zip => "application/zip".parse().unwrap()
+            DownloadFormat::Zip => "application/zip".parse().unwrap(),
         }
     }
 }
