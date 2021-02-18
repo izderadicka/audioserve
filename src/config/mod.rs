@@ -1,3 +1,5 @@
+use mime::Mime;
+
 use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
 
 use crate::util;
@@ -29,6 +31,30 @@ fn base_data_dir() -> &'static PathBuf {
         BASE_DATA_DIR
             .as_ref()
             .expect("Base data dir is not initialized")
+    }
+}
+
+#[cfg(feature= "folder-download")]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum DownloadFormat {
+    Tar,
+    Zip
+}
+
+#[cfg(feature= "folder-download")]
+impl DownloadFormat {
+    pub fn extension(&self) -> &'static str {
+        match self {
+            DownloadFormat::Tar => ".tar",
+            DownloadFormat::Zip => ".zip"
+        }
+    }
+
+    pub fn mime(&self) -> Mime {
+        match self {
+            DownloadFormat::Tar => "application/x-tar".parse().unwrap(),
+            DownloadFormat::Zip => "application/zip".parse().unwrap()
+        }
     }
 }
 
