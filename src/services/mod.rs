@@ -1,7 +1,7 @@
 use self::auth::{AuthResult, Authenticator};
 use self::search::Search;
 use self::subs::{
-    collections_list, download_folder, get_folder, recent, search, send_file, send_file_simple,
+    collections_list, get_folder, recent, search, send_file, send_file_simple,
     transcodings_list, ResponseFuture,
 };
 use self::transcode::QualityLevel;
@@ -401,7 +401,20 @@ impl<C> FileSendService<C> {
                         get_folder(base_dir, get_subpath(&path, "/folder/"), ord)
                     } else if !get_config().disable_folder_download && path.starts_with("/download")
                     {
-                        download_folder(base_dir, get_subpath(&path, "/download/"))
+                        #[cfg(feature = "folder-download")]
+                        {
+                            let format = params
+                                .as_ref()
+                                .and_then(|p| p.get("fmt"))
+                                .and_then(|f| f.parse::<types::DownloadFormat>().ok())
+                                .unwrap_or_default();
+                            subs::download_folder(base_dir, get_subpath(&path, "/download/"), format)
+                        }
+                        #[cfg(not(feature = "folder-download"))]
+                        {
+                            error!("folder download not ");
+                            resp::fut(resp::not_found)
+                        }
                     } else if path == "/search" {
                         if let Some(search_string) = params.and_then(|mut p| p.remove("q")) {
                             search(colllection_index, searcher, search_string.into_owned(), ord)

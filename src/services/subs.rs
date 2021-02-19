@@ -18,8 +18,6 @@ use crate::{
 use futures::prelude::*;
 use futures::{future, ready, Stream};
 use headers::{AcceptRanges, CacheControl, ContentLength, ContentRange, ContentType, LastModified};
-#[cfg(feature = "folder-download")]
-use hyper::header::CONTENT_DISPOSITION;
 use hyper::{Body, Response as HyperResponse, StatusCode};
 use std::{
     collections::Bound,
@@ -394,63 +392,123 @@ pub fn get_folder(
     )
 }
 
-#[cfg(not(feature = "folder-download"))]
-pub fn download_folder(_base_path: &'static Path, _folder_path: PathBuf) -> ResponseFuture {
-    unimplemented!();
-}
-
 #[cfg(feature = "folder-download")]
-pub fn download_folder(base_path: &'static Path, folder_path: PathBuf) -> ResponseFuture {
+pub fn download_folder(
+    base_path: &'static Path,
+    folder_path: PathBuf,
+    format: DownloadFormat,
+) -> ResponseFuture {
+    use anyhow::Context;
+    use hyper::header::CONTENT_DISPOSITION;
     let full_path = base_path.join(&folder_path);
-    let f = tokio::fs::metadata(full_path.clone())
-        .map_err(|e| {
-            error!("Cannot get meta for download path");
-            Error::new(e).context("metadata for folder download")
-        })
-        .and_then(move |meta| {
-            if meta.is_file() {
-                serve_file_from_fs(&full_path, None, None)
-            } else {
-                let mut download_name = folder_path
-                    .file_name()
-                    .and_then(OsStr::to_str)
-                    .map(std::borrow::ToOwned::to_owned)
-                    .unwrap_or_else(|| "audio".into());
-                download_name.push_str(".tar");
-                let fut = blocking(move || list_dir_files_only(&base_path, &folder_path))
-                    .map_ok(move |res| match res {
-                        Ok(folder) => {
-                            let total_len: u64;
-                            {
-                                let lens_iter = (&folder).iter().map(|i| i.1);
-                                total_len = async_tar::calc_size(lens_iter);
-                            }
-                            debug!("Total len of folder is {}", total_len);
-                            let files = folder.into_iter().map(|i| i.0);
-                            let tar_stream = async_tar::TarStream::tar_iter(files);
-                            let disposition = format!("attachment; filename=\"{}\"", download_name);
-                            HyperResponse::builder()
-                                .typed_header(ContentType::from(
-                                    "application/x-tar".parse::<mime::Mime>().unwrap(),
-                                ))
-                                .typed_header(ContentLength(total_len))
-                                .header(CONTENT_DISPOSITION, disposition.as_bytes())
-                                .body(Body::wrap_stream(tar_stream))
-                                .unwrap()
-                        }
-                        Err(e) => {
-                            error!("Cannot list download dir: {}", e);
-                            resp::not_found()
-                        }
-                    })
-                    .map_err(|e| {
-                        error!("Error listing files for tar: {}", e);
-                        Error::new(e).context("listing files for tar")
-                    });
+    let f = async move {
+        let meta = tokio::fs::metadata(&full_path)
+            .await
+            .context("metadata for folder download")?;
+        if meta.is_file() {
+            serve_file_from_fs(&full_path, None, None).await
+        } else {
+            let mut download_name = folder_path
+                .file_name()
+                .and_then(OsStr::to_str)
+                .map(std::borrow::ToOwned::to_owned)
+                .unwrap_or_else(|| "audio".into());
 
-                Box::pin(fut)
+            download_name.push_str(format.extension());
+
+            match blocking(move || list_dir_files_only(&base_path, &folder_path)).await {
+                Ok(Ok(folder)) => {
+                    let total_len: u64 = match format {
+                        DownloadFormat::Tar => {
+                            let lens_iter = folder.iter().map(|i| i.1);
+                            async_tar::calc_size(lens_iter)
+                        }
+                        DownloadFormat::Zip => {
+                            let iter = folder.iter().map(|&(ref path, len)| (path, len));
+                            async_zip::calc_size(iter).context("calc zip size")?
+                        }
+                    };
+
+                    debug!("Total len of folder is {}", total_len);
+                    let files = folder.into_iter().map(|i| i.0);
+
+                    let stream: Box<dyn Stream<Item = _> + Unpin + Send> = match format {
+                        DownloadFormat::Tar => Box::new(async_tar::TarStream::tar_iter(files)),
+                        DownloadFormat::Zip => {
+                            let zipper = async_zip::Zipper::from_iter(files);
+                            Box::new(zipper.zipped_stream())
+                        }
+                    };
+
+                    let disposition = format!("attachment; filename=\"{}\"", download_name);
+                    Ok(HyperResponse::builder()
+                        .typed_header(ContentType::from(format.mime()))
+                        .typed_header(ContentLength(total_len))
+                        .header(CONTENT_DISPOSITION, disposition.as_bytes())
+                        .body(Body::wrap_stream(stream))
+                        .unwrap())
+                }
+                Ok(Err(e)) => Err(Error::new(e).context("listing directory")),
+                Err(e) => Err(Error::new(e).context("spawn blocking directory")),
             }
-        });
+        }
+    };
+    // let f = tokio::fs::metadata(full_path.clone())
+    //     .map_err(|e| {
+    //         error!("Cannot get meta for download path");
+    //         Error::new(e).context("metadata for folder download")
+    //     })
+    //     .and_then(move |meta| {
+    //         if meta.is_file() {
+    //             serve_file_from_fs(&full_path, None, None)
+    //         } else {
+    //             let mut download_name = folder_path
+    //                 .file_name()
+    //                 .and_then(OsStr::to_str)
+    //                 .map(std::borrow::ToOwned::to_owned)
+    //                 .unwrap_or_else(|| "audio".into());
+    //             download_name.push_str(format.extension());
+    //             let fut = blocking(move || list_dir_files_only(&base_path, &folder_path))
+    //                 .and_then(move |res| match res {
+    //                     Ok(folder) => {
+    //                         let total_len: u64 = match format {
+    //                             DownloadFormat::Tar => {
+    //                                 let lens_iter = folder.iter().map(|i| i.1);
+    //                                 async_tar::calc_size(lens_iter)
+    //                             }
+    //                             DownloadFormat::Zip => {
+    //                                 let iter = folder.iter().map(|&(ref path, len)| (path, len));
+    //                                 async_zip::calc_size(iter).unwrap()
+    //                             }
+    //                         };
+
+    //                         debug!("Total len of folder is {}", total_len);
+    //                         let files = folder.into_iter().map(|i| i.0);
+    //                         let tar_stream = async_tar::TarStream::tar_iter(files);
+    //                         let disposition = format!("attachment; filename=\"{}\"", download_name);
+    //                         future::ok(HyperResponse::builder()
+    //                             .typed_header(ContentType::from(
+    //                                 format.mime(),
+    //                             ))
+    //                             .typed_header(ContentLength(total_len))
+    //                             .header(CONTENT_DISPOSITION, disposition.as_bytes())
+    //                             .body(Body::wrap_stream(tar_stream))
+    //                             .unwrap()
+    //                         )
+    //                     }
+    //                     Err(e) => {
+    //                         error!("Cannot list download dir: {}", e);
+    //                         future::ok(resp::not_found())
+    //                     }
+    //                 })
+    //                 .map_err(|e| {
+    //                     error!("Error listing files for archive {}", e);
+    //                     Error::new(e).context("listing files for archive")
+    //                 });
+
+    //             Box::pin(fut)
+    //         }
+    //     });
     Box::pin(f)
 }
 

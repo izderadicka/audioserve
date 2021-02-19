@@ -1,0 +1,18 @@
+[package]
+name = "async-zip"
+version = "0.1.0"
+authors = ["Ivan <ivan.zderadicka@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+futures = "0.3"
+tokio = {version="1.2", features=["full"]}
+bytes = "1.0"
+chrono = "0.4"
+thiserror = "1.0"
+crc32fast = "1.2"
+
+[dev-dependencies]
+zip = {version="0.5", default-features=false}

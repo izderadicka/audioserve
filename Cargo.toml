@@ -1,6 +1,6 @@
 [package]
 name = "audioserve"
-version = "0.15.1"
+version = "0.15.2"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2018"
 
@@ -48,22 +48,13 @@ leaky-cauldron = {path="crates/leaky-cauldron"}
 
 tokio-util = {version="0.6", optional=true}
 
+# this repo dependencies
 media_info = {path="crates/media_info"}
-
 proxy-headers = {path="crates/proxy-headers", optional=true}
-
-[dependencies.simple-file-cache]
-path="crates/file-cache"
-features=["asynch"]
-optional=true
-
-[dependencies.async-tar]
-path="crates/async-tar"
-optional=true
-
-[dependencies.websock]
-path="crates/websock"
-optional = true
+simple-file-cache = {path="crates/file-cache", features=["asynch"], optional=true }
+async-tar = {path="crates/async-tar", optional=true}
+async-zip = {path="crates/async-zip", optional=true}
+websock = {path="crates/websock", optional = true}
 
 [target.'cfg(unix)'.dependencies]
 nix = "0.19"
@@ -74,7 +65,7 @@ default = ["tls", "symlinks","search-cache", "folder-download", "shared-position
 tls=["tokio-native-tls", "native-tls"]
 symlinks=["cachedirtree/symlinks"]
 search-cache=["cachedirtree"]
-folder-download = ["async-tar"]
+folder-download = ["async-tar", "async-zip"]
 folder-download-default-tar =[]
 shared-positions = ["websock"]
 # non-default
