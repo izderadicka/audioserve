@@ -1,7 +1,5 @@
-use mime::Mime;
-
+pub use self::error::{Error, Result};
 use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
-
 use crate::util;
 use std::env;
 use std::fs::File;
@@ -9,8 +7,6 @@ use std::io::Read;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-
-pub use self::error::{Error, Result};
 
 mod cli;
 mod validators;
@@ -31,30 +27,6 @@ fn base_data_dir() -> &'static PathBuf {
         BASE_DATA_DIR
             .as_ref()
             .expect("Base data dir is not initialized")
-    }
-}
-
-#[cfg(feature = "folder-download")]
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum DownloadFormat {
-    Tar,
-    Zip,
-}
-
-#[cfg(feature = "folder-download")]
-impl DownloadFormat {
-    pub fn extension(&self) -> &'static str {
-        match self {
-            DownloadFormat::Tar => ".tar",
-            DownloadFormat::Zip => ".zip",
-        }
-    }
-
-    pub fn mime(&self) -> Mime {
-        match self {
-            DownloadFormat::Tar => "application/x-tar".parse().unwrap(),
-            DownloadFormat::Zip => "application/zip".parse().unwrap(),
-        }
     }
 }
 

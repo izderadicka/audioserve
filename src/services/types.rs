@@ -229,6 +229,58 @@ pub fn is_description<P: AsRef<Path>>(path: P) -> bool {
     mime.type_() == "text" && has_subtype(&mime, DESCRIPTIONS)
 }
 
+#[cfg(feature = "folder-download")]
+pub use download_format::DownloadFormat;
+
+#[cfg(feature = "folder-download")]
+mod download_format {
+
+    use crate::error::Error;
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub enum DownloadFormat {
+        Tar,
+        Zip,
+    }
+
+    impl DownloadFormat {
+        pub fn extension(&self) -> &'static str {
+            match self {
+                DownloadFormat::Tar => ".tar",
+                DownloadFormat::Zip => ".zip",
+            }
+        }
+
+        pub fn mime(&self) -> mime::Mime {
+            match self {
+                DownloadFormat::Tar => "application/x-tar".parse().unwrap(),
+                DownloadFormat::Zip => "application/zip".parse().unwrap(),
+            }
+        }
+    }
+
+    impl std::str::FromStr for DownloadFormat {
+        type Err = Error;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "tar" => Ok(DownloadFormat::Tar),
+            "zip" => Ok(DownloadFormat::Zip),
+            _ => Err(Error::msg("Invalid download archive format tag"))
+        }
+    }
+    }
+
+    impl Default for DownloadFormat {
+        fn default() -> Self {
+        if cfg!(feature="folder-download-default-tar") {
+            DownloadFormat::Tar
+        } else {
+            DownloadFormat::Zip
+        }
+    }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -75,6 +75,7 @@ tls=["tokio-native-tls", "native-tls"]
 symlinks=["cachedirtree/symlinks"]
 search-cache=["cachedirtree"]
 folder-download = ["async-tar"]
+folder-download-default-tar =[]
 shared-positions = ["websock"]
 # non-default
 transcoding-cache=["simple-file-cache", "tokio-util"]
