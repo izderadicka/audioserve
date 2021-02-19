@@ -158,9 +158,9 @@ Folder can contain additional information `cover`, which is cover image (first .
 **download**
 
 Sample URL: https://your_server_name:3000/download/author_name/audio_book  
-Sample URL: https://your_server_name:3000/1/download/author_name/audio_book
+Sample URL: https://your_server_name:3000/1/download/author_name/audio_book?fmt=tar
 
-Downloads all files (audio files, cover, description) from this folder as a tar archive. The path to folder is same as in folder list endpoint `folder` - so it can start with collection number.
+Downloads all files (audio files, cover, description) from this folder as an archive. The path to folder is same as in folder list endpoint `folder` - so it can start with collection number. Default format of the archive is zip, tar archive is also supported - format can be chosen by `fmt` query parameter (values `tar` or `zip`). Also if you want to change default format by compiling audioserve with `folder-download-default-tar` feature.
 
 This endpoint can be disabled, if audioserve is compiled without default feature `folder-download` or with command line argument `--disable-folder-download` .
 

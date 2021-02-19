@@ -262,22 +262,22 @@ mod download_format {
         type Err = Error;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "tar" => Ok(DownloadFormat::Tar),
-            "zip" => Ok(DownloadFormat::Zip),
-            _ => Err(Error::msg("Invalid download archive format tag"))
+            match s {
+                "tar" => Ok(DownloadFormat::Tar),
+                "zip" => Ok(DownloadFormat::Zip),
+                _ => Err(Error::msg("Invalid download archive format tag")),
+            }
         }
-    }
     }
 
     impl Default for DownloadFormat {
         fn default() -> Self {
-        if cfg!(feature="folder-download-default-tar") {
-            DownloadFormat::Tar
-        } else {
-            DownloadFormat::Zip
+            if cfg!(feature = "folder-download-default-tar") {
+                DownloadFormat::Tar
+            } else {
+                DownloadFormat::Zip
+            }
         }
-    }
     }
 }
 

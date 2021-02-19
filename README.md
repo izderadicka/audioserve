@@ -332,6 +332,7 @@ Feature | Description | Default | Program options
 | behind-proxy | Enable logging of client address from proxy headers | No | Enables argument --behind-proxy which should be use to log client address from headers provided by reverse proxy
 | static | Enables fully static build of audioserve. Check above notes for static build | No |
 | partially-static | Statically links libavformat (and related).Enables to run audioserve on systems, which do not have required version of libavformat| No |
+| folder-download-default-tar | Default folder download format is tar (instead of zip) | No |
 
 License
 -------

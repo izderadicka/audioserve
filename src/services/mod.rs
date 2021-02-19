@@ -1,8 +1,8 @@
 use self::auth::{AuthResult, Authenticator};
 use self::search::Search;
 use self::subs::{
-    collections_list, get_folder, recent, search, send_file, send_file_simple,
-    transcodings_list, ResponseFuture,
+    collections_list, get_folder, recent, search, send_file, send_file_simple, transcodings_list,
+    ResponseFuture,
 };
 use self::transcode::QualityLevel;
 use self::types::FoldersOrdering;
@@ -408,7 +408,11 @@ impl<C> FileSendService<C> {
                                 .and_then(|p| p.get("fmt"))
                                 .and_then(|f| f.parse::<types::DownloadFormat>().ok())
                                 .unwrap_or_default();
-                            subs::download_folder(base_dir, get_subpath(&path, "/download/"), format)
+                            subs::download_folder(
+                                base_dir,
+                                get_subpath(&path, "/download/"),
+                                format,
+                            )
                         }
                         #[cfg(not(feature = "folder-download"))]
                         {
