@@ -326,8 +326,12 @@ impl Transcoder {
         use std::io;
 
         let is_transcoded = matches!(file, AudioFilePath::Transcoded(_));
-        if is_transcoded || seek.is_some() || get_config().transcoding.cache.disabled {
-            debug!("Shoud not add to cache as is already transcoded, seeking or cache is disabled");
+        if is_transcoded
+            || seek.is_some()
+            || quality == QualityLevel::Passthrough
+            || get_config().transcoding.cache.disabled
+        {
+            debug!("Shoud not add to cache as is already transcoded, seeking, remuxing or cache is disabled");
             return Box::pin(future::ready(
                 self.transcode_inner(file, seek, span, counter)
                     .map(|(stream, f)| {
