@@ -72,7 +72,7 @@ impl FromStr for Msg {
 }
 
 pub fn position_service(req: RequestWrapper) -> ResponseFuture {
-    debug!("We got these headers: {:?}", req.headers());
+    debug!("We got these headers on websocket: {:?}", req.headers());
 
     let res = spawn_websocket::<String, _>(req.into_request(), |m| {
         debug!("Got message {:?}", m);

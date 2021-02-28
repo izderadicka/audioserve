@@ -1,18 +1,17 @@
 #[macro_use]
 extern crate log;
 
-use futures::future;
 use futures::prelude::*;
 use futures::ready;
 use headers::{self, HeaderMapExt};
 use hyper::header::{self, AsHeaderName, HeaderMap, HeaderValue};
 use hyper::upgrade;
 use hyper::{Body, Request, Response, StatusCode};
-use std::fmt;
 use std::io;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::{fmt, time::Duration};
 use thiserror::Error;
 use tokio::{self, sync::RwLock};
 use tokio_tungstenite::{
@@ -49,7 +48,36 @@ fn header_matches<S: AsHeaderName>(headers: &HeaderMap<HeaderValue>, name: S, va
 /// handshake was no successful.
 ///
 /// All messages in this websocket share (guarded by RwLock) context of type T
-pub fn spawn_websocket<T, F>(req: Request<Body>, mut f: F) -> Response<Body>
+pub fn spawn_websocket<T, F>(req: Request<Body>, f: F) -> Response<Body>
+where
+    T: Default + Send + Sync + 'static,
+    F: FnMut(Message<T>) -> Pin<Box<dyn Future<Output = Result<Option<Message<T>>, Error>> + Send>>
+        + Send
+        + 'static,
+{
+    spawn_websocket_inner(req, f, None)
+}
+
+pub fn spawn_websocket_with_timeout<T, F>(
+    req: Request<Body>,
+    f: F,
+    timeout: Duration,
+) -> Response<Body>
+where
+    T: Default + Send + Sync + 'static,
+    F: FnMut(Message<T>) -> Pin<Box<dyn Future<Output = Result<Option<Message<T>>, Error>> + Send>>
+        + Send
+        + 'static,
+{
+    spawn_websocket_inner(req, f, Some(timeout))
+}
+
+/// Implementation of spawn websocket
+fn spawn_websocket_inner<T, F>(
+    req: Request<Body>,
+    mut f: F,
+    timeout: Option<Duration>,
+) -> Response<Body>
 where
     T: Default + Send + Sync + 'static,
     F: FnMut(Message<T>) -> Pin<Box<dyn Future<Output = Result<Option<Message<T>>, Error>> + Send>>
@@ -59,25 +87,71 @@ where
     match upgrade_connection::<T>(req) {
         Err(r) => r,
         Ok((r, ws_future)) => {
-            let ws_process = ws_future.and_then(move |ws| {
-                let (tx, rc) = ws.split();
-                rc.and_then(move |m| match m.inner {
-                    protocol::Message::Ping(p) => {
-                        // Send Pong for Ping
-                        debug!("Got ping {:?}", p);
-                        Box::pin(future::ok(Some(Message {
-                            inner: protocol::Message::Pong(p),
-                            context: m.context,
-                        })))
+            let ws_process = async move {
+                match ws_future.await {
+                    Err(_) => error!("Failed upgrade to websocket"),
+                    Ok(ws) => {
+                        let (mut tx, mut rc) = ws.split();
+                        loop {
+                            let next = async {
+                                match timeout {
+                                    None => Ok(rc.next().await),
+                                    Some(d) => tokio::time::timeout(d, rc.next()).await,
+                                }
+                            };
+                            match next.await {
+                                Err(_) => {
+                                    debug!("Timeout on websocket - let's close");
+                                    //TODO: Send Close or just break?
+                                    break;
+                                }
+
+                                Ok(None) => {
+                                    debug!("Websocket has ended normally");
+                                    break;
+                                }
+
+                                Ok(Some(msg)) => {
+                                    match msg {
+                                        Ok(m) => {
+                                            let reply: Option<Message<_>> = match m.inner {
+                                                protocol::Message::Ping(p) => {
+                                                    // Send Pong for Ping
+                                                    debug!("Got ping {:?}", p);
+                                                    Some(Message {
+                                                        inner: protocol::Message::Pong(p),
+                                                        context: m.context,
+                                                    })
+                                                }
+                                                protocol::Message::Close(_) => {
+                                                    debug!("Got close message from client");
+                                                    // TODO: According to RFC6455 we should reply to close message - is it done by library or do we need to do it here?
+                                                    None
+                                                }
+                                                _ => match f(m).await {
+                                                    Ok(m) => m,
+                                                    Err(e) => {
+                                                        error!("error when processing message: {}; will close WS", e);
+                                                        break;
+                                                    }
+                                                },
+                                            };
+
+                                            if let Some(m) = reply {
+                                                if let Err(e) = tx.send(m).await {
+                                                    error!("error sending reply message: {}", e);
+                                                };
+                                            }
+                                        }
+                                        Err(e) => error!("message error: {}", e),
+                                    }
+                                }
+                            }
+                        }
+                        debug!("Websocket closing")
                     }
-                    protocol::Message::Close(_) => Box::pin(future::ok(None)), // No response for Close message
-                    _ => f(m),
-                })
-                .try_filter_map(|m| async { Ok(m) })
-                .forward(tx)
-                .map_ok(|_| debug!("Websocket has ended"))
-                .map_err(|err| error!("Socket error {}", err))
-            });
+                }
+            };
             tokio::spawn(ws_process);
             r
         }
