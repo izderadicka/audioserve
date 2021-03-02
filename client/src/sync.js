@@ -19,6 +19,7 @@ class PlaybackSync {
         this.closed = false;
         this.filePath = null;
         this.groupPrefix = null;
+        this.failures = 0;
     }
 
     open() {
@@ -26,17 +27,32 @@ class PlaybackSync {
         debug("Opening ws on url "+this.socketUrl);
         const webSocket = new WebSocket(this.socketUrl);
         webSocket.addEventListener("error", err => {
-            console.error("WS Error", err);
+            console.error(`WS Error (in row ${this.failures})`, err);
+            this.failures += 1;
         });
-        webSocket.addEventListener("close", err => {
-            this.resetOnClose();
-            debug("WS Close", err);
-            // reopen
-            if (! this.closed) window.setTimeout(() => this.open(), 1000);
+        webSocket.addEventListener("close", close => {
+            this.socket = null;
+            debug("WS Close", close);
+            // Do not reopen - it'll reopen only on demand
+            // if (! this.closed && this.failures < 20) window.setTimeout(() => this.open(), 100 * Math.min(5, this.failures));
 
         });
         webSocket.addEventListener("open", ev => {
+            this.failures = 0;
+            this.filePath = null;
+            this.lastSend = null;
             debug("WS is ready");
+            // do we have pending query?
+            if (this.pendingQuery) {
+                this.socket.send(this.pendingQuery);
+                this.pendingQuery = null;
+            }
+
+            // do we have pending time update?
+            if (this.pendingPosition) {
+                this.enqueuePosition(this.pendingPosition.filePath, this.pendingPosition.position);
+                this.pendingPosition = null;
+            }
         });
         webSocket.addEventListener("message", evt => {
             debug("Got message " + evt.data);
@@ -50,12 +66,12 @@ class PlaybackSync {
             };
             parseGroup(data.folder);
             parseGroup(data.last);
-            if (this.pendingAnswer) {
-                if (this.pendingTimeout) clearInterval(this.pendingTimeout);
-                this.pendingTimeout = null;
-                this.pendingAnswer(data);
-                this.pendingAnswer = null;
-                this.pendingQuery = null;
+            if (this.pendingQueryAnswer) {
+                if (this.pendingQueryTimeout) clearInterval(this.pendingQueryTimeout);
+                this.pendingQueryTimeout = null;
+                this.pendingQueryAnswer(data);
+                this.pendingQueryAnswer = null;
+                this.pendingQueryReject = null;
             }
         });
 
@@ -65,18 +81,26 @@ class PlaybackSync {
     close() {
         this.closed = true;
         this.socket.close();
-        this.resetOnClose();
-    }
-
-    resetOnClose() {
-        this.socket = null;
-        this.filePath = null;
-        this.lastSend = null;
+        this.socket = null;;
     }
 
     enqueuePosition(filePath, position, force=false) {
-        if (this.pendingMessage) window.clearTimeout(this.pendingMessage);
-        if (!this.active) return;
+        if (this.pendingPositionTimeout) {
+            window.clearTimeout(this.pendingPositionTimeout);
+            this.pendingPositionTimeout = null;
+        }
+        if (!this.active) {
+            this.pendingPosition = {
+                filePath,
+                position
+            };
+
+            if (!this.opening) {
+                this.open()
+            }
+
+            return;
+        };
         position = Math.round(position*1000)/1000;
         filePath = this.groupPrefix+filePath;
         if (this.filePath && this.lastSend && filePath == this.filePath) {
@@ -84,9 +108,9 @@ class PlaybackSync {
             if (force || Date.now() - this.lastSend > config.POSITION_REPORTING_PERIOD) {
                 this.sendMessage(`${position}|`);
             } else {
-                this.pendingMessage = window.setTimeout(() => {
+                this.pendingPositionTimeout = window.setTimeout(() => {
                     this.sendMessage(`${position}|`);
-                    this.pendingMessage = null;
+                    this.pendingPositionTimeout = null;
                 },
                 config.POSITION_REPORTING_PERIOD
                 );
@@ -108,32 +132,54 @@ class PlaybackSync {
     }
 
     queryPosition(folderPath) {
-        if (this.pendingQuery) {
-            if (this.pendingTimeout) clearInterval(this.pendingTimeout);
-            pendingQuery(new Error("Canceled by next query"));
+        if (this.pendingQueryReject) {
+            if (this.pendingQueryTimeout) {
+                 clearTimeout(this.pendingQueryTimeout);
+                 this.pendingQueryTimeout = null;
+            }
+
+            this.pendingQueryReject(new Error("Canceled by next query"));
+            this.pendingQueryAnswer = null;
+            this.pendingQueryReject = null;
 
         }
+        
         if (this.active) {
-            const p = new Promise((resolve, reject) => {
-                this.pendingAnswer = resolve;
-                this.pendingQuery = reject;
-                this.pendingTimeout = setTimeout(() => {
-                    reject(new Error("Timeout"));
-                }, 3000);
-            });
+            const p = this._makeQueryPromise();
             this.socket.send(folderPath?this.groupPrefix+folderPath:"?");
             return p;
 
-        } else if (this.groupPrefix){
-            return Promise.reject(new Error("No websocket connection "));
+        } else if (this.groupPrefix && !this.active){
+            this.pendingQuery = folderPath?this.groupPrefix+folderPath:"?";
+            if (!this.opening) {
+                this.open()
+            }
+            return this._makeQueryPromise();
         } else {
             return Promise.resolve(null);
         }
 
     }
 
+    _makeQueryPromise() {
+        return new Promise((resolve, reject) => {
+            this.pendingQueryAnswer = resolve;
+            this.pendingQueryReject = reject;
+            this.pendingQueryTimeout = setTimeout(() => {
+                reject(new Error("Timeout"));
+                this.pendingQueryTimeout = null;
+                this.pendingQueryReject = null;
+                this.pendingQueryAnswer = null;
+            }, 3000);
+        }); 
+    };
+
     get active() {
         return !this.closed && this.socket && this.socket.readyState == WebSocket.OPEN;
+    }
+
+    get opening() {
+        return this.socket && this.socket.readyState == WebSocket.CONNECTING;
     }
 
 }

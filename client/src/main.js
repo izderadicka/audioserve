@@ -105,7 +105,6 @@ $(function () {
 
                 // opens websocket if group is defined
                 if (sync.groupPrefix && ! sync.active) {
-                    sync.open();
                     $('#position-sync-btn').show();
                 } else if (!sync.groupPrefix && sync.active) {
                     sync.close();
@@ -287,7 +286,7 @@ $(function () {
                 if (lastFile) {
                     let target = $(`#files a[href="${lastFile}"]`);
                     if (target.length) {
-                        restoredPosition = true;
+                        restoredPosition = !startPlay;
                         let time = window.localStorage.getItem("audioserve_time");
                         showInView(target);
                         playFile(target, !startPlay, time);
@@ -444,7 +443,13 @@ $(function () {
 
                         if (item.folder == window.localStorage.getItem("audioserve_folder")) {
                             let target = $(`#files a[href="${itemPath}"]`);
+                            if (target.length) {
+                            restoredPosition = false;
+                            showInView(target);
                             playFile(target, false, item.position);
+                            } else {
+                                console.error(`File ${itemPath} is missing from current folder`)
+                            }
                         } else {
                             window.localStorage.setItem("audioserve_folder", item.folder);
                             window.localStorage.setItem("audioserve_file", itemPath);

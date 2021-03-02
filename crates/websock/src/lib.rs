@@ -107,7 +107,7 @@ where
                                 }
 
                                 Ok(None) => {
-                                    debug!("Websocket has ended normally");
+                                    debug!("Websocket stream has ended");
                                     break;
                                 }
 
@@ -143,12 +143,12 @@ where
                                                 };
                                             }
                                         }
-                                        Err(e) => error!("message error: {}", e),
+                                        Err(e) => error!("message error: {:?} {}", e, e),
                                     }
                                 }
                             }
                         }
-                        debug!("Websocket closing")
+                        debug!("Websocket closed")
                     }
                 }
             };
@@ -265,10 +265,7 @@ impl<T> Stream for WebSocket<T> {
                 inner: item,
                 context: self.context.clone(),
             }))),
-            Some(Err(e)) => {
-                log::debug!("websocket poll error: {}", e);
-                Poll::Ready(Some(Err(crate::Error::Ws(e))))
-            }
+            Some(Err(e)) => Poll::Ready(Some(Err(crate::Error::Ws(e)))),
             None => {
                 log::trace!("websocket closed");
                 Poll::Ready(None)
