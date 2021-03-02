@@ -1,9 +1,10 @@
 use super::{RequestWrapper, ResponseFuture};
+use crate::config::get_config;
 use crate::error::{bail, Context, Error};
 use cache::{Cache, Position};
 use futures::future;
 use std::str::FromStr;
-use websock::{self as ws, spawn_websocket};
+use websock::{self as ws, spawn_websocket_with_timeout};
 
 mod cache;
 
@@ -74,71 +75,77 @@ impl FromStr for Msg {
 pub fn position_service(req: RequestWrapper) -> ResponseFuture {
     debug!("We got these headers on websocket: {:?}", req.headers());
 
-    let res = spawn_websocket::<String, _>(req.into_request(), |m| {
-        debug!("Got message {:?}", m);
-        let message = m.to_str().map_err(Error::new).and_then(str::parse);
+    let res = spawn_websocket_with_timeout::<String, _>(
+        req.into_request(),
+        |m| {
+            debug!("Got message {:?}", m);
+            let message = m.to_str().map_err(Error::new).and_then(str::parse);
 
-        match message {
-            Ok(message) => Box::pin(async {
-                Ok(match message {
-                    Msg::Position {
-                        position,
-                        file_path,
-                    } => {
-                        match file_path {
-                            Some(file_path) => {
-                                {
-                                    let mut p = m.context_ref().write().await;
-                                    *p = file_path.clone();
+            match message {
+                Ok(message) => Box::pin(async {
+                    Ok(match message {
+                        Msg::Position {
+                            position,
+                            file_path,
+                        } => {
+                            match file_path {
+                                Some(file_path) => {
+                                    {
+                                        let mut p = m.context_ref().write().await;
+                                        *p = file_path.clone();
+                                    }
+                                    CACHE.insert(file_path, position).await
                                 }
-                                CACHE.insert(file_path, position).await
-                            }
 
-                            None => {
-                                let prev = { m.context_ref().read().await.clone() };
+                                None => {
+                                    let prev = { m.context_ref().read().await.clone() };
 
-                                if !prev.is_empty() {
-                                    CACHE.insert(prev, position).await
-                                } else {
-                                    error!("Client sent short position, but there is no context");
+                                    if !prev.is_empty() {
+                                        CACHE.insert(prev, position).await
+                                    } else {
+                                        error!(
+                                            "Client sent short position, but there is no context"
+                                        );
+                                    }
                                 }
-                            }
-                        };
+                            };
 
-                        None
-                    }
-                    Msg::GenericQuery { group } => {
-                        let last = CACHE.get_last(group).await;
-                        let res = Reply { folder: None, last };
+                            None
+                        }
+                        Msg::GenericQuery { group } => {
+                            let last = CACHE.get_last(group).await;
+                            let res = Reply { folder: None, last };
 
-                        Some(ws::Message::text(
-                            serde_json::to_string(&res).unwrap(),
-                            m.context(),
-                        ))
-                    }
+                            Some(ws::Message::text(
+                                serde_json::to_string(&res).unwrap(),
+                                m.context(),
+                            ))
+                        }
 
-                    Msg::FolderQuery { folder_path } => {
-                        let group = Some(folder_path.splitn(2, '/')).and_then(|mut p| p.next());
-                        let last = CACHE.get_last(group.unwrap()).await;
-                        let folder = CACHE.get(&folder_path).await;
-                        let res = Reply {
-                            last: if last != folder { last } else { None },
-                            folder,
-                        };
+                        Msg::FolderQuery { folder_path } => {
+                            let group = Some(folder_path.splitn(2, '/')).and_then(|mut p| p.next());
+                            let last = CACHE.get_last(group.unwrap()).await;
+                            let folder = CACHE.get(&folder_path).await;
+                            let res = Reply {
+                                last: if last != folder { last } else { None },
+                                folder,
+                            };
 
-                        Some(ws::Message::text(
-                            serde_json::to_string(&res).unwrap(),
-                            m.context(),
-                        ))
-                    }
-                })
-            }),
-            Err(e) => {
-                error!("Position message error: {}", e);
-                Box::pin(future::ok(None))
+                            Some(ws::Message::text(
+                                serde_json::to_string(&res).unwrap(),
+                                m.context(),
+                            ))
+                        }
+                    })
+                }),
+                Err(e) => {
+                    error!("Position message error: {}", e);
+                    Box::pin(future::ok(None))
+                }
             }
-        }
-    });
+        },
+        get_config().positions_ws_timeout,
+    );
 
     Box::pin(future::ok(res))
 }

@@ -260,6 +260,7 @@ pub struct Config {
     pub disable_folder_download: bool,
     pub chapters: ChaptersSize,
     pub positions_file: PathBuf,
+    pub positions_ws_timeout: Duration,
     pub behind_proxy: bool,
 }
 
@@ -320,6 +321,10 @@ impl Config {
                 "token-validity-days",
                 "Token must be valid for at least 10 days"
             );
+        }
+
+        if self.positions_ws_timeout < Duration::from_secs(60) {
+            return value_error!("positions-ws-timeout", "Timeout must be at least 60s");
         }
 
         if !self.client_dir.is_dir() {
@@ -398,6 +403,7 @@ impl Default for Config {
             disable_folder_download: false,
             chapters: ChaptersSize::default(),
             positions_file: data_base_dir.join("audioserve.positions"),
+            positions_ws_timeout: Duration::from_secs(600),
             behind_proxy: false,
         }
     }
