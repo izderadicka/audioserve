@@ -1,21 +1,21 @@
 import { debug } from "./debug";
-import config from"./config";
+import config from "./config";
 
 function mapProtocol(p) {
     if (p == "http:") {
         return "ws:";
-    } else if (p== "https:") {
+    } else if (p == "https:") {
         return "wss:";
     }
 }
 
 class PlaybackSync {
     constructor() {
-        const baseUrl = AUDIOSERVE_DEVELOPMENT?
-            `${mapProtocol(window.location.protocol)}//${window.location.hostname}:${config.DEVELOPMENT_PORT}`:
+        const baseUrl = AUDIOSERVE_DEVELOPMENT ?
+            `${mapProtocol(window.location.protocol)}//${window.location.hostname}:${config.DEVELOPMENT_PORT}` :
             `${mapProtocol(window.location.protocol)}//${window.location.host}${window.location.pathname.length > 1 ? window.location.pathname : ""}`;
-        
-        this.socketUrl = baseUrl + (baseUrl.endsWith("/")?"":"/") + "position";
+
+        this.socketUrl = baseUrl + (baseUrl.endsWith("/") ? "" : "/") + "position";
         this.closed = false;
         this.filePath = null;
         this.groupPrefix = null;
@@ -24,7 +24,7 @@ class PlaybackSync {
 
     open() {
         this.closed = false;
-        debug("Opening ws on url "+this.socketUrl);
+        debug("Opening ws on url " + this.socketUrl);
         const webSocket = new WebSocket(this.socketUrl);
         webSocket.addEventListener("error", err => {
             console.error(`WS Error (in row ${this.failures})`, err);
@@ -42,22 +42,23 @@ class PlaybackSync {
             this.filePath = null;
             this.lastSend = null;
             debug("WS is ready");
+            // do we have pending time update?
+            if (this.pendingPosition) {
+                if ((new Date() - this.pendingPosition.timestamp) < 300000) { // do not send old updates
+                    this.enqueuePosition(this.pendingPosition.filePath, this.pendingPosition.position);
+                }
+                this.pendingPosition = null;
+            }
             // do we have pending query?
             if (this.pendingQuery) {
                 this.socket.send(this.pendingQuery);
                 this.pendingQuery = null;
             }
-
-            // do we have pending time update?
-            if (this.pendingPosition) {
-                this.enqueuePosition(this.pendingPosition.filePath, this.pendingPosition.position);
-                this.pendingPosition = null;
-            }
         });
         webSocket.addEventListener("message", evt => {
             debug("Got message " + evt.data);
             const data = JSON.parse(evt.data);
-            const parseGroup  = (item) => {
+            const parseGroup = (item) => {
                 if (item && item.folder) {
                     const [prefix, collection] = /^(\d+)\//.exec(item.folder);
                     item.folder = item.folder.substr(prefix.length);
@@ -84,7 +85,7 @@ class PlaybackSync {
         this.socket = null;;
     }
 
-    enqueuePosition(filePath, position, force=false) {
+    enqueuePosition(filePath, position, force = false) {
         if (this.pendingPositionTimeout) {
             window.clearTimeout(this.pendingPositionTimeout);
             this.pendingPositionTimeout = null;
@@ -92,7 +93,8 @@ class PlaybackSync {
         if (!this.active) {
             this.pendingPosition = {
                 filePath,
-                position
+                position,
+                timestamp: new Date()
             };
 
             if (!this.opening) {
@@ -101,8 +103,8 @@ class PlaybackSync {
 
             return;
         };
-        position = Math.round(position*1000)/1000;
-        filePath = this.groupPrefix+filePath;
+        position = Math.round(position * 1000) / 1000;
+        filePath = this.groupPrefix + filePath;
         if (this.filePath && this.lastSend && filePath == this.filePath) {
 
             if (force || Date.now() - this.lastSend > config.POSITION_REPORTING_PERIOD) {
@@ -112,7 +114,7 @@ class PlaybackSync {
                     this.sendMessage(`${position}|`);
                     this.pendingPositionTimeout = null;
                 },
-                config.POSITION_REPORTING_PERIOD
+                    config.POSITION_REPORTING_PERIOD
                 );
             }
         } else {
@@ -134,8 +136,8 @@ class PlaybackSync {
     queryPosition(folderPath) {
         if (this.pendingQueryReject) {
             if (this.pendingQueryTimeout) {
-                 clearTimeout(this.pendingQueryTimeout);
-                 this.pendingQueryTimeout = null;
+                clearTimeout(this.pendingQueryTimeout);
+                this.pendingQueryTimeout = null;
             }
 
             this.pendingQueryReject(new Error("Canceled by next query"));
@@ -143,14 +145,14 @@ class PlaybackSync {
             this.pendingQueryReject = null;
 
         }
-        
+
         if (this.active) {
             const p = this._makeQueryPromise();
-            this.socket.send(folderPath?this.groupPrefix+folderPath:"?");
+            this.socket.send(folderPath ? this.groupPrefix + folderPath : "?");
             return p;
 
-        } else if (this.groupPrefix && !this.active){
-            this.pendingQuery = folderPath?this.groupPrefix+folderPath:"?";
+        } else if (this.groupPrefix && !this.active) {
+            this.pendingQuery = folderPath ? this.groupPrefix + folderPath : "?";
             if (!this.opening) {
                 this.open()
             }
@@ -170,8 +172,9 @@ class PlaybackSync {
                 this.pendingQueryTimeout = null;
                 this.pendingQueryReject = null;
                 this.pendingQueryAnswer = null;
+                this.pendingQuery = null;
             }, 3000);
-        }); 
+        });
     };
 
     get active() {
