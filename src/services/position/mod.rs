@@ -23,6 +23,7 @@ enum Msg {
     Position {
         position: f32,
         file_path: Option<String>,
+        timestamp: Option<u64>,
     },
     FolderQuery {
         folder_path: String,
@@ -43,17 +44,28 @@ impl FromStr for Msg {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<_> = s.split('|').collect();
-        if parts.len() == 2 {
+        let mut timestamp: Option<u64> = None;
+        if parts.len() == 3 {
+            timestamp = Some(parts[2].parse().context("Invalid timestamp")?);
+            if parts[1].is_empty() {
+                return Err(Error::msg(
+                    "If timestamp is present, then also file path must be present",
+                ));
+            }
+        }
+        if parts.len() >= 2 && parts.len() <= 3 {
             let position: f32 = parts[0].parse().context("Position is not a number")?;
             if parts[1].is_empty() {
                 Ok(Msg::Position {
                     position,
                     file_path: None,
+                    timestamp,
                 })
             } else {
                 Ok(Msg::Position {
                     position,
                     file_path: Some(parts[1].into()),
+                    timestamp,
                 })
             }
         } else if parts.len() == 1 {
@@ -87,6 +99,7 @@ pub fn position_service(req: RequestWrapper) -> ResponseFuture {
                         Msg::Position {
                             position,
                             file_path,
+                            timestamp,
                         } => {
                             match file_path {
                                 Some(file_path) => {
@@ -94,14 +107,21 @@ pub fn position_service(req: RequestWrapper) -> ResponseFuture {
                                         let mut p = m.context_ref().write().await;
                                         *p = file_path.clone();
                                     }
-                                    CACHE.insert(file_path, position).await.unwrap_or_else(|e| error!("Cannot insert position: {}", e))
+                                    if let Some(ts) = timestamp {
+                                        CACHE.insert_if_newer(file_path, position, ts).await
+                                    } else {
+                                        CACHE.insert(file_path, position).await
+                                    }
+                                    .unwrap_or_else(|e| error!("Cannot insert position: {}", e))
                                 }
 
                                 None => {
                                     let prev = { m.context_ref().read().await.clone() };
 
                                     if !prev.is_empty() {
-                                        CACHE.insert(prev, position).await.unwrap_or_else(|e| error!("Cannot insert position: {}", e))
+                                        CACHE.insert(prev, position).await.unwrap_or_else(|e| {
+                                            error!("Cannot insert position: {}", e)
+                                        })
                                     } else {
                                         error!(
                                             "Client sent short position, but there is no context"
@@ -159,7 +179,8 @@ mod test {
         assert_eq!(
             Msg::Position {
                 position: 123.1,
-                file_path: Some("group/book1/chap1".into())
+                file_path: Some("group/book1/chap1".into()),
+                timestamp: None
             },
             m1
         );
@@ -167,7 +188,8 @@ mod test {
         assert_eq!(
             Msg::Position {
                 position: 123.1,
-                file_path: None
+                file_path: None,
+                timestamp: None
             },
             m2
         );
@@ -191,5 +213,18 @@ mod test {
         let m7 = "||".parse::<Msg>();
         assert!(m6.is_err());
         assert!(m7.is_err());
+
+        let m8: Msg = "123.1|group/book1/chap1|123456".parse().unwrap();
+        assert_eq!(
+            m8,
+            Msg::Position {
+                position: 123.1,
+                file_path: Some("group/book1/chap1".into()),
+                timestamp: Some(123456)
+            }
+        );
+
+        let m9 = "123.1||123456".parse::<Msg>();
+        assert!(m9.is_err());
     }
 }

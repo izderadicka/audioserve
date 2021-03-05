@@ -2,12 +2,12 @@ use crate::config::get_config;
 use crate::error::{Error, Result};
 use linked_hash_map::LinkedHashMap;
 use serde::Serializer;
-use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::sync::Arc;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
+use std::{collections::HashMap, time::Duration};
 use tokio::sync::RwLock;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -90,6 +90,18 @@ impl Cache {
         self.inner.write().await.insert(file_path, position)
     }
 
+    pub async fn insert_if_newer<S: Into<String>>(
+        &self,
+        group_path: S,
+        position: f32,
+        ts: u64,
+    ) -> Result<()> {
+        self.inner
+            .write()
+            .await
+            .insert_if_newer(group_path, position, ts)
+    }
+
     pub async fn get<K>(&self, folder: &K) -> Option<Position>
     where
         K: AsRef<str> + ?Sized,
@@ -116,7 +128,7 @@ impl Cache {
 struct CacheInner {
     table: HashMap<String, LinkedHashMap<String, PositionRecord>>,
     max_size: usize,
-    max_groups: usize
+    max_groups: usize,
 }
 
 impl CacheInner {
@@ -124,11 +136,15 @@ impl CacheInner {
         CacheInner {
             table: HashMap::new(),
             max_size: sz,
-            max_groups: groups
+            max_groups: groups,
         }
     }
 
-    fn insert<S: Into<String>>(&mut self, group_path: S, position: f32) -> Result<()> {
+    fn _insert<S, F>(&mut self, group_path: S, position: f32, check_rec: F) -> Result<()>
+    where
+        S: Into<String>,
+        F: FnOnce(&CacheInner, &str, PositionRecord) -> Result<PositionRecord>,
+    {
         let group_path = group_path.into();
         if let Some((group, file_path)) = split_group(&group_path) {
             let last_slash = file_path.rfind('/');
@@ -141,16 +157,16 @@ impl CacheInner {
                 None => ("".to_owned(), file_path.to_owned()),
             };
 
-            let rec = PositionRecord {
+            if !self.table.contains_key(group) && self.table.len() >= self.max_groups {
+                return Err(Error::msg("Positions cache is full, all groups taken"));
+            }
+
+            let mut rec = PositionRecord {
                 file,
                 position,
                 timestamp: SystemTime::now(),
             };
-
-            if !self.table.contains_key(group) && self.table.len()>= self.max_groups {
-                return Err(Error::msg("Positions cache is full, all groups taken"))
-            }
-
+            rec = check_rec(&*self, group, rec)?;
             let table = self
                 .table
                 .entry(group.into())
@@ -163,6 +179,36 @@ impl CacheInner {
         } else {
             Err(Error::msg("Invalid path, ignoring"))
         }
+    }
+
+    fn insert_if_newer<S: Into<String>>(
+        &mut self,
+        group_path: S,
+        position: f32,
+        ts: u64,
+    ) -> Result<()> {
+        self._insert(group_path, position, |t, group, mut rec| {
+            let diff = rec
+                .timestamp
+                .duration_since(SystemTime::UNIX_EPOCH)?
+                .as_secs()
+                .saturating_sub(ts);
+            rec.timestamp = rec.timestamp - Duration::from_secs(diff);
+            match t.get_last(group) {
+                None => Ok(rec),
+                Some(last) => {
+                    if last.timestamp < rec.timestamp {
+                        Ok(rec)
+                    } else {
+                        Err(Error::msg("There is already newer record"))
+                    }
+                }
+            }
+        })
+    }
+
+    fn insert<S: Into<String>>(&mut self, group_path: S, position: f32) -> Result<()> {
+        self._insert(group_path, position, |_, _, r| Ok(r))
     }
 
     fn get<K>(&self, group_folder: &K) -> Option<Position>
@@ -224,7 +270,7 @@ mod test {
     use super::*;
 
     fn make_cache() -> CacheInner {
-        let mut c = CacheInner::new(5,5);
+        let mut c = CacheInner::new(5, 5);
         let p = c.get_last("group");
         assert!(p.is_none());
 
@@ -276,7 +322,7 @@ mod test {
 
     #[test]
     fn position_serialization() {
-        let mut c = CacheInner::new(10,10);
+        let mut c = CacheInner::new(10, 10);
         c.insert("group/book1/chap1", 123.456).unwrap();
         let p = c.get("group/book1").unwrap();
         let s = serde_json::to_string_pretty(&p).unwrap();
@@ -311,5 +357,22 @@ mod test {
         c.insert("g2/book/f", 1.0).unwrap();
         c.insert("g3/book/f", 1.0).unwrap();
         assert!(c.insert("g4/book/f", 1.0).is_err());
+    }
+
+    #[test]
+    fn test_insert_newer() {
+        let mut c = CacheInner::new(5, 3);
+        c.insert("g1/book/f", 1.0).unwrap();
+        let ts = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let ts_old = ts - 10;
+        assert!(c.insert_if_newer("g1/book/g", 2.0, ts_old).is_err());
+        c.insert_if_newer("g2/book/f", 3.0, ts_old).unwrap();
+        c.insert_if_newer("g2/book/f", 4.0, ts).unwrap();
+        let rec = c.get("g2/book").unwrap();
+        assert_eq!(rec.file, "f");
+        assert_eq!(rec.position, 4.0);
     }
 }
