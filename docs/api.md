@@ -253,6 +253,14 @@ Example of such message is (group here is name of group, can be anything):
 
     480.383|group/0/Adams Douglas/Douglas Adams - Stoparuv pruvodce galaxii (2008)/01.kapitola.mp3
 
+Client can send also longer form of this message:
+
+    playback_time_secs|group_name/collection_number/audio_file_path|timestamp
+
+This longer form is useful, if connection is interrupt and client wants to report on position which was reached in past (however it's taken into consideration if there is no newer position in the group). Timestamp is unix time in seconds. Example of such message:
+
+    480.383|group/0/Adams Douglas/Douglas Adams - Stoparuv pruvodce galaxii (2008)/01.kapitola.mp3|1614963001
+
 Such message can be send also in short form, without  `group_name/collection_number/audio_file_path`, if we are continuing to report position in same audio file. So next position update could be just:
 
     486.859|
