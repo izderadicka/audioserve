@@ -9,7 +9,7 @@ use websock::{self as ws, spawn_websocket_with_timeout};
 mod cache;
 
 lazy_static! {
-    static ref CACHE: Cache = Cache::new(100);
+    static ref CACHE: Cache = Cache::new(100, 100);
 }
 
 pub async fn save_positions() {
@@ -94,14 +94,14 @@ pub fn position_service(req: RequestWrapper) -> ResponseFuture {
                                         let mut p = m.context_ref().write().await;
                                         *p = file_path.clone();
                                     }
-                                    CACHE.insert(file_path, position).await
+                                    CACHE.insert(file_path, position).await.unwrap_or_else(|e| error!("Cannot insert position: {}", e))
                                 }
 
                                 None => {
                                     let prev = { m.context_ref().read().await.clone() };
 
                                     if !prev.is_empty() {
-                                        CACHE.insert(prev, position).await
+                                        CACHE.insert(prev, position).await.unwrap_or_else(|e| error!("Cannot insert position: {}", e))
                                     } else {
                                         error!(
                                             "Client sent short position, but there is no context"

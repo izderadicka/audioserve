@@ -1,4 +1,5 @@
 use crate::config::get_config;
+use crate::error::{Error, Result};
 use linked_hash_map::LinkedHashMap;
 use serde::Serializer;
 use std::collections::HashMap;
@@ -39,20 +40,32 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn new(sz: usize) -> Self {
+    pub fn new(sz: usize, groups: usize) -> Self {
         let fname = &get_config().positions_file;
-        if let Ok(f) = fs::File::open(fname) {
-            if let Ok(mut inner) = serde_json::from_reader::<_, CacheInner>(f) {
+        match  fs::File::open(fname) {
+        Ok(f)=> {
+            match serde_json::from_reader::<_, CacheInner>(f) {
+            Ok(mut inner) =>  {
                 inner.shrink(sz);
                 inner.max_size = sz;
+                inner.max_groups = groups;
                 return Cache {
                     inner: Arc::new(RwLock::new(inner)),
                 };
             }
+            Err(e) => error!("Cannot read positions file: {}", e)
         }
+        }
+        Err(e) => {
+            match e.kind() {
+                io::ErrorKind::NotFound => debug!("Position file is not present, new will be created"),
+                _ => error!("Cannot open positions file: {}, will start with empty one (kill with SIGKILL to preserve old one)",e)
+            }
+        }
+    }
 
         Cache {
-            inner: Arc::new(RwLock::new(CacheInner::new(sz))),
+            inner: Arc::new(RwLock::new(CacheInner::new(sz, groups))),
         }
     }
 
@@ -73,7 +86,7 @@ impl Cache {
         }
     }
 
-    pub async fn insert<S: Into<String>>(&self, file_path: S, position: f32) {
+    pub async fn insert<S: Into<String>>(&self, file_path: S, position: f32) -> Result<()> {
         self.inner.write().await.insert(file_path, position)
     }
 
@@ -103,17 +116,19 @@ impl Cache {
 struct CacheInner {
     table: HashMap<String, LinkedHashMap<String, PositionRecord>>,
     max_size: usize,
+    max_groups: usize
 }
 
 impl CacheInner {
-    fn new(sz: usize) -> Self {
+    fn new(sz: usize, groups: usize) -> Self {
         CacheInner {
             table: HashMap::new(),
             max_size: sz,
+            max_groups: groups
         }
     }
 
-    fn insert<S: Into<String>>(&mut self, group_path: S, position: f32) {
+    fn insert<S: Into<String>>(&mut self, group_path: S, position: f32) -> Result<()> {
         let group_path = group_path.into();
         if let Some((group, file_path)) = split_group(&group_path) {
             let last_slash = file_path.rfind('/');
@@ -132,6 +147,10 @@ impl CacheInner {
                 timestamp: SystemTime::now(),
             };
 
+            if !self.table.contains_key(group) && self.table.len()>= self.max_groups {
+                return Err(Error::msg("Positions cache is full, all groups taken"))
+            }
+
             let table = self
                 .table
                 .entry(group.into())
@@ -140,8 +159,9 @@ impl CacheInner {
             if table.len() > self.max_size {
                 table.pop_front();
             }
+            Ok(())
         } else {
-            error!("Invalid path, ignoring");
+            Err(Error::msg("Invalid path, ignoring"))
         }
     }
 
@@ -204,17 +224,17 @@ mod test {
     use super::*;
 
     fn make_cache() -> CacheInner {
-        let mut c = CacheInner::new(5);
+        let mut c = CacheInner::new(5,5);
         let p = c.get_last("group");
         assert!(p.is_none());
 
-        c.insert("group/book1/chap1", 1.1);
-        c.insert("group/book2/chap2", 2.1);
-        c.insert("group/book3/chap3", 3.1);
-        c.insert("group/book4/chap4", 4.1);
-        c.insert("group/book5/chap5", 5.1);
-        c.insert("group/book6/chap6", 6.1);
-        c.insert("group/book4/chap7", 7.1);
+        c.insert("group/book1/chap1", 1.1).unwrap();
+        c.insert("group/book2/chap2", 2.1).unwrap();
+        c.insert("group/book3/chap3", 3.1).unwrap();
+        c.insert("group/book4/chap4", 4.1).unwrap();
+        c.insert("group/book5/chap5", 5.1).unwrap();
+        c.insert("group/book6/chap6", 6.1).unwrap();
+        c.insert("group/book4/chap7", 7.1).unwrap();
 
         c
     }
@@ -256,8 +276,8 @@ mod test {
 
     #[test]
     fn position_serialization() {
-        let mut c = CacheInner::new(10);
-        c.insert("group/book1/chap1", 123.456);
+        let mut c = CacheInner::new(10,10);
+        c.insert("group/book1/chap1", 123.456).unwrap();
         let p = c.get("group/book1").unwrap();
         let s = serde_json::to_string_pretty(&p).unwrap();
         println!("{}", s);
@@ -269,7 +289,7 @@ mod test {
         let serc = serde_json::to_string(&c).unwrap();
         let mut c2: CacheInner = serde_json::from_str(&serc).unwrap();
         check_cache(&c2);
-        c2.insert("other/book10/chap1", 15.1);
+        c2.insert("other/book10/chap1", 15.1).unwrap();
         let pos = c2.get("other/book10").unwrap();
         assert_eq!(15.1, pos.position);
         let pos = c2.get_last("other").unwrap();
@@ -282,5 +302,14 @@ mod test {
         let res = split_group(s).unwrap();
         assert_eq!("group", res.0);
         assert_eq!("0/adams/stopar", res.1);
+    }
+
+    #[test]
+    fn test_max_groups() {
+        let mut c = CacheInner::new(5, 3);
+        c.insert("g1/book/f", 1.0).unwrap();
+        c.insert("g2/book/f", 1.0).unwrap();
+        c.insert("g3/book/f", 1.0).unwrap();
+        assert!(c.insert("g4/book/f", 1.0).is_err());
     }
 }
