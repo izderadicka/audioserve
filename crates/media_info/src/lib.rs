@@ -158,7 +158,8 @@ impl MediaFile {
                 for s in streams {
                     let codec_type = (*(**s).codecpar).codec_type;
                     if codec_type == ffi::AVMediaType_AVMEDIA_TYPE_AUDIO {
-                        m = (**s).metadata
+                        m = (**s).metadata;
+                        break;
                     }
                 }
             }
@@ -200,6 +201,10 @@ impl MediaFile {
 
     pub fn all_meta(&self) -> HashMap<String, String> {
         self.meta.get_all()
+    }
+
+    pub fn chapters_count(&self) -> usize {
+        unsafe { (*self.ctx).nb_chapters as usize }
     }
 
     pub fn chapters(&self) -> Option<Vec<Chapter>> {
