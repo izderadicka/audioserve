@@ -44,8 +44,8 @@ class PlaybackSync {
             debug("WS is ready");
             // do we have pending time update?
             if (this.pendingPosition) {
-                if ((new Date() - this.pendingPosition.timestamp) < 300000) { // do not send old updates
-                    this.enqueuePosition(this.pendingPosition.filePath, this.pendingPosition.position);
+                if ((new Date() - this.pendingPosition.timestamp) < 300000000) { // do not send old updates
+                    this.enqueuePosition(this.pendingPosition.filePath, this.pendingPosition.position, this.pendingPosition.timestamp);
                 }
                 this.pendingPosition = null;
             }
@@ -85,7 +85,7 @@ class PlaybackSync {
         this.socket = null;;
     }
 
-    enqueuePosition(filePath, position, force = false) {
+    enqueuePosition(filePath, position, timestamp = null) {
         if (this.pendingPositionTimeout) {
             window.clearTimeout(this.pendingPositionTimeout);
             this.pendingPositionTimeout = null;
@@ -107,11 +107,12 @@ class PlaybackSync {
         filePath = this.groupPrefix + filePath;
         if (this.filePath && this.lastSend && filePath == this.filePath) {
 
-            if (force || Date.now() - this.lastSend > config.POSITION_REPORTING_PERIOD) {
-                this.sendMessage(`${position}|`);
+            if ((Date.now() - this.lastSend.timestamp > config.POSITION_REPORTING_PERIOD) ||
+                (1000* Math.abs(position - this.lastSend.position)) > config.POSITION_REPORTING_PERIOD) {
+                this.sendMessage(position);
             } else {
                 this.pendingPositionTimeout = window.setTimeout(() => {
-                    this.sendMessage(`${position}|`);
+                    this.sendMessage(position);
                     this.pendingPositionTimeout = null;
                 },
                     config.POSITION_REPORTING_PERIOD
@@ -119,14 +120,20 @@ class PlaybackSync {
             }
         } else {
             this.filePath = filePath;
-            this.sendMessage(`${position}|${filePath}`);
+            this.sendMessage(position, filePath, timestamp);
         }
     }
 
-    sendMessage(msg) {
+    sendMessage(position, filePath, timestamp) {
         if (this.active) {
+            let msg = position.toString() + "|";
+            if (filePath) msg += filePath;
+            if (timestamp) msg += '|' + Math.round(timestamp.getTime()/1000);
             this.socket.send(msg);
-            this.lastSend = Date.now();
+            this.lastSend = {
+                position,
+                timestamp: Date.now()
+            };
         } else {
             console.error("Cannot send message, socket not ready");
         }
