@@ -68,9 +68,17 @@ docker run -d --name audioserve  \
 
 ```
 
-You will need to replace `<you_host_name>` with domain name added to DNS in previous step. Also you need to create two directories `mkdir $HOME/audioserve`, which must be readable for audioserve container, and `mkdir $HOME/audioserve`, which must be writable and readable for audioserve container. Audioserve contains is running by default with user and group id 1000 (which is default normal user in many distributions, so it should work). If you have different  uid (check by `id` command), you will need to assure that audioserve has proper access (either `chmod` on directories or run audioserve container with different uid).
+You will need to replace `<you_host_name>` with domain name added to DNS in previous step. Also you need to create two directories `mkdir $HOME/audiobooks` (audiobooks collection directory), which must be readable for audioserve container, and `mkdir $HOME/.audioserve`, which must be writable and readable for audioserve container. Audioserve contains is running by default with user and group id 1000 (which is default normal user in many distributions, so it should work). If you have different  uid (check by `id` command), you will need to assure that audioserve has proper access (either `chmod` on directories or run audioserve container with different uid).
+
+## Ramp up
+
+Now you have 
 
 ## Copying audiobooks to host
+
+In order to test (and further use) audioserve you'll need to copy some audiobooks to collections directory. As ssh connection is working you can use `scp` command - something like `scp -r ./my_new_audiobook me@remote.host:audiobooks/`. If you want GUI application [Filezilla](https://filezilla-project.org/) is nice application for copying files using SFTP protocol (usually supported in SSH daemon).
+Another solution could be to synchronize local collection to remote server with `rsync` command, that supports file copy one SSH too.
+
 ## Considerations
 
 
