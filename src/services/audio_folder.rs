@@ -22,7 +22,7 @@ pub fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
         DirType::File {
             chapters,
             audio_meta,
-        } => list_dir_file(base_dir, full_path, audio_meta, chapters),
+        } => list_dir_file(base_dir, full_path, audio_meta, chapters, false),
         DirType::Other => Err(io::Error::new(
             io::ErrorKind::Other,
             "Not folder or chapterised audio file",
@@ -173,17 +173,26 @@ fn chapters_from_csv(path: &Path) -> Result<Option<Vec<Chapter>>, io::Error> {
     Ok(None)
 }
 
-fn path_for_chapter(p: &Path, chap: &Chapter) -> PathBuf {
+fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> Option<PathBuf> {
     let ext = p
         .extension()
         .and_then(OsStr::to_str)
         .map(|e| ".".to_owned() + e)
         .unwrap_or_else(|| "".to_owned());
+
     let pseudo_file = format!(
         "{:03} - {}$${}-{}$${}",
         chap.number, chap.title, chap.start, chap.end, ext
     );
-    p.join(pseudo_file)
+    if collapse {
+        let base = p.parent()?;
+        let mut f = OsStr::to_str(p.file_name()?)?.to_string();
+        f.push_str("$$");
+        f.push_str(&pseudo_file);
+        Some(base.join(f))
+    } else {
+        Some(p.join(pseudo_file))
+    }
 }
 
 lazy_static! {
@@ -211,6 +220,7 @@ fn list_dir_file<P: AsRef<Path>>(
     full_path: PathBuf,
     audio_meta: AudioMeta,
     chapters: Vec<Chapter>,
+    collapse: bool,
 ) -> Result<AudioFolder, io::Error> {
     let path = full_path.strip_prefix(&base_dir).unwrap();
     let mime = guess_mime_type(&path);
@@ -223,18 +233,23 @@ fn list_dir_file<P: AsRef<Path>>(
                     duration: ((chap.end - chap.start) / 1000) as u32,
                 }
             };
-            AudioFile {
+            Ok(AudioFile {
                 meta: Some(new_meta),
-                path: path_for_chapter(path, &chap),
+                path: path_for_chapter(path, &chap, collapse).ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("Cannot create path for chapter in {:?}", path),
+                    )
+                })?,
                 name: format!("{:03} - {}", chap.number, chap.title).into(),
                 section: Some(FileSection {
                     start: chap.start,
                     duration: Some(chap.end - chap.start),
                 }),
                 mime: mime.to_string(),
-            }
+            })
         })
-        .collect();
+        .collect::<io::Result<Vec<_>>>()?;
 
     Ok(AudioFolder {
         files,
@@ -337,7 +352,7 @@ fn list_dir_dir<P: AsRef<Path>>(
                         chapters,
                         audio_meta,
                     } => {
-                        let f = list_dir_file(base_dir, full_path, audio_meta, chapters)?;
+                        let f = list_dir_file(base_dir, full_path, audio_meta, chapters, true)?;
                         files = f.files;
                     }
                     _ => {
@@ -521,6 +536,28 @@ mod tests {
         assert_eq!(
             Some((1000f32 * (2f32 * 3600f32 + 35f32 * 60f32 + 1.1)) as u64),
             ms_from_time("02:35:01.1")
+        );
+    }
+
+    #[test]
+    fn test_create_pseudofile_name() {
+        let chap = Chapter {
+            number: 1,
+            title: "Chapter1".into(),
+            start: 1000,
+            end: 2000,
+        };
+
+        let p = PathBuf::from("stoker/dracula/dracula.m4b");
+        let pseudo = path_for_chapter(&p, &chap, false).unwrap();
+        assert_eq!(
+            pseudo.to_str().unwrap(),
+            "stoker/dracula/dracula.m4b/001 - Chapter1$$1000-2000$$.m4b"
+        );
+        let pseudo = path_for_chapter(&p, &chap, true).unwrap();
+        assert_eq!(
+            pseudo.to_str().unwrap(),
+            "stoker/dracula/dracula.m4b$$001 - Chapter1$$1000-2000$$.m4b"
         );
     }
 }
