@@ -295,10 +295,8 @@ fn list_dir_dir<P: AsRef<Path>>(
                                         let meta = meta.get_audio_info();
                                         if is_long_file((&meta).as_ref())
                                             || chapters_file_path(&audio_file_path)
-                                                .and_then(
-                                                    |p| if p.is_file() { Some(()) } else { None },
-                                                )
-                                                .is_some()
+                                                .map(|p| p.is_file())
+                                                .unwrap_or(false)
                                         {
                                             // file is bigger then limit present as folder
                                             subfolders.push(AudioFolderShort::from_dir_entry(
@@ -331,8 +329,28 @@ fn list_dir_dir<P: AsRef<Path>>(
                     ),
                 }
             }
-            files.sort_unstable_by(|a, b| a.name.cmp(&b.name));
-            subfolders.sort_unstable_by(|a, b| a.compare_as(ordering, b));
+            // if we have just one chapterized audiobook, let's include it into current directory
+            if files.is_empty() && subfolders.len() == 1 && subfolders[0].is_file {
+                let full_path = base_dir.as_ref().join(subfolders.pop().unwrap().path);
+                match get_dir_type(&full_path)? {
+                    DirType::File {
+                        chapters,
+                        audio_meta,
+                    } => {
+                        let f = list_dir_file(base_dir, full_path, audio_meta, chapters)?;
+                        files = f.files;
+                    }
+                    _ => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("Expecting chapterized file on {:?}", full_path),
+                        ))
+                    }
+                }
+            } else {
+                files.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+                subfolders.sort_unstable_by(|a, b| a.compare_as(ordering, b));
+            }
 
             Ok(AudioFolder {
                 files,
