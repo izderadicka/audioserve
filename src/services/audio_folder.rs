@@ -351,7 +351,11 @@ fn list_dir_dir<P: AsRef<Path>>(
                 }
             }
             // if we have just one chapterized audiobook, let's include it into current directory
-            if files.is_empty() && subfolders.len() == 1 && subfolders[0].is_file {
+            if !get_config().no_dir_collaps
+                && files.is_empty()
+                && subfolders.len() == 1
+                && subfolders[0].is_file
+            {
                 let full_path = base_dir.as_ref().join(subfolders.pop().unwrap().path);
                 match get_dir_type(&full_path)? {
                     DirType::File {

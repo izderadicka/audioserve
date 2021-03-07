@@ -148,6 +148,11 @@ fn create_parser<'a>() -> Parser<'a> {
             .env("AUDIOSERVE_CHAPTERS_FROM_DURATION")
             .help("If long files is presented as chapters, one chapter has x mins [default: 30]")
             )
+        .arg(Arg::with_name("no-dir-collaps")
+            .long("no-dir-collaps")
+            .help("Prevents automatic collaps/skip of directory with single chapterized audio file")
+
+            )
         .arg(Arg::with_name("url-path-prefix")
         .long("url-path-prefix")
         .takes_value(true)
@@ -472,6 +477,10 @@ where
 
     if let Some(d) = args.value_of("chapters-duration") {
         config.chapters.duration = d.parse().unwrap()
+    }
+
+    if is_present_or_env("no-dir-collaps", "AUDIOSERVE_NO_DIR_COLLAPS") {
+        config.no_dir_collaps = true;
     }
 
     if let Some(positions_file) = args.value_of_os("positions-file") {
