@@ -307,7 +307,7 @@ fn list_dir_dir<P: AsRef<Path>>(
                                         }
                                     };
 
-                                    if meta.has_chapters() {
+                                    if !get_config().ignore_chapters_meta && meta.has_chapters() {
                                         // we do have chapters so let present this file as folder
                                         subfolders.push(AudioFolderShort::from_dir_entry(
                                             &f, path, ordering, true,

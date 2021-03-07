@@ -153,6 +153,10 @@ fn create_parser<'a>() -> Parser<'a> {
             .help("Prevents automatic collaps/skip of directory with single chapterized audio file")
 
             )
+        .arg(Arg::with_name("ignore-chapters-meta")
+            .long("ignore-chapters-meta")
+            .help("Ignore chapters metadata, so files with chapters will not be presented as folders")
+            )
         .arg(Arg::with_name("url-path-prefix")
         .long("url-path-prefix")
         .takes_value(true)
@@ -481,6 +485,10 @@ where
 
     if is_present_or_env("no-dir-collaps", "AUDIOSERVE_NO_DIR_COLLAPS") {
         config.no_dir_collaps = true;
+    }
+
+    if is_present_or_env("ignore-chapters-meta", "AUDIOSERVE_IGNORE_CHAPTERS_META") {
+        config.ignore_chapters_meta = true;
     }
 
     if let Some(positions_file) = args.value_of_os("positions-file") {
