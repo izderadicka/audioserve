@@ -1,4 +1,4 @@
-use std::borrow;
+use std::borrow::{self, Cow};
 use std::ffi::OsStr;
 use std::fs;
 use std::io;
@@ -187,7 +187,7 @@ fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> Option<PathBuf>
     if collapse {
         let base = p.parent()?;
         let mut f = OsStr::to_str(p.file_name()?)?.to_string();
-        f.push_str("$$");
+        f.push_str(">>");
         f.push_str(&pseudo_file);
         Some(base.join(f))
     } else {
@@ -199,7 +199,7 @@ lazy_static! {
     static ref CHAPTER_PSEUDO_RE: Regex = Regex::new(r"\$\$(\d+)-(\d*)\$\$").unwrap();
 }
 
-pub fn parse_chapter_path(p: &Path) -> (&Path, Option<TimeSpan>) {
+pub fn parse_chapter_path(p: &Path) -> (Cow<Path>, Option<TimeSpan>) {
     let fname = p.file_name().and_then(OsStr::to_str);
     if let Some(fname) = fname {
         if let Some(cap) = CHAPTER_PSEUDO_RE.captures(fname) {
@@ -207,11 +207,17 @@ pub fn parse_chapter_path(p: &Path) -> (&Path, Option<TimeSpan>) {
             let end: Option<u64> = cap.get(2).and_then(|g| g.as_str().parse().ok());
             let duration = end.map(|end| end - start);
             let parent = p.parent().unwrap_or_else(|| Path::new(""));
-            return (parent, Some(TimeSpan { start, duration }));
+            let path = if let Some(pos) = fname.find(">>") {
+                Cow::Owned(parent.join(&fname[..pos]))
+            } else {
+                Cow::Borrowed(parent)
+            };
+
+            return (path, Some(TimeSpan { start, duration }));
         }
     };
 
-    (p, None)
+    (Cow::Borrowed(p), None)
 }
 
 #[allow(clippy::unnecessary_wraps)] // actually as its used in match with function returning results it's better to have Result return type
@@ -507,19 +513,6 @@ mod tests {
     }
 
     #[test]
-    fn test_pseudo_file() {
-        let fname = format!(
-            "kniha/{:3} - {}$${}-{}$${}",
-            1, "Usak Jede", 1234, 5678, ".opus"
-        );
-        let (p, span) = parse_chapter_path(Path::new(&fname));
-        let span = span.unwrap();
-        assert_eq!(Path::new("kniha"), p);
-        assert_eq!(span.start, 1234);
-        assert_eq!(span.duration, Some(5678u64 - 1234));
-    }
-
-    #[test]
     fn test_chapters_file() {
         //env_logger::init();
         let path = Path::new("./test_data/01-file.mp3");
@@ -557,7 +550,37 @@ mod tests {
         let pseudo = path_for_chapter(&p, &chap, true).unwrap();
         assert_eq!(
             pseudo.to_str().unwrap(),
-            "stoker/dracula/dracula.m4b$$001 - Chapter1$$1000-2000$$.m4b"
+            "stoker/dracula/dracula.m4b>>001 - Chapter1$$1000-2000$$.m4b"
         );
+    }
+
+    #[test]
+    fn test_pseudo_file() {
+        let fname = format!(
+            "kniha/{:3} - {}$${}-{}$${}",
+            1, "Usak Jede", 1234, 5678, ".opus"
+        );
+        let (p, span) = parse_chapter_path(Path::new(&fname));
+        let span = span.unwrap();
+        assert_eq!(Path::new("kniha"), p);
+        assert_eq!(span.start, 1234);
+        assert_eq!(span.duration, Some(5678u64 - 1234));
+    }
+
+    #[test]
+    fn test_pseudo_file2() {
+        let f = "stoker/dracula/dracula.m4b/001 - Chapter1$$1000-2000$$.m4b";
+        let (p, span) = parse_chapter_path(Path::new(f));
+        let span = span.unwrap();
+        assert_eq!(p.to_str().unwrap(), "stoker/dracula/dracula.m4b");
+        assert_eq!(span.start, 1000);
+        assert_eq!(span.duration.unwrap(), 1000);
+
+        let f = "stoker/dracula/dracula.m4b>>001 - Chapter1$$1000-2000$$.m4b";
+        let (p, span) = parse_chapter_path(Path::new(f));
+        let span = span.unwrap();
+        assert_eq!(p.to_str().unwrap(), "stoker/dracula/dracula.m4b");
+        assert_eq!(span.start, 1000);
+        assert_eq!(span.duration.unwrap(), 1000);
     }
 }
