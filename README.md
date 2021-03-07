@@ -28,19 +28,24 @@ Files should be named so they are in right alphabetical order - ideal is:
 
 But this structure is not mandatory -  you will just see whatever directories and files you have, so use anything that will suite you.
 
+The characters `$$` `>>` and `|`  are used for internal usage of audioserve, so you should not use then in file names.
+
 In folders you can have additional metadata files - first available image (jpeg or png) is taken as a cover picture and first text file (html, txt, md) is taken as description of the folder.
 
 Search is done for folder names only (not individual files, neither audio metadata tags).
 
-You can have several libraries/ collections - just use several root directories as audioserve start parametes. In client you can switch between collections in the client. Typical usage will be to have separate collections for different languages.
+You can have several libraries/ collections - just use several root directories as audioserve start parameters. In client you can switch between collections in the client. Typical usage will be to have separate collections for different languages.
 
-By default symbolic(soft) links are not followed in the collections directory (because if incorretly used it can have quite negative impact on search and browse), but they can be enabled by `--allow-symlinks` program argument.
+By default symbolic(soft) links are not followed in the collections directory (because if incorrectly used it can have quite negative impact on search and browse), but they can be enabled by `--allow-symlinks` program argument.
 
 ### Single file audiobooks and chapters
 
-Recently better support for .m4b (one file with chapters metadata) and similar was added. Such file is presented as a folder, which contains chapters. Also long audiofile without chapters meta, can be split into equaly sized parts/chapters (this has a slight disadvantage as split can be in middle of word). To enable later use `--chapters-from-duration` to set a limit, from which it should be used, and `chapters-duration` to set a duration of a part. Also for large files, which do not have chapters metadata, you can easily supply them in a separate file, with same name as the audio file but with additional extenssion `.chapters` - so it looks like `your_audiobook.mp3.chapters`. This file is simple CSV file (with header), where first column is chapter title, second is chapter start time, third (and last) is the chapter end time.  Time is either in seconds (like `23.836`) or in `HH:MM:SS.mmm` format (like `02:35:23.386`).
+Recently better support for .m4b (one big file with chapters metadata) and similar was added. Such file is presented as a folder, which contains chapters. Also long audiofile without chapters metadata, can be split into equaly sized parts/chapters (this has a slight disadvantage as split can be in middle of word). To enable later use `--chapters-from-duration` to set a limit, from which it should be used, and `chapters-duration` to set a duration of a part. Also for large files, which do not have chapters metadata, you can easily supply them in a separate file, with same name as the audio file but with additional extension `.chapters` - so it looks like `your_audiobook.mp3.chapters`. This file is simple CSV file (with header), where first column is chapter title, second is chapter start time, third (and last) is the chapter end time.  Time is either in seconds (like `23.836`) or in `HH:MM:SS.mmm` format (like `02:35:23.386`).
 
 There are some small glitches with this approach - search still works on directories only and cover and description metadata are yet not working (plan is to extract them from the audio file metadata). Apart of that chapters behaves like other audio files - can be transcoded to lower bitrates, seeked within etc.
+
+If chaptered file is a single file in a directory (and there are no other subdirectories), then chapters are presented within this directory, as if they were files in this directory. This can help overcome above mentioned limitations - as search will work on directory name and also cover and description is shown from this directory - so this would be preferred way of placing .m4b files. If you do not like this new feature you can disable by `--no-dir-collaps` option.
+
 Also beware that web client will often load same part of chapter again if you're seeking within it (especially Firefox with m4b), so it's definitely not bandwidth optimal (similar issue appears when often seeking in transcoded file).
 
 Sharing playback positions between clients
