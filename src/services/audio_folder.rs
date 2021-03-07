@@ -173,7 +173,7 @@ fn chapters_from_csv(path: &Path) -> Result<Option<Vec<Chapter>>, io::Error> {
     Ok(None)
 }
 
-fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> Option<PathBuf> {
+fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> io::Result<PathBuf> {
     let ext = p
         .extension()
         .and_then(OsStr::to_str)
@@ -184,33 +184,59 @@ fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> Option<PathBuf>
         "{:03} - {}$${}-{}$${}",
         chap.number, chap.title, chap.start, chap.end, ext
     );
-    if collapse {
-        let base = p.parent()?;
-        let mut f = OsStr::to_str(p.file_name()?)?.to_string();
-        f.push_str(">>");
+    let (base, file_name) = if collapse {
+        let base = p.parent().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Cannot create path for chapter (no parent) in {:?}", p),
+            )
+        })?;
+        let mut f = p
+            .file_name()
+            .and_then(OsStr::to_str)
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!(
+                        "Cannot create path for chapter (invalid file name) in {:?}",
+                        p
+                    ),
+                )
+            })?
+            .to_string();
+        f.push_str("$$");
         f.push_str(&pseudo_file);
-        Some(base.join(f))
+        (base, f)
     } else {
-        Some(p.join(pseudo_file))
+        (p, pseudo_file)
+    };
+
+    if file_name.len() > 255 {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            "Chapter file name too long",
+        ));
     }
+
+    Ok(base.join(file_name))
 }
 
 lazy_static! {
-    static ref CHAPTER_PSEUDO_RE: Regex = Regex::new(r"\$\$(\d+)-(\d*)\$\$").unwrap();
+    static ref CHAPTER_PSEUDO_RE: Regex = Regex::new(r"\$\$(\d+)-(\d+)\$\$").unwrap();
 }
 
 pub fn parse_chapter_path(p: &Path) -> (Cow<Path>, Option<TimeSpan>) {
     let fname = p.file_name().and_then(OsStr::to_str);
     if let Some(fname) = fname {
         if let Some(cap) = CHAPTER_PSEUDO_RE.captures(fname) {
+            let start_index = cap.get(0).unwrap().start();
             let start: u64 = cap.get(1).unwrap().as_str().parse().unwrap();
             let end: Option<u64> = cap.get(2).and_then(|g| g.as_str().parse().ok());
             let duration = end.map(|end| end - start);
             let parent = p.parent().unwrap_or_else(|| Path::new(""));
-            let path = if let Some(pos) = fname.find(">>") {
-                Cow::Owned(parent.join(&fname[..pos]))
-            } else {
-                Cow::Borrowed(parent)
+            let path = match fname.find("$$") {
+                Some(pos) if pos < start_index => Cow::Owned(parent.join(&fname[..pos])),
+                _ => Cow::Borrowed(parent),
             };
 
             return (path, Some(TimeSpan { start, duration }));
@@ -241,12 +267,7 @@ fn list_dir_file<P: AsRef<Path>>(
             };
             Ok(AudioFile {
                 meta: Some(new_meta),
-                path: path_for_chapter(path, &chap, collapse).ok_or_else(|| {
-                    io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Cannot create path for chapter in {:?}", path),
-                    )
-                })?,
+                path: path_for_chapter(path, &chap, collapse)?,
                 name: format!("{:03} - {}", chap.number, chap.title).into(),
                 section: Some(FileSection {
                     start: chap.start,
@@ -554,7 +575,7 @@ mod tests {
         let pseudo = path_for_chapter(&p, &chap, true).unwrap();
         assert_eq!(
             pseudo.to_str().unwrap(),
-            "stoker/dracula/dracula.m4b>>001 - Chapter1$$1000-2000$$.m4b"
+            "stoker/dracula/dracula.m4b$$001 - Chapter1$$1000-2000$$.m4b"
         );
     }
 
@@ -580,7 +601,7 @@ mod tests {
         assert_eq!(span.start, 1000);
         assert_eq!(span.duration.unwrap(), 1000);
 
-        let f = "stoker/dracula/dracula.m4b>>001 - Chapter1$$1000-2000$$.m4b";
+        let f = "stoker/dracula/dracula.m4b$$001 - Chapter1$$1000-2000$$.m4b";
         let (p, span) = parse_chapter_path(Path::new(f));
         let span = span.unwrap();
         assert_eq!(p.to_str().unwrap(), "stoker/dracula/dracula.m4b");

@@ -28,7 +28,7 @@ Files should be named so they are in right alphabetical order - ideal is:
 
 But this structure is not mandatory -  you will just see whatever directories and files you have, so use anything that will suite you.
 
-The characters `$$` `>>` and `|`  are used for internal usage of audioserve, so you should not use then in file names.
+The characters `$$` and `|`  are used for internal usage of audioserve, so you should not use then in file names.
 
 In folders you can have additional metadata files - first available image (jpeg or png) is taken as a cover picture and first text file (html, txt, md) is taken as description of the folder.
 
@@ -57,7 +57,7 @@ Recently (from version 0.10) audioserve supports sharing playback positions betw
 
 After you have several active devices with same group name, you'll be notified when you click play and there is more recent playback position in the group and you can choose if jump to this latest position or continue with current position. There is also option to check latest position directly (in web client it's icon in the folder header, in Android client it's in options menu).
 
-*This function is kind of experimental now, it works, but not ideally, so definitelly interested in feedback, as I'm not using it much, I'm mostly listening on just one device - my mobile.*
+Proper functioning is (indeed) dependent on good connectivity -  as position is shared during playback via web socket connection. If connection is unstable this can be unreliable or behave bit strangely.
 
 Security
 --------
@@ -107,6 +107,7 @@ Number of parallel transcodings (transcodings are most resource intensive tasks)
 - Always SSL/TLS - ideally behind well proven reverse proxy (I'm using nginx) (audioserve has support for SSL/TLS, but reverse proxy is probably more solid, plus can provide additional safeguards)
 - Set solid shared secret 10+ different character types ... (to prevent guessing and brute force attacks), do not run on Internet with `no-authentication` - it's for testing only
 - Never run audioserve as root
+- in $HOME/.audoserve are couple of files that are writable by server - so they should have proper permissions - especially `audioserve.secret` should be be limited to user (running audioserve) access only
 - Never put any secret information into media directories - all content of these directories is potentially accessible via Web API.
 - Running in dedicated container also improves security
 - if using remote proxy limit listening (`--listen` argument) interface of audioserve to one reachable by remote proxy only (for instance if they are on same server use `--listen 127.0.0.1:3000`)

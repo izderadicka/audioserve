@@ -422,11 +422,12 @@ $(function () {
                         config.MIN_TIME_DIFFERENCE_FOR_POSITION_SHARING) return;
 
                     const normName = (n) => {
-                        let idx = n.indexOf(">>");
+                        n = n.replace(/\$\$[\d\-]+\$\$/, '');
+                        let idx = n.indexOf("$$");
                         if (idx>=0) {
                             n = n.slice(idx+2);
                         }
-                        n = n.replace(/\$\$[\d\-]+\$\$/, '');
+                        
                         const extIndex = n.lastIndexOf('.');
                         if (extIndex > 0) {
                             n = n.substr(0, extIndex);
