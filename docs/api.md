@@ -151,7 +151,16 @@ using path `/folder/` + `path` (for collection 0) or `/x/folder/` + `path` (for 
 `files` contains playable files -  `path` should be used with `audio` endpoint - see below - in similar way as in listing subfolders.  `meta` contains some metadata about audio file - `duration` in seconds and `bitrate` in kbps. `mime` is mime type
 of the audio file and `section` is only used with chapters extracted from single file audiobook (then it contains `start` and `duration` of the chapters in ms).
 
-`subfolders` entries contain also field `is_file`, which is true for single file chaptered audibooks (.m4b format for instance) that are presented as folders. Listing of such file's chapters is done via this endpoint.  The only difference against regular directory is that artificial file entries are created for chapters - name is chapter name and path is in form `path/to/audiobook.m4b/Chapter_name$$1000-2000$$.m4b`, where numbers between `$$` are start and end of the chapter in milliseconds. There is also alternative form of path is containing directory is collapsed/skipped `path/to/audiobook.m4b>>Chapter_name$$1000-2000$$.m4b` using `>>` separator.
+`subfolders` entries contain also field `is_file`, which is true for single file chaptered audibooks (.m4b format for instance) that are presented as folders. Listing of such file's chapters is done via this endpoint.  The only difference against regular directory is that artificial file entries are created for chapters - name is chapter name and path is in form `path/to/audiobook.m4b/Chapter_name$$1000-2000$$.m4b`, where numbers between `$$` are start and end of the chapter in milliseconds. There is also alternative form of path is containing directory is collapsed/skipped `path/to/audiobook.m4b>>Chapter_name$$1000-2000$$.m4b` using `>>` separator. Also each such file has data in `section` key with start of chapter and its duration in milliseconds. Here is example of such entry:
+
+```json
+{
+    "name":"000 - Chapter_1",
+    "path":"Stoker Bram/Dracula/Dracula.m4b>>000 - Chapter_1$$0-1020288$$.m4b",
+    "meta":{"duration":1020,"bitrate":54},
+    "mime":"audio/m4b",
+    "section":{"start":0,"duration":1020288}}
+```
 
 Folder can contain additional information `cover`, which is cover image (first .jpg or .png file encountered in the folder) and text information `description` (first .txt, .html, .md file encoutered in the folder). Both can be null, if there is no appropriate file and if not null, file can be retrieved in appropriate API end point by using the `path`.
 
