@@ -1,8 +1,8 @@
 # Easy Guide To Deploy Audioserve
 
-This guide give you receipt how to deploy audioserve easily and quickly without any special IT skill - just basic command line and common Internet tools knowledge is enough. It's opinionated to **Ubuntu**, other deployments are of course possible. This guide tries to keeps it simple, with minimal dependencies and tools - all you need is just one (virtual) host with Linux.
+This guide give you receipt how to deploy audioserve easily and quickly without any special IT skills - just basic command line and common Internet tools knowledge is enough. It's opinionated to **Ubuntu**, other deployments are of course possible. This guide tries to keeps it simple, with minimal dependencies and tools - all you need is just one (virtual) host with Ubuntu Linux, which have public IP address and DNS name.
 
-You'll end up with fully working audioserve, securely accessible from Internet, serving your favorite audiobooks to you and family and friends (you of course need to **consider author rights before sharing**). All setup is (depending of particular choices) free (mine is).
+You'll end up with fully working audioserve, securely accessible from Internet, serving your favorite audiobooks to you and family and friends (indeed you need to **consider author rights before sharing**). All setup is free - no initial and recurring costs (depending on particular choices, what I'm describing here is now completely free, but depends of current free offerings).
 
 ## Prerequisites
 
@@ -24,10 +24,10 @@ Assure host ports 80 and 433 are accessible from Internet (either cloud provider
 ### Docker containers
 
 Now you need basically start two services:
-- reverse proxy - **nginx** - to terminate TLS (secure encrypted connection - https) and protect you from various internet attacks, as nginx is much battle proven then audioserve (and you can tight security there with additional settings, not covered here). In our case there is one companion service to assure nginx has appropriate certificate for TLS(https) serving. 
+- reverse proxy - **nginx** - to terminate TLS (secure encrypted connection - https) and protect you from various internet attacks, as nginx is much more battle proven then audioserve (and you can tighten security there with additional settings, not covered here). In our case there is also one companion service to assure nginx has appropriate certificate for TLS(https) serving. 
 - **audioserve** itself, servings files from your collection directories
 
-So create two simple scripts (you can start directly typing to shell,but having a script file is useful for future usage) - you'll need to replace there couple of parameters - marked there as `<placeholder_name>`:
+So create two simple scripts (you can start directly typing to shell, but having a script file is useful for future usage) - you'll need to replace there couple of parameters - marked there as `<placeholder_name>`:
 
 run-nginx.sh:
 
@@ -50,7 +50,9 @@ docker run --detach \
     --env "DEFAULT_EMAIL=<your_email>" \
     jrcs/letsencrypt-nginx-proxy-companion
 ```
-Above will start nginx reverse proxy, which will automatically configure itself as frontend for other started containers (assuming they contain proper environment variables). Edit this file to add your email you want to use with [Let's Encrypt Certification Authority](https://letsencrypt.org/).
+Above will start nginx reverse proxy, which will automatically configure itself as the frontend for other started containers (assuming they contain proper environment variables). Edit this file to add your email you want to use with [Let's Encrypt Certification Authority](https://letsencrypt.org/).
+
+And then create another script to start audioserve:
 
 run-audioserve.sh
 ```bash
@@ -68,18 +70,33 @@ docker run -d --name audioserve  \
 
 ```
 
-You will need to replace `<you_host_name>` with domain name added to DNS in previous step. Also you need to create two directories `mkdir $HOME/audiobooks` (audiobooks collection directory), which must be readable for audioserve container, and `mkdir $HOME/.audioserve`, which must be writable and readable for audioserve container. Audioserve contains is running by default with user and group id 1000 (which is default normal user in many distributions, so it should work). If you have different  uid (check by `id` command), you will need to assure that audioserve has proper access (either `chmod` on directories or run audioserve container with different uid).
+You will need to replace `<you_host_name>` with domain name added to DNS in previous step. Also you need to create two directories `mkdir $HOME/audiobooks` (audiobooks collection directory), which must be readable for audioserve container, and `mkdir $HOME/.audioserve`, which must be writable and readable for audioserve container. Audioserve container is running by default with user and group id 1000 (which is default regular user in many distributions, so it usually works without further considerations). If you have different uid (check by `id` command), you will need to assure that audioserve has proper access (either `chmod` on directories or run audioserve container with different uid).
 
 ## Ramp up
 
-Now you have 
+Now you should have running (virtual) host, with ubuntu and docker, this host should have valid DNS name (check by trying to ssh there with host name) and open ports 80 and 443. 
+
+Run script `./run-nginx.sh` and wait until it starts fully.  Then try to load in browser `http://your.host.name` and you should get page with 503 error as audioserve is not yet running.
+
+Run script `./run-audioserve.sh` and wait a bit (you can check `docker log -f nginx-letsencrypt` to see that certificate was installed) then reload browser and you should see audioserve login screen - log there with your shared secret.  
+
+There are no audio files to listen to - so let's copy there some in next step.
 
 ## Copying audiobooks to host
 
 In order to test (and further use) audioserve you'll need to copy some audiobooks to collections directory. As ssh connection is working you can use `scp` command - something like `scp -r ./my_new_audiobook me@remote.host:audiobooks/`. If you want GUI application [Filezilla](https://filezilla-project.org/) is nice application for copying files using SFTP protocol (usually supported in SSH daemon).
 Another solution could be to synchronize local collection to remote server with `rsync` command, that supports file copy one SSH too.
 
+After copying files assure that they are readable for user that runs audioserve (id 1000 by default) and then just navigate to new audiobooks in web client (reload Home, if you cannot see them).
+
 ## Considerations
+
+Above steps worked for me, but your setup might be bit different.  There are couple of items to check particularly, if you run into problems:
+- ports 80 and 443 are open
+- Domain works with Let's Encrypt service (check their [docs](https://letsencrypt.org/docs/) or (help forum)[https://community.letsencrypt.org/])
+- you have proper permission on files and directories used by audioserve
+
+This guide describes just simple straightforward installation - check [README file](../README.md) for more details about advanced features of audioserve and other deployment option. 
 
 
 
