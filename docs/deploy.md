@@ -2,7 +2,7 @@
 
 This guide give you receipt how to deploy audioserve easily and quickly without any special IT skills - just basic command line and common Internet tools knowledge is enough. It's opinionated to **Ubuntu**, other deployments are of course possible. This guide tries to keeps it simple, with minimal dependencies and tools - all you need is just one (virtual) host with Ubuntu Linux, which have public IP address and DNS name.
 
-You'll end up with fully working audioserve, securely accessible from Internet, serving your favorite audiobooks to you and family and friends (indeed you need to **consider authors rights before sharing**). All setup is free - no initial and recurring costs (depending on particular choices, what I'm describing here is now completely free, but depends of current free offerings).
+You'll end up with fully working audioserve, securely accessible from Internet, serving your favorite audiobooks to you and family and friends (indeed you need to **consider authors rights before sharing**). All setup is free - no initial and recurring costs (depending on particular choices, what I'm describing here is now completely free, but depends of some current free offerings).
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ You'll end up with fully working audioserve, securely accessible from Internet, 
 
 Install machine with latest Ubuntu (20.4, 18.4) (I used current [offering from Oracle](https://www.oracle.com/cloud/free/)).  Assure you have SSH access to the machine (If you need to learn more about SSH try [this free course](https://www.udemy.com/course/ssh-basics-for-cloud-security/)).
 
-When logged into host you need to install Docker:  either follow [official guide](https://docs.docker.com/engine/install/ubuntu/) to get latest and greatest Docker or I just installed bundled version via `sudo apt install docker.io`, it was enough.
+When logged into host you need to install Docker:  either follow [official guide](https://docs.docker.com/engine/install/ubuntu/) to get latest and greatest Docker or I just installed bundled version via `sudo apt update && sudo apt install docker.io`, it was enough. You'll also need to add your user to docker group with `sudo usermod -a -G docker $(whoami)` and then restart ssh connection for change to take effect.
 
 Now assure that host has public IP address and address has valid DNS record. (if you do not have domain you can you use free DDNS services like dynu.com or afraid.org - if need to know more about setting free DDNS domain try [this guide](https://www.howtogeek.com/66438/how-to-easily-access-your-home-network-from-anywhere-with-ddns/).
 
@@ -70,15 +70,17 @@ docker run -d --name audioserve  \
 
 ```
 
+Do not forget to make these two scripts executable with `chmod a+x *.sh` command.
+
 You will need to replace `<you_host_name>` with domain name added to DNS in previous step. Also you need to create two directories `mkdir $HOME/audiobooks` (audiobooks collection directory), which must be readable for audioserve container, and `mkdir $HOME/.audioserve`, which must be writable and readable for audioserve container. Audioserve container is running by default with user and group id 1000 (which is default regular user in many distributions, so it usually works without further considerations). If you have different uid (check by `id` command), you will need to assure that audioserve has proper access (either `chmod` on directories or run audioserve container with different uid).
 
 ## Ramp up
 
 Now you should have running (virtual) host, with ubuntu and docker, this host should have valid DNS name (check by trying to ssh there with host name) and open ports 80 and 443. 
 
-Run script `./run-nginx.sh` and wait until it starts fully.  Then try to load in browser `http://your.host.name` and you should get page with 503 error as audioserve is not yet running.
+Run script `./run-nginx.sh` and wait until it starts fully.  Then try to load in browser `http://your.host.name` and you should get page with "503 Service Temporarily Unavailable" error as audioserve is not yet running.
 
-Run script `./run-audioserve.sh` and wait a bit (you can check `docker log -f nginx-letsencrypt` to see that certificate was installed) then reload browser and you should see audioserve login screen - log there with your shared secret.  
+Run script `./run-audioserve.sh` and wait a bit (you can check `docker logs -f nginx-letsencrypt` to see that certificate was installed) then reload browser and you should see audioserve login screen - log there with your shared secret.  
 
 There are no audio files to listen to - so let's copy there some in next step.
 
