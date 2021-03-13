@@ -19,7 +19,7 @@ When logged into host you need to install Docker:  either follow [official guide
 
 Now assure that host has public IP address and address has valid DNS record. (if you do not have domain you can you use free DDNS services like dynu.com or afraid.org - if need to know more about setting free DDNS domain try [this guide](https://www.howtogeek.com/66438/how-to-easily-access-your-home-network-from-anywhere-with-ddns/).
 
-Assure host ports 80 and 433 are accessible from Internet (either cloud provider (cloud hosted) or your home router (home hosted) may need some additional settings).
+Assure host ports 80 and 443 are accessible from Internet (either cloud provider (cloud hosted) or your home router (home hosted) may need some additional settings).
 
 ### Docker containers
 
