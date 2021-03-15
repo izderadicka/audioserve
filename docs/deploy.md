@@ -1,6 +1,6 @@
 # Easy Guide To Deploy Audioserve
 
-This guide give you receipt how to deploy audioserve easily and quickly without any special IT skills - just basic command line and common Internet tools knowledge is enough. It's opinionated to **Ubuntu**, other deployments are of course possible. This guide tries to keeps it simple, with minimal dependencies and tools - all you need is just one (virtual) host with Ubuntu Linux, which have public IP address and DNS name.
+This guide give you recipe how to deploy audioserve easily and quickly without any special IT skills - just basic command line and common Internet tools knowledge is enough. It's opinionated to **Ubuntu**, other deployments are of course possible. This guide tries to keeps it simple, with minimal dependencies and tools - all you need is just one (virtual) host with Ubuntu Linux, which have public IP address and DNS name.
 
 You'll end up with fully working audioserve, securely accessible from Internet, serving your favorite audiobooks to you and family and friends (indeed you need to **consider authors rights before sharing**). All setup is free - no initial and recurring costs (depending on particular choices, what I'm describing here is now completely free, but depends of some current free offerings).
 
