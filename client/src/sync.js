@@ -90,6 +90,7 @@ class PlaybackSync {
             window.clearTimeout(this.pendingPositionTimeout);
             this.pendingPositionTimeout = null;
         }
+        if (!this.groupPrefix) return;
         if (!this.active) {
             this.pendingPosition = {
                 filePath,
@@ -153,7 +154,7 @@ class PlaybackSync {
 
         }
 
-        if (this.active) {
+        if (this.groupPrefix && this.active) {
             const p = this._makeQueryPromise();
             this.socket.send(folderPath ? this.groupPrefix + folderPath : "?");
             return p;
