@@ -18,8 +18,21 @@ class PlaybackSync {
         this.socketUrl = baseUrl + (baseUrl.endsWith("/") ? "" : "/") + "position";
         this.closed = false;
         this.filePath = null;
-        this.groupPrefix = null;
+        this._groupPrefix = null;
         this.failures = 0;
+        this._enabled = true;
+    }
+
+    get groupPrefix() {
+        return this._enabled ? this._groupPrefix : null;
+    }
+
+    set groupPrefix(v) {
+        this._groupPrefix = v;
+    }
+
+    disable() {
+        this._enabled = false;
     }
 
     open() {

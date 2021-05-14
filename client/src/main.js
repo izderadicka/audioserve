@@ -103,6 +103,10 @@ $(function () {
                     $("#folder-download-link").hide();
                 }
 
+                if (!data.shared_positions) {
+                    sync.disable();
+                }
+
                 // opens websocket if group is defined
                 if (sync.groupPrefix && ! sync.active) {
                     $('#position-sync-btn').show();

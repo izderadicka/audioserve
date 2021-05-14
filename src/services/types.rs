@@ -134,6 +134,7 @@ impl FoldersOrdering {
 #[derive(Debug, Serialize)]
 pub struct Collections {
     pub folder_download: bool,
+    pub shared_positions: bool,
     pub count: u32,
     pub names: Vec<&'static str>,
 }

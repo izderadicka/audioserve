@@ -462,12 +462,14 @@ where
             config.transcoding.cache.save_often = true;
         }
     };
-    if cfg!(feature = "folder-download")
-        && is_present_or_env(
+    if cfg!(feature = "folder-download") {
+        if is_present_or_env(
             "disable-folder-download",
             "AUDIOSERVE_DISABLE_FOLDER_DOWNLOAD",
-        )
-    {
+        ) {
+            config.disable_folder_download = true
+        }
+    } else {
         config.disable_folder_download = true
     };
 
