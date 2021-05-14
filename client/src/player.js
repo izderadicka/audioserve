@@ -426,9 +426,10 @@ export class AudioPlayer {
                     return `UNKNOWN_${code}`;
             };
             let e = this._player.error;
-            let msg = `Player errror: ${codeName(e.code)} : ${e.message}`;
-            console.log(msg);
-            alert("Player error - check connection");
+            let msg = e.message? `${codeName(e.code)} : ${e.message}` : codeName(e.code);
+            console.log("Player error: " + msg);
+            this.pause();
+            alert("Player error:\n" + msg);
         });
 
         this._player.addEventListener('timeupdate', this._updateProgress.bind(this));
