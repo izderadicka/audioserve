@@ -1,11 +1,10 @@
 Audioserve
 ==========
 
-**!!PLEASE UPDATE TO v0.15.0 (or newer) DUE TO IMPORTANT SECURITY FIX!!**
+[![Build Status](https://travis-ci.org/izderadicka/audioserve.svg?branch=master)](https://travis-ci.org/izderadicka/audioserve) 
+[![Docker Pulls](https://img.shields.io/docker/pulls/izderadicka/audioserve)](https://hub.docker.com/repository/docker/izderadicka/audioserve)
 
 [ [**DEMO AVAILABLE** - shared secret: mypass] ](https://audioserve.zderadicka.eu)
-[![Build Status](https://travis-ci.org/izderadicka/audioserve.svg?branch=master)](https://travis-ci.org/izderadicka/audioserve)
-
 
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalistic design.
 
@@ -111,6 +110,7 @@ Number of parallel transcodings (transcodings are most resource intensive tasks)
 - Always SSL/TLS - ideally behind well proven reverse proxy (I'm using nginx) (audioserve has support for SSL/TLS, but reverse proxy is probably more solid, plus can provide additional safeguards)
 - Set solid shared secret 10+ different character types ... (to prevent guessing and brute force attacks), do not run on Internet with `no-authentication` - it's for testing only
 - Never run audioserve as root
+- Keep audioserve updated - as I'm addressing found issues in new releases (definitely do not use older version v0.15.0, which addressed important fix)
 - in $HOME/.audoserve are couple of files that are writable by server - so they should have proper permissions - especially `audioserve.secret` should be be limited to user (running audioserve) access only
 - Never put any secret information into media directories - all content of these directories is potentially accessible via Web API.
 - Running in dedicated container also improves security
