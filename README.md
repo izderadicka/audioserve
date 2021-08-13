@@ -19,7 +19,7 @@ Like audioserve and want to start quickly and easily and securely? Try [this sim
 Media Library
 -------------
 
-Audioserve is intended to serve files from directory in exactly same structure (recently with some support for .m4b and similar single file audiovooks), audio tags are not considered.  So recommended structure is:
+Audioserve is intended to serve files from directory in exactly same structure (recently with some support for .m4b and similar single file audiobooks), audio tags are not considered.  So recommended structure is:
 
     Author Last Name, First Name/Audio Book Name
     Author Last Name, First Name/Series Name/Audio Book Name
