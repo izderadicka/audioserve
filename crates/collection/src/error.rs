@@ -8,5 +8,11 @@ pub enum Error {
 
     #[error("Db error")]
     DbError(#[from] sled::Error),
+
+    #[error("Media metadata error")]
+    MediaInfoError(#[from] media_info::Error),
+
+    #[error("Invalid file name - not UTF8")]
+    InvalidFileName,
     
 }

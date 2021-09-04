@@ -1,8 +1,13 @@
+#[macro_use]
+extern crate log;
+
 use std::{path::{Path, PathBuf}, sync::Arc};
 use error::{Error,Result};
 use sled::Db;
 
 pub mod error;
+pub mod audio_folder;
+pub mod audio_meta;
 
 #[derive(Clone)]
 pub struct Collection {
@@ -16,6 +21,14 @@ impl Collection {
         Ok(Collection {  
             db: Arc::new(db)
         })
+    }
+
+    pub fn f() {
+
+    }
+
+    pub fn update_dir<P: Into<PathBuf>>(&self, dir: PathBuf) -> Result<()> {
+        Ok(())
     }
 
     fn db_path<P1: AsRef<Path>, P2: AsRef<Path>>(path: P1, db_dir: P2) -> Result<PathBuf> {

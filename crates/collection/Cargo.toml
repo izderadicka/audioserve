@@ -11,6 +11,12 @@ edition = "2018"
 media_info = {path="../media_info"}
 sled = "0.34"
 thiserror = "1.0"
+serde = "1.0"
+serde_derive = "1.0"
+lazy_static = "1.4"
+log="0.4"
+regex = "1.5"
+csv = "1.1"
 
 [features]
 partially-static = ["media_info/partially-static"]
