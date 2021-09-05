@@ -306,7 +306,7 @@ fn list_dir_dir<P: AsRef<Path>>(
                                             files.push(AudioFile {
                                                 meta,
                                                 path,
-                                                name: f.file_name(),
+                                                name: f.file_name().to_string_lossy().into(),
                                                 section: None,
                                                 mime: mime.to_string(),
                                             });
@@ -419,7 +419,6 @@ pub fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::init::init_default_config;
     use serde_json;
 
     #[test]

@@ -1,3 +1,4 @@
+use mime_guess::Mime;
 use serde_derive::Serialize;
 use crate::error::{Error, Result};
 use std::{cmp::Ordering, path::{Path, PathBuf}, time::SystemTime};
@@ -152,6 +153,41 @@ pub struct Chapter {
     pub start: u64,
     pub end: u64,
 }
+
+fn has_subtype(mime: &Mime, subtypes: &[&str]) -> bool {
+    subtypes.iter().any(|&s| s == mime.subtype())
+}
+
+const AUDIO: &[&str] = &[
+    "ogg",
+    "mpeg",
+    "aac",
+    "m4a",
+    "m4b",
+    "x-matroska",
+    "flac",
+    "webm",
+];
+pub fn is_audio<P: AsRef<Path>>(path: P) -> bool {
+    let mime = guess_mime_type(path);
+    mime.type_() == "audio" && has_subtype(&mime, AUDIO)
+}
+
+const COVERS: &[&str] = &["jpeg", "png"];
+
+pub fn is_cover<P: AsRef<Path>>(path: P) -> bool {
+    let mime = guess_mime_type(path);
+    mime.type_() == "image" && has_subtype(&mime, COVERS)
+}
+
+const DESCRIPTIONS: &[&str] = &["html", "plain", "markdown"];
+
+pub fn is_description<P: AsRef<Path>>(path: P) -> bool {
+    let mime = guess_mime_type(path);
+    mime.type_() == "text" && has_subtype(&mime, DESCRIPTIONS)
+}
+
+
 
 /// trait to generalize access to media metadata
 /// (so that underlying library can be easily changed)
