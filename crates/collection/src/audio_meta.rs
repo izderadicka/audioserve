@@ -1,6 +1,64 @@
 use serde_derive::Serialize;
 use crate::error::{Error, Result};
-use std::path::Path;
+use std::{cmp::Ordering, path::{Path, PathBuf}, time::SystemTime};
+use crate::util::guess_mime_type;
+use unicase::UniCase;
+
+#[derive(Debug, Serialize)]
+pub struct TypedFile {
+    pub path: PathBuf,
+    pub mime: String,
+}
+
+impl TypedFile {
+    pub fn new<P: Into<PathBuf>>(path: P) -> Self {
+        let path = path.into();
+        let mime = guess_mime_type(&path);
+        TypedFile {
+            path,
+            mime: mime.as_ref().into(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct FileSection {
+    pub start: u64,
+    pub duration: Option<u64>,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AudioFile {
+    #[serde(with = "unicase_serde::unicase")]
+    pub name: UniCase<String>,
+    pub path: PathBuf,
+    pub meta: Option<AudioMeta>,
+    pub mime: String,
+    pub section: Option<FileSection>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AudioFolder {
+    pub files: Vec<AudioFile>,
+    pub subfolders: Vec<AudioFolderShort>,
+    pub cover: Option<TypedFile>, // cover is file in folder - either jpg or png
+    pub description: Option<TypedFile>, // description is file in folder - either txt, html, md
+}
+
+#[derive(Clone, Copy)]
+pub enum FoldersOrdering {
+    Alphabetical,
+    RecentFirst,
+}
+
+impl FoldersOrdering {
+    pub fn from_letter(l: &str) -> Self {
+        match l {
+            "m" => FoldersOrdering::RecentFirst,
+            _ => FoldersOrdering::Alphabetical,
+        }
+    }
+}
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct AudioMeta {
@@ -19,6 +77,71 @@ impl std::fmt::Display for TimeSpan {
         match self.duration {
             Some(d) => write!(f, "{}-{}", self.start, d),
             None => write!(f, "{}", self.start),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AudioFolderShort {
+    #[serde(with = "unicase_serde::unicase")]
+    pub name: UniCase<String>,
+    pub path: PathBuf,
+    pub is_file: bool,
+    #[serde(skip)] // May make it visible in future
+    pub modified: Option<SystemTime>,
+}
+
+impl AudioFolderShort {
+    pub fn from_path<P: AsRef<Path>>(base_path: &Path, p: P) -> Self {
+        let p = p.as_ref();
+        AudioFolderShort {
+            name: p.file_name().unwrap().to_string_lossy().into(),
+            path: p.strip_prefix(base_path).unwrap().into(),
+            is_file: false,
+            modified: None,
+        }
+    }
+
+    pub fn from_dir_entry(
+        f: &std::fs::DirEntry,
+        path: PathBuf,
+        ordering: FoldersOrdering,
+        is_file: bool,
+    ) -> std::result::Result<Self, std::io::Error> {
+        Ok(AudioFolderShort {
+            path,
+            name: f.file_name().to_string_lossy().into(),
+            is_file,
+
+            modified: {
+                if let FoldersOrdering::RecentFirst = ordering {
+                    Some(f.metadata()?.modified()?)
+                } else {
+                    None
+                }
+            },
+        })
+    }
+
+    #[cfg(feature = "search-cache")]
+    pub fn from_path_and_name(name: String, path: PathBuf, is_file: bool) -> Self {
+        AudioFolderShort {
+            name: name.into(),
+            path,
+            is_file,
+            modified: None,
+        }
+    }
+
+    pub fn compare_as(&self, ord: FoldersOrdering, other: &Self) -> Ordering {
+        match ord {
+            FoldersOrdering::Alphabetical => self.name.cmp(&other.name),
+            FoldersOrdering::RecentFirst => match (self.modified, other.modified) {
+                (Some(ref a), Some(ref b)) => b.cmp(a),
+                (Some(_), None) => Ordering::Less,
+                (None, Some(_)) => Ordering::Greater,
+                (None, None) => Ordering::Equal,
+            },
         }
     }
 }

@@ -8,6 +8,7 @@ use sled::Db;
 pub mod error;
 pub mod audio_folder;
 pub mod audio_meta;
+pub mod util;
 
 #[derive(Clone)]
 pub struct Collection {

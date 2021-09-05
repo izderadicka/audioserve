@@ -4,9 +4,8 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use super::audio_meta::{get_audio_properties, Chapter, MediaInfo};
-use super::audio_meta::*;
-use crate::util::{get_real_file_type, guess_mime_type, os_to_string};
+use crate::audio_meta::*;
+use crate::util::{get_real_file_type, guess_mime_type};
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -307,7 +306,7 @@ fn list_dir_dir<P: AsRef<Path>>(
                                             files.push(AudioFile {
                                                 meta,
                                                 path,
-                                                name: os_to_string(f.file_name()).into(),
+                                                name: f.file_name(),
                                                 section: None,
                                                 mime: mime.to_string(),
                                             });

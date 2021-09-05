@@ -254,11 +254,14 @@ dependencies = [
  "lazy_static",
  "log",
  "media_info",
+ "mime_guess",
  "regex",
  "serde",
  "serde_derive",
  "sled",
  "thiserror",
+ "unicase",
+ "unicase_serde",
 ]
 
 [[package]]
