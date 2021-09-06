@@ -7,17 +7,23 @@ use self::subs::{
 use self::transcode::QualityLevel;
 use self::types::FoldersOrdering;
 use crate::config::get_config;
+use crate::util::ResponseBuilderExt;
 use crate::{error, util::header2header};
 use bytes::{Bytes, BytesMut};
 use futures::prelude::*;
 use futures::{future, TryFutureExt};
 use headers::{
-    AccessControlAllowCredentials, AccessControlAllowOrigin, HeaderMapExt, Origin, Range,
+    AccessControlAllowCredentials, AccessControlAllowHeaders, AccessControlAllowMethods,
+    AccessControlAllowOrigin, AccessControlMaxAge, AccessControlRequestHeaders, HeaderMapExt,
+    Origin, Range,
 };
+use hyper::StatusCode;
 use hyper::{body::HttpBody, service::Service, Body, Method, Request, Response};
 use leaky_cauldron::Leaky;
 use percent_encoding::percent_decode;
 use regex::Regex;
+use std::iter::FromIterator;
+use std::time::Duration;
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -285,6 +291,28 @@ fn add_cors_headers(
     }
 }
 
+fn preflight_cors_response(req: &Request<Body>) -> Response<Body> {
+    let origin = req.headers().typed_get::<Origin>();
+
+    let mut resp_builder = Response::builder()
+        .status(StatusCode::NO_CONTENT)
+        // Allow all requested headers
+        .typed_header(AccessControlAllowMethods::from_iter(
+            vec![Method::GET, Method::POST, Method::OPTIONS].into_iter(),
+        ))
+        .typed_header(AccessControlMaxAge::from(Duration::from_secs(24 * 3600)));
+
+    if let Some(requested_headers) = req.headers().typed_get::<AccessControlRequestHeaders>() {
+        resp_builder = resp_builder.typed_header(AccessControlAllowHeaders::from_iter(
+            requested_headers.iter(),
+        ));
+    }
+
+    let resp = resp_builder.body(Body::empty()).unwrap();
+
+    add_cors_headers(resp, origin, true)
+}
+
 #[allow(clippy::type_complexity)]
 impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
     type Response = Response<Body>;
@@ -302,6 +330,16 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
                 debug!("Rejecting request due to rate limit");
                 return resp::fut(resp::too_many_requests);
             }
+        }
+
+        // handle OPTIONS method for CORS preflightAtomicUsize
+        if req.method() == Method::OPTIONS && get_config().cors {
+            debug!(
+                "Got OPTIONS request in CORS mode : {} {:?}",
+                req.uri(),
+                req.headers()
+            );
+            return Box::pin(future::ok(preflight_cors_response(&req)));
         }
 
         let req = match RequestWrapper::new(

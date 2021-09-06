@@ -105,6 +105,11 @@ If audioserve is behind reverse proxy you can use rate limiting option of proxy 
 
 Number of parallel transcodings (transcodings are most resource intensive tasks) is limited by `--transcoding-max-parallel-processes`, which is 2 * number of CPU cores by default. This is different then limit-rate, as it guards number of transcodings that run concurrently.
 
+### CORS
+
+When web client is served from different host (or port) then audioserve API (this is mostly the case during  web client development, when client is served from development server like `webpack serve`), browser CORS policies will prevent client from communicating with audioserve server API (as it is in different origing than client pages).  In this case you can start audioserve with additional `--cors` option, which will add appropriate CORS headers to responses, thus enabling browser to accept responses from server.
+Responses' CORS headers are totally permissive, allowing access from all origins and with any additional headers, so this should be used rather in development. For production use web client served by audioserve server and avoid `--cors` option.
+
 ### Security Best Practices
 
 - Always SSL/TLS - ideally behind well proven reverse proxy (I'm using nginx) (audioserve has support for SSL/TLS, but reverse proxy is probably more solid, plus can provide additional safeguards)
