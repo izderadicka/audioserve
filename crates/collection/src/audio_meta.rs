@@ -194,6 +194,7 @@ pub fn is_description<P: AsRef<Path>>(path: P) -> bool {
 pub trait MediaInfo<'a>: Sized {
     fn get_audio_info(&self) -> Option<AudioMeta>;
     fn get_chapters(&self) -> Option<Vec<Chapter>>;
+    fn has_chapters(&self) -> bool;
 }
 
 mod libavformat {
@@ -216,6 +217,11 @@ mod libavformat {
                 bitrate: self.media_file.bitrate(),
             })
         }
+
+        fn has_chapters(&self) -> bool {
+            self.media_file.chapters_count() > 1
+        }
+        
         fn get_chapters(&self) -> Option<Vec<Chapter>> {
             self.media_file.chapters().map(|l| {
                 l.into_iter()

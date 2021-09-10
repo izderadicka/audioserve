@@ -453,62 +453,7 @@ pub fn download_folder(
             }
         }
     };
-    // let f = tokio::fs::metadata(full_path.clone())
-    //     .map_err(|e| {
-    //         error!("Cannot get meta for download path");
-    //         Error::new(e).context("metadata for folder download")
-    //     })
-    //     .and_then(move |meta| {
-    //         if meta.is_file() {
-    //             serve_file_from_fs(&full_path, None, None)
-    //         } else {
-    //             let mut download_name = folder_path
-    //                 .file_name()
-    //                 .and_then(OsStr::to_str)
-    //                 .map(std::borrow::ToOwned::to_owned)
-    //                 .unwrap_or_else(|| "audio".into());
-    //             download_name.push_str(format.extension());
-    //             let fut = blocking(move || list_dir_files_only(&base_path, &folder_path))
-    //                 .and_then(move |res| match res {
-    //                     Ok(folder) => {
-    //                         let total_len: u64 = match format {
-    //                             DownloadFormat::Tar => {
-    //                                 let lens_iter = folder.iter().map(|i| i.1);
-    //                                 async_tar::calc_size(lens_iter)
-    //                             }
-    //                             DownloadFormat::Zip => {
-    //                                 let iter = folder.iter().map(|&(ref path, len)| (path, len));
-    //                                 async_zip::calc_size(iter).unwrap()
-    //                             }
-    //                         };
-
-    //                         debug!("Total len of folder is {}", total_len);
-    //                         let files = folder.into_iter().map(|i| i.0);
-    //                         let tar_stream = async_tar::TarStream::tar_iter(files);
-    //                         let disposition = format!("attachment; filename=\"{}\"", download_name);
-    //                         future::ok(HyperResponse::builder()
-    //                             .typed_header(ContentType::from(
-    //                                 format.mime(),
-    //                             ))
-    //                             .typed_header(ContentLength(total_len))
-    //                             .header(CONTENT_DISPOSITION, disposition.as_bytes())
-    //                             .body(Body::wrap_stream(tar_stream))
-    //                             .unwrap()
-    //                         )
-    //                     }
-    //                     Err(e) => {
-    //                         error!("Cannot list download dir: {}", e);
-    //                         future::ok(resp::not_found())
-    //                     }
-    //                 })
-    //                 .map_err(|e| {
-    //                     error!("Error listing files for archive {}", e);
-    //                     Error::new(e).context("listing files for archive")
-    //                 });
-
-    //             Box::pin(fut)
-    //         }
-    //     });
+   
     Box::pin(f)
 }
 
