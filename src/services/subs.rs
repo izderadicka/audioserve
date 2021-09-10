@@ -1,10 +1,9 @@
-#[cfg(feature = "folder-download")]
-use super::audio_folder::list_dir_files_only;
+//#[cfg(feature = "folder-download")]
+use collection::{list_dir_files_only, parse_chapter_path, TimeSpan, FoldersOrdering, guess_mime_type};
 use super::{
-    audio_folder::{list_dir, parse_chapter_path},
     resp,
     search::{Search, SearchTrait},
-    transcode::{guess_format, AudioFilePath, QualityLevel, TimeSpan},
+    transcode::{guess_format, AudioFilePath, QualityLevel},
     types::*,
     Counter,
 };
@@ -12,22 +11,14 @@ use crate::{
     config::get_config,
     error::{Error, Result},
     util::{
-        checked_dec, guess_mime_type, into_range_bounds, to_satisfiable_range, ResponseBuilderExt,
+        checked_dec, into_range_bounds, to_satisfiable_range, ResponseBuilderExt,
     },
 };
 use futures::prelude::*;
 use futures::{future, ready, Stream};
 use headers::{AcceptRanges, CacheControl, ContentLength, ContentRange, ContentType, LastModified};
 use hyper::{Body, Response as HyperResponse, StatusCode};
-use std::{
-    collections::Bound,
-    ffi::OsStr,
-    io::{self, SeekFrom},
-    path::{Path, PathBuf},
-    pin::Pin,
-    sync::atomic::Ordering,
-    task::{Context, Poll},
-};
+use std::{collections::Bound, ffi::OsStr, io::{self, SeekFrom}, path::{Path, PathBuf}, pin::Pin, sync::{Arc, atomic::Ordering}, task::{Context, Poll}};
 use tokio::{
     io::{AsyncRead, AsyncSeekExt, ReadBuf},
     task::spawn_blocking as blocking,
@@ -380,10 +371,11 @@ pub fn send_file<P: AsRef<Path>>(
 pub fn get_folder(
     base_path: &'static Path,
     folder_path: PathBuf,
+    collections: Arc<collection::Collections>,
     ordering: FoldersOrdering,
 ) -> ResponseFuture {
     Box::pin(
-        blocking(move || list_dir(&base_path, &folder_path, ordering))
+        blocking(move || collections.list_dir(&base_path, &folder_path, ordering))
             .map_ok(|res| match res {
                 Ok(folder) => json_response(&folder),
                 Err(_) => resp::not_found(),
@@ -416,7 +408,8 @@ pub fn download_folder(
 
             download_name.push_str(format.extension());
 
-            match blocking(move || list_dir_files_only(&base_path, &folder_path)).await {
+            match blocking(move || list_dir_files_only(&base_path, &folder_path,
+            get_config().allow_symlinks)).await {
                 Ok(Ok(folder)) => {
                     let total_len: u64 = match format {
                         DownloadFormat::Tar => {
@@ -470,7 +463,7 @@ fn json_response<T: serde::Serialize>(data: &T) -> Response {
 const UKNOWN_NAME: &str = "unknown";
 
 pub fn collections_list() -> ResponseFuture {
-    let collections = Collections {
+    let collections = CollectionsInfo {
         folder_download: !get_config().disable_folder_download,
         shared_positions: if cfg!(feature = "shared-positions") {
             true

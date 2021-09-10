@@ -15,7 +15,6 @@ hyper = {version="0.14", features = ["full"]}
 headers = "0.3"
 futures = "0.3"
 mime = "0.3"
-mime_guess = "2.0"
 serde_json = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
@@ -34,8 +33,6 @@ tokio = {version="1.2", features=["full"]}
 
 dirs = "3.0"
 csv = "1.1"
-unicase = "2.6"
-unicase_serde = "0.1.0"
 linked-hash-map = {git="https://github.com/izderadicka/linked-hash-map.git", version="0.5.3", features=["serde_impl"]}
 
 # for tls
@@ -49,7 +46,7 @@ leaky-cauldron = {path="crates/leaky-cauldron"}
 tokio-util = {version="0.6", optional=true}
 
 # this repo dependencies
-media_info = {path="crates/media_info"}
+collection = {path="crates/collection"}
 proxy-headers = {path="crates/proxy-headers", optional=true}
 simple-file-cache = {path="crates/file-cache", features=["asynch"], optional=true }
 async-tar = {path="crates/async-tar", optional=true}
@@ -63,7 +60,7 @@ nix = "0.20"
 default = ["tls", "symlinks","search-cache", "folder-download", "shared-positions"]
 # default
 tls=["tokio-native-tls", "native-tls"]
-symlinks=["cachedirtree/symlinks"]
+symlinks=["cachedirtree/symlinks", "collection/symlinks"]
 search-cache=["cachedirtree"]
 folder-download = ["async-tar", "async-zip"]
 folder-download-default-tar =[]
@@ -72,8 +69,8 @@ shared-positions = ["websock"]
 transcoding-cache=["simple-file-cache", "tokio-util"]
 behind-proxy = ["proxy-headers"]
 # for static compilation only
-partially-static = ["media_info/partially-static"]
-static = ["media_info/static"]
+partially-static = ["collection/partially-static"]
+static = ["collection/static"]
 
 
 

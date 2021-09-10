@@ -23,6 +23,7 @@ csv = "1.1"
 mime_guess = "2.0"
 unicase = "2.6"
 unicase_serde = "0.1"
+ring = "0.16"
 
 [features]
 

@@ -124,7 +124,6 @@ impl AudioFolderShort {
         })
     }
 
-    #[cfg(feature = "search-cache")]
     pub fn from_path_and_name(name: String, path: PathBuf, is_file: bool) -> Self {
         AudioFolderShort {
             name: name.into(),
@@ -255,4 +254,31 @@ pub fn get_audio_properties(audio_file_name: &Path) -> Result<impl MediaInfo> {
 
 pub fn init_media_lib() {
     libavformat::init()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_audio() {
+        assert!(is_audio("my/song.mp3"));
+        assert!(is_audio("other/chapter.opus"));
+        assert!(!is_audio("cover.jpg"));
+    }
+
+    #[test]
+    fn test_is_cover() {
+        assert!(is_cover("cover.jpg"));
+        assert!(!is_cover("my/song.mp3"));
+    }
+
+    #[test]
+    fn test_is_description() {
+        assert!(!is_description("cover.jpg"));
+        assert!(is_description("about.html"));
+        assert!(is_description("about.txt"));
+        assert!(is_description("some/folder/text.md"));
+    }
+
 }

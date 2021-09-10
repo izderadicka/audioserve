@@ -18,6 +18,7 @@ enum DirType {
     Other,
 }
 
+#[derive(Debug,Clone)]
 pub struct FoldersOptions {
     pub chapters_duration: u32,
     pub chapters_from_duration: u32,
@@ -38,6 +39,7 @@ impl Default for FoldersOptions {
     }
 }
 
+#[derive(Clone)]
 pub struct FolderLister {
     config: FoldersOptions,
 }

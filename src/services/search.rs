@@ -1,6 +1,7 @@
-use super::types::{AudioFolderShort, FoldersOrdering, SearchResult};
+use super::types::SearchResult;
 use crate::config::get_config;
 use crate::util::get_real_file_type;
+use collection::{AudioFolderShort,FoldersOrdering};
 use std::collections::BinaryHeap;
 use std::fs;
 use std::path::{Path, PathBuf};

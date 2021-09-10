@@ -1,6 +1,5 @@
 use headers::{Header, HeaderMapExt};
 use hyper::http::response::Builder;
-use mime_guess::{self, Mime};
 use std::cmp::{max, min};
 use std::fs::DirEntry;
 use std::{
@@ -8,20 +7,6 @@ use std::{
     ops::{Bound, RangeBounds},
     path::Path,
 };
-
-pub fn guess_mime_type<P: AsRef<Path>>(path: P) -> Mime {
-    mime_guess::from_path(path).first_or_octet_stream()
-}
-
-pub fn os_to_string(s: ::std::ffi::OsString) -> String {
-    match s.into_string() {
-        Ok(s) => s,
-        Err(s) => {
-            warn!("Invalid file name - cannot covert to UTF8 : {:?}", s);
-            "INVALID_NAME".into()
-        }
-    }
-}
 
 pub fn parent_dir_exists<P: AsRef<Path>>(p: &P) -> bool {
     match p.as_ref().parent() {

@@ -5,11 +5,11 @@ use self::subs::{
     ResponseFuture,
 };
 use self::transcode::QualityLevel;
-use self::types::FoldersOrdering;
 use crate::config::get_config;
 use crate::util::ResponseBuilderExt;
 use crate::{error, util::header2header};
 use bytes::{Bytes, BytesMut};
+use collection::{Collections, FoldersOrdering};
 use futures::prelude::*;
 use futures::{future, TryFutureExt};
 use headers::{
@@ -38,8 +38,6 @@ use std::{
 };
 use url::form_urlencoded;
 
-pub mod audio_folder;
-pub mod audio_meta;
 pub mod auth;
 #[cfg(feature = "shared-positions")]
 pub mod position;
@@ -218,6 +216,7 @@ pub struct ServiceFactory<T> {
     rate_limitter: Option<Arc<Leaky>>,
     search: Search<String>,
     transcoding: TranscodingDetails,
+    collections: Arc<Collections>
 }
 
 impl<T> ServiceFactory<T> {
@@ -236,6 +235,7 @@ impl<T> ServiceFactory<T> {
             rate_limitter: rate_limit.map(|l| Arc::new(Leaky::new(l))),
             search,
             transcoding,
+            collections: Arc::new(Collections::new())
         }
     }
 
@@ -249,6 +249,7 @@ impl<T> ServiceFactory<T> {
             rate_limitter: self.rate_limitter.clone(),
             search: self.search.clone(),
             transcoding: self.transcoding.clone(),
+            collections: self.collections.clone(),
             remote_addr,
             is_ssl,
         })
@@ -261,6 +262,7 @@ pub struct FileSendService<T> {
     pub rate_limitter: Option<Arc<Leaky>>,
     pub search: Search<String>,
     pub transcoding: TranscodingDetails,
+    pub collections: Arc<Collections>,
     pub remote_addr: Option<SocketAddr>,
     pub is_ssl: bool,
 }
@@ -375,19 +377,20 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
         let transcoding = self.transcoding.clone();
         let cors = get_config().cors;
         let origin = req.headers().typed_get::<Origin>();
-
+        
         let resp = match self.authenticator {
             Some(ref auth) => {
+                let collections = self.collections.clone();
                 Box::pin(auth.authenticate(req).and_then(move |result| match result {
                     AuthResult::Authenticated { request, .. } => {
-                        FileSendService::<C>::process_checked(request, searcher, transcoding)
+                        FileSendService::<C>::process_checked(request, searcher, transcoding, collections)
                     }
                     AuthResult::LoggedIn(resp) | AuthResult::Rejected(resp) => {
                         Box::pin(future::ok(resp))
                     }
                 }))
             }
-            None => FileSendService::<C>::process_checked(req, searcher, transcoding),
+            None => FileSendService::<C>::process_checked(req, searcher, transcoding, self.collections.clone()),
         };
         Box::pin(resp.map_ok(move |r| add_cors_headers(r, origin, cors)))
     }
@@ -398,6 +401,7 @@ impl<C> FileSendService<C> {
         req: RequestWrapper,
         searcher: Search<String>,
         transcoding: TranscodingDetails,
+        collections: Arc<Collections>
     ) -> ResponseFuture {
         let params = req.params();
 
@@ -437,7 +441,7 @@ impl<C> FileSendService<C> {
                             params,
                         )
                     } else if path.starts_with("/folder/") {
-                        get_folder(base_dir, get_subpath(&path, "/folder/"), ord)
+                        get_folder(base_dir, get_subpath(&path, "/folder/"), collections, ord)
                     } else if !get_config().disable_folder_download && path.starts_with("/download")
                     {
                         #[cfg(feature = "folder-download")]
