@@ -33,6 +33,7 @@ cd $FFMPEG_VERSION/
   --disable-encoders \
   --disable-decoders \
   --disable-doc \
+  --disable-vdpau \
   --enable-pic
 
 make
