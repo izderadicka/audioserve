@@ -264,6 +264,7 @@ pub struct Config {
     pub positions_file: PathBuf,
     pub positions_ws_timeout: Duration,
     pub behind_proxy: bool,
+    pub collections_cache_dir: PathBuf
 }
 
 impl Config {
@@ -409,6 +410,7 @@ impl Default for Config {
             positions_file: data_base_dir.join("audioserve.positions"),
             positions_ws_timeout: Duration::from_secs(600),
             behind_proxy: false,
+            collections_cache_dir: data_base_dir.join("col_db"),
         }
     }
 }

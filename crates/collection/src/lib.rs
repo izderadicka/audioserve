@@ -4,10 +4,9 @@ extern crate log;
 use audio_folder::{FolderLister, FoldersOptions};
 use audio_meta::AudioFolder;
 use cache::CollectionCache;
-use error::Result;
+use error::{Error, Result};
 use std::{
     collections::HashMap,
-    io,
     path::{Path, PathBuf},
 };
 
@@ -23,17 +22,10 @@ mod cache;
 
 pub struct Collections {
     caches: HashMap<PathBuf, CollectionCache>,
-    lister: FolderLister,
 }
 
 impl Collections {
-    pub fn new() -> Self {
-        Collections {
-            caches: HashMap::new(),
-            lister: FolderLister::new(),
-        }
-    }
-
+    
     pub fn new_with_detail<I, P1, P2>(
         collections_dirs: Vec<PathBuf>,
         db_path: P2,
@@ -46,14 +38,16 @@ impl Collections {
     {
         let mut caches = HashMap::new();
         let db_path = db_path.as_ref();
+        let lister = FolderLister::new_with_options(opt);
         for d in collections_dirs.into_iter() {
             let collection_path: PathBuf = d.into();
-            let cache = CollectionCache::new(collection_path.clone(), db_path)?;
+            let mut cache = CollectionCache::new(collection_path.clone(), db_path, lister.clone())?;
+            cache.run_update_loop(collection_path.clone());
             caches.insert(collection_path, cache);
+
         }
         Ok(Collections {
             caches,
-            lister: FolderLister::new_with_options(opt),
         })
     }
 }
@@ -64,8 +58,9 @@ impl Collections {
         base_dir: P,
         dir_path: P2,
         ordering: FoldersOrdering,
-    ) -> std::result::Result<AudioFolder, io::Error> {
-        self.lister.list_dir(base_dir, dir_path, ordering)
+    ) -> Result<AudioFolder> {
+        self.caches.get(base_dir.as_ref()).ok_or_else(|| Error::MissingCollectionCache(base_dir.as_ref().to_string_lossy().into()))?
+        .list_dir(base_dir, dir_path, ordering)
     }
 }
 

@@ -14,5 +14,14 @@ pub enum Error {
 
     #[error("Invalid file name - not UTF8")]
     InvalidFileName,
+
+    #[error("IO Error")]
+    IOError(#[from] std::io::Error),
+
+    #[error("Bincode serialization error")]
+    BincodeError(#[from] Box<bincode::ErrorKind>),
+
+    #[error("Missing Collection Cache: {0}")]
+    MissingCollectionCache(String)
     
 }

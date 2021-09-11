@@ -9,6 +9,7 @@ use crate::config::get_config;
 use crate::util::ResponseBuilderExt;
 use crate::{error, util::header2header};
 use bytes::{Bytes, BytesMut};
+use collection::audio_folder::FoldersOptions;
 use collection::{Collections, FoldersOrdering};
 use futures::prelude::*;
 use futures::{future, TryFutureExt};
@@ -229,13 +230,25 @@ impl<T> ServiceFactory<T> {
     where
         A: Authenticator<Credentials = T> + 'static,
     {
+
         ServiceFactory {
             authenticator: auth
                 .map(|a| Arc::new(Box::new(a) as Box<dyn Authenticator<Credentials = T>>)),
             rate_limitter: rate_limit.map(|l| Arc::new(Leaky::new(l))),
             search,
             transcoding,
-            collections: Arc::new(Collections::new()) //get_config().base_dirs.clone()))
+            collections: Arc::new(Collections::new_with_detail::<Vec<PathBuf>,_,_>(
+                get_config().base_dirs.clone(),
+                get_config().collections_cache_dir.as_path(),
+                FoldersOptions{
+                    allow_symlinks: get_config().allow_symlinks,
+                    chapters_duration: get_config().chapters.duration,
+                    chapters_from_duration: get_config().chapters.from_duration,
+                    ignore_chapters_meta: get_config().ignore_chapters_meta,
+                    no_dir_collaps: get_config().no_dir_collaps
+                }
+
+            ).expect("Unable to create collections cache")) 
         }
     }
 

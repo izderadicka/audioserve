@@ -1,11 +1,11 @@
 use mime_guess::Mime;
-use serde_derive::Serialize;
+use serde_derive::{Serialize, Deserialize};
 use crate::error::{Error, Result};
 use std::{cmp::Ordering, path::{Path, PathBuf}, time::SystemTime};
 use crate::util::guess_mime_type;
 use unicase::UniCase;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TypedFile {
     pub path: PathBuf,
     pub mime: String,
@@ -22,13 +22,13 @@ impl TypedFile {
     }
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FileSection {
     pub start: u64,
     pub duration: Option<u64>,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AudioFile {
     #[serde(with = "unicase_serde::unicase")]
     pub name: UniCase<String>,
@@ -38,7 +38,7 @@ pub struct AudioFile {
     pub section: Option<FileSection>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AudioFolder {
     pub files: Vec<AudioFile>,
     pub subfolders: Vec<AudioFolderShort>,
@@ -61,7 +61,7 @@ impl FoldersOrdering {
     }
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct AudioMeta {
     pub duration: u32, // duration in seconds, if available
     pub bitrate: u32,  // bitrate in kB/s
@@ -82,7 +82,7 @@ impl std::fmt::Display for TimeSpan {
     }
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AudioFolderShort {
     #[serde(with = "unicase_serde::unicase")]
     pub name: UniCase<String>,
