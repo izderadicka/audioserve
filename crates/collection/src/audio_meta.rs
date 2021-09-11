@@ -40,6 +40,8 @@ pub struct AudioFile {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AudioFolder {
+    pub last_modification: Option<SystemTime>, // last modification time of this folder
+    pub total_time: Option<u32>, // total playback time of contained audio files
     pub files: Vec<AudioFile>,
     pub subfolders: Vec<AudioFolderShort>,
     pub cover: Option<TypedFile>, // cover is file in folder - either jpg or png

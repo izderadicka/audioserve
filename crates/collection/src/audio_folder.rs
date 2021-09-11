@@ -18,7 +18,7 @@ enum DirType {
     Other,
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct FoldersOptions {
     pub chapters_duration: u32,
     pub chapters_from_duration: u32,
@@ -250,7 +250,8 @@ impl FolderLister {
                             chapters,
                             audio_meta,
                         } => {
-                            let f = self.list_dir_file(base_dir, full_path, audio_meta, chapters, true)?;
+                            let f = self
+                                .list_dir_file(base_dir, full_path, audio_meta, chapters, true)?;
                             files = f.files;
                         }
                         _ => {
@@ -265,7 +266,9 @@ impl FolderLister {
                     subfolders.sort_unstable_by(|a, b| a.compare_as(ordering, b));
                 }
 
-                Ok(AudioFolder {
+                self.extend_audiofolder(& full_path, AudioFolder {
+                    last_modification: None,
+                    total_time: None,
                     files,
                     subfolders,
                     cover,
@@ -281,6 +284,17 @@ impl FolderLister {
                 Err(e)
             }
         }
+    }
+
+    fn extend_audiofolder<P:AsRef<Path>>(&self, full_path:P, mut af: AudioFolder) -> Result<AudioFolder, io::Error> {
+        let last_modification = full_path.as_ref().metadata().ok().and_then(|m| m.modified().ok());
+        let total_time: u32 = af.files
+                    .iter()
+                    .map(|f| f.meta.as_ref(). map(|m| m.duration).unwrap_or(0))
+                    .sum();
+        af.last_modification = last_modification;
+        af.total_time = Some(total_time);
+        Ok(af)
     }
 
     #[allow(clippy::unnecessary_wraps)] // actually as its used in match with function returning results it's better to have Result return type
@@ -316,12 +330,14 @@ impl FolderLister {
             })
             .collect::<io::Result<Vec<_>>>()?;
 
-        Ok(AudioFolder {
-            files,
-            subfolders: vec![],
-            cover: None,
-            description: None,
-        })
+            self.extend_audiofolder(& full_path, AudioFolder {
+                last_modification: None,
+                total_time: None,
+                files,
+                subfolders: vec![],
+                cover: None,
+                description: None
+            })
     }
 }
 
@@ -529,7 +545,7 @@ mod tests {
     use super::*;
     use serde_json;
 
-    const  TEST_DATA_BASE: &str = "../..";
+    const TEST_DATA_BASE: &str = "../..";
 
     #[test]
     fn test_list_dir() {
@@ -561,7 +577,9 @@ mod tests {
     #[test]
     fn test_json() {
         let lister = FolderLister::new();
-        let folder = lister.list_dir(TEST_DATA_BASE, "test_data/", FoldersOrdering::Alphabetical).unwrap();
+        let folder = lister
+            .list_dir(TEST_DATA_BASE, "test_data/", FoldersOrdering::Alphabetical)
+            .unwrap();
         let json = serde_json::to_string(&folder).unwrap();
         println!("JSON: {}", &json);
     }
