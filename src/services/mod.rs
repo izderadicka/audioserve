@@ -235,7 +235,7 @@ impl<T> ServiceFactory<T> {
             rate_limitter: rate_limit.map(|l| Arc::new(Leaky::new(l))),
             search,
             transcoding,
-            collections: Arc::new(Collections::new())
+            collections: Arc::new(Collections::new()) //get_config().base_dirs.clone()))
         }
     }
 
