@@ -179,9 +179,8 @@ impl FolderLister {
                             Ok(ft) => {
                                 let path = f.path().strip_prefix(&base_dir).unwrap().into();
                                 if ft.is_dir() {
-                                    subfolders.push(AudioFolderShort::from_dir_entry(
-                                        &f, path, ordering, false,
-                                    )?)
+                                    subfolders
+                                        .push(AudioFolderShort::from_dir_entry(&f, path, false)?)
                                 } else if ft.is_file() {
                                     if is_audio(&path) {
                                         let mime = guess_mime_type(&path);
@@ -198,7 +197,7 @@ impl FolderLister {
                                         {
                                             // we do have chapters so let present this file as folder
                                             subfolders.push(AudioFolderShort::from_dir_entry(
-                                                &f, path, ordering, true,
+                                                &f, path, true,
                                             )?)
                                         } else {
                                             let meta = meta.get_audio_info();
@@ -209,7 +208,7 @@ impl FolderLister {
                                             {
                                                 // file is bigger then limit present as folder
                                                 subfolders.push(AudioFolderShort::from_dir_entry(
-                                                    &f, path, ordering, true,
+                                                    &f, path, true,
                                                 )?)
                                             } else {
                                                 files.push(AudioFile {
@@ -266,14 +265,17 @@ impl FolderLister {
                     subfolders.sort_unstable_by(|a, b| a.compare_as(ordering, b));
                 }
 
-                self.extend_audiofolder(& full_path, AudioFolder {
-                    last_modification: None,
-                    total_time: None,
-                    files,
-                    subfolders,
-                    cover,
-                    description,
-                })
+                self.extend_audiofolder(
+                    &full_path,
+                    AudioFolder {
+                        last_modification: None,
+                        total_time: None,
+                        files,
+                        subfolders,
+                        cover,
+                        description,
+                    },
+                )
             }
             Err(e) => {
                 error!(
@@ -286,12 +288,21 @@ impl FolderLister {
         }
     }
 
-    fn extend_audiofolder<P:AsRef<Path>>(&self, full_path:P, mut af: AudioFolder) -> Result<AudioFolder, io::Error> {
-        let last_modification = full_path.as_ref().metadata().ok().and_then(|m| m.modified().ok());
-        let total_time: u32 = af.files
-                    .iter()
-                    .map(|f| f.meta.as_ref(). map(|m| m.duration).unwrap_or(0))
-                    .sum();
+    fn extend_audiofolder<P: AsRef<Path>>(
+        &self,
+        full_path: P,
+        mut af: AudioFolder,
+    ) -> Result<AudioFolder, io::Error> {
+        let last_modification = full_path
+            .as_ref()
+            .metadata()
+            .ok()
+            .and_then(|m| m.modified().ok());
+        let total_time: u32 = af
+            .files
+            .iter()
+            .map(|f| f.meta.as_ref().map(|m| m.duration).unwrap_or(0))
+            .sum();
         af.last_modification = last_modification;
         af.total_time = Some(total_time);
         Ok(af)
@@ -330,14 +341,17 @@ impl FolderLister {
             })
             .collect::<io::Result<Vec<_>>>()?;
 
-            self.extend_audiofolder(& full_path, AudioFolder {
+        self.extend_audiofolder(
+            &full_path,
+            AudioFolder {
                 last_modification: None,
                 total_time: None,
                 files,
                 subfolders: vec![],
                 cover: None,
-                description: None
-            })
+                description: None,
+            },
+        )
     }
 }
 

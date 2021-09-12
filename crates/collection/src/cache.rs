@@ -5,7 +5,13 @@ use crate::{
     FoldersOrdering,
 };
 use sled::Db;
-use std::{convert::TryInto, path::{Path, PathBuf}, sync::Arc, thread, time::SystemTime};
+use std::{
+    convert::TryInto,
+    path::{Path, PathBuf},
+    sync::Arc,
+    thread,
+    time::SystemTime,
+};
 use walkdir::{DirEntry, WalkDir};
 
 #[derive(Clone)]
@@ -32,14 +38,12 @@ impl CacheInner {
             })
     }
 
-    fn get_if_actual<P: AsRef<Path>>(&self, dir: P, ts: Option<SystemTime>)  -> Option<AudioFolder> {
+    fn get_if_actual<P: AsRef<Path>>(&self, dir: P, ts: Option<SystemTime>) -> Option<AudioFolder> {
         let af = self.get(dir);
         af.as_ref()
-                                .and_then(|af| af.last_modification)
-                                .and_then(|cached_time| {
-                                    ts.map(|actual_time| cached_time >= actual_time)
-                                })
-                                .and_then(|actual| if actual {af} else {None})
+            .and_then(|af| af.last_modification)
+            .and_then(|cached_time| ts.map(|actual_time| cached_time >= actual_time))
+            .and_then(|actual| if actual { af } else { None })
     }
 }
 
@@ -72,17 +76,28 @@ impl CollectionCache {
         dir_path: P2,
         ordering: FoldersOrdering,
     ) -> Result<AudioFolder> {
-        let full_path =base_dir.as_ref().join(&dir_path);
+        let full_path = base_dir.as_ref().join(&dir_path);
         let ts = full_path.metadata().ok().and_then(|m| m.modified().ok());
-        self.inner.get_if_actual(&dir_path, ts)
-        .ok_or_else(|| {
-            debug!("Fetching folder {:?} from file file system", dir_path.as_ref());
         self.inner
-            .lister
-            .list_dir(base_dir, dir_path, ordering)
-            .map_err(Error::from)
-        })
-        .or_else(|r| r)
+            .get_if_actual(&dir_path, ts)
+            .map(|mut af| {
+                if matches!(ordering, FoldersOrdering::RecentFirst) {
+                    af.subfolders
+                        .sort_unstable_by(|a, b| a.compare_as(ordering, b));
+                }
+                af
+            })
+            .ok_or_else(|| {
+                debug!(
+                    "Fetching folder {:?} from file file system",
+                    dir_path.as_ref()
+                );
+                self.inner
+                    .lister
+                    .list_dir(base_dir, dir_path, ordering)
+                    .map_err(Error::from)
+            })
+            .or_else(|r| r)
     }
 
     fn db_path<P1: AsRef<Path>, P2: AsRef<Path>>(path: P1, db_dir: P2) -> Result<PathBuf> {
@@ -113,7 +128,6 @@ impl CollectionCache {
                             .to_str();
                         let mod_ts = entry.metadata().ok().and_then(|m| m.modified().ok());
                         if let Some(rel_path) = rel_path {
-                            
                             if inner.get_if_actual(rel_path, mod_ts).is_none() {
                                 match inner
                                     .lister
@@ -126,7 +140,7 @@ impl CollectionCache {
                                             .db
                                             .insert(rel_path, data)
                                             .map_err(|e| error!("Cannot insert to db {}", e))
-                                            .map(|p| debug!("Path {:?} was cached", entry.path()))
+                                            .map(|_| debug!("Path {:?} was cached", entry.path()))
                                             .ok();
                                     }
                                     Err(e) => error!(

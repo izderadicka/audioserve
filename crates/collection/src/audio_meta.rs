@@ -1,8 +1,12 @@
-use mime_guess::Mime;
-use serde_derive::{Serialize, Deserialize};
 use crate::error::{Error, Result};
-use std::{cmp::Ordering, path::{Path, PathBuf}, time::SystemTime};
 use crate::util::guess_mime_type;
+use mime_guess::Mime;
+use serde_derive::{Deserialize, Serialize};
+use std::{
+    cmp::Ordering,
+    path::{Path, PathBuf},
+    time::SystemTime,
+};
 use unicase::UniCase;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -41,7 +45,7 @@ pub struct AudioFile {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AudioFolder {
     pub last_modification: Option<SystemTime>, // last modification time of this folder
-    pub total_time: Option<u32>, // total playback time of contained audio files
+    pub total_time: Option<u32>,               // total playback time of contained audio files
     pub files: Vec<AudioFile>,
     pub subfolders: Vec<AudioFolderShort>,
     pub cover: Option<TypedFile>, // cover is file in folder - either jpg or png
@@ -90,7 +94,6 @@ pub struct AudioFolderShort {
     pub name: UniCase<String>,
     pub path: PathBuf,
     pub is_file: bool,
-    #[serde(skip)] // May make it visible in future
     pub modified: Option<SystemTime>,
 }
 
@@ -108,7 +111,6 @@ impl AudioFolderShort {
     pub fn from_dir_entry(
         f: &std::fs::DirEntry,
         path: PathBuf,
-        ordering: FoldersOrdering,
         is_file: bool,
     ) -> std::result::Result<Self, std::io::Error> {
         Ok(AudioFolderShort {
@@ -116,13 +118,7 @@ impl AudioFolderShort {
             name: f.file_name().to_string_lossy().into(),
             is_file,
 
-            modified: {
-                if let FoldersOrdering::RecentFirst = ordering {
-                    Some(f.metadata()?.modified()?)
-                } else {
-                    None
-                }
-            },
+            modified: Some(f.metadata()?.modified()?),
         })
     }
 
@@ -188,8 +184,6 @@ pub fn is_description<P: AsRef<Path>>(path: P) -> bool {
     mime.type_() == "text" && has_subtype(&mime, DESCRIPTIONS)
 }
 
-
-
 /// trait to generalize access to media metadata
 /// (so that underlying library can be easily changed)
 pub trait MediaInfo<'a>: Sized {
@@ -222,7 +216,7 @@ mod libavformat {
         fn has_chapters(&self) -> bool {
             self.media_file.chapters_count() > 1
         }
-        
+
         fn get_chapters(&self) -> Option<Vec<Chapter>> {
             self.media_file.chapters().map(|l| {
                 l.into_iter()
@@ -240,7 +234,9 @@ mod libavformat {
     impl Info {
         pub fn from_file(path: &Path) -> Result<Info> {
             match path.as_os_str().to_str() {
-                Some(fname) => Ok(Info { media_file:  media_info::MediaFile::open(fname)?}),
+                Some(fname) => Ok(Info {
+                    media_file: media_info::MediaFile::open(fname)?,
+                }),
                 None => {
                     error!("Invalid file name {:?}, not utf-8", path);
                     Err(Error::InvalidFileName)
@@ -282,5 +278,4 @@ mod tests {
         assert!(is_description("about.txt"));
         assert!(is_description("some/folder/text.md"));
     }
-
 }
