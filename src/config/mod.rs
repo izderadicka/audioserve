@@ -264,7 +264,7 @@ pub struct Config {
     pub positions_file: PathBuf,
     pub positions_ws_timeout: Duration,
     pub behind_proxy: bool,
-    pub collections_cache_dir: PathBuf
+    pub collections_cache_dir: PathBuf,
 }
 
 impl Config {

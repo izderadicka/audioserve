@@ -1,4 +1,3 @@
-
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(thiserror::Error, Debug)]
@@ -22,6 +21,5 @@ pub enum Error {
     BincodeError(#[from] Box<bincode::ErrorKind>),
 
     #[error("Missing Collection Cache: {0}")]
-    MissingCollectionCache(String)
-    
+    MissingCollectionCache(String),
 }

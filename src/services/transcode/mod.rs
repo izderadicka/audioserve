@@ -521,8 +521,8 @@ mod vec_codec {
 
 #[cfg(test)]
 mod tests {
-    use collection::audio_meta::{get_audio_properties, MediaInfo};
     use super::*;
+    use collection::audio_meta::{get_audio_properties, MediaInfo};
     use std::env::temp_dir;
     use std::fs::remove_file;
     use std::path::Path;

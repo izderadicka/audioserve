@@ -3,7 +3,6 @@ use crate::config::get_config;
 
 use collection::{AudioFile, AudioFolderShort};
 
-
 #[derive(Debug, Serialize)]
 pub struct CollectionsInfo {
     pub folder_download: bool,
@@ -113,5 +112,3 @@ mod download_format {
         }
     }
 }
-
-

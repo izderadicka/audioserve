@@ -1,7 +1,7 @@
 use super::types::SearchResult;
 use crate::config::get_config;
 use crate::util::get_real_file_type;
-use collection::{AudioFolderShort,FoldersOrdering};
+use collection::{AudioFolderShort, FoldersOrdering};
 use std::collections::BinaryHeap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -163,12 +163,8 @@ impl FoldersSearch {
                                     let m = tokens.iter().all(|token| lc_s.contains(token));
                                     if m {
                                         debug!("Found {:?} in {}", tokens, lc_s);
-                                        let folder = AudioFolderShort::from_dir_entry(
-                                            &f,
-                                            s.into(),
-                                            ordering,
-                                            false,
-                                        );
+                                        let folder =
+                                            AudioFolderShort::from_dir_entry(&f, s.into(), false);
                                         if let Ok(folder) = folder {
                                             results.subfolders.push(folder)
                                         }

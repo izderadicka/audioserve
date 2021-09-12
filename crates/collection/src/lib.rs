@@ -16,16 +16,15 @@ pub use util::guess_mime_type;
 
 pub mod audio_folder;
 pub mod audio_meta;
+mod cache;
 pub mod error;
 pub mod util;
-mod cache;
 
 pub struct Collections {
     caches: HashMap<PathBuf, CollectionCache>,
 }
 
 impl Collections {
-    
     pub fn new_with_detail<I, P1, P2>(
         collections_dirs: Vec<PathBuf>,
         db_path: P2,
@@ -44,11 +43,8 @@ impl Collections {
             let mut cache = CollectionCache::new(collection_path.clone(), db_path, lister.clone())?;
             cache.run_update_loop(collection_path.clone());
             caches.insert(collection_path, cache);
-
         }
-        Ok(Collections {
-            caches,
-        })
+        Ok(Collections { caches })
     }
 }
 
@@ -59,8 +55,11 @@ impl Collections {
         dir_path: P2,
         ordering: FoldersOrdering,
     ) -> Result<AudioFolder> {
-        self.caches.get(base_dir.as_ref()).ok_or_else(|| Error::MissingCollectionCache(base_dir.as_ref().to_string_lossy().into()))?
-        .list_dir(base_dir, dir_path, ordering)
+        self.caches
+            .get(base_dir.as_ref())
+            .ok_or_else(|| {
+                Error::MissingCollectionCache(base_dir.as_ref().to_string_lossy().into())
+            })?
+            .list_dir(base_dir, dir_path, ordering)
     }
 }
-

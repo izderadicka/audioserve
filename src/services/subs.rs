@@ -1,5 +1,4 @@
 //#[cfg(feature = "folder-download")]
-use collection::{list_dir_files_only, parse_chapter_path, TimeSpan, FoldersOrdering, guess_mime_type};
 use super::{
     resp,
     search::{Search, SearchTrait},
@@ -10,15 +9,24 @@ use super::{
 use crate::{
     config::get_config,
     error::{Error, Result},
-    util::{
-        checked_dec, into_range_bounds, to_satisfiable_range, ResponseBuilderExt,
-    },
+    util::{checked_dec, into_range_bounds, to_satisfiable_range, ResponseBuilderExt},
+};
+use collection::{
+    guess_mime_type, list_dir_files_only, parse_chapter_path, FoldersOrdering, TimeSpan,
 };
 use futures::prelude::*;
 use futures::{future, ready, Stream};
 use headers::{AcceptRanges, CacheControl, ContentLength, ContentRange, ContentType, LastModified};
 use hyper::{Body, Response as HyperResponse, StatusCode};
-use std::{collections::Bound, ffi::OsStr, io::{self, SeekFrom}, path::{Path, PathBuf}, pin::Pin, sync::{Arc, atomic::Ordering}, task::{Context, Poll}};
+use std::{
+    collections::Bound,
+    ffi::OsStr,
+    io::{self, SeekFrom},
+    path::{Path, PathBuf},
+    pin::Pin,
+    sync::{atomic::Ordering, Arc},
+    task::{Context, Poll},
+};
 use tokio::{
     io::{AsyncRead, AsyncSeekExt, ReadBuf},
     task::spawn_blocking as blocking,
@@ -408,8 +416,11 @@ pub fn download_folder(
 
             download_name.push_str(format.extension());
 
-            match blocking(move || list_dir_files_only(&base_path, &folder_path,
-            get_config().allow_symlinks)).await {
+            match blocking(move || {
+                list_dir_files_only(&base_path, &folder_path, get_config().allow_symlinks)
+            })
+            .await
+            {
                 Ok(Ok(folder)) => {
                     let total_len: u64 = match format {
                         DownloadFormat::Tar => {
@@ -446,7 +457,7 @@ pub fn download_folder(
             }
         }
     };
-   
+
     Box::pin(f)
 }
 

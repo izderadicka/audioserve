@@ -217,7 +217,7 @@ pub struct ServiceFactory<T> {
     rate_limitter: Option<Arc<Leaky>>,
     search: Search<String>,
     transcoding: TranscodingDetails,
-    collections: Arc<Collections>
+    collections: Arc<Collections>,
 }
 
 impl<T> ServiceFactory<T> {
@@ -230,25 +230,26 @@ impl<T> ServiceFactory<T> {
     where
         A: Authenticator<Credentials = T> + 'static,
     {
-
         ServiceFactory {
             authenticator: auth
                 .map(|a| Arc::new(Box::new(a) as Box<dyn Authenticator<Credentials = T>>)),
             rate_limitter: rate_limit.map(|l| Arc::new(Leaky::new(l))),
             search,
             transcoding,
-            collections: Arc::new(Collections::new_with_detail::<Vec<PathBuf>,_,_>(
-                get_config().base_dirs.clone(),
-                get_config().collections_cache_dir.as_path(),
-                FoldersOptions{
-                    allow_symlinks: get_config().allow_symlinks,
-                    chapters_duration: get_config().chapters.duration,
-                    chapters_from_duration: get_config().chapters.from_duration,
-                    ignore_chapters_meta: get_config().ignore_chapters_meta,
-                    no_dir_collaps: get_config().no_dir_collaps
-                }
-
-            ).expect("Unable to create collections cache")) 
+            collections: Arc::new(
+                Collections::new_with_detail::<Vec<PathBuf>, _, _>(
+                    get_config().base_dirs.clone(),
+                    get_config().collections_cache_dir.as_path(),
+                    FoldersOptions {
+                        allow_symlinks: get_config().allow_symlinks,
+                        chapters_duration: get_config().chapters.duration,
+                        chapters_from_duration: get_config().chapters.from_duration,
+                        ignore_chapters_meta: get_config().ignore_chapters_meta,
+                        no_dir_collaps: get_config().no_dir_collaps,
+                    },
+                )
+                .expect("Unable to create collections cache"),
+            ),
         }
     }
 
@@ -390,20 +391,30 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
         let transcoding = self.transcoding.clone();
         let cors = get_config().cors;
         let origin = req.headers().typed_get::<Origin>();
-        
+
         let resp = match self.authenticator {
             Some(ref auth) => {
                 let collections = self.collections.clone();
                 Box::pin(auth.authenticate(req).and_then(move |result| match result {
                     AuthResult::Authenticated { request, .. } => {
-                        FileSendService::<C>::process_checked(request, searcher, transcoding, collections)
+                        FileSendService::<C>::process_checked(
+                            request,
+                            searcher,
+                            transcoding,
+                            collections,
+                        )
                     }
                     AuthResult::LoggedIn(resp) | AuthResult::Rejected(resp) => {
                         Box::pin(future::ok(resp))
                     }
                 }))
             }
-            None => FileSendService::<C>::process_checked(req, searcher, transcoding, self.collections.clone()),
+            None => FileSendService::<C>::process_checked(
+                req,
+                searcher,
+                transcoding,
+                self.collections.clone(),
+            ),
         };
         Box::pin(resp.map_ok(move |r| add_cors_headers(r, origin, cors)))
     }
@@ -414,7 +425,7 @@ impl<C> FileSendService<C> {
         req: RequestWrapper,
         searcher: Search<String>,
         transcoding: TranscodingDetails,
-        collections: Arc<Collections>
+        collections: Arc<Collections>,
     ) -> ResponseFuture {
         let params = req.params();
 

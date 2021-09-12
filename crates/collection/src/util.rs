@@ -1,9 +1,8 @@
-use std::path::Path;
 use std::fs::DirEntry;
 use std::io;
+use std::path::Path;
 
 use mime_guess::Mime;
-
 
 pub fn guess_mime_type<P: AsRef<Path>>(path: P) -> Mime {
     mime_guess::from_path(path).first_or_octet_stream()
@@ -36,6 +35,5 @@ pub fn get_real_file_type<P: AsRef<Path>>(
     _full_path: P,
     _allow_symlinks: bool,
 ) -> Result<::std::fs::FileType, io::Error> {
-
     dir_entry.file_type()
 }
