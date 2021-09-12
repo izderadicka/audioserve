@@ -291,11 +291,10 @@ fn add_cors_headers(
     }
 }
 
-
 fn preflight_cors_response(req: &Request<Body>) -> Response<Body> {
     let origin = req.headers().typed_get::<Origin>();
     const ALLOWED_METHODS: &[Method] = &[Method::GET, Method::POST, Method::OPTIONS];
-    
+
     let mut resp_builder = Response::builder()
         .status(StatusCode::NO_CONTENT)
         // Allow all requested headers
