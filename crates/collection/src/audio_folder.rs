@@ -9,7 +9,7 @@ use crate::util::{get_real_file_type, guess_mime_type};
 use lazy_static::lazy_static;
 use regex::Regex;
 
-enum DirType {
+pub enum DirType {
     File {
         chapters: Vec<Chapter>,
         audio_meta: AudioMeta,
@@ -103,7 +103,7 @@ impl FolderLister {
         chaps
     }
 
-    fn get_dir_type<P: AsRef<Path>>(&self, path: P) -> Result<DirType, io::Error> {
+    pub fn get_dir_type<P: AsRef<Path>>(&self, path: P) -> Result<DirType, io::Error> {
         let path = path.as_ref();
         let meta = if cfg!(feature = "symlinks") {
             path.metadata()?
