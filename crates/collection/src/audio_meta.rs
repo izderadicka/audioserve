@@ -9,7 +9,45 @@ use std::{
 };
 use unicase::UniCase;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, Ord)]
+/// This is timestamp is miliseconds from start of Unix epoch
+pub struct TimeStamp(u64);
+
+impl From<SystemTime> for TimeStamp {
+    fn from(t: SystemTime) -> Self {
+        let milis = t
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0) as u64;
+        TimeStamp(milis)
+    }
+}
+
+impl From<u64> for TimeStamp {
+    fn from(n: u64) -> Self {
+        TimeStamp(n)
+    }
+}
+
+impl<T> PartialEq<T> for TimeStamp
+where
+    T: Into<TimeStamp> + Copy,
+{
+    fn eq(&self, other: &T) -> bool {
+        self.0 == (*other).into().0
+    }
+}
+
+impl<T> PartialOrd<T> for TimeStamp
+where
+    T: Into<TimeStamp> + Copy,
+{
+    fn partial_cmp(&self, other: &T) -> Option<Ordering> {
+        self.0.partial_cmp(&(*other).into().0)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TypedFile {
     pub path: PathBuf,
     pub mime: String,
@@ -26,13 +64,13 @@ impl TypedFile {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct FileSection {
     pub start: u64,
     pub duration: Option<u64>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AudioFile {
     #[serde(with = "unicase_serde::unicase")]
     pub name: UniCase<String>,
@@ -42,10 +80,10 @@ pub struct AudioFile {
     pub section: Option<FileSection>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AudioFolder {
-    pub last_modification: Option<SystemTime>, // last modification time of this folder
-    pub total_time: Option<u32>,               // total playback time of contained audio files
+    pub modified: Option<TimeStamp>, // last modification time of this folder
+    pub total_time: Option<u32>,     // total playback time of contained audio files
     pub files: Vec<AudioFile>,
     pub subfolders: Vec<AudioFolderShort>,
     pub cover: Option<TypedFile>, // cover is file in folder - either jpg or png
@@ -67,7 +105,7 @@ impl FoldersOrdering {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AudioMeta {
     pub duration: u32, // duration in seconds, if available
     pub bitrate: u32,  // bitrate in kB/s
@@ -88,13 +126,13 @@ impl std::fmt::Display for TimeSpan {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AudioFolderShort {
     #[serde(with = "unicase_serde::unicase")]
     pub name: UniCase<String>,
     pub path: PathBuf,
     pub is_file: bool,
-    pub modified: Option<SystemTime>,
+    pub modified: Option<TimeStamp>,
 }
 
 impl AudioFolderShort {
@@ -118,7 +156,7 @@ impl AudioFolderShort {
             name: f.file_name().to_string_lossy().into(),
             is_file,
 
-            modified: Some(f.metadata()?.modified()?),
+            modified: Some(f.metadata()?.modified()?.into()),
         })
     }
 
@@ -256,6 +294,8 @@ pub fn init_media_lib() {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
 
     #[test]
@@ -277,5 +317,17 @@ mod tests {
         assert!(is_description("about.html"));
         assert!(is_description("about.txt"));
         assert!(is_description("some/folder/text.md"));
+    }
+
+    #[test]
+    fn test_timestamp() {
+        let now = SystemTime::now();
+        let now_ts: TimeStamp = now.into();
+        let in_future = now + Duration::from_secs(120);
+        let in_future_ts: TimeStamp = in_future.into();
+        assert!(now_ts < in_future_ts);
+        assert!(now_ts < in_future);
+        assert!(in_future_ts > now_ts);
+        assert!(in_future_ts > now);
     }
 }

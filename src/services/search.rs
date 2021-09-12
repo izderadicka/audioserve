@@ -262,7 +262,7 @@ mod cache {
                     let full_path = base_path.join(&s.path);
                     if let Ok(metadata) = fs::metadata(full_path) {
                         if let Ok(modified) = metadata.modified() {
-                            s.modified = Some(modified)
+                            s.modified = Some(modified.into())
                         }
                     }
                 });

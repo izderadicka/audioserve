@@ -268,7 +268,7 @@ impl FolderLister {
                 self.extend_audiofolder(
                     &full_path,
                     AudioFolder {
-                        last_modification: None,
+                        modified: None,
                         total_time: None,
                         files,
                         subfolders,
@@ -303,7 +303,7 @@ impl FolderLister {
             .iter()
             .map(|f| f.meta.as_ref().map(|m| m.duration).unwrap_or(0))
             .sum();
-        af.last_modification = last_modification;
+        af.modified = last_modification.map(TimeStamp::from);
         af.total_time = Some(total_time);
         Ok(af)
     }
@@ -344,7 +344,7 @@ impl FolderLister {
         self.extend_audiofolder(
             &full_path,
             AudioFolder {
-                last_modification: None,
+                modified: None,
                 total_time: None,
                 files,
                 subfolders: vec![],

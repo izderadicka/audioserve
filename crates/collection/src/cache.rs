@@ -41,9 +41,31 @@ impl CacheInner {
     fn get_if_actual<P: AsRef<Path>>(&self, dir: P, ts: Option<SystemTime>) -> Option<AudioFolder> {
         let af = self.get(dir);
         af.as_ref()
-            .and_then(|af| af.last_modification)
+            .and_then(|af| af.modified)
             .and_then(|cached_time| ts.map(|actual_time| cached_time >= actual_time))
             .and_then(|actual| if actual { af } else { None })
+    }
+
+    fn update<P: AsRef<Path>>(&self, dir: P, af: AudioFolder) -> Result<()> {
+        let dir = dir
+            .as_ref()
+            .to_str()
+            .ok_or_else(|| Error::InvalidCollectionPath)?;
+        bincode::serialize(&af)
+            .map_err(Error::from)
+            .and_then(|data| self.db.insert(dir, data).map_err(Error::from))
+            .map(|_| debug!("Cache updated for {:?}", dir))
+    }
+
+    fn force_update<P: AsRef<Path>, P2: AsRef<Path>>(
+        &self,
+        base_dir: P,
+        dir_path: P2,
+    ) -> Result<()> {
+        let af =
+            self.lister
+                .list_dir(base_dir, dir_path.as_ref(), FoldersOrdering::Alphabetical)?;
+        self.update(dir_path, af)
     }
 }
 
@@ -97,7 +119,19 @@ impl CollectionCache {
                     .list_dir(base_dir, dir_path, ordering)
                     .map_err(Error::from)
             })
-            .or_else(|r| r)
+            .or_else(|r| {
+                if let Ok(af_ref) = r.as_ref() {
+                    // We should update cache as we got new info
+                    debug!("Updating cache for dir {:?}", full_path);
+                    let mut af = af_ref.clone();
+                    if matches!(ordering, FoldersOrdering::RecentFirst) {
+                        af.subfolders.sort_unstable_by(|a, b| {
+                            a.compare_as(FoldersOrdering::Alphabetical, b)
+                        });
+                    }
+                }
+                r
+            })
     }
 
     fn db_path<P1: AsRef<Path>, P2: AsRef<Path>>(path: P1, db_dir: P2) -> Result<PathBuf> {
@@ -124,36 +158,28 @@ impl CollectionCache {
                         let rel_path = entry
                             .path()
                             .strip_prefix(&root_path)
-                            .expect("always have root path")
-                            .to_str();
+                            .expect("always have root path");
                         let mod_ts = entry.metadata().ok().and_then(|m| m.modified().ok());
-                        if let Some(rel_path) = rel_path {
-                            if inner.get_if_actual(rel_path, mod_ts).is_none() {
-                                match inner
-                                    .lister
-                                    .list_dir(&root_path, rel_path, FoldersOrdering::Alphabetical)
-                                    .map_err(Error::from)
-                                    .and_then(|af| bincode::serialize(&af).map_err(Error::from))
-                                {
-                                    Ok(data) => {
-                                        inner
-                                            .db
-                                            .insert(rel_path, data)
-                                            .map_err(|e| error!("Cannot insert to db {}", e))
-                                            .map(|_| debug!("Path {:?} was cached", entry.path()))
-                                            .ok();
-                                    }
-                                    Err(e) => error!(
-                                        "Cannot listing audio folder {:?}, error {}",
-                                        entry.path(),
-                                        e
-                                    ),
+                        if inner.get_if_actual(rel_path, mod_ts).is_none() {
+                            match inner.lister.list_dir(
+                                &root_path,
+                                rel_path,
+                                FoldersOrdering::Alphabetical,
+                            ) {
+                                Ok(af) => {
+                                    inner
+                                        .update(rel_path, af)
+                                        .map_err(|e| error!("Cannot insert to db {}", e))
+                                        .ok();
                                 }
-                            } else {
-                                debug!("For path {:?} using cached data", entry.path())
+                                Err(e) => error!(
+                                    "Cannot listing audio folder {:?}, error {}",
+                                    entry.path(),
+                                    e
+                                ),
                             }
                         } else {
-                            error!("Path in collection is not UTF8 {:?}", entry.path());
+                            debug!("For path {:?} using cached data", entry.path())
                         }
                     }
                     Err(e) => error!("Cannot read directory entry: {}", e),
@@ -165,6 +191,14 @@ impl CollectionCache {
 
     pub fn get<P: AsRef<Path>>(&self, dir: P) -> Option<AudioFolder> {
         self.inner.get(dir)
+    }
+
+    pub fn force_update<P: AsRef<Path>, P2: AsRef<Path>>(
+        &self,
+        base_dir: P,
+        dir_path: P2,
+    ) -> Result<()> {
+        self.inner.force_update(base_dir, dir_path)
     }
 }
 
@@ -180,12 +214,15 @@ fn is_visible_dir(entry: &DirEntry) -> bool {
 #[cfg(test)]
 mod tests {
 
+    use std::fs;
+
+    use fs_extra::dir::{copy, CopyOptions};
     use tempdir::TempDir;
 
     use super::*;
 
     #[test]
-    fn test_updater() {
+    fn test_cache_creation() {
         env_logger::try_init().ok();
         let tmp_dir = TempDir::new("AS_CACHE_TEST").expect("Cannot create temp dir");
         let test_data_dir = Path::new("../../test_data");
@@ -204,6 +241,38 @@ mod tests {
         assert_eq!(2, entry1.files.len());
         assert_eq!(2, entry1.subfolders.len());
         assert_eq!(0, entry2.files.len())
+    }
+
+    #[test]
+    fn test_cache_manipulation() -> anyhow::Result<()> {
+        env_logger::try_init().ok();
+        let tmp_dir = TempDir::new("AS_CACHE_TEST")?;
+        let test_data_dir_orig = Path::new("../../test_data");
+        let test_data_dir = tmp_dir.path().join("test_data");
+        copy(&test_data_dir_orig, tmp_dir.path(), &CopyOptions::default())?;
+        let info_file = test_data_dir.join("usak/kulisak/desc.txt");
+        assert!(info_file.exists());
+        let db_path = tmp_dir.path().join("updater_db");
+        let col = CollectionCache::new(&test_data_dir, db_path, FolderLister::new())
+            .expect("Cannot create CollectionCache");
+
+        col.force_update(&test_data_dir, "usak/kulisak")?;
+        let af = col.get("usak/kulisak").expect("cache record exits");
+        let ts1 = af.modified.unwrap();
+        assert_eq!(
+            Path::new("usak/kulisak/desc.txt"),
+            af.description.unwrap().path
+        );
+        let new_info_name = test_data_dir.join("usak/kulisak/info.txt");
+        fs::rename(info_file, new_info_name)?;
+        let af2 = col.list_dir(test_data_dir, "usak/kulisak", FoldersOrdering::RecentFirst)?;
+        assert_eq!(
+            Path::new("usak/kulisak/info.txt"),
+            af2.description.unwrap().path
+        );
+        assert!(af2.modified.unwrap() >= ts1);
+
+        Ok(())
     }
 
     #[test]

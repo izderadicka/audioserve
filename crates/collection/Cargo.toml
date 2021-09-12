@@ -10,6 +10,8 @@ edition = "2018"
 serde_json ="1.0"
 env_logger = "0.9"
 tempdir = "0.3"
+fs_extra = "1.2"
+anyhow = "1.0"
 
 [dependencies]
 
