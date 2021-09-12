@@ -30,6 +30,7 @@ unicase_serde = "0.1"
 ring = "0.16"
 walkdir = "2.3"
 bincode = "1.3"
+notify = "4.0"
 
 [features]
 

@@ -265,6 +265,7 @@ dependencies = [
  "log",
  "media_info",
  "mime_guess",
+ "notify",
  "regex",
  "ring",
  "serde",

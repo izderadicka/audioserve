@@ -4,13 +4,14 @@ use crate::{
     error::{Error, Result},
     FoldersOrdering,
 };
+use notify::{watcher, Watcher};
 use sled::Db;
 use std::{
     convert::TryInto,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{mpsc::channel, Arc},
     thread,
-    time::SystemTime,
+    time::{Duration, SystemTime},
 };
 use walkdir::{DirEntry, WalkDir};
 
@@ -116,7 +117,7 @@ impl CollectionCache {
                 );
                 self.inner
                     .lister
-                    .list_dir(base_dir, dir_path, ordering)
+                    .list_dir(base_dir, &dir_path, ordering)
                     .map_err(Error::from)
             })
             .or_else(|r| {
@@ -129,6 +130,7 @@ impl CollectionCache {
                             a.compare_as(FoldersOrdering::Alphabetical, b)
                         });
                     }
+                    self.inner.update(dir_path, af).map_err(|e| error!("Cannot update collection: {}", e)).ok();
                 }
                 r
             })
@@ -151,38 +153,100 @@ impl CollectionCache {
     pub fn run_update_loop(&mut self, root_path: PathBuf) {
         let inner = self.inner.clone();
         let thread = thread::spawn(move || {
-            let walker = WalkDir::new(&root_path).follow_links(false).into_iter();
-            for entry in walker.filter_entry(|e| is_visible_dir(e)) {
-                match entry {
-                    Ok(entry) => {
-                        let rel_path = entry
-                            .path()
-                            .strip_prefix(&root_path)
-                            .expect("always have root path");
-                        let mod_ts = entry.metadata().ok().and_then(|m| m.modified().ok());
-                        if inner.get_if_actual(rel_path, mod_ts).is_none() {
-                            match inner.lister.list_dir(
-                                &root_path,
-                                rel_path,
-                                FoldersOrdering::Alphabetical,
-                            ) {
-                                Ok(af) => {
-                                    inner
-                                        .update(rel_path, af)
-                                        .map_err(|e| error!("Cannot insert to db {}", e))
-                                        .ok();
+            loop {
+                let walker = WalkDir::new(&root_path).follow_links(false).into_iter();
+                let (tx, rx) = channel();
+                let mut watcher = watcher(tx, Duration::from_secs(10))
+                    .map_err(|e| error!("Failed to create fs watcher: {}", e));
+                if let Ok(ref mut watcher) = watcher {
+                    watcher
+                        .watch(&root_path, notify::RecursiveMode::Recursive)
+                        .map_err(|e| error!("failed to start watching: {}", e))
+                        .ok();
+                }
+
+                // clean up non-exitent directories
+                for key in inner.db.iter()
+                .filter_map(|e| e.ok())
+                .map(|(k,_)| k)
+                 {
+                    if let Ok(rel_path) =  std::str::from_utf8(&key) {
+                    let full_path = root_path.join(rel_path);
+                    if ! full_path.exists() {
+                        debug!("Removing {:?} from collection cache db", full_path);
+                        inner.db.remove(rel_path)
+                        .map_err(|e| error! ("cannot remove revord from db: {}", e)).ok();
+                    }
+                    }
+                }
+
+                // inittial scan of directory
+                for entry in walker.filter_entry(|e| is_visible_dir(e)) {
+                    match entry {
+                        Ok(entry) => {
+                            let rel_path = entry
+                                .path()
+                                .strip_prefix(&root_path)
+                                .expect("always have root path");
+                            let mod_ts = entry.metadata().ok().and_then(|m| m.modified().ok());
+                            if inner.get_if_actual(rel_path, mod_ts).is_none() {
+                                match inner.lister.list_dir(
+                                    &root_path,
+                                    rel_path,
+                                    FoldersOrdering::Alphabetical,
+                                ) {
+                                    Ok(af) => {
+                                        inner
+                                            .update(rel_path, af)
+                                            .map_err(|e| error!("Cannot insert to db {}", e))
+                                            .ok();
+                                    }
+                                    Err(e) => error!(
+                                        "Cannot listing audio folder {:?}, error {}",
+                                        entry.path(),
+                                        e
+                                    ),
                                 }
-                                Err(e) => error!(
-                                    "Cannot listing audio folder {:?}, error {}",
-                                    entry.path(),
-                                    e
-                                ),
+                            } else {
+                                debug!("For path {:?} using cached data", entry.path())
                             }
-                        } else {
-                            debug!("For path {:?} using cached data", entry.path())
+                        }
+                        Err(e) => error!("Cannot read directory entry: {}", e),
+                    }
+                }
+
+                // now update changed directories
+                loop {
+                    match rx.recv() {
+                        Ok(event) => {
+                            debug!(
+                                "Change in collection {:?} => {:?}",
+                                root_path, event
+                            );
+                            let paths_to_update = match event {
+                                notify::DebouncedEvent::NoticeWrite(_) => continue,
+                                notify::DebouncedEvent::NoticeRemove(_) => continue,
+                                notify::DebouncedEvent::Create(p) => (p, None),
+                                notify::DebouncedEvent::Write(p) => (p, None),
+                                notify::DebouncedEvent::Chmod(_) => continue,
+                                notify::DebouncedEvent::Remove(p) => (p, None),
+                                notify::DebouncedEvent::Rename(p1, p2) => (p1, Some(p2)),
+                                notify::DebouncedEvent::Rescan => {
+                                    warn!("Rescaning of collection required");
+                                    break;
+                                }
+                                notify::DebouncedEvent::Error(e, p) => {
+                                    error!("Watch event error {} on {:?}", e, p);
+                                    continue;
+                                }
+                            };
+                            
+                        }
+                        Err(e) => {
+                            error!("Error in collection watcher channel: {}", e);
+                            thread::sleep(Duration::from_secs(10));
                         }
                     }
-                    Err(e) => error!("Cannot read directory entry: {}", e),
                 }
             }
         });
