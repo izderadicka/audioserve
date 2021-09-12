@@ -1,4 +1,4 @@
-FROM alpine:edge AS build
+FROM alpine:3.14 AS build
 LABEL maintainer="Ivan <ivan@zderadicka.eu>"
 
 ARG CARGO_ARGS
@@ -20,7 +20,7 @@ RUN mkdir /ssl &&\
         -subj "/C=CZ/ST=Prague/L=Prague/O=Ivan/CN=audioserve" &&\
     openssl pkcs12 -inkey key.pem -in certificate.pem -export  -passout pass:mypass -out audioserve.p12 
 
-FROM node:10-alpine as client
+FROM node:12-alpine as client
 
 COPY ./client /audioserve_client
 
@@ -28,7 +28,7 @@ RUN cd audioserve_client &&\
     npm install &&\
     npm run build
 
-FROM alpine:edge
+FROM alpine:3.14
 
 VOLUME /audiobooks
 COPY --from=build /audioserve/target/release/audioserve /audioserve/audioserve
