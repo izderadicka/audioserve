@@ -2,9 +2,7 @@ name: Rust_check
 
 on:
   push:
-    branches: [ master ]
   pull_request:
-    branches: [ master ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -16,6 +14,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - uses: Swatinem/rust-cache@v1
     - name: Check formattig
       run: cargo fmt --all -- --check
     - name: Check compilation
