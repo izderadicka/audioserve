@@ -252,6 +252,9 @@ mod tests {
         tst!();
     }
 
+    // This test is sometimes causing problems on CI - probably due to high load there
+    // Locally works fine but will disable for now, can run manually
+    #[ignore]
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_ticker() {
         env_logger::try_init().ok();
