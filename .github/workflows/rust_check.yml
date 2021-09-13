@@ -16,6 +16,10 @@ jobs:
     - uses: actions/checkout@v2
     - uses: Swatinem/rust-cache@v1
     - name: Check formattig
-      run: cargo fmt --all -- --check
+      run: |
+        rustfmt --version
+        cargo fmt --all -- --check
     - name: Check compilation
-      run: cargo check --verbose
+      run: |
+        rustc --version
+        cargo check --verbose
