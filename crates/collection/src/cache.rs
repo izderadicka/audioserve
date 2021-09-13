@@ -264,6 +264,10 @@ impl CollectionCache {
     ) -> Result<()> {
         self.inner.force_update(base_dir, dir_path)
     }
+
+    pub fn flush(&self) -> Result<()>{
+        self.inner.db.flush().map(|_| ()).map_err(Error::from)
+    }
 }
 
 fn is_visible_dir(entry: &DirEntry) -> bool {

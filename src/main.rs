@@ -5,6 +5,8 @@ extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
 
+use collection::Collections;
+use collection::audio_folder::FoldersOptions;
 use config::{get_config, init_config};
 use error::{bail, Context, Error};
 use futures::prelude::*;
@@ -15,7 +17,7 @@ use services::{
 };
 use std::fs::File;
 use std::io::{self, Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process;
 use std::sync::atomic::AtomicUsize;
@@ -76,7 +78,24 @@ macro_rules! get_url_path {
     };
 }
 
-fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
+fn create_collections() -> Arc<Collections> {
+    Arc::new(
+        Collections::new_with_detail::<Vec<PathBuf>, _, _>(
+            get_config().base_dirs.clone(),
+            get_config().collections_cache_dir.as_path(),
+            FoldersOptions {
+                allow_symlinks: get_config().allow_symlinks,
+                chapters_duration: get_config().chapters.duration,
+                chapters_from_duration: get_config().chapters.from_duration,
+                ignore_chapters_meta: get_config().ignore_chapters_meta,
+                no_dir_collaps: get_config().no_dir_collaps,
+            },
+        )
+        .expect("Unable to create collections cache"),
+    )
+}
+
+fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> tokio::runtime::Runtime {
     let cfg = get_config();
 
     let addr = cfg.listen;
@@ -89,7 +108,7 @@ fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
             max_transcodings: cfg.transcoding.max_parallel_processes,
         };
         let svc_factory =
-            ServiceFactory::new(authenticator, Search::new(), transcoding, cfg.limit_rate);
+            ServiceFactory::new(authenticator, Search::new(), transcoding, collections, cfg.limit_rate);
 
         let server: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> =
             match get_config().ssl.as_ref() {
@@ -209,7 +228,9 @@ fn main() {
         }
     };
 
-    let runtime = start_server(server_secret);
+    let collections = create_collections();
+
+    let runtime = start_server(server_secret, collections.clone());
 
     runtime.block_on(terminate_server());
 
@@ -220,6 +241,9 @@ fn main() {
     }
     //graceful shutdown of server will wait till transcoding ends, so rather shut it down hard
     runtime.shutdown_timeout(std::time::Duration::from_millis(300));
+
+    debug!("Saving collections db");
+    collections.flush().map_err(|e| error!("Flush of colletions db failed: {}",e)).ok();
 
     #[cfg(feature = "transcoding-cache")]
     {

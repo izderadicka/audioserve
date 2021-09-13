@@ -62,4 +62,14 @@ impl Collections {
             })?
             .list_dir(base_dir, dir_path, ordering)
     }
+
+    pub fn flush(&self) -> Result<()> {
+        let mut result = vec![];
+        for c in self.caches.values() {
+            result.push(c.flush())
+        }
+        result.into_iter().find(|r| r.is_err()).unwrap_or(Ok(()))
+
+       
+    }
 }
