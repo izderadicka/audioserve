@@ -5,8 +5,8 @@ extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
 
-use collection::Collections;
 use collection::audio_folder::FoldersOptions;
+use collection::Collections;
 use config::{get_config, init_config};
 use error::{bail, Context, Error};
 use futures::prelude::*;
@@ -107,8 +107,13 @@ fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> tokio:
             transcodings: Arc::new(AtomicUsize::new(0)),
             max_transcodings: cfg.transcoding.max_parallel_processes,
         };
-        let svc_factory =
-            ServiceFactory::new(authenticator, Search::new(), transcoding, collections, cfg.limit_rate);
+        let svc_factory = ServiceFactory::new(
+            authenticator,
+            Search::new(),
+            transcoding,
+            collections,
+            cfg.limit_rate,
+        );
 
         let server: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> =
             match get_config().ssl.as_ref() {
@@ -243,7 +248,10 @@ fn main() {
     runtime.shutdown_timeout(std::time::Duration::from_millis(300));
 
     debug!("Saving collections db");
-    collections.flush().map_err(|e| error!("Flush of colletions db failed: {}",e)).ok();
+    collections
+        .flush()
+        .map_err(|e| error!("Flush of colletions db failed: {}", e))
+        .ok();
 
     #[cfg(feature = "transcoding-cache")]
     {

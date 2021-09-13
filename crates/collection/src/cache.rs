@@ -130,7 +130,10 @@ impl CollectionCache {
                             a.compare_as(FoldersOrdering::Alphabetical, b)
                         });
                     }
-                    self.inner.update(dir_path, af).map_err(|e| error!("Cannot update collection: {}", e)).ok();
+                    self.inner
+                        .update(dir_path, af)
+                        .map_err(|e| error!("Cannot update collection: {}", e))
+                        .ok();
                 }
                 r
             })
@@ -166,17 +169,17 @@ impl CollectionCache {
                 }
 
                 // clean up non-exitent directories
-                for key in inner.db.iter()
-                .filter_map(|e| e.ok())
-                .map(|(k,_)| k)
-                 {
-                    if let Ok(rel_path) =  std::str::from_utf8(&key) {
-                    let full_path = root_path.join(rel_path);
-                    if ! full_path.exists() {
-                        debug!("Removing {:?} from collection cache db", full_path);
-                        inner.db.remove(rel_path)
-                        .map_err(|e| error! ("cannot remove revord from db: {}", e)).ok();
-                    }
+                for key in inner.db.iter().filter_map(|e| e.ok()).map(|(k, _)| k) {
+                    if let Ok(rel_path) = std::str::from_utf8(&key) {
+                        let full_path = root_path.join(rel_path);
+                        if !full_path.exists() {
+                            debug!("Removing {:?} from collection cache db", full_path);
+                            inner
+                                .db
+                                .remove(rel_path)
+                                .map_err(|e| error!("cannot remove revord from db: {}", e))
+                                .ok();
+                        }
                     }
                 }
 
@@ -219,10 +222,7 @@ impl CollectionCache {
                 loop {
                     match rx.recv() {
                         Ok(event) => {
-                            debug!(
-                                "Change in collection {:?} => {:?}",
-                                root_path, event
-                            );
+                            debug!("Change in collection {:?} => {:?}", root_path, event);
                             let paths_to_update = match event {
                                 notify::DebouncedEvent::NoticeWrite(_) => continue,
                                 notify::DebouncedEvent::NoticeRemove(_) => continue,
@@ -240,7 +240,6 @@ impl CollectionCache {
                                     continue;
                                 }
                             };
-                            
                         }
                         Err(e) => {
                             error!("Error in collection watcher channel: {}", e);
@@ -265,7 +264,7 @@ impl CollectionCache {
         self.inner.force_update(base_dir, dir_path)
     }
 
-    pub fn flush(&self) -> Result<()>{
+    pub fn flush(&self) -> Result<()> {
         self.inner.db.flush().map(|_| ()).map_err(Error::from)
     }
 }

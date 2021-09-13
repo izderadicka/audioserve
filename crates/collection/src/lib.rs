@@ -69,7 +69,5 @@ impl Collections {
             result.push(c.flush())
         }
         result.into_iter().find(|r| r.is_err()).unwrap_or(Ok(()))
-
-       
     }
 }
