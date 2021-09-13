@@ -1,0 +1,22 @@
+name: Rust_check
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Check formattig
+      run: cargo fmt --all -- --check
+    - name: Check compilation
+      run: cargo check --verbose
