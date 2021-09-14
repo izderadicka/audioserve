@@ -9,7 +9,7 @@ use sled::Db;
 use std::{
     convert::TryInto,
     path::{Path, PathBuf},
-    sync::{mpsc::channel, Arc},
+    sync::{mpsc::channel, Arc, Condvar, Mutex},
     thread,
     time::{Duration, SystemTime},
 };
@@ -19,6 +19,7 @@ use walkdir::{DirEntry, WalkDir};
 struct CacheInner {
     db: Arc<Db>,
     lister: FolderLister,
+    base_dir: PathBuf,
 }
 
 impl CacheInner {
@@ -68,38 +69,44 @@ impl CacheInner {
                 .list_dir(base_dir, dir_path.as_ref(), FoldersOrdering::Alphabetical)?;
         self.update(dir_path, af)
     }
+
+    fn full_path<P: AsRef<Path>>(&self, rel_path: P) -> PathBuf {
+        self.base_dir.join(rel_path.as_ref())
+    }
 }
 
 pub struct CollectionCache {
     thread: Option<thread::JoinHandle<()>>,
+    cond: Arc<(Condvar, Mutex<bool>)>,
     inner: CacheInner,
 }
 
 impl CollectionCache {
-    pub fn new<P1: AsRef<Path>, P2: AsRef<Path>>(
+    pub fn new<P1: Into<PathBuf>, P2: AsRef<Path>>(
         path: P1,
         db_dir: P2,
         lister: FolderLister,
     ) -> Result<CollectionCache> {
-        let root_path = path.as_ref();
+        let root_path = path.into();
         let db_path = CollectionCache::db_path(&root_path, db_dir)?;
         let db = sled::open(db_path)?;
         Ok(CollectionCache {
             inner: CacheInner {
                 db: Arc::new(db),
                 lister,
+                base_dir: root_path,
             },
             thread: None,
+            cond: Arc::new((Condvar::new(), Mutex::new(false))),
         })
     }
 
-    pub fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
+    pub fn list_dir<P: AsRef<Path>>(
         &self,
-        base_dir: P,
-        dir_path: P2,
+        dir_path: P,
         ordering: FoldersOrdering,
     ) -> Result<AudioFolder> {
-        let full_path = base_dir.as_ref().join(&dir_path);
+        let full_path = self.inner.full_path(&dir_path);
         let ts = full_path.metadata().ok().and_then(|m| m.modified().ok());
         self.inner
             .get_if_actual(&dir_path, ts)
@@ -117,7 +124,7 @@ impl CollectionCache {
                 );
                 self.inner
                     .lister
-                    .list_dir(base_dir, &dir_path, ordering)
+                    .list_dir(&self.inner.base_dir, &dir_path, ordering)
                     .map_err(Error::from)
             })
             .or_else(|r| {
@@ -155,9 +162,15 @@ impl CollectionCache {
 
     pub fn run_update_loop(&mut self, root_path: PathBuf) {
         let inner = self.inner.clone();
+        let cond = self.cond.clone();
         let thread = thread::spawn(move || {
             loop {
                 let walker = WalkDir::new(&root_path).follow_links(false).into_iter();
+                let (cond_var, cond_mtx) = &*cond;
+                {
+                    let mut started = cond_mtx.lock().unwrap();
+                    *started = false;
+                }
                 let (tx, rx) = channel();
                 let mut watcher = watcher(tx, Duration::from_secs(10))
                     .map_err(|e| error!("Failed to create fs watcher: {}", e));
@@ -218,6 +231,13 @@ impl CollectionCache {
                     }
                 }
 
+                // Notify about finish of initial scan
+                {
+                    let mut started = cond_mtx.lock().unwrap();
+                    *started = true;
+                    cond_var.notify_all();
+                }
+
                 // now update changed directories
                 loop {
                     match rx.recv() {
@@ -250,6 +270,14 @@ impl CollectionCache {
             }
         });
         self.thread = Some(thread);
+    }
+
+    pub fn wait_until_inital_scan_is_done(&self) {
+        let (cond_var, cond_mtx) = &*self.cond;
+        let mut started = cond_mtx.lock().unwrap();
+        while !*started {
+            started = cond_var.wait(started).unwrap();
+        }
     }
 
     pub fn get<P: AsRef<Path>>(&self, dir: P) -> Option<AudioFolder> {
@@ -297,11 +325,7 @@ mod tests {
         let mut col = CollectionCache::new(test_data_dir, db_path, FolderLister::new())
             .expect("Cannot create CollectionCache");
         col.run_update_loop(test_data_dir.into());
-        col.thread
-            .take()
-            .expect("thread was not created")
-            .join()
-            .expect("thread error");
+        col.wait_until_inital_scan_is_done();
 
         let entry1 = col.get("").unwrap();
         let entry2 = col.get("usak/kulisak").unwrap();
@@ -332,7 +356,7 @@ mod tests {
         );
         let new_info_name = test_data_dir.join("usak/kulisak/info.txt");
         fs::rename(info_file, new_info_name)?;
-        let af2 = col.list_dir(test_data_dir, "usak/kulisak", FoldersOrdering::RecentFirst)?;
+        let af2 = col.list_dir("usak/kulisak", FoldersOrdering::RecentFirst)?;
         assert_eq!(
             Path::new("usak/kulisak/info.txt"),
             af2.description.unwrap().path

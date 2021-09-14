@@ -377,13 +377,13 @@ pub fn send_file<P: AsRef<Path>>(
 }
 
 pub fn get_folder(
-    base_path: &'static Path,
+    collection: usize,
     folder_path: PathBuf,
     collections: Arc<collection::Collections>,
     ordering: FoldersOrdering,
 ) -> ResponseFuture {
     Box::pin(
-        blocking(move || collections.list_dir(&base_path, &folder_path, ordering))
+        blocking(move || collections.list_dir(collection, &folder_path, ordering))
             .map_ok(|res| match res {
                 Ok(folder) => json_response(&folder),
                 Err(_) => resp::not_found(),

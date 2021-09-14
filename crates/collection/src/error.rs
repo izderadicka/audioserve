@@ -21,5 +21,5 @@ pub enum Error {
     BincodeError(#[from] Box<bincode::ErrorKind>),
 
     #[error("Missing Collection Cache: {0}")]
-    MissingCollectionCache(String),
+    MissingCollectionCache(usize),
 }

@@ -5,10 +5,7 @@ use audio_folder::{FolderLister, FoldersOptions};
 use audio_meta::AudioFolder;
 use cache::CollectionCache;
 use error::{Error, Result};
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 pub use audio_folder::{list_dir_files_only, parse_chapter_path};
 pub use audio_meta::{init_media_lib, AudioFile, AudioFolderShort, FoldersOrdering, TimeSpan};
@@ -21,7 +18,7 @@ pub mod error;
 pub mod util;
 
 pub struct Collections {
-    caches: HashMap<PathBuf, CollectionCache>,
+    caches: Vec<CollectionCache>,
 }
 
 impl Collections {
@@ -35,37 +32,39 @@ impl Collections {
         P1: Into<PathBuf>,
         P2: AsRef<Path>,
     {
-        let mut caches = HashMap::new();
         let db_path = db_path.as_ref();
         let lister = FolderLister::new_with_options(opt);
-        for d in collections_dirs.into_iter() {
-            let collection_path: PathBuf = d.into();
-            let mut cache = CollectionCache::new(collection_path.clone(), db_path, lister.clone())?;
-            cache.run_update_loop(collection_path.clone());
-            caches.insert(collection_path, cache);
-        }
+        let caches = collections_dirs
+            .into_iter()
+            .map(|collection_path| {
+                CollectionCache::new(collection_path.clone(), db_path, lister.clone()).map(
+                    |mut cache| {
+                        cache.run_update_loop(collection_path.clone());
+                        cache
+                    },
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
         Ok(Collections { caches })
     }
 }
 
 impl Collections {
-    pub fn list_dir<P: AsRef<Path>, P2: AsRef<Path>>(
+    pub fn list_dir<P: AsRef<Path>>(
         &self,
-        base_dir: P,
-        dir_path: P2,
+        collection: usize,
+        dir_path: P,
         ordering: FoldersOrdering,
     ) -> Result<AudioFolder> {
         self.caches
-            .get(base_dir.as_ref())
-            .ok_or_else(|| {
-                Error::MissingCollectionCache(base_dir.as_ref().to_string_lossy().into())
-            })?
-            .list_dir(base_dir, dir_path, ordering)
+            .get(collection)
+            .ok_or_else(|| Error::MissingCollectionCache(collection))?
+            .list_dir(dir_path, ordering)
     }
 
     pub fn flush(&self) -> Result<()> {
         let mut result = vec![];
-        for c in self.caches.values() {
+        for c in &self.caches {
             result.push(c.flush())
         }
         result.into_iter().find(|r| r.is_err()).unwrap_or(Ok(()))

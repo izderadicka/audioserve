@@ -452,7 +452,12 @@ impl<C> FileSendService<C> {
                             params,
                         )
                     } else if path.starts_with("/folder/") {
-                        get_folder(base_dir, get_subpath(&path, "/folder/"), collections, ord)
+                        get_folder(
+                            colllection_index,
+                            get_subpath(&path, "/folder/"),
+                            collections,
+                            ord,
+                        )
                     } else if !get_config().disable_folder_download && path.starts_with("/download")
                     {
                         #[cfg(feature = "folder-download")]
