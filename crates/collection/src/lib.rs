@@ -39,7 +39,7 @@ impl Collections {
             .map(|collection_path| {
                 CollectionCache::new(collection_path.clone(), db_path, lister.clone()).map(
                     |mut cache| {
-                        cache.run_update_loop(collection_path.clone());
+                        cache.run_update_loop();
                         cache
                     },
                 )
@@ -60,6 +60,13 @@ impl Collections {
             .get(collection)
             .ok_or_else(|| Error::MissingCollectionCache(collection))?
             .list_dir(dir_path, ordering)
+    }
+
+    pub fn force_update<P: AsRef<Path>>(&self, collection: usize, dir_path: P) -> Result<()> {
+        self.caches
+            .get(collection)
+            .ok_or_else(|| Error::MissingCollectionCache(collection))?
+            .force_update(dir_path)
     }
 
     pub fn flush(&self) -> Result<()> {

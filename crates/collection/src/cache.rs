@@ -17,7 +17,7 @@ use walkdir::{DirEntry, WalkDir};
 
 #[derive(Clone)]
 struct CacheInner {
-    db: Arc<Db>,
+    db: Db,
     lister: FolderLister,
     base_dir: PathBuf,
 }
@@ -59,14 +59,13 @@ impl CacheInner {
             .map(|_| debug!("Cache updated for {:?}", dir))
     }
 
-    fn force_update<P: AsRef<Path>, P2: AsRef<Path>>(
+    fn force_update<P: AsRef<Path>>(
         &self,
-        base_dir: P,
-        dir_path: P2,
+        dir_path: P,
     ) -> Result<()> {
         let af =
             self.lister
-                .list_dir(base_dir, dir_path.as_ref(), FoldersOrdering::Alphabetical)?;
+                .list_dir(&self.base_dir, dir_path.as_ref(), FoldersOrdering::Alphabetical)?;
         self.update(dir_path, af)
     }
 
@@ -78,7 +77,7 @@ impl CacheInner {
 pub struct CollectionCache {
     thread: Option<thread::JoinHandle<()>>,
     cond: Arc<(Condvar, Mutex<bool>)>,
-    inner: CacheInner,
+    inner: Arc<CacheInner>,
 }
 
 impl CollectionCache {
@@ -91,11 +90,11 @@ impl CollectionCache {
         let db_path = CollectionCache::db_path(&root_path, db_dir)?;
         let db = sled::open(db_path)?;
         Ok(CollectionCache {
-            inner: CacheInner {
-                db: Arc::new(db),
+            inner: Arc::new(CacheInner {
+                db:db,
                 lister,
                 base_dir: root_path,
-            },
+            }),
             thread: None,
             cond: Arc::new((Condvar::new(), Mutex::new(false))),
         })
@@ -160,12 +159,14 @@ impl CollectionCache {
         Ok(db_dir.as_ref().join(name.as_ref()))
     }
 
-    pub fn run_update_loop(&mut self, root_path: PathBuf) {
+    pub fn run_update_loop(&mut self) {
         let inner = self.inner.clone();
         let cond = self.cond.clone();
+        
         let thread = thread::spawn(move || {
+            let root_path = inner.base_dir.as_path();
             loop {
-                let walker = WalkDir::new(&root_path).follow_links(false).into_iter();
+                let walker = WalkDir::new(root_path).follow_links(false).into_iter();
                 let (cond_var, cond_mtx) = &*cond;
                 {
                     let mut started = cond_mtx.lock().unwrap();
@@ -272,6 +273,7 @@ impl CollectionCache {
         self.thread = Some(thread);
     }
 
+    #[allow(dead_code)]
     pub fn wait_until_inital_scan_is_done(&self) {
         let (cond_var, cond_mtx) = &*self.cond;
         let mut started = cond_mtx.lock().unwrap();
@@ -280,16 +282,16 @@ impl CollectionCache {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get<P: AsRef<Path>>(&self, dir: P) -> Option<AudioFolder> {
         self.inner.get(dir)
     }
 
-    pub fn force_update<P: AsRef<Path>, P2: AsRef<Path>>(
+    pub fn force_update<P: AsRef<Path>>(
         &self,
-        base_dir: P,
-        dir_path: P2,
+        dir_path: P,
     ) -> Result<()> {
-        self.inner.force_update(base_dir, dir_path)
+        self.inner.force_update(dir_path)
     }
 
     pub fn flush(&self) -> Result<()> {
@@ -324,7 +326,7 @@ mod tests {
         let db_path = tmp_dir.path().join("updater_db");
         let mut col = CollectionCache::new(test_data_dir, db_path, FolderLister::new())
             .expect("Cannot create CollectionCache");
-        col.run_update_loop(test_data_dir.into());
+        col.run_update_loop();
         col.wait_until_inital_scan_is_done();
 
         let entry1 = col.get("").unwrap();
@@ -347,7 +349,7 @@ mod tests {
         let col = CollectionCache::new(&test_data_dir, db_path, FolderLister::new())
             .expect("Cannot create CollectionCache");
 
-        col.force_update(&test_data_dir, "usak/kulisak")?;
+        col.force_update("usak/kulisak")?;
         let af = col.get("usak/kulisak").expect("cache record exits");
         let ts1 = af.modified.unwrap();
         assert_eq!(
