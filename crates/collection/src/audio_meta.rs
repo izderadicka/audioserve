@@ -82,6 +82,7 @@ pub struct AudioFile {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AudioFolder {
+    pub is_file: bool,
     pub modified: Option<TimeStamp>, // last modification time of this folder
     pub total_time: Option<u32>,     // total playback time of contained audio files
     pub files: Vec<AudioFile>,

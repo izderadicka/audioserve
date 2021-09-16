@@ -268,6 +268,7 @@ impl FolderLister {
                 self.extend_audiofolder(
                     &full_path,
                     AudioFolder {
+                        is_file: false,
                         modified: None,
                         total_time: None,
                         files,
@@ -344,6 +345,7 @@ impl FolderLister {
         self.extend_audiofolder(
             &full_path,
             AudioFolder {
+                is_file: true,
                 modified: None,
                 total_time: None,
                 files,

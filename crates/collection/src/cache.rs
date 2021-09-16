@@ -343,8 +343,8 @@ impl Iterator for Search {
                         let af = AudioFolderShort {
                             name: path.file_name().unwrap().to_string_lossy().into(),
                             path: path.into(),
-                            is_file: false,
-                            modified: folder.and_then(|f| f.modified),
+                            is_file: folder.as_ref().map(|f| f.is_file).unwrap_or(false),
+                            modified: folder.as_ref().and_then(|f| f.modified),
                         };
                         return Some(af);
                     }
