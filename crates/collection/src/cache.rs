@@ -2,7 +2,7 @@ use crate::{
     audio_folder::FolderLister,
     audio_meta::AudioFolder,
     error::{Error, Result},
-    FoldersOrdering,
+    AudioFolderShort, FoldersOrdering,
 };
 use notify::{watcher, Watcher};
 use sled::Db;
@@ -14,6 +14,12 @@ use std::{
     time::{Duration, SystemTime},
 };
 use walkdir::{DirEntry, WalkDir};
+
+fn deser_audiofoler<T: AsRef<[u8]>>(data: T) -> Option<AudioFolder> {
+    bincode::deserialize(data.as_ref())
+        .map_err(|e| error!("Error deserializing data from db {}", e))
+        .ok()
+}
 
 #[derive(Clone)]
 struct CacheInner {
@@ -33,11 +39,7 @@ impl CacheInner {
                     .ok()
                     .flatten()
             })
-            .and_then(|data| {
-                bincode::deserialize(&data)
-                    .map_err(|e| error!("Error deserializing data from db {}", e))
-                    .ok()
-            })
+            .and_then(deser_audiofoler)
     }
 
     fn get_if_actual<P: AsRef<Path>>(&self, dir: P, ts: Option<SystemTime>) -> Option<AudioFolder> {
@@ -59,13 +61,12 @@ impl CacheInner {
             .map(|_| debug!("Cache updated for {:?}", dir))
     }
 
-    fn force_update<P: AsRef<Path>>(
-        &self,
-        dir_path: P,
-    ) -> Result<()> {
-        let af =
-            self.lister
-                .list_dir(&self.base_dir, dir_path.as_ref(), FoldersOrdering::Alphabetical)?;
+    fn force_update<P: AsRef<Path>>(&self, dir_path: P) -> Result<()> {
+        let af = self.lister.list_dir(
+            &self.base_dir,
+            dir_path.as_ref(),
+            FoldersOrdering::Alphabetical,
+        )?;
         self.update(dir_path, af)
     }
 
@@ -91,7 +92,7 @@ impl CollectionCache {
         let db = sled::open(db_path)?;
         Ok(CollectionCache {
             inner: Arc::new(CacheInner {
-                db:db,
+                db: db,
                 lister,
                 base_dir: root_path,
             }),
@@ -162,7 +163,7 @@ impl CollectionCache {
     pub fn run_update_loop(&mut self) {
         let inner = self.inner.clone();
         let cond = self.cond.clone();
-        
+
         let thread = thread::spawn(move || {
             let root_path = inner.base_dir.as_path();
             loop {
@@ -287,15 +288,71 @@ impl CollectionCache {
         self.inner.get(dir)
     }
 
-    pub fn force_update<P: AsRef<Path>>(
-        &self,
-        dir_path: P,
-    ) -> Result<()> {
+    pub fn force_update<P: AsRef<Path>>(&self, dir_path: P) -> Result<()> {
         self.inner.force_update(dir_path)
     }
 
     pub fn flush(&self) -> Result<()> {
         self.inner.db.flush().map(|_| ()).map_err(Error::from)
+    }
+
+    pub fn search<S: AsRef<str>>(&self, q: S) -> Search {
+        let tokens: Vec<String> = q
+            .as_ref()
+            .split_whitespace()
+            .filter(|s| !s.is_empty())
+            .map(str::to_lowercase)
+            .collect();
+        let iter = self.inner.db.iter();
+        Search {
+            tokens,
+            iter,
+            prev_match: None,
+        }
+    }
+}
+
+pub struct Search {
+    tokens: Vec<String>,
+    iter: sled::Iter,
+    prev_match: Option<String>,
+}
+
+impl Iterator for Search {
+    type Item = AudioFolderShort;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(item) = self.iter.next() {
+            match item {
+                Ok((key, val)) => {
+                    let path = std::str::from_utf8(key.as_ref()).unwrap(); // we can safely unwrap as we inserted string
+                    if self
+                        .prev_match
+                        .as_ref()
+                        .map(|m| path.starts_with(m))
+                        .unwrap_or(false)
+                    {
+                        continue;
+                    }
+                    let path_lower_case = path.to_lowercase();
+                    let is_match = self.tokens.iter().all(|t| path_lower_case.contains(t));
+                    if is_match {
+                        self.prev_match = Some(path.to_owned());
+                        let path = Path::new(path);
+                        let folder = deser_audiofoler(val);
+                        let af = AudioFolderShort {
+                            name: path.file_name().unwrap().to_string_lossy().into(),
+                            path: path.into(),
+                            is_file: false,
+                            modified: folder.and_then(|f| f.modified),
+                        };
+                        return Some(af);
+                    }
+                }
+                Err(e) => error!("Error iterating collection db: {}", e),
+            }
+        }
+        None
     }
 }
 
@@ -318,9 +375,7 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_cache_creation() {
-        env_logger::try_init().ok();
+    fn create_tmp_collection() -> (CollectionCache, TempDir) {
         let tmp_dir = TempDir::new("AS_CACHE_TEST").expect("Cannot create temp dir");
         let test_data_dir = Path::new("../../test_data");
         let db_path = tmp_dir.path().join("updater_db");
@@ -328,6 +383,13 @@ mod tests {
             .expect("Cannot create CollectionCache");
         col.run_update_loop();
         col.wait_until_inital_scan_is_done();
+        (col, tmp_dir)
+    }
+
+    #[test]
+    fn test_cache_creation() {
+        env_logger::try_init().ok();
+        let (col, _tmp_dir) = create_tmp_collection();
 
         let entry1 = col.get("").unwrap();
         let entry2 = col.get("usak/kulisak").unwrap();
@@ -376,5 +438,22 @@ mod tests {
         let name: Vec<_> = name.split('_').collect();
         assert_eq!("kolekci", name[0]);
         assert_eq!(16, name[1].len());
+    }
+
+    #[test]
+    fn test_search() {
+        env_logger::try_init().ok();
+        let (col, _tmp_dir) = create_tmp_collection();
+        let res: Vec<_> = col.search("usak kulisak").collect();
+        assert_eq!(1, res.len());
+        let af = &res[0];
+        assert_eq!("kulisak", af.name.as_str());
+        let corr_path = Path::new("usak").join("kulisak");
+        assert_eq!(corr_path, af.path);
+        assert!(af.modified.is_some());
+        assert!(!af.is_file);
+
+        let res: Vec<_> = col.search("neneneexistuje").collect();
+        assert_eq!(0, res.len());
     }
 }
