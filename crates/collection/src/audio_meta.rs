@@ -127,13 +127,13 @@ impl std::fmt::Display for TimeSpan {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct AudioFolderShort {
     #[serde(with = "unicase_serde::unicase")]
     pub name: UniCase<String>,
+    pub modified: Option<TimeStamp>,
     pub path: PathBuf,
     pub is_file: bool,
-    pub modified: Option<TimeStamp>,
 }
 
 impl AudioFolderShort {

@@ -109,7 +109,7 @@ fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> tokio:
         };
         let svc_factory = ServiceFactory::new(
             authenticator,
-            Search::new(),
+            Search::new(Some(collections.clone())),
             transcoding,
             collections,
             cfg.limit_rate,

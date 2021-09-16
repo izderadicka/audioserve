@@ -33,23 +33,19 @@ impl<S: AsRef<str>> SearchTrait<S> for Search<S> {
 
 impl<S: AsRef<str>> Search<S> {
     #[cfg(feature = "search-cache")]
-    pub fn new() -> Self {
-        if get_config().search_cache {
-            info!("Using search cache");
-            Search {
-                inner: Arc::new(Box::new(cache::CachedSearch::new())),
-            }
-        } else {
-            Search {
-                inner: Arc::new(Box::new(FoldersSearch)),
-            }
+    pub fn new(_collections: Option<Arc<collection::Collections>>) -> Self {
+        info!("Using search cache");
+        Search {
+            inner: Arc::new(Box::new(cache::CachedSearch::new())),
         }
     }
 
     #[cfg(not(feature = "search-cache"))]
-    pub fn new() -> Self {
+    pub fn new(collections: Option<Arc<collection::Collections>>) -> Self {
         Search {
-            inner: Arc::new(Box::new(FoldersSearch)),
+            inner: Arc::new(Box::new(col_db::CollectionsSearch::new(
+                collections.unwrap(),
+            ))),
         }
     }
 }
@@ -204,6 +200,47 @@ impl FoldersSearch {
         res.subfolders
             .sort_unstable_by(|a, b| a.compare_as(ordering, b));
         res
+    }
+}
+
+mod col_db {
+    use collection::Collections;
+
+    use super::*;
+
+    pub struct CollectionsSearch {
+        collections: Arc<Collections>,
+    }
+
+    impl CollectionsSearch {
+        pub fn new(collections: Arc<Collections>) -> Self {
+            CollectionsSearch { collections }
+        }
+    }
+
+    impl<T: AsRef<str>> SearchTrait<T> for CollectionsSearch {
+        fn search(&self, collection: usize, query: T, ordering: FoldersOrdering) -> SearchResult {
+            SearchResult {
+                files: vec![],
+                subfolders: self
+                    .collections
+                    .search(collection, query, ordering)
+                    .map_err(|e| error!("Error in collections search: {}", e))
+                    .unwrap_or_else(|_| vec![]),
+            }
+        }
+
+        fn recent(&self, collection: usize) -> SearchResult {
+            let res = self
+                .collections
+                .recent(collection, 100)
+                .map_err(|e| error!("Cannot get recents from coolection db: {}", e))
+                .unwrap_or_else(|_| vec![]);
+            SearchResult {
+                files: vec![],
+                subfolders: res,
+            }
+        }
     }
 }
 

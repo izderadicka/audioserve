@@ -7,6 +7,8 @@ use crate::{
 use notify::{watcher, Watcher};
 use sled::Db;
 use std::{
+    cmp::Ordering,
+    collections::BinaryHeap,
     convert::TryInto,
     path::{Path, PathBuf},
     sync::{mpsc::channel, Arc, Condvar, Mutex},
@@ -19,6 +21,17 @@ fn deser_audiofoler<T: AsRef<[u8]>>(data: T) -> Option<AudioFolder> {
     bincode::deserialize(data.as_ref())
         .map_err(|e| error!("Error deserializing data from db {}", e))
         .ok()
+}
+
+fn kv_to_audiofolder<K: AsRef<str>, V: AsRef<[u8]>>(key: K, val: V) -> AudioFolderShort {
+    let path = Path::new(key.as_ref());
+    let folder = deser_audiofoler(val);
+    AudioFolderShort {
+        name: path.file_name().unwrap().to_string_lossy().into(),
+        path: path.into(),
+        is_file: folder.as_ref().map(|f| f.is_file).unwrap_or(false),
+        modified: folder.as_ref().and_then(|f| f.modified),
+    }
 }
 
 #[derive(Clone)]
@@ -310,6 +323,31 @@ impl CollectionCache {
             prev_match: None,
         }
     }
+
+    pub fn recent(&self, limit: usize) -> Vec<AudioFolderShort> {
+        let mut heap = BinaryHeap::with_capacity(limit + 1);
+
+        for (key, val) in self.inner.db.iter().filter_map(|r| r.ok()) {
+            let sf = kv_to_audiofolder(std::str::from_utf8(&key).unwrap(), val);
+            heap.push(FolderByModification(sf));
+            if heap.len() > limit {
+                heap.pop();
+            }
+        }
+        heap.into_iter().map(|i| i.0).collect()
+    }
+}
+
+#[derive(PartialEq, Eq, Ord)]
+struct FolderByModification(AudioFolderShort);
+
+impl PartialOrd for FolderByModification {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match other.0.modified.partial_cmp(&self.0.modified) {
+            Some(Ordering::Equal) => self.0.partial_cmp(&other.0),
+            other => other,
+        }
+    }
 }
 
 pub struct Search {
@@ -338,15 +376,7 @@ impl Iterator for Search {
                     let is_match = self.tokens.iter().all(|t| path_lower_case.contains(t));
                     if is_match {
                         self.prev_match = Some(path.to_owned());
-                        let path = Path::new(path);
-                        let folder = deser_audiofoler(val);
-                        let af = AudioFolderShort {
-                            name: path.file_name().unwrap().to_string_lossy().into(),
-                            path: path.into(),
-                            is_file: folder.as_ref().map(|f| f.is_file).unwrap_or(false),
-                            modified: folder.as_ref().and_then(|f| f.modified),
-                        };
-                        return Some(af);
+                        return Some(kv_to_audiofolder(path, val));
                     }
                 }
                 Err(e) => error!("Error iterating collection db: {}", e),

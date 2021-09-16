@@ -76,4 +76,28 @@ impl Collections {
         }
         result.into_iter().find(|r| r.is_err()).unwrap_or(Ok(()))
     }
+
+    pub fn search<S: AsRef<str>>(
+        &self,
+        collection: usize,
+        q: S,
+        ordering: FoldersOrdering,
+    ) -> Result<Vec<AudioFolderShort>> {
+        let mut res: Vec<_> = self
+            .caches
+            .get(collection)
+            .ok_or_else(|| Error::MissingCollectionCache(collection))?
+            .search(q)
+            .collect();
+
+        res.sort_unstable_by(|a, b| a.compare_as(ordering, b));
+        Ok(res)
+    }
+
+    pub fn recent(&self, collection: usize, limit: usize) -> Result<Vec<AudioFolderShort>> {
+        self.caches
+            .get(collection)
+            .ok_or_else(|| Error::MissingCollectionCache(collection))
+            .map(|cache| cache.recent(limit))
+    }
 }
