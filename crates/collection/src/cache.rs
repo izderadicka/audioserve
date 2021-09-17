@@ -8,14 +8,13 @@ use notify::{watcher, Watcher};
 use sled::Db;
 use std::{
     cmp::Ordering,
-    collections::BinaryHeap,
+    collections::{BinaryHeap, VecDeque},
     convert::TryInto,
     path::{Path, PathBuf},
     sync::{mpsc::channel, Arc, Condvar, Mutex},
     thread,
     time::{Duration, SystemTime},
 };
-use walkdir::{DirEntry, WalkDir};
 
 fn deser_audiofoler<T: AsRef<[u8]>>(data: T) -> Option<AudioFolder> {
     bincode::deserialize(data.as_ref())
@@ -180,7 +179,6 @@ impl CollectionCache {
         let thread = thread::spawn(move || {
             let root_path = inner.base_dir.as_path();
             loop {
-                let walker = WalkDir::new(root_path).follow_links(false).into_iter();
                 let (cond_var, cond_mtx) = &*cond;
                 {
                     let mut started = cond_mtx.lock().unwrap();
@@ -212,39 +210,8 @@ impl CollectionCache {
                 }
 
                 // inittial scan of directory
-                for entry in walker.filter_entry(|e| is_visible_dir(e)) {
-                    match entry {
-                        Ok(entry) => {
-                            let rel_path = entry
-                                .path()
-                                .strip_prefix(&root_path)
-                                .expect("always have root path");
-                            let mod_ts = entry.metadata().ok().and_then(|m| m.modified().ok());
-                            if inner.get_if_actual(rel_path, mod_ts).is_none() {
-                                match inner.lister.list_dir(
-                                    &root_path,
-                                    rel_path,
-                                    FoldersOrdering::Alphabetical,
-                                ) {
-                                    Ok(af) => {
-                                        inner
-                                            .update(rel_path, af)
-                                            .map_err(|e| error!("Cannot insert to db {}", e))
-                                            .ok();
-                                    }
-                                    Err(e) => error!(
-                                        "Cannot listing audio folder {:?}, error {}",
-                                        entry.path(),
-                                        e
-                                    ),
-                                }
-                            } else {
-                                debug!("For path {:?} using cached data", entry.path())
-                            }
-                        }
-                        Err(e) => error!("Cannot read directory entry: {}", e),
-                    }
-                }
+                let mut updater = Updater::new(inner.clone());
+                updater.process();
 
                 // Notify about finish of initial scan
                 {
@@ -386,13 +353,54 @@ impl Iterator for Search {
     }
 }
 
-fn is_visible_dir(entry: &DirEntry) -> bool {
-    entry.file_type().is_dir()
-        && !entry
-            .file_name()
-            .to_str()
-            .map(|s| s.starts_with("."))
-            .unwrap_or(false)
+struct Updater {
+    queue: VecDeque<AudioFolderShort>,
+    inner: Arc<CacheInner>,
+}
+
+impl Updater {
+    fn new(inner: Arc<CacheInner>) -> Self {
+        let root = AudioFolderShort {
+            name: "root".into(),
+            path: Path::new("").into(),
+            is_file: false,
+            modified: None,
+        };
+        let mut queue = VecDeque::new();
+        queue.push_back(root);
+        Updater { queue, inner }
+    }
+
+    fn process(&mut self) {
+        while let Some(folder_info) = self.queue.pop_front() {
+            // process AF
+            let full_path = self.inner.base_dir.join(&folder_info.path);
+            let mod_ts = full_path.metadata().ok().and_then(|m| m.modified().ok());
+            match self.inner.get_if_actual(&folder_info.path, mod_ts) {
+                None => match self.inner.lister.list_dir(
+                    &self.inner.base_dir,
+                    &folder_info.path,
+                    FoldersOrdering::Alphabetical,
+                ) {
+                    Ok(af) => {
+                        self.queue.extend(af.subfolders.iter().cloned());
+                        self.inner
+                            .update(&folder_info.path, af)
+                            .map_err(|e| error!("Cannot insert to db {}", e))
+                            .ok();
+                    }
+                    Err(e) => error!(
+                        "Cannot listing audio folder {:?}, error {}",
+                        folder_info.path, e
+                    ),
+                },
+                Some(af) => {
+                    debug!("For path {:?} using cached data", folder_info.path);
+                    self.queue.extend(af.subfolders)
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -425,7 +433,11 @@ mod tests {
         let entry2 = col.get("usak/kulisak").unwrap();
         assert_eq!(2, entry1.files.len());
         assert_eq!(2, entry1.subfolders.len());
-        assert_eq!(0, entry2.files.len())
+        assert_eq!(0, entry2.files.len());
+
+        let entry3 = col.get("01-file.mp3").unwrap();
+        assert_eq!(3, entry3.files.len());
+        assert_eq!(0, entry3.subfolders.len());
     }
 
     #[test]
