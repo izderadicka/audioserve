@@ -327,14 +327,14 @@ impl CollectionCache {
     pub fn recent(&self, limit: usize) -> Vec<AudioFolderShort> {
         let mut heap = BinaryHeap::with_capacity(limit + 1);
 
-        for (key, val) in self.inner.db.iter().filter_map(|r| r.ok()) {
+        for (key, val) in self.inner.db.iter().skip(1).filter_map(|r| r.ok()) {
             let sf = kv_to_audiofolder(std::str::from_utf8(&key).unwrap(), val);
             heap.push(FolderByModification(sf));
             if heap.len() > limit {
                 heap.pop();
             }
         }
-        heap.into_iter().map(|i| i.0).collect()
+        heap.into_sorted_vec().into_iter().map(|i| i.0).collect()
     }
 }
 
