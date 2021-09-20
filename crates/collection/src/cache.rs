@@ -36,6 +36,7 @@ fn kv_to_audiofolder<K: AsRef<str>, V: AsRef<[u8]>>(key: K, val: V) -> AudioFold
 #[derive(Clone)]
 struct CacheInner {
     db: Db,
+    position: Db,
     lister: FolderLister,
     base_dir: PathBuf,
 }
@@ -100,11 +101,12 @@ impl CollectionCache {
         lister: FolderLister,
     ) -> Result<CollectionCache> {
         let root_path = path.into();
-        let db_path = CollectionCache::db_path(&root_path, db_dir)?;
+        let db_path = CollectionCache::db_path(&root_path, &db_dir)?;
         let db = sled::open(db_path)?;
         Ok(CollectionCache {
             inner: Arc::new(CacheInner {
                 db: db,
+                position: sled::open(db_dir.as_ref().join("pos"))?,
                 lister,
                 base_dir: root_path,
             }),
@@ -302,6 +304,16 @@ impl CollectionCache {
             }
         }
         heap.into_sorted_vec().into_iter().map(|i| i.0).collect()
+    }
+
+    // positions
+
+    pub fn insert<S, P>(&self, group: S, path: P) -> Result<()>
+    where
+        S: Into<String>,
+        P: Into<String>,
+    {
+        todo!()
     }
 }
 

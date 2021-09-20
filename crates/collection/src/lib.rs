@@ -5,6 +5,7 @@ use audio_folder::{FolderLister, FoldersOptions};
 use audio_meta::AudioFolder;
 use cache::CollectionCache;
 use error::{Error, Result};
+use sled::Db;
 use std::path::{Path, PathBuf};
 
 pub use audio_folder::{list_dir_files_only, parse_chapter_path};
@@ -15,6 +16,7 @@ pub mod audio_folder;
 pub mod audio_meta;
 mod cache;
 pub mod error;
+pub mod position;
 pub mod util;
 
 pub struct Collections {
@@ -50,23 +52,23 @@ impl Collections {
 }
 
 impl Collections {
+    fn get_cache(&self, collection: usize) -> Result<&CollectionCache> {
+        self.caches
+            .get(collection)
+            .ok_or_else(|| Error::MissingCollectionCache(collection))
+    }
+
     pub fn list_dir<P: AsRef<Path>>(
         &self,
         collection: usize,
         dir_path: P,
         ordering: FoldersOrdering,
     ) -> Result<AudioFolder> {
-        self.caches
-            .get(collection)
-            .ok_or_else(|| Error::MissingCollectionCache(collection))?
-            .list_dir(dir_path, ordering)
+        self.get_cache(collection)?.list_dir(dir_path, ordering)
     }
 
     pub fn force_update<P: AsRef<Path>>(&self, collection: usize, dir_path: P) -> Result<()> {
-        self.caches
-            .get(collection)
-            .ok_or_else(|| Error::MissingCollectionCache(collection))?
-            .force_update(dir_path)
+        self.get_cache(collection)?.force_update(dir_path)
     }
 
     pub fn flush(&self) -> Result<()> {
@@ -83,21 +85,23 @@ impl Collections {
         q: S,
         ordering: FoldersOrdering,
     ) -> Result<Vec<AudioFolderShort>> {
-        let mut res: Vec<_> = self
-            .caches
-            .get(collection)
-            .ok_or_else(|| Error::MissingCollectionCache(collection))?
-            .search(q)
-            .collect();
+        let mut res: Vec<_> = self.get_cache(collection)?.search(q).collect();
 
         res.sort_unstable_by(|a, b| a.compare_as(ordering, b));
         Ok(res)
     }
 
     pub fn recent(&self, collection: usize, limit: usize) -> Result<Vec<AudioFolderShort>> {
-        self.caches
-            .get(collection)
-            .ok_or_else(|| Error::MissingCollectionCache(collection))
-            .map(|cache| cache.recent(limit))
+        self.get_cache(collection).map(|cache| cache.recent(limit))
+    }
+
+    // positions
+
+    pub fn insert<S, P>(&self, collection: usize, group: S, path: P) -> Result<()>
+    where
+        S: Into<String>,
+        P: Into<String>,
+    {
+        self.get_cache(collection)?.insert(group, path)
     }
 }
