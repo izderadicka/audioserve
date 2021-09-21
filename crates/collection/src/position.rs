@@ -1,5 +1,5 @@
 use serde_derive::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap};
 
 use crate::audio_meta::TimeStamp;
 
@@ -8,9 +8,9 @@ pub const MAX_HISTORY_PER_FOLDER: usize = 10;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct PositionItem {
-    file: String,
-    timestamp: TimeStamp,
-    position: f32,
+    pub file: String,
+    pub timestamp: TimeStamp,
+    pub position: f32,
 }
 
 impl PositionItem {
@@ -26,14 +26,14 @@ impl PositionItem {
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct Position {
-    file: String,
-    folder: String,
-    timestamp: TimeStamp,
-    position: f32,
+    pub file: String,
+    pub folder: String,
+    pub timestamp: TimeStamp,
+    pub position: f32,
 }
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct PositionRecord {
-    latest: Position,
-    folder_positions: HashMap<String, VecDeque<PositionItem>>,
+    pub latest_folder: String,
+    pub folder_positions: HashMap<String, PositionItem>,
 }

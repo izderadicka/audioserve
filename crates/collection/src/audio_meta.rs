@@ -13,6 +13,12 @@ use unicase::UniCase;
 /// This is timestamp is miliseconds from start of Unix epoch
 pub struct TimeStamp(u64);
 
+impl TimeStamp {
+    pub fn now() -> Self {
+        SystemTime::now().into()
+    }
+}
+
 impl From<SystemTime> for TimeStamp {
     fn from(t: SystemTime) -> Self {
         let milis = t

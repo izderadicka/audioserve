@@ -1,20 +1,7 @@
-use crate::{
-    audio_folder::FolderLister,
-    audio_meta::AudioFolder,
-    error::{Error, Result},
-    AudioFolderShort, FoldersOrdering,
-};
+use crate::{AudioFolderShort, FoldersOrdering, audio_folder::FolderLister, audio_meta::{AudioFolder, TimeStamp}, error::{Error, Result}, position::{PositionItem, PositionRecord}};
 use notify::{watcher, Watcher};
 use sled::Db;
-use std::{
-    cmp::Ordering,
-    collections::{BinaryHeap, VecDeque},
-    convert::TryInto,
-    path::{Path, PathBuf},
-    sync::{mpsc::channel, Arc, Condvar, Mutex},
-    thread,
-    time::{Duration, SystemTime},
-};
+use std::{cmp::Ordering, collections::{BinaryHeap, HashMap, VecDeque}, convert::TryInto, path::{Path, PathBuf}, sync::{mpsc::channel, Arc, Condvar, Mutex}, thread, time::{Duration, SystemTime}};
 
 fn deser_audiofoler<T: AsRef<[u8]>>(data: T) -> Option<AudioFolder> {
     bincode::deserialize(data.as_ref())
@@ -308,12 +295,43 @@ impl CollectionCache {
 
     // positions
 
-    pub fn insert<S, P>(&self, group: S, path: P) -> Result<()>
+    pub fn insert<S, P>(&self, group: S, path: P, position: f32) -> Result<()>
     where
-        S: Into<String>,
-        P: Into<String>,
+        S: AsRef<str>,
+        P: AsRef<str>,
     {
-        todo!()
+        let (path, file) = split_path(&path);
+
+        let mut folder_pos=  match self.inner.position.get(group.as_ref()) {
+            Ok(Some(data)) => match bincode::deserialize::<PositionRecord>(&data) {
+                Ok(r) => r.folder_positions,
+                Err(e) => {
+                    error!("Db item deserialization error: {}", e);
+                    HashMap::new()
+                }
+            }
+            Ok(None) => HashMap::new(),
+            Err(e) => {
+                error!("Db get error: {}", e);
+                HashMap::new()
+            },
+        };
+        
+        folder_pos.insert(path.clone(), PositionItem { file: file, timestamp: TimeStamp::now(), position});
+        let value = PositionRecord{
+            folder_positions: folder_pos,
+            latest_folder: path
+        };
+        self.inner.position.insert(group.as_ref(), bincode::serialize(&value)?)?;
+        Ok(())
+    }
+}
+
+fn split_path<S:AsRef<str>>(p: &S) -> (String, String) {
+    let s = p.as_ref();
+    match s.rsplit_once('/') {
+        Some((path,file)) => (path.into(), file.into()),
+        None => ("".into(), s.to_owned())
     }
 }
 

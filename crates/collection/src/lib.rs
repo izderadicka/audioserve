@@ -5,7 +5,6 @@ use audio_folder::{FolderLister, FoldersOptions};
 use audio_meta::AudioFolder;
 use cache::CollectionCache;
 use error::{Error, Result};
-use sled::Db;
 use std::path::{Path, PathBuf};
 
 pub use audio_folder::{list_dir_files_only, parse_chapter_path};
@@ -97,11 +96,11 @@ impl Collections {
 
     // positions
 
-    pub fn insert<S, P>(&self, collection: usize, group: S, path: P) -> Result<()>
+    pub fn insert<S, P>(&self, collection: usize, group: S, path: P, position: f32) -> Result<()>
     where
-        S: Into<String>,
-        P: Into<String>,
+        S: AsRef<str>,
+        P: AsRef<str>,
     {
-        self.get_cache(collection)?.insert(group, path)
+        self.get_cache(collection)?.insert(group, path, position)
     }
 }
