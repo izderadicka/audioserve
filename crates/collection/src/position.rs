@@ -11,6 +11,7 @@ pub(crate) struct PositionItem {
     pub file: String,
     pub timestamp: TimeStamp,
     pub position: f32,
+    pub folder_finished: bool
 }
 
 impl PositionItem {

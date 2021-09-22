@@ -1,4 +1,4 @@
-use crate::{AudioFolderShort, FoldersOrdering, audio_folder::FolderLister, audio_meta::{AudioFolder, TimeStamp}, error::{Error, Result}, position::{PositionItem, PositionRecord}};
+use crate::{AudioFolderShort, FoldersOrdering, audio_folder::FolderLister, audio_meta::{AudioFolder, TimeStamp}, error::{Error, Result}, position::{Position, PositionItem, PositionRecord}};
 use notify::{watcher, Watcher};
 use sled::Db;
 use std::{cmp::Ordering, collections::{BinaryHeap, HashMap, VecDeque}, convert::TryInto, path::{Path, PathBuf}, sync::{mpsc::channel, Arc, Condvar, Mutex}, thread, time::{Duration, SystemTime}};
@@ -89,11 +89,10 @@ impl CollectionCache {
     ) -> Result<CollectionCache> {
         let root_path = path.into();
         let db_path = CollectionCache::db_path(&root_path, &db_dir)?;
-        let db = sled::open(db_path)?;
         Ok(CollectionCache {
             inner: Arc::new(CacheInner {
-                db: db,
-                position: sled::open(db_dir.as_ref().join("pos"))?,
+                db: sled::open(&db_path)?,
+                position: sled::open(db_path.join("_pos"))?,
                 lister,
                 base_dir: root_path,
             }),
@@ -295,7 +294,7 @@ impl CollectionCache {
 
     // positions
 
-    pub fn insert<S, P>(&self, group: S, path: P, position: f32) -> Result<()>
+    pub fn insert_position<S, P>(&self, group: S, path: P, position: f32) -> Result<()>
     where
         S: AsRef<str>,
         P: AsRef<str>,
@@ -316,14 +315,43 @@ impl CollectionCache {
                 HashMap::new()
             },
         };
-        
-        folder_pos.insert(path.clone(), PositionItem { file: file, timestamp: TimeStamp::now(), position});
+        let this_pos = PositionItem { file: file, timestamp: TimeStamp::now(), position, folder_finished: false};
+        folder_pos.insert(path.clone(), this_pos);
         let value = PositionRecord{
             folder_positions: folder_pos,
             latest_folder: path
         };
         self.inner.position.insert(group.as_ref(), bincode::serialize(&value)?)?;
         Ok(())
+    }
+
+    pub fn get_position<S,P>(&self, group:S, folder:Option<P>) -> Option<Position> 
+    where S: AsRef<str>,
+          P: AsRef<str>
+    {
+        self.inner.position.get(group.as_ref())
+        .map_err(|e| error!("Error reading from position db: {}", e))
+        .ok()
+        .flatten()
+        .and_then(|data| {
+            bincode::deserialize::<PositionRecord>(&data)
+            .map_err(|e| error!("Error deserializing position record {}", e))
+            .ok()
+        })
+        .and_then(|p| {
+            let fld = folder.as_ref()
+            .map(|p| p.as_ref())
+            .unwrap_or_else(|| p.latest_folder.as_str());
+            p.folder_positions.get(fld)
+            .map(|p| 
+            Position{
+                file: (&p.file).into(),
+                folder: fld.into(),
+                timestamp: p.timestamp,
+                position: p.position,
+            })
+        })
+
     }
 }
 
@@ -527,5 +555,21 @@ mod tests {
 
         let res: Vec<_> = col.search("neneneexistuje").collect();
         assert_eq!(0, res.len());
+    }
+
+    #[test]
+    fn test_position() -> anyhow::Result<()>{
+        env_logger::try_init().ok();
+        let (col, _tmp_dir) = create_tmp_collection();
+        col.insert_position("ivan", "02-file.opus", 1.0)?;
+        let r1 = col.get_position("ivan", Some("")).expect("position record exists");
+        assert_eq!(r1.file, "02-file.opus");
+        assert_eq!(r1.position, 1.0);
+        col.insert_position("ivan", "01-file.mp3/002 - Chapter 3$$2000-3000$$.mp3", 0.04)?;
+        let r2 = col.get_position("ivan", Some("01-file.mp3")).expect("position record exists");
+        assert_eq!(r2.file, "002 - Chapter 3$$2000-3000$$.mp3");
+        let r3 = col.get_position::<_, &str>("ivan", None).expect("last position exists");
+        assert_eq!(r3.file, "002 - Chapter 3$$2000-3000$$.mp3");
+        Ok(())
     }
 }
