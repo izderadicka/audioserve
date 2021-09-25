@@ -1,5 +1,5 @@
 use serde_derive::{Deserialize, Serialize};
-use std::collections::{HashMap};
+use std::collections::HashMap;
 
 use crate::audio_meta::TimeStamp;
 
@@ -11,7 +11,7 @@ pub(crate) struct PositionItem {
     pub file: String,
     pub timestamp: TimeStamp,
     pub position: f32,
-    pub folder_finished: bool
+    pub folder_finished: bool,
 }
 
 impl PositionItem {
@@ -33,8 +33,4 @@ pub struct Position {
     pub position: f32,
 }
 
-#[derive(Serialize, Deserialize)]
-pub(crate) struct PositionRecord {
-    pub latest_folder: String,
-    pub folder_positions: HashMap<String, PositionItem>,
-}
+pub(crate) type PositionRecord = HashMap<String, PositionItem>;

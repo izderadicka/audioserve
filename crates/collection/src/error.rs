@@ -1,3 +1,4 @@
+use sled::transaction::TransactionError;
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(thiserror::Error, Debug)]
@@ -7,6 +8,9 @@ pub enum Error {
 
     #[error("Db error")]
     DbError(#[from] sled::Error),
+
+    #[error("Db transaction error")]
+    DbTransactionError(String),
 
     #[error("Media metadata error")]
     MediaInfoError(#[from] media_info::Error),
@@ -22,4 +26,13 @@ pub enum Error {
 
     #[error("Missing Collection Cache: {0}")]
     MissingCollectionCache(usize),
+}
+
+impl From<TransactionError<Error>> for Error {
+    fn from(e: TransactionError<Error>) -> Self {
+        match e {
+            TransactionError::Abort(e) => e,
+            TransactionError::Storage(e) => Error::DbError(e),
+        }
+    }
 }

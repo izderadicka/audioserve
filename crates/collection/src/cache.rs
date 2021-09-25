@@ -1,7 +1,24 @@
-use crate::{AudioFolderShort, FoldersOrdering, audio_folder::FolderLister, audio_meta::{AudioFolder, TimeStamp}, error::{Error, Result}, position::{Position, PositionItem, PositionRecord}};
+use crate::{
+    audio_folder::FolderLister,
+    audio_meta::{AudioFolder, TimeStamp},
+    error::{Error, Result},
+    position::{Position, PositionItem, PositionRecord},
+    AudioFolderShort, FoldersOrdering,
+};
 use notify::{watcher, Watcher};
-use sled::Db;
-use std::{cmp::Ordering, collections::{BinaryHeap, HashMap, VecDeque}, convert::TryInto, path::{Path, PathBuf}, sync::{mpsc::channel, Arc, Condvar, Mutex}, thread, time::{Duration, SystemTime}};
+use sled::{
+    transaction::{self, TransactionError},
+    Db, Transactional, Tree,
+};
+use std::{
+    cmp::Ordering,
+    collections::{BinaryHeap, HashMap, VecDeque},
+    convert::TryInto,
+    path::{Path, PathBuf},
+    sync::{mpsc::channel, Arc, Condvar, Mutex},
+    thread,
+    time::{Duration, SystemTime},
+};
 
 fn deser_audiofoler<T: AsRef<[u8]>>(data: T) -> Option<AudioFolder> {
     bincode::deserialize(data.as_ref())
@@ -23,7 +40,8 @@ fn kv_to_audiofolder<K: AsRef<str>, V: AsRef<[u8]>>(key: K, val: V) -> AudioFold
 #[derive(Clone)]
 struct CacheInner {
     db: Db,
-    position: Db,
+    pos_latest: Tree,
+    pos_folder: Tree,
     lister: FolderLister,
     base_dir: PathBuf,
 }
@@ -89,10 +107,12 @@ impl CollectionCache {
     ) -> Result<CollectionCache> {
         let root_path = path.into();
         let db_path = CollectionCache::db_path(&root_path, &db_dir)?;
+        let db = sled::open(&db_path)?;
         Ok(CollectionCache {
             inner: Arc::new(CacheInner {
-                db: sled::open(&db_path)?,
-                position: sled::open(db_path.join("_pos"))?,
+                pos_latest: db.open_tree("pos_latest")?,
+                pos_folder: db.open_tree("pos_folder")?,
+                db,
                 lister,
                 base_dir: root_path,
             }),
@@ -261,7 +281,16 @@ impl CollectionCache {
     }
 
     pub fn flush(&self) -> Result<()> {
-        self.inner.db.flush().map(|_| ()).map_err(Error::from)
+        let mut res = vec![];
+        res.push(self.inner.db.flush());
+        res.push(self.inner.pos_folder.flush());
+        res.push(self.inner.pos_latest.flush());
+
+        res.into_iter()
+            .find(|r| r.is_err())
+            .unwrap_or(Ok(0))
+            .map(|_| ())
+            .map_err(Error::from)
     }
 
     pub fn search<S: AsRef<str>>(&self, q: S) -> Search {
@@ -299,67 +328,92 @@ impl CollectionCache {
         S: AsRef<str>,
         P: AsRef<str>,
     {
-        let (path, file) = split_path(&path);
+        (&self.inner.pos_latest, &self.inner.pos_folder)
+            .transaction(|(pos_latest, pos_folder)| {
+                let (path, file) = split_path(&path);
 
-        let mut folder_pos=  match self.inner.position.get(group.as_ref()) {
-            Ok(Some(data)) => match bincode::deserialize::<PositionRecord>(&data) {
-                Ok(r) => r.folder_positions,
-                Err(e) => {
-                    error!("Db item deserialization error: {}", e);
-                    HashMap::new()
-                }
-            }
-            Ok(None) => HashMap::new(),
-            Err(e) => {
-                error!("Db get error: {}", e);
-                HashMap::new()
-            },
-        };
-        let this_pos = PositionItem { file: file, timestamp: TimeStamp::now(), position, folder_finished: false};
-        folder_pos.insert(path.clone(), this_pos);
-        let value = PositionRecord{
-            folder_positions: folder_pos,
-            latest_folder: path
-        };
-        self.inner.position.insert(group.as_ref(), bincode::serialize(&value)?)?;
-        Ok(())
+                let mut folder_rec = pos_folder
+                    .get(&path)
+                    .map_err(|e| error!("Db get error: {}", e))
+                    .ok()
+                    .flatten()
+                    .and_then(|data| {
+                        bincode::deserialize::<PositionRecord>(&data)
+                            .map_err(|e| error!("Db item deserialization error: {}", e))
+                            .ok()
+                    })
+                    .unwrap_or_else(HashMap::new);
+
+                let this_pos = PositionItem {
+                    file: file,
+                    timestamp: TimeStamp::now(),
+                    position,
+                    folder_finished: false,
+                };
+
+                folder_rec.insert(group.as_ref().into(), this_pos);
+                let rec = match bincode::serialize(&folder_rec) {
+                    Err(e) => return transaction::abort(Error::from(e)),
+                    Ok(res) => res,
+                };
+
+                pos_folder.insert(path.as_bytes(), rec)?;
+                pos_latest.insert(group.as_ref(), path.as_bytes())?;
+                Ok(())
+            })
+            .map_err(|e| Error::from(e))
     }
 
-    pub fn get_position<S,P>(&self, group:S, folder:Option<P>) -> Option<Position> 
-    where S: AsRef<str>,
-          P: AsRef<str>
+    pub fn get_position<S, P>(&self, group: S, folder: Option<P>) -> Option<Position>
+    where
+        S: AsRef<str>,
+        P: AsRef<str>,
     {
-        self.inner.position.get(group.as_ref())
-        .map_err(|e| error!("Error reading from position db: {}", e))
-        .ok()
-        .flatten()
-        .and_then(|data| {
-            bincode::deserialize::<PositionRecord>(&data)
-            .map_err(|e| error!("Error deserializing position record {}", e))
-            .ok()
-        })
-        .and_then(|p| {
-            let fld = folder.as_ref()
-            .map(|p| p.as_ref())
-            .unwrap_or_else(|| p.latest_folder.as_str());
-            p.folder_positions.get(fld)
-            .map(|p| 
-            Position{
-                file: (&p.file).into(),
-                folder: fld.into(),
-                timestamp: p.timestamp,
-                position: p.position,
-            })
-        })
+        (&self.inner.pos_latest, &self.inner.pos_folder)
+            .transaction(|(pos_latest, pos_folder)| {
+                let fld = match folder.as_ref().map(|f| f.as_ref().to_string()).or_else(|| {
+                    pos_latest
+                        .get(group.as_ref())
+                        .map_err(|e| error!("Get last pos db error: {}", e))
+                        .ok()
+                        .flatten()
+                        // it's safe because we know for sure we inserted string here
+                        .map(|data| unsafe { String::from_utf8_unchecked(data.as_ref().into()) })
+                }) {
+                    Some(s) => s,
+                    None => return Ok(None),
+                };
 
+                Ok(pos_folder
+                    .get(&fld)
+                    .map_err(|e| error!("Error reading position folder record in db: {}", e))
+                    .ok()
+                    .flatten()
+                    .and_then(|r| {
+                        bincode::deserialize::<PositionRecord>(&r)
+                            .map_err(|e| error!("Error deserializing position record {}", e))
+                            .ok()
+                    })
+                    .and_then(|m| {
+                        m.get(group.as_ref()).map(|p| Position {
+                            file: (&p.file).into(),
+                            folder: fld,
+                            timestamp: p.timestamp,
+                            position: p.position,
+                        })
+                    }))
+            })
+            .map_err(|e: TransactionError<Error>| error!("Db transaction error: {}", e))
+            .ok()
+            .flatten()
     }
 }
 
-fn split_path<S:AsRef<str>>(p: &S) -> (String, String) {
+fn split_path<S: AsRef<str>>(p: &S) -> (String, String) {
     let s = p.as_ref();
     match s.rsplit_once('/') {
-        Some((path,file)) => (path.into(), file.into()),
-        None => ("".into(), s.to_owned())
+        Some((path, file)) => (path.into(), file.into()),
+        None => ("".into(), s.to_owned()),
     }
 }
 
@@ -558,17 +612,23 @@ mod tests {
     }
 
     #[test]
-    fn test_position() -> anyhow::Result<()>{
+    fn test_position() -> anyhow::Result<()> {
         env_logger::try_init().ok();
         let (col, _tmp_dir) = create_tmp_collection();
         col.insert_position("ivan", "02-file.opus", 1.0)?;
-        let r1 = col.get_position("ivan", Some("")).expect("position record exists");
+        let r1 = col
+            .get_position("ivan", Some(""))
+            .expect("position record exists");
         assert_eq!(r1.file, "02-file.opus");
         assert_eq!(r1.position, 1.0);
         col.insert_position("ivan", "01-file.mp3/002 - Chapter 3$$2000-3000$$.mp3", 0.04)?;
-        let r2 = col.get_position("ivan", Some("01-file.mp3")).expect("position record exists");
+        let r2 = col
+            .get_position("ivan", Some("01-file.mp3"))
+            .expect("position record exists");
         assert_eq!(r2.file, "002 - Chapter 3$$2000-3000$$.mp3");
-        let r3 = col.get_position::<_, &str>("ivan", None).expect("last position exists");
+        let r3 = col
+            .get_position::<_, &str>("ivan", None)
+            .expect("last position exists");
         assert_eq!(r3.file, "002 - Chapter 3$$2000-3000$$.mp3");
         Ok(())
     }

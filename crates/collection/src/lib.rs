@@ -96,11 +96,18 @@ impl Collections {
 
     // positions
 
-    pub fn insert_position<S, P>(&self, collection: usize, group: S, path: P, position: f32) -> Result<()>
+    pub fn insert_position<S, P>(
+        &self,
+        collection: usize,
+        group: S,
+        path: P,
+        position: f32,
+    ) -> Result<()>
     where
         S: AsRef<str>,
         P: AsRef<str>,
     {
-        self.get_cache(collection)?.insert_position(group, path, position)
+        self.get_cache(collection)?
+            .insert_position(group, path, position)
     }
 }
