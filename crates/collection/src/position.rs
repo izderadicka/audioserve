@@ -15,9 +15,9 @@ pub(crate) struct PositionItem {
 }
 
 impl PositionItem {
-    pub(crate) fn to_position<S: Into<String>>(self, folder: S) -> Position {
+    pub(crate) fn into_position<S: Into<String>>(&self, folder: S) -> Position {
         Position {
-            file: self.file,
+            file: self.file.clone(),
             folder: folder.into(),
             timestamp: self.timestamp,
             position: self.position,

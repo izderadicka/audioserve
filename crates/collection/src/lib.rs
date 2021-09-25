@@ -93,9 +93,10 @@ impl Collections {
     pub fn recent(&self, collection: usize, limit: usize) -> Result<Vec<AudioFolderShort>> {
         self.get_cache(collection).map(|cache| cache.recent(limit))
     }
+}
 
-    // positions
-
+// positions
+impl Collections {
     pub fn insert_position<S, P>(
         &self,
         collection: usize,
@@ -108,6 +109,6 @@ impl Collections {
         P: AsRef<str>,
     {
         self.get_cache(collection)?
-            .insert_position(group, path, position)
+            .insert_position(group, path, position, None)
     }
 }

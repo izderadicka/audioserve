@@ -323,7 +323,13 @@ impl CollectionCache {
 
     // positions
 
-    pub fn insert_position<S, P>(&self, group: S, path: P, position: f32) -> Result<()>
+    pub fn insert_position<S, P>(
+        &self,
+        group: S,
+        path: P,
+        position: f32,
+        ts: Option<TimeStamp>,
+    ) -> Result<()>
     where
         S: AsRef<str>,
         P: AsRef<str>,
@@ -343,6 +349,14 @@ impl CollectionCache {
                             .ok()
                     })
                     .unwrap_or_else(HashMap::new);
+
+                if let Some(ts) = ts {
+                    if let Some(current_record) = folder_rec.get(group.as_ref()) {
+                        if current_record.timestamp > ts {
+                            return Ok(());
+                        }
+                    }
+                }
 
                 let this_pos = PositionItem {
                     file: file,
@@ -394,14 +408,7 @@ impl CollectionCache {
                             .map_err(|e| error!("Error deserializing position record {}", e))
                             .ok()
                     })
-                    .and_then(|m| {
-                        m.get(group.as_ref()).map(|p| Position {
-                            file: (&p.file).into(),
-                            folder: fld,
-                            timestamp: p.timestamp,
-                            position: p.position,
-                        })
-                    }))
+                    .and_then(|m| m.get(group.as_ref()).map(|p| p.into_position(fld))))
             })
             .map_err(|e: TransactionError<Error>| error!("Db transaction error: {}", e))
             .ok()
@@ -518,7 +525,7 @@ impl Updater {
 #[cfg(test)]
 mod tests {
 
-    use std::fs;
+    use std::{alloc::System, fs};
 
     use fs_extra::dir::{copy, CopyOptions};
     use tempdir::TempDir;
@@ -615,21 +622,55 @@ mod tests {
     fn test_position() -> anyhow::Result<()> {
         env_logger::try_init().ok();
         let (col, _tmp_dir) = create_tmp_collection();
-        col.insert_position("ivan", "02-file.opus", 1.0)?;
+        col.insert_position("ivan", "02-file.opus", 1.0, None)?;
         let r1 = col
             .get_position("ivan", Some(""))
             .expect("position record exists");
         assert_eq!(r1.file, "02-file.opus");
         assert_eq!(r1.position, 1.0);
-        col.insert_position("ivan", "01-file.mp3/002 - Chapter 3$$2000-3000$$.mp3", 0.04)?;
+        col.insert_position(
+            "ivan",
+            "01-file.mp3/002 - Chapter 3$$2000-3000$$.mp3",
+            0.04,
+            None,
+        )?;
+        // test insert position with old timestamp, should not be inserted
+        let ts: TimeStamp = (SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            - 10 * 1000)
+            .into();
+        col.insert_position(
+            "ivan",
+            "01-file.mp3/002 - Chapter 3$$2000-3000$$.mp3",
+            0.08,
+            Some(ts),
+        )?;
         let r2 = col
             .get_position("ivan", Some("01-file.mp3"))
             .expect("position record exists");
         assert_eq!(r2.file, "002 - Chapter 3$$2000-3000$$.mp3");
+        assert_eq!(r2.position, 0.04);
+
+        // test insert position with current timestamp, should be inserted
+        let ts: TimeStamp = (SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64)
+            .into();
+        col.insert_position(
+            "ivan",
+            "01-file.mp3/002 - Chapter 3$$2000-3000$$.mp3",
+            0.08,
+            Some(ts),
+        )?;
+
         let r3 = col
             .get_position::<_, &str>("ivan", None)
             .expect("last position exists");
         assert_eq!(r3.file, "002 - Chapter 3$$2000-3000$$.mp3");
+        assert_eq!(r3.position, 0.08);
         Ok(())
     }
 }
