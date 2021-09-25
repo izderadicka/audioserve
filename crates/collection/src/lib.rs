@@ -204,14 +204,25 @@ impl Collections {
             .await
     }
 
-    pub async fn get_last_position_async<S>(&self, collection: usize, group: S) -> Option<Position>
+    pub async fn get_last_position_async<S>(&self, group: S) -> Option<Position>
     where
         S: AsRef<str> + Send + 'static,
     {
-        self.get_cache(collection)
-            .map_err(|e| error!("Invalid collection used in get_position: {}", e))
-            .ok()?
-            .get_position_async::<_, String>(group, None)
-            .await
+        let mut res = None;
+        for c in 0..self.caches.len() {
+            let cache = self.get_cache(c).expect("cache availavle"); // is safe, because we are iterating over known range
+            let g: String = group.as_ref().to_owned();
+            let pos = cache.get_position_async::<_, String>(g, None).await;
+            match (&mut res, pos) {
+                (None, Some(p)) => res = Some(p),
+                (Some(ref prev), Some(p)) => {
+                    if p.timestamp > prev.timestamp {
+                        res = Some(p)
+                    }
+                }
+                (_, None) => (),
+            }
+        }
+        res
     }
 }

@@ -18,7 +18,21 @@ impl FromStr for Location {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        let mut parts = s.splitn(3, "/");
+        let group = parts
+            .next()
+            .ok_or_else(|| Error::msg("Missing group part"))?;
+        let collection: usize = parts
+            .next()
+            .ok_or_else(|| Error::msg("Missin collection num"))?
+            .parse()
+            .context("Invalid collection number")?;
+        let path = parts.next().unwrap_or_else(|| "");
+        Ok(Location {
+            group: group.into(),
+            collection,
+            path: path.into(),
+        })
     }
 }
 
@@ -33,7 +47,6 @@ enum Msg {
         folder_path: Location,
     },
     GenericQuery {
-        collection: usize,
         group: String,
     },
 }
@@ -79,9 +92,7 @@ impl FromStr for Msg {
                     folder_path: parts[0].parse()?,
                 })
             } else {
-                let collection = 0usize;
                 Ok(Msg::GenericQuery {
-                    collection,
                     group: parts[0].into(),
                 })
             }
@@ -157,8 +168,8 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseF
 
                             None
                         }
-                        Msg::GenericQuery { collection, group } => {
-                            let last = col.get_last_position_async(collection, group).await;
+                        Msg::GenericQuery { group } => {
+                            let last = col.get_last_position_async(group).await;
                             let res = Reply { folder: None, last };
 
                             Some(ws::Message::text(
@@ -168,12 +179,7 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseF
                         }
 
                         Msg::FolderQuery { folder_path } => {
-                            let last = col
-                                .get_last_position_async(
-                                    folder_path.collection,
-                                    folder_path.group.clone(),
-                                )
-                                .await;
+                            let last = col.get_last_position_async(folder_path.group.clone()).await;
                             let folder = col
                                 .get_position_async(
                                     folder_path.collection,
@@ -209,12 +215,30 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseF
 mod test {
     use super::*;
     #[test]
+    fn test_position_location() {
+        let l = Location {
+            group: "group".into(),
+            collection: 1,
+            path: "".into(),
+        };
+        let l1: Location = "group/1".parse().expect("valid path");
+        assert_eq!(l.clone(), l1);
+        let l2: Location = "group/1/".parse().expect("valid path");
+        assert_eq!(l.clone(), l2);
+    }
+
+    #[test]
     fn test_position_msg() {
-        let m1: Msg = "123.1|group/book1/chap1".parse().unwrap();
+        let m1: Msg = "123.1|group/0/book1/chap1".parse().unwrap();
+        let loc = Location {
+            group: "group".into(),
+            collection: 0,
+            path: "book1/chap1".into(),
+        };
         assert_eq!(
             Msg::Position {
                 position: 123.1,
-                file_path: Some("group/book1/chap1".into()),
+                file_path: Some(loc.clone()),
                 timestamp: None
             },
             m1
@@ -236,25 +260,25 @@ mod test {
             m3
         );
 
-        let m5: Msg = "group/book1".parse().unwrap();
-        assert_eq!(
-            Msg::FolderQuery {
-                folder_path: "group/book1".into()
-            },
-            m5
-        );
+        let m5: Msg = "group/1/book1".parse().unwrap();
+        let loc5 = Location {
+            group: "group".into(),
+            collection: 1,
+            path: "book1".into(),
+        };
+        assert_eq!(Msg::FolderQuery { folder_path: loc5 }, m5);
 
         let m6 = "aaa|bbb".parse::<Msg>();
         let m7 = "||".parse::<Msg>();
         assert!(m6.is_err());
         assert!(m7.is_err());
 
-        let m8: Msg = "123.1|group/book1/chap1|123456".parse().unwrap();
+        let m8: Msg = "123.1|group/0/book1/chap1|123456".parse().unwrap();
         assert_eq!(
             m8,
             Msg::Position {
                 position: 123.1,
-                file_path: Some("group/book1/chap1".into()),
+                file_path: Some(loc),
                 timestamp: Some(123456)
             }
         );
