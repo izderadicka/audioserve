@@ -1,20 +1,24 @@
 use super::{RequestWrapper, ResponseFuture};
 use crate::config::get_config;
 use crate::error::{bail, Context, Error};
-use cache::{Cache, Position};
+use collection::{Collections, Position};
 use futures::future;
 use std::str::FromStr;
+use std::sync::Arc;
 use websock::{self as ws, spawn_websocket_with_timeout};
 
-mod cache;
-
-lazy_static! {
-    static ref CACHE: Cache = Cache::new(100, 100);
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+struct Location {
+    collection: usize,
+    group: String,
+    path: String,
 }
 
-pub async fn save_positions() {
-    if let Err(e) = CACHE.save().await {
-        error!("Cannot save positions to file: {}", e);
+impl FromStr for Location {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        todo!()
     }
 }
 
@@ -22,13 +26,14 @@ pub async fn save_positions() {
 enum Msg {
     Position {
         position: f32,
-        file_path: Option<String>,
+        file_path: Option<Location>,
         timestamp: Option<u64>,
     },
     FolderQuery {
-        folder_path: String,
+        folder_path: Location,
     },
     GenericQuery {
+        collection: usize,
         group: String,
     },
 }
@@ -64,17 +69,19 @@ impl FromStr for Msg {
             } else {
                 Ok(Msg::Position {
                     position,
-                    file_path: Some(parts[1].into()),
+                    file_path: Some(parts[1].parse()?),
                     timestamp,
                 })
             }
         } else if parts.len() == 1 {
             if parts[0].find('/').is_some() {
                 Ok(Msg::FolderQuery {
-                    folder_path: parts[0].into(),
+                    folder_path: parts[0].parse()?,
                 })
             } else {
+                let collection = 0usize;
                 Ok(Msg::GenericQuery {
+                    collection,
                     group: parts[0].into(),
                 })
             }
@@ -84,17 +91,17 @@ impl FromStr for Msg {
     }
 }
 
-pub fn position_service(req: RequestWrapper) -> ResponseFuture {
+pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseFuture {
     debug!("We got these headers on websocket: {:?}", req.headers());
-
-    let res = spawn_websocket_with_timeout::<String, _>(
+    //let col = col.clone();
+    let res = spawn_websocket_with_timeout::<Location, _>(
         req.into_request(),
-        |m| {
+        move |m| {
             debug!("Got message {:?}", m);
             let message = m.to_str().map_err(Error::new).and_then(str::parse);
-
+            let col = col.clone();
             match message {
-                Ok(message) => Box::pin(async {
+                Ok(message) => Box::pin(async move {
                     Ok(match message {
                         Msg::Position {
                             position,
@@ -102,15 +109,28 @@ pub fn position_service(req: RequestWrapper) -> ResponseFuture {
                             timestamp,
                         } => {
                             match file_path {
-                                Some(file_path) => {
+                                Some(file_loc) => {
                                     {
                                         let mut p = m.context_ref().write().await;
-                                        *p = file_path.clone();
+                                        *p = file_loc.clone();
                                     }
                                     if let Some(ts) = timestamp {
-                                        CACHE.insert_if_newer(file_path, position, ts).await
+                                        col.insert_position_if_newer_async(
+                                            file_loc.collection,
+                                            file_loc.group,
+                                            file_loc.path,
+                                            position,
+                                            ts.into(),
+                                        )
+                                        .await
                                     } else {
-                                        CACHE.insert(file_path, position).await
+                                        col.insert_position_async(
+                                            file_loc.collection,
+                                            file_loc.group,
+                                            file_loc.path,
+                                            position,
+                                        )
+                                        .await
                                     }
                                     .unwrap_or_else(|e| error!("Cannot insert position: {}", e))
                                 }
@@ -118,10 +138,15 @@ pub fn position_service(req: RequestWrapper) -> ResponseFuture {
                                 None => {
                                     let prev = { m.context_ref().read().await.clone() };
 
-                                    if !prev.is_empty() {
-                                        CACHE.insert(prev, position).await.unwrap_or_else(|e| {
-                                            error!("Cannot insert position: {}", e)
-                                        })
+                                    if !prev.path.is_empty() {
+                                        col.insert_position_async(
+                                            prev.collection,
+                                            prev.group,
+                                            prev.path,
+                                            position,
+                                        )
+                                        .await
+                                        .unwrap_or_else(|e| error!("Cannot insert position: {}", e))
                                     } else {
                                         error!(
                                             "Client sent short position, but there is no context"
@@ -132,8 +157,8 @@ pub fn position_service(req: RequestWrapper) -> ResponseFuture {
 
                             None
                         }
-                        Msg::GenericQuery { group } => {
-                            let last = CACHE.get_last(group).await;
+                        Msg::GenericQuery { collection, group } => {
+                            let last = col.get_last_position_async(collection, group).await;
                             let res = Reply { folder: None, last };
 
                             Some(ws::Message::text(
@@ -143,9 +168,19 @@ pub fn position_service(req: RequestWrapper) -> ResponseFuture {
                         }
 
                         Msg::FolderQuery { folder_path } => {
-                            let group = Some(folder_path.splitn(2, '/')).and_then(|mut p| p.next());
-                            let last = CACHE.get_last(group.unwrap()).await;
-                            let folder = CACHE.get(&folder_path).await;
+                            let last = col
+                                .get_last_position_async(
+                                    folder_path.collection,
+                                    folder_path.group.clone(),
+                                )
+                                .await;
+                            let folder = col
+                                .get_position_async(
+                                    folder_path.collection,
+                                    folder_path.group,
+                                    folder_path.path,
+                                )
+                                .await;
                             let res = Reply {
                                 last: if last != folder { last } else { None },
                                 folder,

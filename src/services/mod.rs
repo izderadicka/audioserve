@@ -428,7 +428,7 @@ impl<C> FileSendService<C> {
                     #[cfg(not(feature = "shared-positions"))]
                     unimplemented!();
                     #[cfg(feature = "shared-positions")]
-                    self::position::position_service(req)
+                    self::position::position_service(req, collections)
                 } else {
                     let (path, colllection_index) = match extract_collection_number(path) {
                         Ok(r) => r,

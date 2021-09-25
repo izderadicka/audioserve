@@ -5,11 +5,11 @@ use audio_folder::{FolderLister, FoldersOptions};
 use audio_meta::{AudioFolder, TimeStamp};
 use cache::CollectionCache;
 use error::{Error, Result};
-use position::Position;
 use std::path::{Path, PathBuf};
 
 pub use audio_folder::{list_dir_files_only, parse_chapter_path};
 pub use audio_meta::{init_media_lib, AudioFile, AudioFolderShort, FoldersOrdering, TimeSpan};
+pub use position::Position;
 pub use util::guess_mime_type;
 
 pub mod audio_folder;
@@ -204,11 +204,7 @@ impl Collections {
             .await
     }
 
-    pub async fn get_last_position_async<S, P>(
-        &self,
-        collection: usize,
-        group: S,
-    ) -> Option<Position>
+    pub async fn get_last_position_async<S>(&self, collection: usize, group: S) -> Option<Position>
     where
         S: AsRef<str> + Send + 'static,
     {

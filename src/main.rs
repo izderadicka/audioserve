@@ -239,11 +239,6 @@ fn main() {
 
     runtime.block_on(terminate_server());
 
-    #[cfg(feature = "shared-positions")]
-    {
-        debug!("Saving shared positions");
-        runtime.block_on(crate::services::position::save_positions());
-    }
     //graceful shutdown of server will wait till transcoding ends, so rather shut it down hard
     runtime.shutdown_timeout(std::time::Duration::from_millis(300));
 
