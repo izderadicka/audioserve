@@ -180,7 +180,7 @@ impl CacheInner {
                             .map_err(|e| error!("Error deserializing position record {}", e))
                             .ok()
                     })
-                    .and_then(|m| m.get(group.as_ref()).map(|p| p.into_position(fld))))
+                    .and_then(|m| m.get(group.as_ref()).map(|p| p.into_position(fld, 0))))
             })
             .map_err(|e: TransactionError<Error>| error!("Db transaction error: {}", e))
             .ok()

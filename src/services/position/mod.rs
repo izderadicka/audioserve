@@ -1,6 +1,7 @@
 use super::{RequestWrapper, ResponseFuture};
 use crate::config::get_config;
 use crate::error::{bail, Context, Error};
+use collection::audio_meta::TimeStamp;
 use collection::{Collections, Position};
 use futures::future;
 use std::str::FromStr;
@@ -12,6 +13,26 @@ struct Location {
     collection: usize,
     group: String,
     path: String,
+}
+
+// This is workaround to match old websocket API
+#[derive(Debug, Serialize)]
+struct PositionCompatible {
+    file: String,
+    folder: String,
+    timestamp: TimeStamp,
+    position: f32,
+}
+
+impl From<Position> for PositionCompatible {
+    fn from(p: Position) -> Self {
+        PositionCompatible {
+            file: p.file,
+            timestamp: p.timestamp,
+            position: p.position,
+            folder: p.collection.to_string() + "/" + &p.folder,
+        }
+    }
 }
 
 impl FromStr for Location {
@@ -53,8 +74,8 @@ enum Msg {
 
 #[derive(Serialize)]
 struct Reply {
-    folder: Option<Position>,
-    last: Option<Position>,
+    folder: Option<PositionCompatible>,
+    last: Option<PositionCompatible>,
 }
 
 impl FromStr for Msg {
@@ -170,7 +191,10 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseF
                         }
                         Msg::GenericQuery { group } => {
                             let last = col.get_last_position_async(group).await;
-                            let res = Reply { folder: None, last };
+                            let res = Reply {
+                                folder: None,
+                                last: last.map(PositionCompatible::from),
+                            };
 
                             Some(ws::Message::text(
                                 serde_json::to_string(&res).unwrap(),
@@ -188,8 +212,12 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseF
                                 )
                                 .await;
                             let res = Reply {
-                                last: if last != folder { last } else { None },
-                                folder,
+                                last: if last != folder {
+                                    last.map(PositionCompatible::from)
+                                } else {
+                                    None
+                                },
+                                folder: folder.map(PositionCompatible::from),
                             };
 
                             Some(ws::Message::text(

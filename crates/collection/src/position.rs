@@ -15,12 +15,13 @@ pub(crate) struct PositionItem {
 }
 
 impl PositionItem {
-    pub(crate) fn into_position<S: Into<String>>(&self, folder: S) -> Position {
+    pub(crate) fn into_position<S: Into<String>>(&self, folder: S, collection: usize) -> Position {
         Position {
             file: self.file.clone(),
             folder: folder.into(),
             timestamp: self.timestamp,
             position: self.position,
+            collection,
         }
     }
 }
@@ -31,6 +32,7 @@ pub struct Position {
     pub folder: String,
     pub timestamp: TimeStamp,
     pub position: f32,
+    pub collection: usize,
 }
 
 pub(crate) type PositionRecord = HashMap<String, PositionItem>;

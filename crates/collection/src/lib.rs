@@ -138,20 +138,38 @@ impl Collections {
             .map_err(|e| error!("get position for invalid collection: {}", e))
             .ok()
             .and_then(|c| c.get_position(group, Some(folder)))
+            .map(|mut p| {
+                p.collection = collection;
+                p
+            })
     }
 
-    pub fn get_last_position<S, P>(&self, collection: usize, group: S) -> Option<Position>
+    pub fn get_last_position<S, P>(&self, group: S) -> Option<Position>
     where
         S: AsRef<str>,
     {
-        self.get_cache(collection)
-            .map_err(|e| error!("get position for invalid collection: {}", e))
-            .ok()
-            .and_then(|c| c.get_position::<_, String>(group, None))
+        let mut res = None;
+        for c in 0..self.caches.len() {
+            let cache = self.get_cache(c).expect("cache availavle"); // is safe, because we are iterating over known range
+            let pos = cache.get_position::<_, String>(&group, None).map(|mut p| {
+                p.collection = c;
+                p
+            });
+            match (&mut res, pos) {
+                (None, Some(p)) => res = Some(p),
+                (Some(ref prev), Some(p)) => {
+                    if p.timestamp > prev.timestamp {
+                        res = Some(p)
+                    }
+                }
+                (_, None) => (),
+            }
+        }
+        res
     }
 }
 
-// positions
+// positions async
 #[cfg(feature = "async")]
 impl Collections {
     pub async fn insert_position_async<S, P>(
@@ -202,6 +220,10 @@ impl Collections {
             .ok()?
             .get_position_async(group, Some(folder))
             .await
+            .map(|mut p| {
+                p.collection = collection;
+                p
+            })
     }
 
     pub async fn get_last_position_async<S>(&self, group: S) -> Option<Position>
@@ -212,7 +234,13 @@ impl Collections {
         for c in 0..self.caches.len() {
             let cache = self.get_cache(c).expect("cache availavle"); // is safe, because we are iterating over known range
             let g: String = group.as_ref().to_owned();
-            let pos = cache.get_position_async::<_, String>(g, None).await;
+            let pos = cache
+                .get_position_async::<_, String>(g, None)
+                .await
+                .map(|mut p| {
+                    p.collection = c;
+                    p
+                });
             match (&mut res, pos) {
                 (None, Some(p)) => res = Some(p),
                 (Some(ref prev), Some(p)) => {
