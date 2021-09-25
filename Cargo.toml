@@ -46,7 +46,7 @@ leaky-cauldron = {path="crates/leaky-cauldron"}
 tokio-util = {version="0.6", optional=true}
 
 # this repo dependencies
-collection = {path="crates/collection"}
+collection = {path="crates/collection", features=["async"]}
 proxy-headers = {path="crates/proxy-headers", optional=true}
 simple-file-cache = {path="crates/file-cache", features=["asynch"], optional=true }
 async-tar = {path="crates/async-tar", optional=true}

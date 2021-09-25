@@ -2,9 +2,10 @@
 extern crate log;
 
 use audio_folder::{FolderLister, FoldersOptions};
-use audio_meta::AudioFolder;
+use audio_meta::{AudioFolder, TimeStamp};
 use cache::CollectionCache;
 use error::{Error, Result};
+use position::Position;
 use std::path::{Path, PathBuf};
 
 pub use audio_folder::{list_dir_files_only, parse_chapter_path};
@@ -110,5 +111,111 @@ impl Collections {
     {
         self.get_cache(collection)?
             .insert_position(group, path, position, None)
+    }
+
+    pub fn insert_position_if_newer<S, P>(
+        &self,
+        collection: usize,
+        group: S,
+        path: P,
+        position: f32,
+        ts: TimeStamp,
+    ) -> Result<()>
+    where
+        S: AsRef<str>,
+        P: AsRef<str>,
+    {
+        self.get_cache(collection)?
+            .insert_position(group, path, position, Some(ts))
+    }
+
+    pub fn get_position<S, P>(&self, collection: usize, group: S, folder: P) -> Option<Position>
+    where
+        S: AsRef<str>,
+        P: AsRef<str>,
+    {
+        self.get_cache(collection)
+            .map_err(|e| error!("get position for invalid collection: {}", e))
+            .ok()
+            .and_then(|c| c.get_position(group, Some(folder)))
+    }
+
+    pub fn get_last_position<S, P>(&self, collection: usize, group: S) -> Option<Position>
+    where
+        S: AsRef<str>,
+    {
+        self.get_cache(collection)
+            .map_err(|e| error!("get position for invalid collection: {}", e))
+            .ok()
+            .and_then(|c| c.get_position::<_, String>(group, None))
+    }
+}
+
+// positions
+#[cfg(feature = "async")]
+impl Collections {
+    pub async fn insert_position_async<S, P>(
+        &self,
+        collection: usize,
+        group: S,
+        path: P,
+        position: f32,
+    ) -> Result<()>
+    where
+        S: AsRef<str> + Send + 'static,
+        P: AsRef<str> + Send + 'static,
+    {
+        self.get_cache(collection)?
+            .insert_position_async(group, path, position, None)
+            .await
+    }
+
+    pub async fn insert_position_if_newer_async<S, P>(
+        &self,
+        collection: usize,
+        group: S,
+        path: P,
+        position: f32,
+        ts: TimeStamp,
+    ) -> Result<()>
+    where
+        S: AsRef<str> + Send + 'static,
+        P: AsRef<str> + Send + 'static,
+    {
+        self.get_cache(collection)?
+            .insert_position_async(group, path, position, Some(ts))
+            .await
+    }
+
+    pub async fn get_position_async<S, P>(
+        &self,
+        collection: usize,
+        group: S,
+        folder: P,
+    ) -> Option<Position>
+    where
+        S: AsRef<str> + Send + 'static,
+        P: AsRef<str> + Send + 'static,
+    {
+        self.get_cache(collection)
+            .map_err(|e| error!("Invalid collection used in get_position: {}", e))
+            .ok()?
+            .get_position_async(group, Some(folder))
+            .await
+    }
+
+    pub async fn get_last_position_async<S, P>(
+        &self,
+        collection: usize,
+        group: S,
+    ) -> Option<Position>
+    where
+        S: AsRef<str> + Send + 'static,
+    {
+        self.get_cache(collection)
+            .map_err(|e| error!("Invalid collection used in get_position: {}", e))
+            .ok()?
+            .get_position_async::<_, String>(group, None)
+            .await
     }
 }

@@ -276,6 +276,7 @@ dependencies = [
  "sled",
  "tempdir",
  "thiserror",
+ "tokio",
  "unicase",
  "unicase_serde",
 ]

@@ -26,6 +26,9 @@ pub enum Error {
 
     #[error("Missing Collection Cache: {0}")]
     MissingCollectionCache(usize),
+
+    #[error("Tokio join error")]
+    TokioJoinError(#[from] tokio::task::JoinError),
 }
 
 impl From<TransactionError<Error>> for Error {

@@ -38,7 +38,7 @@ fn kv_to_audiofolder<K: AsRef<str>, V: AsRef<[u8]>>(key: K, val: V) -> AudioFold
 }
 
 #[derive(Clone)]
-struct CacheInner {
+pub(crate) struct CacheInner {
     db: Db,
     pos_latest: Tree,
     pos_folder: Tree,
@@ -93,10 +93,105 @@ impl CacheInner {
     }
 }
 
+// positions
+impl CacheInner {
+    pub fn insert_position<S, P>(
+        &self,
+        group: S,
+        path: P,
+        position: f32,
+        ts: Option<TimeStamp>,
+    ) -> Result<()>
+    where
+        S: AsRef<str>,
+        P: AsRef<str>,
+    {
+        (&self.pos_latest, &self.pos_folder)
+            .transaction(|(pos_latest, pos_folder)| {
+                let (path, file) = split_path(&path);
+
+                let mut folder_rec = pos_folder
+                    .get(&path)
+                    .map_err(|e| error!("Db get error: {}", e))
+                    .ok()
+                    .flatten()
+                    .and_then(|data| {
+                        bincode::deserialize::<PositionRecord>(&data)
+                            .map_err(|e| error!("Db item deserialization error: {}", e))
+                            .ok()
+                    })
+                    .unwrap_or_else(HashMap::new);
+
+                if let Some(ts) = ts {
+                    if let Some(current_record) = folder_rec.get(group.as_ref()) {
+                        if current_record.timestamp > ts {
+                            return Ok(());
+                        }
+                    }
+                }
+
+                let this_pos = PositionItem {
+                    file: file,
+                    timestamp: TimeStamp::now(),
+                    position,
+                    folder_finished: false,
+                };
+
+                folder_rec.insert(group.as_ref().into(), this_pos);
+                let rec = match bincode::serialize(&folder_rec) {
+                    Err(e) => return transaction::abort(Error::from(e)),
+                    Ok(res) => res,
+                };
+
+                pos_folder.insert(path.as_bytes(), rec)?;
+                pos_latest.insert(group.as_ref(), path.as_bytes())?;
+                Ok(())
+            })
+            .map_err(|e| Error::from(e))
+    }
+
+    pub fn get_position<S, P>(&self, group: S, folder: Option<P>) -> Option<Position>
+    where
+        S: AsRef<str>,
+        P: AsRef<str>,
+    {
+        (&self.pos_latest, &self.pos_folder)
+            .transaction(|(pos_latest, pos_folder)| {
+                let fld = match folder.as_ref().map(|f| f.as_ref().to_string()).or_else(|| {
+                    pos_latest
+                        .get(group.as_ref())
+                        .map_err(|e| error!("Get last pos db error: {}", e))
+                        .ok()
+                        .flatten()
+                        // it's safe because we know for sure we inserted string here
+                        .map(|data| unsafe { String::from_utf8_unchecked(data.as_ref().into()) })
+                }) {
+                    Some(s) => s,
+                    None => return Ok(None),
+                };
+
+                Ok(pos_folder
+                    .get(&fld)
+                    .map_err(|e| error!("Error reading position folder record in db: {}", e))
+                    .ok()
+                    .flatten()
+                    .and_then(|r| {
+                        bincode::deserialize::<PositionRecord>(&r)
+                            .map_err(|e| error!("Error deserializing position record {}", e))
+                            .ok()
+                    })
+                    .and_then(|m| m.get(group.as_ref()).map(|p| p.into_position(fld))))
+            })
+            .map_err(|e: TransactionError<Error>| error!("Db transaction error: {}", e))
+            .ok()
+            .flatten()
+    }
+}
+
 pub struct CollectionCache {
     thread: Option<thread::JoinHandle<()>>,
     cond: Arc<(Condvar, Mutex<bool>)>,
-    inner: Arc<CacheInner>,
+    pub(crate) inner: Arc<CacheInner>,
 }
 
 impl CollectionCache {
@@ -334,48 +429,7 @@ impl CollectionCache {
         S: AsRef<str>,
         P: AsRef<str>,
     {
-        (&self.inner.pos_latest, &self.inner.pos_folder)
-            .transaction(|(pos_latest, pos_folder)| {
-                let (path, file) = split_path(&path);
-
-                let mut folder_rec = pos_folder
-                    .get(&path)
-                    .map_err(|e| error!("Db get error: {}", e))
-                    .ok()
-                    .flatten()
-                    .and_then(|data| {
-                        bincode::deserialize::<PositionRecord>(&data)
-                            .map_err(|e| error!("Db item deserialization error: {}", e))
-                            .ok()
-                    })
-                    .unwrap_or_else(HashMap::new);
-
-                if let Some(ts) = ts {
-                    if let Some(current_record) = folder_rec.get(group.as_ref()) {
-                        if current_record.timestamp > ts {
-                            return Ok(());
-                        }
-                    }
-                }
-
-                let this_pos = PositionItem {
-                    file: file,
-                    timestamp: TimeStamp::now(),
-                    position,
-                    folder_finished: false,
-                };
-
-                folder_rec.insert(group.as_ref().into(), this_pos);
-                let rec = match bincode::serialize(&folder_rec) {
-                    Err(e) => return transaction::abort(Error::from(e)),
-                    Ok(res) => res,
-                };
-
-                pos_folder.insert(path.as_bytes(), rec)?;
-                pos_latest.insert(group.as_ref(), path.as_bytes())?;
-                Ok(())
-            })
-            .map_err(|e| Error::from(e))
+        self.inner.insert_position(group, path, position, ts)
     }
 
     pub fn get_position<S, P>(&self, group: S, folder: Option<P>) -> Option<Position>
@@ -383,34 +437,41 @@ impl CollectionCache {
         S: AsRef<str>,
         P: AsRef<str>,
     {
-        (&self.inner.pos_latest, &self.inner.pos_folder)
-            .transaction(|(pos_latest, pos_folder)| {
-                let fld = match folder.as_ref().map(|f| f.as_ref().to_string()).or_else(|| {
-                    pos_latest
-                        .get(group.as_ref())
-                        .map_err(|e| error!("Get last pos db error: {}", e))
-                        .ok()
-                        .flatten()
-                        // it's safe because we know for sure we inserted string here
-                        .map(|data| unsafe { String::from_utf8_unchecked(data.as_ref().into()) })
-                }) {
-                    Some(s) => s,
-                    None => return Ok(None),
-                };
+        self.inner.get_position(group, folder)
+    }
+}
 
-                Ok(pos_folder
-                    .get(&fld)
-                    .map_err(|e| error!("Error reading position folder record in db: {}", e))
-                    .ok()
-                    .flatten()
-                    .and_then(|r| {
-                        bincode::deserialize::<PositionRecord>(&r)
-                            .map_err(|e| error!("Error deserializing position record {}", e))
-                            .ok()
-                    })
-                    .and_then(|m| m.get(group.as_ref()).map(|p| p.into_position(fld))))
-            })
-            .map_err(|e: TransactionError<Error>| error!("Db transaction error: {}", e))
+// positions
+#[cfg(feature = "async")]
+use tokio::task::spawn_blocking;
+#[cfg(feature = "async")]
+impl CollectionCache {
+    pub async fn insert_position_async<S, P>(
+        &self,
+        group: S,
+        path: P,
+        position: f32,
+        ts: Option<TimeStamp>,
+    ) -> Result<()>
+    where
+        S: AsRef<str> + Send + 'static,
+        P: AsRef<str> + Send + 'static,
+    {
+        let inner = self.inner.clone();
+        spawn_blocking(move || inner.insert_position(group, path, position, ts))
+            .await
+            .map_err(Error::from)?
+    }
+
+    pub async fn get_position_async<S, P>(&self, group: S, path: Option<P>) -> Option<Position>
+    where
+        S: AsRef<str> + Send + 'static,
+        P: AsRef<str> + Send + 'static,
+    {
+        let inner = self.inner.clone();
+        spawn_blocking(move || inner.get_position(group, path))
+            .await
+            .map_err(|e| error!("Tokio join error: {}", e))
             .ok()
             .flatten()
     }
@@ -525,7 +586,7 @@ impl Updater {
 #[cfg(test)]
 mod tests {
 
-    use std::{alloc::System, fs};
+    use std::fs;
 
     use fs_extra::dir::{copy, CopyOptions};
     use tempdir::TempDir;
