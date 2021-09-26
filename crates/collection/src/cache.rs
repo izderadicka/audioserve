@@ -334,6 +334,8 @@ impl CollectionCache {
                     cond_var.notify_all();
                 }
 
+                info!("Initial scan for collection {:?} finished", inner.base_dir);
+
                 // now update changed directories
                 loop {
                     match rx.recv() {
