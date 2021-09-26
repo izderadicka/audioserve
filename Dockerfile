@@ -45,7 +45,7 @@ WORKDIR /audioserve
 USER audioserve
 
 ENV PORT=3000
-ENV RUST_LOG=audioserve=info
+ENV RUST_LOG=info
 
 EXPOSE ${PORT}
 
