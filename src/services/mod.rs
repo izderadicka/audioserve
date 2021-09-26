@@ -359,19 +359,21 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
             }
         };
         //static files
-        if req.path() == "/" {
-            return send_file_simple(
-                &get_config().client_dir,
-                "index.html",
-                Some(APP_STATIC_FILES_CACHE_AGE),
-            );
-        };
-        if req.path() == "/bundle.js" {
-            return send_file_simple(
-                &get_config().client_dir,
-                "bundle.js",
-                Some(APP_STATIC_FILES_CACHE_AGE),
-            );
+        if req.method() == Method::GET {
+            if req.path() == "/" {
+                return send_file_simple(
+                    &get_config().client_dir,
+                    "index.html",
+                    Some(APP_STATIC_FILES_CACHE_AGE),
+                );
+            };
+            if req.path() == "/bundle.js" {
+                return send_file_simple(
+                    &get_config().client_dir,
+                    "bundle.js",
+                    Some(APP_STATIC_FILES_CACHE_AGE),
+                );
+            }
         }
         // from here everything must be authenticated
         let searcher = self.search.clone();
