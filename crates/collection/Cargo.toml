@@ -16,7 +16,7 @@ anyhow = "1.0"
 [dependencies]
 
 media_info = {path="../media_info"}
-sled = "0.34"
+sled = {version="0.34", features=["compression"]}
 thiserror = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
