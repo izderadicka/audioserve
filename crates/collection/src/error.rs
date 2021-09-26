@@ -29,6 +29,9 @@ pub enum Error {
 
     #[error("Tokio join error")]
     TokioJoinError(#[from] tokio::task::JoinError),
+
+    #[error("Too many position groups")]
+    TooManyGroups,
 }
 
 impl From<TransactionError<Error>> for Error {

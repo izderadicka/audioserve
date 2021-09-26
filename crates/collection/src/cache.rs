@@ -20,6 +20,8 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+const MAX_GROUPS: usize = 100;
+
 fn deser_audiofoler<T: AsRef<[u8]>>(data: T) -> Option<AudioFolder> {
     bincode::deserialize(data.as_ref())
         .map_err(|e| error!("Error deserializing data from db {}", e))
@@ -136,6 +138,10 @@ impl CacheInner {
                     position,
                     folder_finished: false,
                 };
+
+                if !folder_rec.contains_key(group.as_ref()) && folder_rec.len() >= MAX_GROUPS {
+                    return transaction::abort(Error::TooManyGroups);
+                }
 
                 folder_rec.insert(group.as_ref().into(), this_pos);
                 let rec = match bincode::serialize(&folder_rec) {
