@@ -202,7 +202,12 @@ impl CollectionCache {
     ) -> Result<CollectionCache> {
         let root_path = path.into();
         let db_path = CollectionCache::db_path(&root_path, &db_dir)?;
-        let db = sled::open(&db_path)?;
+        let db = sled::Config::default()
+            .path(&db_path)
+            .use_compression(true)
+            .flush_every_ms(Some(10_000))
+            .cache_capacity(100 * 1024 * 1024)
+            .open()?;
         Ok(CollectionCache {
             inner: Arc::new(CacheInner {
                 pos_latest: db.open_tree("pos_latest")?,
