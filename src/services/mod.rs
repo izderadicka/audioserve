@@ -207,20 +207,28 @@ impl RequestWrapper {
 
     pub fn is_https(&self) -> bool {
         if self.is_ssl {
-            return true
+            return true;
         }
         #[cfg(feature = "behind-proxy")]
         if self.is_behind_proxy {
-            //try some known proxy headers
-            // let forwarded_https self
-            //     .request
-            //     .headers()
-            //     .typed_get::<proxy_headers::Forwarded>()
-            //     .and_then(|fwd| )
+            //try scommon  proxy headers
+            let forwarded_https = self
+                .request
+                .headers()
+                .typed_get::<proxy_headers::Forwarded>()
+                .and_then(|fwd| fwd.client_protocol().map(|p| p.as_ref() == "https"))
+                .unwrap_or(false);
 
-            return self.request.headers()
-            .get("X-Forwarded-Proto").map(|v| v.as_bytes() == b"https").unwrap_or(false);
+            if forwarded_https {
+                return true;
+            }
 
+            return self
+                .request
+                .headers()
+                .get("X-Forwarded-Proto")
+                .map(|v| v.as_bytes() == b"https")
+                .unwrap_or(false);
         }
         false
     }

@@ -241,6 +241,10 @@ impl Forwarded {
             .and_then(|n| n.fwd_for.as_ref())
             .and_then(|i| i.port())
     }
+
+    pub fn client_protocol(&self) -> Option<&Protocol> {
+        self.nodes.get(0).and_then(|n| n.fwd_protocol.as_ref())
+    }
 }
 
 impl Header for Forwarded {

@@ -86,7 +86,7 @@ impl Authenticator for SharedSecretAuthenticator {
                             debug!("Authenticating user");
                             if auth.auth_token_ok(secret) {
                                 debug!("Authentication success");
-                                let cookie_params =if req.is_https() && get_config().cors {
+                                let cookie_params = if req.is_https() && get_config().cors {
                                     "SameSite=None; Secure"
                                 } else {
                                     "SameSite=Lax"
