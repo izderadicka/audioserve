@@ -57,17 +57,19 @@ websock = {path="crates/websock", optional = true}
 nix = "0.20"
 
 [features]
-default = ["tls", "symlinks", "folder-download", "shared-positions"]
+default = ["tls", "symlinks", "folder-download", "shared-positions", "behind-proxy"]
 # default
 tls=["tokio-native-tls", "native-tls"]
 symlinks=["cachedirtree/symlinks", "collection/symlinks"]
-search-cache=["cachedirtree"]
+
 folder-download = ["async-tar", "async-zip"]
 folder-download-default-tar =[]
 shared-positions = ["websock"]
+behind-proxy = ["proxy-headers"]
 # non-default
 transcoding-cache=["simple-file-cache", "tokio-util"]
-behind-proxy = ["proxy-headers"]
+# this is for legacy search - keeping around for some time
+search-cache=["cachedirtree"] 
 # for static compilation only
 partially-static = ["collection/partially-static"]
 static = ["collection/static"]

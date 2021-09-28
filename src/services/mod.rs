@@ -204,6 +204,26 @@ impl RequestWrapper {
             .query()
             .map(|query| form_urlencoded::parse(query.as_bytes()).collect::<HashMap<_, _>>())
     }
+
+    pub fn is_https(&self) -> bool {
+        if self.is_ssl {
+            return true
+        }
+        #[cfg(feature = "behind-proxy")]
+        if self.is_behind_proxy {
+            //try some known proxy headers
+            // let forwarded_https self
+            //     .request
+            //     .headers()
+            //     .typed_get::<proxy_headers::Forwarded>()
+            //     .and_then(|fwd| )
+
+            return self.request.headers()
+            .get("X-Forwarded-Proto").map(|v| v.as_bytes() == b"https").unwrap_or(false);
+
+        }
+        false
+    }
 }
 #[derive(Clone)]
 pub struct TranscodingDetails {
