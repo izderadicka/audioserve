@@ -5,6 +5,7 @@ use crate::{
     position::{Position, PositionItem, PositionRecord},
     AudioFolderShort, FoldersOrdering,
 };
+use crossbeam_channel::{unbounded as channel, Receiver, RecvTimeoutError, Sender};
 use notify::{watcher, DebouncedEvent, Watcher};
 use sled::{
     transaction::{self, TransactionError},
@@ -15,7 +16,7 @@ use std::{
     collections::{BinaryHeap, HashMap, VecDeque},
     convert::TryInto,
     path::{Path, PathBuf},
-    sync::{mpsc::channel, Arc, Condvar, Mutex},
+    sync::{Arc, Condvar, Mutex},
     thread,
     time::{Duration, SystemTime},
 };
@@ -46,6 +47,7 @@ pub(crate) struct CacheInner {
     pos_folder: Tree,
     lister: FolderLister,
     base_dir: PathBuf,
+    update_sender: Sender<Option<UpdateAction>>,
 }
 
 impl CacheInner {
@@ -198,19 +200,21 @@ impl CacheInner {
     }
 
     fn proceed_event(&self, evt: DebouncedEvent) {
-        let action = match evt {
+        let snd = |a| {
+            self.update_sender
+                .send(Some(a))
+                .map_err(|e| error!("Error sending update {}", e))
+                .ok()
+                .unwrap_or(())
+        };
+        match evt {
             DebouncedEvent::Create(p) => {
                 let col_path = self.strip_base(&p);
                 if self.is_dir(&p) {
-                    UpdateAction::RefreshFolder {
-                        folder: col_path.into(),
-                        parent: true,
-                    }
+                    snd(UpdateAction::RefreshFolder(col_path.into()));
+                    snd(UpdateAction::RefreshFolder(parent_path(col_path)));
                 } else {
-                    UpdateAction::RefreshFolder {
-                        folder: parent_path(col_path),
-                        parent: false,
-                    }
+                    snd(UpdateAction::RefreshFolder(parent_path(col_path)));
                 }
             }
             DebouncedEvent::Write(p) => {
@@ -218,44 +222,29 @@ impl CacheInner {
                 // TODO - check can get Write on directory?
                 if self.is_dir(&p) {
                     // should be single file folder
-                    UpdateAction::RefreshFolder {
-                        folder: col_path.into(),
-                        parent: false,
-                    }
+                    snd(UpdateAction::RefreshFolder(col_path.into()));
                 } else {
-                    UpdateAction::RefreshFolder {
-                        folder: parent_path(col_path),
-                        parent: false,
-                    }
+                    snd(UpdateAction::RefreshFolder(parent_path(col_path)));
                 }
             }
             DebouncedEvent::Remove(p) => {
                 let col_path = self.strip_base(&p);
                 if self.is_dir(&p) {
-                    UpdateAction::RemoveFolder(col_path.into())
+                    snd(UpdateAction::RemoveFolder(col_path.into()));
                 } else {
-                    UpdateAction::RefreshFolder {
-                        folder: parent_path(col_path),
-                        parent: false,
-                    }
+                    snd(UpdateAction::RefreshFolder(parent_path(col_path)))
                 }
             }
             DebouncedEvent::Rename(p1, p2) => {
                 let col_path = self.strip_base(&p1);
                 match (p2.starts_with(&self.base_dir), self.is_dir(&p1)) {
-                    (true, true) => UpdateAction::RenameFolder {
+                    (true, true) => snd(UpdateAction::RenameFolder {
                         from: col_path.into(),
                         to: self.strip_base(&p2).into(),
-                    },
-                    (true, false) => UpdateAction::RefreshFolder {
-                        folder: parent_path(col_path),
-                        parent: false,
-                    },
-                    (false, true) => UpdateAction::RemoveFolder(col_path.into()),
-                    (false, false) => UpdateAction::RefreshFolder {
-                        folder: parent_path(col_path),
-                        parent: false,
-                    },
+                    }),
+                    (true, false) => snd(UpdateAction::RefreshFolder(parent_path(col_path))),
+                    (false, true) => snd(UpdateAction::RemoveFolder(col_path.into())),
+                    (false, false) => snd(UpdateAction::RefreshFolder(parent_path(col_path))),
                 }
             }
             other => {
@@ -263,8 +252,6 @@ impl CacheInner {
                 return;
             }
         };
-
-        self.proceed_update(action);
     }
 
     /// must be used only on paths with this collection
@@ -308,9 +295,12 @@ fn parent_path<P: AsRef<Path>>(path: P) -> PathBuf {
 }
 
 pub struct CollectionCache {
-    thread: Option<thread::JoinHandle<()>>,
+    thread_loop: Option<thread::JoinHandle<()>>,
+    thread_updater: Option<thread::JoinHandle<()>>,
     cond: Arc<(Condvar, Mutex<bool>)>,
     pub(crate) inner: Arc<CacheInner>,
+    update_sender: Sender<Option<UpdateAction>>,
+    update_receiver: Option<Receiver<Option<UpdateAction>>>,
 }
 
 impl CollectionCache {
@@ -327,6 +317,7 @@ impl CollectionCache {
             .flush_every_ms(Some(10_000))
             .cache_capacity(100 * 1024 * 1024)
             .open()?;
+        let (update_sender, update_receiver) = channel::<Option<UpdateAction>>();
         Ok(CollectionCache {
             inner: Arc::new(CacheInner {
                 pos_latest: db.open_tree("pos_latest")?,
@@ -334,9 +325,13 @@ impl CollectionCache {
                 db,
                 lister,
                 base_dir: root_path,
+                update_sender: update_sender.clone(),
             }),
-            thread: None,
+            thread_loop: None,
+            thread_updater: None,
             cond: Arc::new((Condvar::new(), Mutex::new(false))),
+            update_sender,
+            update_receiver: Some(update_receiver),
         })
     }
 
@@ -400,7 +395,10 @@ impl CollectionCache {
     }
 
     pub fn run_update_loop(&mut self) {
+        let update_receiver = self.update_receiver.take().expect("run multiple times");
         let inner = self.inner.clone();
+        let ongoing_updater = OngoingUpdater::new(update_receiver, inner.clone());
+        self.thread_updater = Some(thread::spawn(move || ongoing_updater.run()));
         let cond = self.cond.clone();
 
         let thread = thread::spawn(move || {
@@ -411,8 +409,8 @@ impl CollectionCache {
                     let mut started = cond_mtx.lock().unwrap();
                     *started = false;
                 }
-                let (tx, rx) = channel();
-                let mut watcher = watcher(tx, Duration::from_secs(10))
+                let (tx, rx) = std::sync::mpsc::channel();
+                let mut watcher = watcher(tx, Duration::from_secs(1))
                     .map_err(|e| error!("Failed to create fs watcher: {}", e));
                 if let Ok(ref mut watcher) = watcher {
                     watcher
@@ -437,7 +435,7 @@ impl CollectionCache {
                 }
 
                 // inittial scan of directory
-                let mut updater = Updater::new(inner.clone());
+                let mut updater = InitialUpdater::new(inner.clone());
                 updater.process();
 
                 // Notify about finish of initial scan
@@ -481,7 +479,7 @@ impl CollectionCache {
                 }
             }
         });
-        self.thread = Some(thread);
+        self.thread_loop = Some(thread);
     }
 
     #[allow(dead_code)]
@@ -568,9 +566,9 @@ impl CollectionCache {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 enum UpdateAction {
-    RefreshFolder { folder: PathBuf, parent: bool },
+    RefreshFolder(PathBuf),
     RemoveFolder(PathBuf),
     RenameFolder { from: PathBuf, to: PathBuf },
 }
@@ -578,7 +576,7 @@ enum UpdateAction {
 impl AsRef<Path> for UpdateAction {
     fn as_ref(&self) -> &Path {
         match self {
-            UpdateAction::RefreshFolder { folder, .. } => folder.as_path(),
+            UpdateAction::RefreshFolder(folder) => folder.as_path(),
             UpdateAction::RemoveFolder(folder) => folder.as_path(),
             UpdateAction::RenameFolder { from, .. } => from.as_path(),
         }
@@ -677,12 +675,69 @@ impl Iterator for Search {
     }
 }
 
-struct Updater {
+struct OngoingUpdater {
+    queue: Receiver<Option<UpdateAction>>,
+    inner: Arc<CacheInner>,
+    pending: HashMap<UpdateAction, SystemTime>,
+    interval: Duration,
+}
+
+impl OngoingUpdater {
+    fn new(queue: Receiver<Option<UpdateAction>>, inner: Arc<CacheInner>) -> Self {
+        OngoingUpdater {
+            queue,
+            inner,
+            pending: HashMap::new(),
+            interval: Duration::from_secs(10),
+        }
+    }
+
+    fn finish(self) {
+        let inner = self.inner;
+        self.pending
+            .into_iter()
+            .for_each(|(a, _)| inner.proceed_update(a))
+    }
+
+    fn run(mut self) {
+        loop {
+            match self.queue.recv_timeout(self.interval) {
+                Ok(Some(action)) => {
+                    self.pending.insert(action, SystemTime::now());
+                }
+                Ok(None) => {
+                    self.finish();
+                    return;
+                }
+                Err(RecvTimeoutError::Disconnected) => {
+                    error!("OngoingUpdater channel disconnected preliminary");
+                    self.finish();
+                    return;
+                }
+                Err(RecvTimeoutError::Timeout) => (), // just give chance to send pending actions
+            }
+            let current_time = SystemTime::now();
+            // TODO replace with drain_filter when becomes stable
+            self.pending
+                .iter()
+                .filter(|(_, time)| current_time.duration_since(**time).unwrap() > self.interval)
+                .map(|v| v.0.clone())
+                .collect::<Vec<_>>()
+                .into_iter()
+                .for_each(|a| {
+                    self.pending.remove(&a);
+                    self.inner.proceed_update(a)
+                })
+        }
+    }
+}
+
+struct InitialUpdater {
     queue: VecDeque<AudioFolderShort>,
     inner: Arc<CacheInner>,
 }
 
-impl Updater {
+impl InitialUpdater {
     fn new(inner: Arc<CacheInner>) -> Self {
         let root = AudioFolderShort {
             name: "root".into(),
@@ -692,7 +747,7 @@ impl Updater {
         };
         let mut queue = VecDeque::new();
         queue.push_back(root);
-        Updater { queue, inner }
+        InitialUpdater { queue, inner }
     }
 
     fn process(&mut self) {
