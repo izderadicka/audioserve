@@ -160,16 +160,22 @@ fn serve_file_transcoded_checked(
         transcoding.max_transcodings - running_transcodings,
         transcoding.max_transcodings
     );
-    serve_file_transcoded(full_path, seek, span, transcoding_quality, counter)
+    Box::pin(serve_file_transcoded(
+        full_path,
+        seek,
+        span,
+        transcoding_quality,
+        counter,
+    ))
 }
 
-fn serve_file_transcoded(
+async fn serve_file_transcoded(
     full_path: AudioFilePath<PathBuf>,
     seek: Option<f32>,
     span: Option<TimeSpan>,
     transcoding_quality: QualityLevel,
     counter: Counter,
-) -> ResponseFuture {
+) -> Result<Response> {
     let transcoder = get_config().transcoder(transcoding_quality);
     let params = transcoder.transcoding_params();
     let mime = if let QualityLevel::Passthrough = transcoding_quality {
@@ -178,22 +184,27 @@ fn serve_file_transcoded(
         transcoder.transcoded_mime()
     };
 
-    let fut = transcoder
+    // check if file exists
+
+    if !tokio::fs::metadata(full_path.as_ref())
+        .await
+        .map(|m| m.is_file())
+        .unwrap_or(false)
+    {
+        error!("Requesting non existent file for transcoding {:?}", full_path);
+        return Ok(resp::not_found());
+    }
+
+    transcoder
         .transcode(full_path, seek, span, counter.clone(), transcoding_quality)
-        .then(move |res| match res {
-            Ok(stream) => future::ok(
-                HyperResponse::builder()
-                    .typed_header(ContentType::from(mime))
-                    .header("X-Transcode", params.as_bytes())
-                    .body(Body::wrap_stream(stream.map_err(Error::new)))
-                    .unwrap(),
-            ),
-            Err(e) => {
-                error!("Cannot create transcoded stream, error: {}", e);
-                future::ok(resp::internal_error())
-            }
-        });
-    Box::pin(fut)
+        .await
+        .map(move |stream| {
+            HyperResponse::builder()
+                .typed_header(ContentType::from(mime))
+                .header("X-Transcode", params.as_bytes())
+                .body(Body::wrap_stream(stream))
+                .unwrap()
+        })
 }
 
 pub struct ChunkStream<T> {
