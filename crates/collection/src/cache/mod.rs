@@ -9,17 +9,16 @@ use crate::{
     cache::{
         update::{
             filter_event,
-            FilteredEvent::{self, Ignore},
+            FilteredEvent,
             InitialUpdater,
         },
-        util::parent_path,
     },
     error::{Error, Result},
     position::Position,
     AudioFolderShort, FoldersOrdering,
 };
 use crossbeam_channel::{unbounded as channel, Receiver, Sender};
-use notify::{watcher, DebouncedEvent, Watcher};
+use notify::{watcher, Watcher};
 use std::{
     collections::BinaryHeap,
     convert::TryInto,
