@@ -263,16 +263,21 @@ impl CacheInner {
             }
             UpdateAction::RemoveFolder(folder) => {
                 folder.to_str().map(|f| self.remove(f));
+                self.force_update(parent_path(&folder), false).ok();
+                // TODO: And we have to remove all subfolders !
                 //TODO: need also to remove positions
             }
             UpdateAction::RenameFolder { from, to } => {
-                // TODO: should be done as transaction
-                from.to_str()
-                    .and_then(|p| self.remove(p).ok().flatten())
-                    .and_then(|f| {
-                        to.to_str()
-                            .and_then(|tf| self.db.insert(tf, f).ok().flatten())
-                    });
+                // TODO: And we have to remove all subfolders !
+                from.to_str().map(|p| self.remove(p));
+                let orig_parent = parent_path(&from);
+                let new_parent = parent_path(&to);
+                self.force_update(&orig_parent, false).ok();
+                if new_parent != orig_parent {
+                    self.force_update(&new_parent, false).ok();
+                }
+                self.force_update(&to, false).ok();
+                // TODO: we need to update all subfolders new location
 
                 // TODO: need also to move positions
             }

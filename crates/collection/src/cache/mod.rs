@@ -6,7 +6,7 @@ use self::{
 use crate::{
     audio_folder::FolderLister,
     audio_meta::{AudioFolder, FolderByModification, TimeStamp},
-    cache::update::InitialUpdater,
+    cache::{update::InitialUpdater, util::parent_path},
     error::{Error, Result},
     position::Position,
     AudioFolderShort, FoldersOrdering,
@@ -83,13 +83,14 @@ impl CollectionCache {
             })
             .ok_or_else(|| {
                 debug!(
-                    "Fetching folder {:?} from file file system",
+                    "Fetching folder {:?} from ile system",
                     dir_path.as_ref()
                 );
                 self.inner.list_dir(&dir_path, ordering)
             })
             .or_else(|r| {
-                if let Ok(af_ref) = r.as_ref() {
+                match r.as_ref() {
+                    Ok(af_ref) =>  {
                     // We should update cache as we got new info
                     debug!("Updating cache for dir {:?}", full_path);
                     let mut af = af_ref.clone();
@@ -103,6 +104,12 @@ impl CollectionCache {
                         .map_err(|e| error!("Cannot update collection: {}", e))
                         .ok();
                 }
+                Err(e) => {
+                    error!("Got error when fetching folder from file system: {} (will reload parent)", e);
+                    let parent = parent_path(dir_path);
+                    self.force_update(parent).map_err(|e| error!("Update of parent dir failed: {}", e)).ok();
+                }
+            }
                 r
             })
     }
