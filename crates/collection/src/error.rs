@@ -6,29 +6,29 @@ pub enum Error {
     #[error("Collection path is invalid")]
     InvalidCollectionPath,
 
-    #[error("Db error")]
+    #[error("Db error: {0}")]
     DbError(#[from] sled::Error),
 
-    #[error("Db transaction error")]
+    #[error("Db transaction error: {0}")]
     DbTransactionError(String),
 
-    #[error("Media metadata error")]
+    #[error("Media metadata error: {0}")]
     MediaInfoError(#[from] media_info::Error),
 
     #[error("Invalid file name - not UTF8")]
     InvalidFileName,
 
-    #[error("IO Error")]
+    #[error("IO Error: {0}")]
     IOError(#[from] std::io::Error),
 
-    #[error("Bincode serialization error")]
+    #[error("Bincode serialization error: {0}")]
     BincodeError(#[from] Box<bincode::ErrorKind>),
 
     #[error("Missing Collection Cache: {0}")]
     MissingCollectionCache(usize),
 
     #[cfg(feature = "async")]
-    #[error("Tokio join error")]
+    #[error("Tokio join error: {0}")]
     TokioJoinError(#[from] tokio::task::JoinError),
 
     #[error("Too many position groups")]

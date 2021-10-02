@@ -6,7 +6,14 @@ use self::{
 use crate::{
     audio_folder::FolderLister,
     audio_meta::{AudioFolder, FolderByModification, TimeStamp},
-    cache::{update::InitialUpdater, util::parent_path},
+    cache::{
+        update::{
+            filter_event,
+            FilteredEvent::{self, Ignore},
+            InitialUpdater,
+        },
+        util::parent_path,
+    },
     error::{Error, Result},
     position::Position,
     AudioFolderShort, FoldersOrdering,
@@ -82,34 +89,31 @@ impl CollectionCache {
                 af
             })
             .ok_or_else(|| {
-                debug!(
-                    "Fetching folder {:?} from ile system",
-                    dir_path.as_ref()
-                );
+                debug!("Fetching folder {:?} from ile system", dir_path.as_ref());
                 self.inner.list_dir(&dir_path, ordering)
             })
             .or_else(|r| {
                 match r.as_ref() {
-                    Ok(af_ref) =>  {
-                    // We should update cache as we got new info
-                    debug!("Updating cache for dir {:?}", full_path);
-                    let mut af = af_ref.clone();
-                    if matches!(ordering, FoldersOrdering::RecentFirst) {
-                        af.subfolders.sort_unstable_by(|a, b| {
-                            a.compare_as(FoldersOrdering::Alphabetical, b)
-                        });
+                    Ok(af_ref) => {
+                        // We should update cache as we got new info
+                        debug!("Updating cache for dir {:?}", full_path);
+                        let mut af = af_ref.clone();
+                        if matches!(ordering, FoldersOrdering::RecentFirst) {
+                            af.subfolders.sort_unstable_by(|a, b| {
+                                a.compare_as(FoldersOrdering::Alphabetical, b)
+                            });
+                        }
+                        self.inner
+                            .update(dir_path, af)
+                            .map_err(|e| error!("Cannot update collection: {}", e))
+                            .ok();
                     }
-                    self.inner
-                        .update(dir_path, af)
-                        .map_err(|e| error!("Cannot update collection: {}", e))
-                        .ok();
+                    Err(e) => {
+                        error!("Got error when fetching folder from file system: {}", e);
+                        // let parent = parent_path(dir_path);
+                        // self.force_update(parent).map_err(|e| error!("Update of parent dir failed: {}", e)).ok();
+                    }
                 }
-                Err(e) => {
-                    error!("Got error when fetching folder from file system: {} (will reload parent)", e);
-                    let parent = parent_path(dir_path);
-                    self.force_update(parent).map_err(|e| error!("Update of parent dir failed: {}", e)).ok();
-                }
-            }
                 r
             })
     }
@@ -187,20 +191,15 @@ impl CollectionCache {
                 loop {
                     match rx.recv() {
                         Ok(event) => {
-                            debug!("Change in collection {:?} => {:?}", root_path, event);
-                            let interesting_event = match event {
-                                DebouncedEvent::NoticeWrite(_) => continue,
-                                DebouncedEvent::NoticeRemove(_) => continue,
-                                evt @ DebouncedEvent::Create(_) => evt,
-                                evt @ DebouncedEvent::Write(_) => evt,
-                                DebouncedEvent::Chmod(_) => continue,
-                                evt @ DebouncedEvent::Remove(_) => evt,
-                                evt @ DebouncedEvent::Rename(_, _) => evt,
-                                DebouncedEvent::Rescan => {
+                            trace!("Change in collection {:?} => {:?}", root_path, event);
+                            let interesting_event = match filter_event(event) {
+                                FilteredEvent::Ignore => continue,
+                                FilteredEvent::Pass(evt) => evt,
+                                FilteredEvent::Rescan => {
                                     warn!("Rescaning of collection required");
                                     break;
                                 }
-                                DebouncedEvent::Error(e, p) => {
+                                FilteredEvent::Error(e, p) => {
                                     error!("Watch event error {} on {:?}", e, p);
                                     continue;
                                 }
@@ -210,6 +209,7 @@ impl CollectionCache {
                         Err(e) => {
                             error!("Error in collection watcher channel: {}", e);
                             thread::sleep(Duration::from_secs(10));
+                            break;
                         }
                     }
                 }

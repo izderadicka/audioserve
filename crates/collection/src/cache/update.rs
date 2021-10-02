@@ -6,6 +6,7 @@ use std::{
 };
 
 use crossbeam_channel::{Receiver, RecvTimeoutError};
+use notify::DebouncedEvent;
 
 use crate::AudioFolderShort;
 
@@ -128,5 +129,27 @@ impl InitialUpdater {
             };
             self.queue.extend(af.subfolders)
         }
+    }
+}
+
+pub(crate) enum FilteredEvent {
+    Pass(DebouncedEvent),
+    Error(notify::Error, Option<PathBuf>),
+    Rescan,
+    Ignore,
+}
+
+pub(crate) fn filter_event(evt: DebouncedEvent) -> FilteredEvent {
+    use FilteredEvent::*;
+    match evt {
+        DebouncedEvent::NoticeWrite(_) => Ignore,
+        DebouncedEvent::NoticeRemove(_) => Ignore,
+        evt @ DebouncedEvent::Create(_) => Pass(evt),
+        evt @ DebouncedEvent::Write(_) => Pass(evt),
+        DebouncedEvent::Chmod(_) => Ignore,
+        evt @ DebouncedEvent::Remove(_) => Pass(evt),
+        evt @ DebouncedEvent::Rename(_, _) => Pass(evt),
+        DebouncedEvent::Rescan => Rescan,
+        DebouncedEvent::Error(e, p) => Error(e, p),
     }
 }

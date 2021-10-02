@@ -8,7 +8,7 @@ use crossbeam_channel::Sender;
 use notify::DebouncedEvent;
 use sled::{
     transaction::{self, TransactionError, Transactional},
-    Db, IVec, Tree,
+    Batch, Db, IVec, Tree,
 };
 
 use crate::{
@@ -133,9 +133,19 @@ impl CacheInner {
         self.base_dir.join(rel_path.as_ref())
     }
 
-    pub(crate) fn remove<P: AsRef<str>>(&self, dir_path: P) -> Result<Option<IVec>> {
-        let path = dir_path.as_ref();
+    pub(crate) fn remove<P: AsRef<Path>>(&self, dir_path: P) -> Result<Option<IVec>> {
+        let path = dir_path.as_ref().to_str().ok_or(Error::InvalidFileName)?;
         self.db.remove(path).map_err(Error::from)
+    }
+
+    pub(crate) fn remove_tree<P: AsRef<Path>>(&self, dir_path: P) -> Result<()> {
+        let path = dir_path.as_ref().to_str().ok_or(Error::InvalidFileName)?;
+        let mut batch = Batch::default();
+        self.db
+            .scan_prefix(path)
+            .filter_map(|r| r.ok())
+            .for_each(|(key, _)| batch.remove(key));
+        self.db.apply_batch(batch).map_err(Error::from)
     }
 
     pub fn flush(&self) -> Result<()> {
@@ -262,14 +272,16 @@ impl CacheInner {
                     .ok();
             }
             UpdateAction::RemoveFolder(folder) => {
-                folder.to_str().map(|f| self.remove(f));
+                self.remove_tree(&folder)
+                    .map_err(|e| error!("Error deleting folder: {}", e))
+                    .ok();
                 self.force_update(parent_path(&folder), false).ok();
-                // TODO: And we have to remove all subfolders !
                 //TODO: need also to remove positions
             }
             UpdateAction::RenameFolder { from, to } => {
-                // TODO: And we have to remove all subfolders !
-                from.to_str().map(|p| self.remove(p));
+                self.remove_tree(&from)
+                    .map_err(|e| error!("Error deleting folder: {}", e))
+                    .ok();
                 let orig_parent = parent_path(&from);
                 let new_parent = parent_path(&to);
                 self.force_update(&orig_parent, false).ok();
