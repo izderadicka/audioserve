@@ -27,6 +27,7 @@ pub enum Error {
     #[error("Missing Collection Cache: {0}")]
     MissingCollectionCache(usize),
 
+    #[cfg(feature = "async")]
     #[error("Tokio join error")]
     TokioJoinError(#[from] tokio::task::JoinError),
 

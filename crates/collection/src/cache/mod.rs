@@ -1,298 +1,30 @@
+use self::{
+    inner::CacheInner,
+    update::{OngoingUpdater, UpdateAction},
+    util::kv_to_audiofolder,
+};
 use crate::{
     audio_folder::FolderLister,
-    audio_meta::{AudioFolder, TimeStamp},
+    audio_meta::{AudioFolder, FolderByModification, TimeStamp},
+    cache::update::InitialUpdater,
     error::{Error, Result},
-    position::{Position, PositionItem, PositionRecord},
+    position::Position,
     AudioFolderShort, FoldersOrdering,
 };
-use crossbeam_channel::{unbounded as channel, Receiver, RecvTimeoutError, Sender};
+use crossbeam_channel::{unbounded as channel, Receiver, Sender};
 use notify::{watcher, DebouncedEvent, Watcher};
-use sled::{
-    transaction::{self, TransactionError},
-    Db, Transactional, Tree,
-};
 use std::{
-    cmp::Ordering,
-    collections::{BinaryHeap, HashMap, VecDeque},
+    collections::BinaryHeap,
     convert::TryInto,
     path::{Path, PathBuf},
     sync::{Arc, Condvar, Mutex},
     thread,
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 
-const MAX_GROUPS: usize = 100;
-
-fn deser_audiofoler<T: AsRef<[u8]>>(data: T) -> Option<AudioFolder> {
-    bincode::deserialize(data.as_ref())
-        .map_err(|e| error!("Error deserializing data from db {}", e))
-        .ok()
-}
-
-fn kv_to_audiofolder<K: AsRef<str>, V: AsRef<[u8]>>(key: K, val: V) -> AudioFolderShort {
-    let path = Path::new(key.as_ref());
-    let folder = deser_audiofoler(val);
-    AudioFolderShort {
-        name: path.file_name().unwrap().to_string_lossy().into(),
-        path: path.into(),
-        is_file: folder.as_ref().map(|f| f.is_file).unwrap_or(false),
-        modified: folder.as_ref().and_then(|f| f.modified),
-    }
-}
-
-#[derive(Clone)]
-pub(crate) struct CacheInner {
-    db: Db,
-    pos_latest: Tree,
-    pos_folder: Tree,
-    lister: FolderLister,
-    base_dir: PathBuf,
-    update_sender: Sender<Option<UpdateAction>>,
-}
-
-impl CacheInner {
-    fn get<P: AsRef<Path>>(&self, dir: P) -> Option<AudioFolder> {
-        dir.as_ref()
-            .to_str()
-            .and_then(|p| {
-                self.db
-                    .get(p)
-                    .map_err(|e| error!("Cannot get record for db: {}", e))
-                    .ok()
-                    .flatten()
-            })
-            .and_then(deser_audiofoler)
-    }
-
-    fn get_if_actual<P: AsRef<Path>>(&self, dir: P, ts: Option<SystemTime>) -> Option<AudioFolder> {
-        let af = self.get(dir);
-        af.as_ref()
-            .and_then(|af| af.modified)
-            .and_then(|cached_time| ts.map(|actual_time| cached_time >= actual_time))
-            .and_then(|actual| if actual { af } else { None })
-    }
-
-    fn update<P: AsRef<Path>>(&self, dir: P, af: AudioFolder) -> Result<()> {
-        let dir = dir
-            .as_ref()
-            .to_str()
-            .ok_or_else(|| Error::InvalidCollectionPath)?;
-        bincode::serialize(&af)
-            .map_err(Error::from)
-            .and_then(|data| self.db.insert(dir, data).map_err(Error::from))
-            .map(|_| debug!("Cache updated for {:?}", dir))
-    }
-
-    fn force_update<P: AsRef<Path>>(&self, dir_path: P) -> Result<()> {
-        let af = self.lister.list_dir(
-            &self.base_dir,
-            dir_path.as_ref(),
-            FoldersOrdering::Alphabetical,
-        )?;
-        self.update(dir_path, af)
-    }
-
-    fn full_path<P: AsRef<Path>>(&self, rel_path: P) -> PathBuf {
-        self.base_dir.join(rel_path.as_ref())
-    }
-}
-
-// positions
-impl CacheInner {
-    pub fn insert_position<S, P>(
-        &self,
-        group: S,
-        path: P,
-        position: f32,
-        ts: Option<TimeStamp>,
-    ) -> Result<()>
-    where
-        S: AsRef<str>,
-        P: AsRef<str>,
-    {
-        (&self.pos_latest, &self.pos_folder)
-            .transaction(|(pos_latest, pos_folder)| {
-                let (path, file) = split_path(&path);
-
-                let mut folder_rec = pos_folder
-                    .get(&path)
-                    .map_err(|e| error!("Db get error: {}", e))
-                    .ok()
-                    .flatten()
-                    .and_then(|data| {
-                        bincode::deserialize::<PositionRecord>(&data)
-                            .map_err(|e| error!("Db item deserialization error: {}", e))
-                            .ok()
-                    })
-                    .unwrap_or_else(HashMap::new);
-
-                if let Some(ts) = ts {
-                    if let Some(current_record) = folder_rec.get(group.as_ref()) {
-                        if current_record.timestamp > ts {
-                            return Ok(());
-                        }
-                    }
-                }
-
-                let this_pos = PositionItem {
-                    file: file,
-                    timestamp: TimeStamp::now(),
-                    position,
-                    folder_finished: false,
-                };
-
-                if !folder_rec.contains_key(group.as_ref()) && folder_rec.len() >= MAX_GROUPS {
-                    return transaction::abort(Error::TooManyGroups);
-                }
-
-                folder_rec.insert(group.as_ref().into(), this_pos);
-                let rec = match bincode::serialize(&folder_rec) {
-                    Err(e) => return transaction::abort(Error::from(e)),
-                    Ok(res) => res,
-                };
-
-                pos_folder.insert(path.as_bytes(), rec)?;
-                pos_latest.insert(group.as_ref(), path.as_bytes())?;
-                Ok(())
-            })
-            .map_err(|e| Error::from(e))
-    }
-
-    pub fn get_position<S, P>(&self, group: S, folder: Option<P>) -> Option<Position>
-    where
-        S: AsRef<str>,
-        P: AsRef<str>,
-    {
-        (&self.pos_latest, &self.pos_folder)
-            .transaction(|(pos_latest, pos_folder)| {
-                let fld = match folder.as_ref().map(|f| f.as_ref().to_string()).or_else(|| {
-                    pos_latest
-                        .get(group.as_ref())
-                        .map_err(|e| error!("Get last pos db error: {}", e))
-                        .ok()
-                        .flatten()
-                        // it's safe because we know for sure we inserted string here
-                        .map(|data| unsafe { String::from_utf8_unchecked(data.as_ref().into()) })
-                }) {
-                    Some(s) => s,
-                    None => return Ok(None),
-                };
-
-                Ok(pos_folder
-                    .get(&fld)
-                    .map_err(|e| error!("Error reading position folder record in db: {}", e))
-                    .ok()
-                    .flatten()
-                    .and_then(|r| {
-                        bincode::deserialize::<PositionRecord>(&r)
-                            .map_err(|e| error!("Error deserializing position record {}", e))
-                            .ok()
-                    })
-                    .and_then(|m| m.get(group.as_ref()).map(|p| p.into_position(fld, 0))))
-            })
-            .map_err(|e: TransactionError<Error>| error!("Db transaction error: {}", e))
-            .ok()
-            .flatten()
-    }
-
-    fn proceed_update(&self, update: UpdateAction) {
-        debug!("Update action: {:?}", update);
-    }
-
-    fn proceed_event(&self, evt: DebouncedEvent) {
-        let snd = |a| {
-            self.update_sender
-                .send(Some(a))
-                .map_err(|e| error!("Error sending update {}", e))
-                .ok()
-                .unwrap_or(())
-        };
-        match evt {
-            DebouncedEvent::Create(p) => {
-                let col_path = self.strip_base(&p);
-                if self.is_dir(&p) {
-                    snd(UpdateAction::RefreshFolder(col_path.into()));
-                    snd(UpdateAction::RefreshFolder(parent_path(col_path)));
-                } else {
-                    snd(UpdateAction::RefreshFolder(parent_path(col_path)));
-                }
-            }
-            DebouncedEvent::Write(p) => {
-                let col_path = self.strip_base(&p);
-                // TODO - check can get Write on directory?
-                if self.is_dir(&p) {
-                    // should be single file folder
-                    snd(UpdateAction::RefreshFolder(col_path.into()));
-                } else {
-                    snd(UpdateAction::RefreshFolder(parent_path(col_path)));
-                }
-            }
-            DebouncedEvent::Remove(p) => {
-                let col_path = self.strip_base(&p);
-                if self.is_dir(&p) {
-                    snd(UpdateAction::RemoveFolder(col_path.into()));
-                } else {
-                    snd(UpdateAction::RefreshFolder(parent_path(col_path)))
-                }
-            }
-            DebouncedEvent::Rename(p1, p2) => {
-                let col_path = self.strip_base(&p1);
-                match (p2.starts_with(&self.base_dir), self.is_dir(&p1)) {
-                    (true, true) => snd(UpdateAction::RenameFolder {
-                        from: col_path.into(),
-                        to: self.strip_base(&p2).into(),
-                    }),
-                    (true, false) => snd(UpdateAction::RefreshFolder(parent_path(col_path))),
-                    (false, true) => snd(UpdateAction::RemoveFolder(col_path.into())),
-                    (false, false) => snd(UpdateAction::RefreshFolder(parent_path(col_path))),
-                }
-            }
-            other => {
-                error!("This event {:?} should not get here", other);
-                return;
-            }
-        };
-    }
-
-    /// must be used only on paths with this collection
-    fn strip_base<'a, P>(&self, path: &'a P) -> &'a Path
-    where
-        P: AsRef<Path>,
-    {
-        path.as_ref().strip_prefix(&self.base_dir).unwrap() // Should be safe as is used only with this collection
-    }
-
-    /// only for absolute paths
-    fn is_dir<P: AsRef<Path>>(&self, path: P) -> bool {
-        let path: &Path = path.as_ref();
-        assert!(path.is_absolute());
-        if path.metadata().map(|m| m.is_dir()).unwrap_or(false) {
-            true
-        } else {
-            let col_path = self.strip_base(&path); // Should be safe as is used only with this collection
-            if col_path
-                .to_str()
-                .and_then(|p| self.db.contains_key(p.as_bytes()).ok())
-                .unwrap_or(false)
-            {
-                // it has been identified as directory before
-                true
-            } else {
-                // have to check hard way - what if we created new .m4b in folder?
-                // and we have problem with concept of single .m4b in directory !
-                // TODO: implement solid logic here
-                false
-            }
-        }
-    }
-}
-
-fn parent_path<P: AsRef<Path>>(path: P) -> PathBuf {
-    path.as_ref()
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_default()
-}
+mod inner;
+mod update;
+mod util;
 
 pub struct CollectionCache {
     thread_loop: Option<thread::JoinHandle<()>>,
@@ -319,14 +51,12 @@ impl CollectionCache {
             .open()?;
         let (update_sender, update_receiver) = channel::<Option<UpdateAction>>();
         Ok(CollectionCache {
-            inner: Arc::new(CacheInner {
-                pos_latest: db.open_tree("pos_latest")?,
-                pos_folder: db.open_tree("pos_folder")?,
+            inner: Arc::new(CacheInner::new(
                 db,
                 lister,
-                base_dir: root_path,
-                update_sender: update_sender.clone(),
-            }),
+                root_path,
+                update_sender.clone(),
+            )?),
             thread_loop: None,
             thread_updater: None,
             cond: Arc::new((Condvar::new(), Mutex::new(false))),
@@ -356,10 +86,7 @@ impl CollectionCache {
                     "Fetching folder {:?} from file file system",
                     dir_path.as_ref()
                 );
-                self.inner
-                    .lister
-                    .list_dir(&self.inner.base_dir, &dir_path, ordering)
-                    .map_err(Error::from)
+                self.inner.list_dir(&dir_path, ordering)
             })
             .or_else(|r| {
                 if let Ok(af_ref) = r.as_ref() {
@@ -402,7 +129,7 @@ impl CollectionCache {
         let cond = self.cond.clone();
 
         let thread = thread::spawn(move || {
-            let root_path = inner.base_dir.as_path();
+            let root_path = inner.base_dir();
             loop {
                 let (cond_var, cond_mtx) = &*cond;
                 {
@@ -420,13 +147,12 @@ impl CollectionCache {
                 }
 
                 // clean up non-exitent directories
-                for key in inner.db.iter().filter_map(|e| e.ok()).map(|(k, _)| k) {
+                for key in inner.iter_folders().filter_map(|e| e.ok()).map(|(k, _)| k) {
                     if let Ok(rel_path) = std::str::from_utf8(&key) {
                         let full_path = root_path.join(rel_path);
                         if !full_path.exists() {
                             debug!("Removing {:?} from collection cache db", full_path);
                             inner
-                                .db
                                 .remove(rel_path)
                                 .map_err(|e| error!("cannot remove revord from db: {}", e))
                                 .ok();
@@ -445,7 +171,10 @@ impl CollectionCache {
                     cond_var.notify_all();
                 }
 
-                info!("Initial scan for collection {:?} finished", inner.base_dir);
+                info!(
+                    "Initial scan for collection {:?} finished",
+                    inner.base_dir()
+                );
 
                 // now update changed directories
                 loop {
@@ -497,20 +226,11 @@ impl CollectionCache {
     }
 
     pub fn force_update<P: AsRef<Path>>(&self, dir_path: P) -> Result<()> {
-        self.inner.force_update(dir_path)
+        self.inner.force_update(dir_path, false).map(|_| ())
     }
 
     pub fn flush(&self) -> Result<()> {
-        let mut res = vec![];
-        res.push(self.inner.db.flush());
-        res.push(self.inner.pos_folder.flush());
-        res.push(self.inner.pos_latest.flush());
-
-        res.into_iter()
-            .find(|r| r.is_err())
-            .unwrap_or(Ok(0))
-            .map(|_| ())
-            .map_err(Error::from)
+        self.inner.flush()
     }
 
     pub fn search<S: AsRef<str>>(&self, q: S) -> Search {
@@ -520,7 +240,7 @@ impl CollectionCache {
             .filter(|s| !s.is_empty())
             .map(str::to_lowercase)
             .collect();
-        let iter = self.inner.db.iter();
+        let iter = self.inner.iter_folders();
         Search {
             tokens,
             iter,
@@ -531,18 +251,22 @@ impl CollectionCache {
     pub fn recent(&self, limit: usize) -> Vec<AudioFolderShort> {
         let mut heap = BinaryHeap::with_capacity(limit + 1);
 
-        for (key, val) in self.inner.db.iter().skip(1).filter_map(|r| r.ok()) {
+        for (key, val) in self.inner.iter_folders().skip(1).filter_map(|r| r.ok()) {
             let sf = kv_to_audiofolder(std::str::from_utf8(&key).unwrap(), val);
-            heap.push(FolderByModification(sf));
+            heap.push(FolderByModification::from(sf));
             if heap.len() > limit {
                 heap.pop();
             }
         }
-        heap.into_sorted_vec().into_iter().map(|i| i.0).collect()
+        heap.into_sorted_vec()
+            .into_iter()
+            .map(|i| i.into())
+            .collect()
     }
+}
 
-    // positions
-
+// positions
+impl CollectionCache {
     pub fn insert_position<S, P>(
         &self,
         group: S,
@@ -566,26 +290,10 @@ impl CollectionCache {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-enum UpdateAction {
-    RefreshFolder(PathBuf),
-    RemoveFolder(PathBuf),
-    RenameFolder { from: PathBuf, to: PathBuf },
-}
-
-impl AsRef<Path> for UpdateAction {
-    fn as_ref(&self) -> &Path {
-        match self {
-            UpdateAction::RefreshFolder(folder) => folder.as_path(),
-            UpdateAction::RemoveFolder(folder) => folder.as_path(),
-            UpdateAction::RenameFolder { from, .. } => from.as_path(),
-        }
-    }
-}
-
-// positions
+// positions async
 #[cfg(feature = "async")]
 use tokio::task::spawn_blocking;
+
 #[cfg(feature = "async")]
 impl CollectionCache {
     pub async fn insert_position_async<S, P>(
@@ -616,26 +324,6 @@ impl CollectionCache {
             .map_err(|e| error!("Tokio join error: {}", e))
             .ok()
             .flatten()
-    }
-}
-
-fn split_path<S: AsRef<str>>(p: &S) -> (String, String) {
-    let s = p.as_ref();
-    match s.rsplit_once('/') {
-        Some((path, file)) => (path.into(), file.into()),
-        None => ("".into(), s.to_owned()),
-    }
-}
-
-#[derive(PartialEq, Eq, Ord)]
-struct FolderByModification(AudioFolderShort);
-
-impl PartialOrd for FolderByModification {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match other.0.modified.partial_cmp(&self.0.modified) {
-            Some(Ordering::Equal) => self.0.partial_cmp(&other.0),
-            other => other,
-        }
     }
 }
 
@@ -675,117 +363,10 @@ impl Iterator for Search {
     }
 }
 
-struct OngoingUpdater {
-    queue: Receiver<Option<UpdateAction>>,
-    inner: Arc<CacheInner>,
-    pending: HashMap<UpdateAction, SystemTime>,
-    interval: Duration,
-}
-
-impl OngoingUpdater {
-    fn new(queue: Receiver<Option<UpdateAction>>, inner: Arc<CacheInner>) -> Self {
-        OngoingUpdater {
-            queue,
-            inner,
-            pending: HashMap::new(),
-            interval: Duration::from_secs(10),
-        }
-    }
-
-    fn finish(self) {
-        let inner = self.inner;
-        self.pending
-            .into_iter()
-            .for_each(|(a, _)| inner.proceed_update(a))
-    }
-
-    fn run(mut self) {
-        loop {
-            match self.queue.recv_timeout(self.interval) {
-                Ok(Some(action)) => {
-                    self.pending.insert(action, SystemTime::now());
-                }
-                Ok(None) => {
-                    self.finish();
-                    return;
-                }
-                Err(RecvTimeoutError::Disconnected) => {
-                    error!("OngoingUpdater channel disconnected preliminary");
-                    self.finish();
-                    return;
-                }
-                Err(RecvTimeoutError::Timeout) => (), // just give chance to send pending actions
-            }
-            let current_time = SystemTime::now();
-            // TODO replace with drain_filter when becomes stable
-            self.pending
-                .iter()
-                .filter(|(_, time)| current_time.duration_since(**time).unwrap() > self.interval)
-                .map(|v| v.0.clone())
-                .collect::<Vec<_>>()
-                .into_iter()
-                .for_each(|a| {
-                    self.pending.remove(&a);
-                    self.inner.proceed_update(a)
-                })
-        }
-    }
-}
-
-struct InitialUpdater {
-    queue: VecDeque<AudioFolderShort>,
-    inner: Arc<CacheInner>,
-}
-
-impl InitialUpdater {
-    fn new(inner: Arc<CacheInner>) -> Self {
-        let root = AudioFolderShort {
-            name: "root".into(),
-            path: Path::new("").into(),
-            is_file: false,
-            modified: None,
-        };
-        let mut queue = VecDeque::new();
-        queue.push_back(root);
-        InitialUpdater { queue, inner }
-    }
-
-    fn process(&mut self) {
-        while let Some(folder_info) = self.queue.pop_front() {
-            // process AF
-            let full_path = self.inner.base_dir.join(&folder_info.path);
-            let mod_ts = full_path.metadata().ok().and_then(|m| m.modified().ok());
-            match self.inner.get_if_actual(&folder_info.path, mod_ts) {
-                None => match self.inner.lister.list_dir(
-                    &self.inner.base_dir,
-                    &folder_info.path,
-                    FoldersOrdering::Alphabetical,
-                ) {
-                    Ok(af) => {
-                        self.queue.extend(af.subfolders.iter().cloned());
-                        self.inner
-                            .update(&folder_info.path, af)
-                            .map_err(|e| error!("Cannot insert to db {}", e))
-                            .ok();
-                    }
-                    Err(e) => error!(
-                        "Cannot listing audio folder {:?}, error {}",
-                        folder_info.path, e
-                    ),
-                },
-                Some(af) => {
-                    debug!("For path {:?} using cached data", folder_info.path);
-                    self.queue.extend(af.subfolders)
-                }
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
-    use std::fs;
+    use std::{fs, time::SystemTime};
 
     use fs_extra::dir::{copy, CopyOptions};
     use tempdir::TempDir;
@@ -932,13 +513,5 @@ mod tests {
         assert_eq!(r3.file, "002 - Chapter 3$$2000-3000$$.mp3");
         assert_eq!(r3.position, 0.08);
         Ok(())
-    }
-
-    #[test]
-    fn test_parent_path() {
-        let p1 = Path::new("usak/kulisak");
-        assert_eq!(Path::new("usak"), parent_path(p1));
-        let p2 = Path::new("usak");
-        assert_eq!(Path::new(""), parent_path(p2));
     }
 }

@@ -189,6 +189,30 @@ impl AudioFolderShort {
     }
 }
 
+#[derive(PartialEq, Eq, Ord)]
+pub(crate) struct FolderByModification(AudioFolderShort);
+
+impl From<AudioFolderShort> for FolderByModification {
+    fn from(f: AudioFolderShort) -> Self {
+        FolderByModification(f)
+    }
+}
+
+impl From<FolderByModification> for AudioFolderShort {
+    fn from(f: FolderByModification) -> Self {
+        f.0
+    }
+}
+
+impl PartialOrd for FolderByModification {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match other.0.modified.partial_cmp(&self.0.modified) {
+            Some(Ordering::Equal) => self.0.partial_cmp(&other.0),
+            other => other,
+        }
+    }
+}
+
 pub struct Chapter {
     pub number: u32,
     pub title: String,
