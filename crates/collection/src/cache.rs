@@ -5,7 +5,7 @@ use crate::{
     position::{Position, PositionItem, PositionRecord},
     AudioFolderShort, FoldersOrdering,
 };
-use notify::{watcher, Watcher};
+use notify::{watcher, DebouncedEvent, Watcher};
 use sled::{
     transaction::{self, TransactionError},
     Db, Transactional, Tree,
@@ -192,6 +192,119 @@ impl CacheInner {
             .ok()
             .flatten()
     }
+
+    fn proceed_update(&self, update: UpdateAction) {
+        debug!("Update action: {:?}", update);
+    }
+
+    fn proceed_event(&self, evt: DebouncedEvent) {
+        let action = match evt {
+            DebouncedEvent::Create(p) => {
+                let col_path = self.strip_base(&p);
+                if self.is_dir(&p) {
+                    UpdateAction::RefreshFolder {
+                        folder: col_path.into(),
+                        parent: true,
+                    }
+                } else {
+                    UpdateAction::RefreshFolder {
+                        folder: parent_path(col_path),
+                        parent: false,
+                    }
+                }
+            }
+            DebouncedEvent::Write(p) => {
+                let col_path = self.strip_base(&p);
+                // TODO - check can get Write on directory?
+                if self.is_dir(&p) {
+                    // should be single file folder
+                    UpdateAction::RefreshFolder {
+                        folder: col_path.into(),
+                        parent: false,
+                    }
+                } else {
+                    UpdateAction::RefreshFolder {
+                        folder: parent_path(col_path),
+                        parent: false,
+                    }
+                }
+            }
+            DebouncedEvent::Remove(p) => {
+                let col_path = self.strip_base(&p);
+                if self.is_dir(&p) {
+                    UpdateAction::RemoveFolder(col_path.into())
+                } else {
+                    UpdateAction::RefreshFolder {
+                        folder: parent_path(col_path),
+                        parent: false,
+                    }
+                }
+            }
+            DebouncedEvent::Rename(p1, p2) => {
+                let col_path = self.strip_base(&p1);
+                match (p2.starts_with(&self.base_dir), self.is_dir(&p1)) {
+                    (true, true) => UpdateAction::RenameFolder {
+                        from: col_path.into(),
+                        to: self.strip_base(&p2).into(),
+                    },
+                    (true, false) => UpdateAction::RefreshFolder {
+                        folder: parent_path(col_path),
+                        parent: false,
+                    },
+                    (false, true) => UpdateAction::RemoveFolder(col_path.into()),
+                    (false, false) => UpdateAction::RefreshFolder {
+                        folder: parent_path(col_path),
+                        parent: false,
+                    },
+                }
+            }
+            other => {
+                error!("This event {:?} should not get here", other);
+                return;
+            }
+        };
+
+        self.proceed_update(action);
+    }
+
+    /// must be used only on paths with this collection
+    fn strip_base<'a, P>(&self, path: &'a P) -> &'a Path
+    where
+        P: AsRef<Path>,
+    {
+        path.as_ref().strip_prefix(&self.base_dir).unwrap() // Should be safe as is used only with this collection
+    }
+
+    /// only for absolute paths
+    fn is_dir<P: AsRef<Path>>(&self, path: P) -> bool {
+        let path: &Path = path.as_ref();
+        assert!(path.is_absolute());
+        if path.metadata().map(|m| m.is_dir()).unwrap_or(false) {
+            true
+        } else {
+            let col_path = self.strip_base(&path); // Should be safe as is used only with this collection
+            if col_path
+                .to_str()
+                .and_then(|p| self.db.contains_key(p.as_bytes()).ok())
+                .unwrap_or(false)
+            {
+                // it has been identified as directory before
+                true
+            } else {
+                // have to check hard way - what if we created new .m4b in folder?
+                // and we have problem with concept of single .m4b in directory !
+                // TODO: implement solid logic here
+                false
+            }
+        }
+    }
+}
+
+fn parent_path<P: AsRef<Path>>(path: P) -> PathBuf {
+    path.as_ref()
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_default()
 }
 
 pub struct CollectionCache {
@@ -341,23 +454,24 @@ impl CollectionCache {
                     match rx.recv() {
                         Ok(event) => {
                             debug!("Change in collection {:?} => {:?}", root_path, event);
-                            let paths_to_update = match event {
-                                notify::DebouncedEvent::NoticeWrite(_) => continue,
-                                notify::DebouncedEvent::NoticeRemove(_) => continue,
-                                notify::DebouncedEvent::Create(p) => (p, None),
-                                notify::DebouncedEvent::Write(p) => (p, None),
-                                notify::DebouncedEvent::Chmod(_) => continue,
-                                notify::DebouncedEvent::Remove(p) => (p, None),
-                                notify::DebouncedEvent::Rename(p1, p2) => (p1, Some(p2)),
-                                notify::DebouncedEvent::Rescan => {
+                            let interesting_event = match event {
+                                DebouncedEvent::NoticeWrite(_) => continue,
+                                DebouncedEvent::NoticeRemove(_) => continue,
+                                evt @ DebouncedEvent::Create(_) => evt,
+                                evt @ DebouncedEvent::Write(_) => evt,
+                                DebouncedEvent::Chmod(_) => continue,
+                                evt @ DebouncedEvent::Remove(_) => evt,
+                                evt @ DebouncedEvent::Rename(_, _) => evt,
+                                DebouncedEvent::Rescan => {
                                     warn!("Rescaning of collection required");
                                     break;
                                 }
-                                notify::DebouncedEvent::Error(e, p) => {
+                                DebouncedEvent::Error(e, p) => {
                                     error!("Watch event error {} on {:?}", e, p);
                                     continue;
                                 }
                             };
+                            inner.proceed_event(interesting_event)
                         }
                         Err(e) => {
                             error!("Error in collection watcher channel: {}", e);
@@ -451,6 +565,23 @@ impl CollectionCache {
         P: AsRef<str>,
     {
         self.inner.get_position(group, folder)
+    }
+}
+
+#[derive(Debug)]
+enum UpdateAction {
+    RefreshFolder { folder: PathBuf, parent: bool },
+    RemoveFolder(PathBuf),
+    RenameFolder { from: PathBuf, to: PathBuf },
+}
+
+impl AsRef<Path> for UpdateAction {
+    fn as_ref(&self) -> &Path {
+        match self {
+            UpdateAction::RefreshFolder { folder, .. } => folder.as_path(),
+            UpdateAction::RemoveFolder(folder) => folder.as_path(),
+            UpdateAction::RenameFolder { from, .. } => from.as_path(),
+        }
     }
 }
 
@@ -746,5 +877,13 @@ mod tests {
         assert_eq!(r3.file, "002 - Chapter 3$$2000-3000$$.mp3");
         assert_eq!(r3.position, 0.08);
         Ok(())
+    }
+
+    #[test]
+    fn test_parent_path() {
+        let p1 = Path::new("usak/kulisak");
+        assert_eq!(Path::new("usak"), parent_path(p1));
+        let p2 = Path::new("usak");
+        assert_eq!(Path::new(""), parent_path(p2));
     }
 }
