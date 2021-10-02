@@ -191,7 +191,10 @@ async fn serve_file_transcoded(
         .map(|m| m.is_file())
         .unwrap_or(false)
     {
-        error!("Requesting non existent file for transcoding {:?}", full_path);
+        error!(
+            "Requesting non existent file for transcoding {:?}",
+            full_path
+        );
         return Ok(resp::not_found());
     }
 

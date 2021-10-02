@@ -6,13 +6,7 @@ use self::{
 use crate::{
     audio_folder::FolderLister,
     audio_meta::{AudioFolder, FolderByModification, TimeStamp},
-    cache::{
-        update::{
-            filter_event,
-            FilteredEvent,
-            InitialUpdater,
-        },
-    },
+    cache::update::{filter_event, FilteredEvent, InitialUpdater},
     error::{Error, Result},
     position::Position,
     AudioFolderShort, FoldersOrdering,
