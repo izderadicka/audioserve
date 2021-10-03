@@ -72,16 +72,17 @@ impl OngoingUpdater {
             }
             let current_time = SystemTime::now();
             // TODO replace with drain_filter when becomes stable
-            self.pending
+            let mut ready = self
+                .pending
                 .iter()
                 .filter(|(_, time)| current_time.duration_since(**time).unwrap() > self.interval)
-                .map(|v| v.0.clone())
-                .collect::<Vec<_>>()
-                .into_iter()
-                .for_each(|a| {
-                    self.pending.remove(&a);
-                    self.inner.proceed_update(a)
-                })
+                .map(|v| (v.1.clone(), v.0.clone()))
+                .collect::<Vec<_>>();
+            ready.sort_unstable_by_key(|i| i.0);
+            ready.into_iter().for_each(|(_, a)| {
+                self.pending.remove(&a);
+                self.inner.proceed_update(a)
+            })
         }
     }
 }
