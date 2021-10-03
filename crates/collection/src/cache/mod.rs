@@ -9,6 +9,7 @@ use crate::{
     cache::update::{filter_event, FilteredEvent, InitialUpdater},
     error::{Error, Result},
     position::Position,
+    util::get_modified,
     AudioFolderShort, FoldersOrdering,
 };
 use crossbeam_channel::{unbounded as channel, Receiver, Sender};
@@ -71,7 +72,7 @@ impl CollectionCache {
         ordering: FoldersOrdering,
     ) -> Result<AudioFolder> {
         let full_path = self.inner.full_path(&dir_path);
-        let ts = full_path.metadata().ok().and_then(|m| m.modified().ok());
+        let ts = get_modified(&full_path);
         self.inner
             .get_if_actual(&dir_path, ts)
             .map(|mut af| {

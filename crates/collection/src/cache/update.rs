@@ -8,7 +8,7 @@ use std::{
 use crossbeam_channel::{Receiver, RecvTimeoutError};
 use notify::DebouncedEvent;
 
-use crate::AudioFolderShort;
+use crate::{util::get_modified, AudioFolderShort};
 
 use super::CacheInner;
 
@@ -109,7 +109,7 @@ impl InitialUpdater {
         while let Some(folder_info) = self.queue.pop_front() {
             // process AF
             let full_path = self.inner.base_dir().join(&folder_info.path);
-            let mod_ts = full_path.metadata().ok().and_then(|m| m.modified().ok());
+            let mod_ts = get_modified(full_path);
             let af = match self.inner.get_if_actual(&folder_info.path, mod_ts) {
                 None => match self.inner.force_update(&folder_info.path, true) {
                     Ok(af) => {

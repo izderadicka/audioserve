@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::util::guess_mime_type;
+use crate::util::{get_modified, guess_mime_type};
 use mime_guess::Mime;
 use serde_derive::{Deserialize, Serialize};
 use std::{
@@ -162,8 +162,7 @@ impl AudioFolderShort {
             path,
             name: f.file_name().to_string_lossy().into(),
             is_file,
-
-            modified: Some(f.metadata()?.modified()?.into()),
+            modified: get_modified(f.path()).map(|t| t.into()),
         })
     }
 

@@ -17,6 +17,7 @@ use crate::{
     cache::util::split_path,
     error::{Error, Result},
     position::{PositionItem, PositionRecord, MAX_GROUPS},
+    util::get_meta,
     FoldersOrdering, Position,
 };
 
@@ -363,10 +364,10 @@ impl CacheInner {
     fn is_dir<P: AsRef<Path>>(&self, path: P) -> bool {
         let path: &Path = path.as_ref();
         assert!(path.is_absolute());
-        if path.metadata().map(|m| m.is_dir()).unwrap_or(false) {
+        if get_meta(path).map(|m| m.is_dir()).unwrap_or(false) {
             true
         } else {
-            let col_path = self.strip_base(&path); // Should be safe as is used only with this collection
+            let col_path = self.strip_base(&path);
             if col_path
                 .to_str()
                 .and_then(|p| self.db.contains_key(p.as_bytes()).ok())

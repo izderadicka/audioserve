@@ -5,7 +5,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use super::audio_meta::*;
-use crate::util::{get_real_file_type, guess_mime_type};
+use crate::util::{get_meta, get_modified, get_real_file_type, guess_mime_type};
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -105,11 +105,7 @@ impl FolderLister {
 
     pub fn get_dir_type<P: AsRef<Path>>(&self, path: P) -> Result<DirType, io::Error> {
         let path = path.as_ref();
-        let meta = if cfg!(feature = "symlinks") {
-            path.metadata()?
-        } else {
-            path.symlink_metadata()?
-        };
+        let meta = get_meta(path)?;
         if meta.is_dir() {
             Ok(DirType::Dir)
         } else if meta.is_file() && is_audio(path) {
@@ -294,11 +290,7 @@ impl FolderLister {
         full_path: P,
         mut af: AudioFolder,
     ) -> Result<AudioFolder, io::Error> {
-        let last_modification = full_path
-            .as_ref()
-            .metadata()
-            .ok()
-            .and_then(|m| m.modified().ok());
+        let last_modification = get_modified(full_path);
         let total_time: u32 = af
             .files
             .iter()
@@ -504,7 +496,7 @@ pub fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
             let allow_symlinks = allow_symlinks;
 
             fn get_size(p: PathBuf) -> Result<(PathBuf, u64), io::Error> {
-                let meta = p.metadata()?;
+                let meta = get_meta(&p)?;
                 Ok((p, meta.len()))
             }
 
