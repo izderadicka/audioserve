@@ -12,7 +12,7 @@ use sled::{
 };
 
 use crate::{
-    audio_folder::FolderLister,
+    audio_folder::{DirType, FolderLister},
     audio_meta::{AudioFolder, TimeStamp},
     cache::util::split_path,
     error::{Error, Result},
@@ -353,33 +353,39 @@ impl CacheInner {
     }
 
     /// must be used only on paths with this collection
-    fn strip_base<'a, P>(&self, path: &'a P) -> &'a Path
+    fn strip_base<'a, P>(&self, full_path: &'a P) -> &'a Path
     where
         P: AsRef<Path>,
     {
-        path.as_ref().strip_prefix(&self.base_dir).unwrap() // Should be safe as is used only with this collection
+        full_path.as_ref().strip_prefix(&self.base_dir).unwrap() // Should be safe as is used only with this collection
     }
 
     /// only for absolute paths
-    fn is_dir<P: AsRef<Path>>(&self, path: P) -> bool {
-        let path: &Path = path.as_ref();
-        assert!(path.is_absolute());
-        if get_meta(path).map(|m| m.is_dir()).unwrap_or(false) {
+    fn is_dir<P: AsRef<Path>>(&self, full_path: P) -> bool {
+        let full_path: &Path = full_path.as_ref();
+        assert!(full_path.is_absolute());
+        if get_meta(full_path).map(|m| m.is_dir()).unwrap_or(false) {
             true
         } else {
-            let col_path = self.strip_base(&path);
+            let col_path = self.strip_base(&full_path);
             if col_path
                 .to_str()
                 .and_then(|p| self.db.contains_key(p.as_bytes()).ok())
                 .unwrap_or(false)
             {
                 // it has been identified as directory before
+                // TODO: but it can change - for instance if chapter metadata are removed from file
                 true
             } else {
-                // have to check hard way - what if we created new .m4b in folder?
-                // and we have problem with concept of single .m4b in directory !
-                // TODO: implement solid logic here
-                false
+                match self.lister.get_dir_type(full_path) {
+                    Ok(DirType::Dir) => true,
+                    Ok(DirType::File { .. }) => false,
+                    Ok(DirType::Other) => false,
+                    Err(e) => {
+                        error!("Error id determining dir type: {}", e);
+                        false
+                    }
+                }
             }
         }
     }
