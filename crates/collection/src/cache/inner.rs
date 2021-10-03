@@ -266,25 +266,14 @@ impl CacheInner {
 impl CacheInner {
     fn force_update_recursive<P: Into<PathBuf>>(&self, folder: P) {
         let folder = folder.into();
-        self.force_update(&folder, true)
-            .map_err(|e| warn!("Error updating folder in cache: {}", e))
-            .ok()
-            .flatten()
-            .and_then(|af| {
-                if !af.is_file {
-                    // file does not have recursive struct
-                    let af: AudioFolderShort = AudioFolderShort {
-                        name: get_file_name(&folder).into(),
-                        modified: None,
-                        path: folder,
-                        is_file: false,
-                    };
-                    let updater = RecursiveUpdater::new(self, Some(af));
-                    updater.process();
-                }
-
-                Some(())
-            });
+        let af: AudioFolderShort = AudioFolderShort {
+            name: get_file_name(&folder).into(),
+            modified: None,
+            path: folder,
+            is_file: false,
+        };
+        let updater = RecursiveUpdater::new(self, Some(af));
+        updater.process();
     }
 
     pub(crate) fn proceed_update(&self, update: UpdateAction) {
