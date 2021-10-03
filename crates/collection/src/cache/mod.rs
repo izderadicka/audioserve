@@ -83,7 +83,7 @@ impl CollectionCache {
                 af
             })
             .ok_or_else(|| {
-                debug!("Fetching folder {:?} from ile system", dir_path.as_ref());
+                debug!("Fetching folder {:?} from file system", dir_path.as_ref());
                 self.inner.list_dir(&dir_path, ordering)
             })
             .or_else(|r| {

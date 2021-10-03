@@ -31,7 +31,7 @@ pub fn get_modified<P: AsRef<Path>>(path: P) -> Option<SystemTime> {
         (Ok(m1), Ok(m2)) => Some(m1.max(m2)),
         _ => {
             // everything else is problem, so rather do not rely on mod time
-            error!("Error getting modtime for {:?}", path);
+            warn!("Error getting modtime for {:?}", path);
             None
         }
     }

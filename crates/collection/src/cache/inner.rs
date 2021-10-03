@@ -269,19 +269,19 @@ impl CacheInner {
         match update {
             UpdateAction::RefreshFolder(folder) => {
                 self.force_update(&folder, false)
-                    .map_err(|e| error!("Error updating folder: {}", e))
+                    .map_err(|e| warn!("Error updating folder in cache: {}", e))
                     .ok();
             }
             UpdateAction::RemoveFolder(folder) => {
                 self.remove_tree(&folder)
-                    .map_err(|e| error!("Error deleting folder: {}", e))
+                    .map_err(|e| warn!("Error removing folder from cache: {}", e))
                     .ok();
                 self.force_update(parent_path(&folder), false).ok();
                 //TODO: need also to remove positions
             }
             UpdateAction::RenameFolder { from, to } => {
                 self.remove_tree(&from)
-                    .map_err(|e| error!("Error deleting folder: {}", e))
+                    .map_err(|e| warn!("Error removing folder from cache: {}", e))
                     .ok();
                 let orig_parent = parent_path(&from);
                 let new_parent = parent_path(&to);
@@ -364,27 +364,31 @@ impl CacheInner {
     fn is_dir<P: AsRef<Path>>(&self, full_path: P) -> bool {
         let full_path: &Path = full_path.as_ref();
         assert!(full_path.is_absolute());
-        if get_meta(full_path).map(|m| m.is_dir()).unwrap_or(false) {
+        let col_path = self.strip_base(&full_path);
+        if col_path
+            .to_str()
+            .and_then(|p| self.db.contains_key(p.as_bytes()).ok())
+            .unwrap_or(false)
+        {
+            // it has been identified as directory before
+            // TODO: but it can change - for instance if chapter metadata are removed from file
+            return true;
+        }
+        let meta = if let Ok(meta) = get_meta(full_path) {
+            meta
+        } else {
+            return false;
+        };
+        if meta.is_dir() {
             true
         } else {
-            let col_path = self.strip_base(&full_path);
-            if col_path
-                .to_str()
-                .and_then(|p| self.db.contains_key(p.as_bytes()).ok())
-                .unwrap_or(false)
-            {
-                // it has been identified as directory before
-                // TODO: but it can change - for instance if chapter metadata are removed from file
-                true
-            } else {
-                match self.lister.get_dir_type(full_path) {
-                    Ok(DirType::Dir) => true,
-                    Ok(DirType::File { .. }) => false,
-                    Ok(DirType::Other) => false,
-                    Err(e) => {
-                        error!("Error id determining dir type: {}", e);
-                        false
-                    }
+            match self.lister.get_dir_type(full_path) {
+                Ok(DirType::Dir) => true,
+                Ok(DirType::File { .. }) => false,
+                Ok(DirType::Other) => false,
+                Err(e) => {
+                    error!("Error id determining dir type: {}", e);
+                    false
                 }
             }
         }
