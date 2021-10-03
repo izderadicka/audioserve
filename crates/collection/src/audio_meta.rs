@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::util::{get_modified, guess_mime_type};
+use crate::util::{get_file_name, get_modified, guess_mime_type};
 use mime_guess::Mime;
 use serde_derive::{Deserialize, Serialize};
 use std::{
@@ -146,7 +146,7 @@ impl AudioFolderShort {
     pub fn from_path<P: AsRef<Path>>(base_path: &Path, p: P) -> Self {
         let p = p.as_ref();
         AudioFolderShort {
-            name: p.file_name().unwrap().to_string_lossy().into(),
+            name: get_file_name(&p).into(),
             path: p.strip_prefix(base_path).unwrap().into(),
             is_file: false,
             modified: None,

@@ -6,7 +6,7 @@ use self::{
 use crate::{
     audio_folder::FolderLister,
     audio_meta::{AudioFolder, FolderByModification, TimeStamp},
-    cache::update::{filter_event, FilteredEvent, InitialUpdater},
+    cache::update::{filter_event, FilteredEvent, RecursiveUpdater},
     error::{Error, Result},
     position::Position,
     util::get_modified,
@@ -166,7 +166,7 @@ impl CollectionCache {
                 }
 
                 // inittial scan of directory
-                let mut updater = InitialUpdater::new(inner.clone());
+                let mut updater = RecursiveUpdater::new(&inner, None);
                 updater.process();
 
                 // Notify about finish of initial scan

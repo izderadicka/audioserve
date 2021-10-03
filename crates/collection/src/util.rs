@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::fs::{DirEntry, Metadata};
 use std::io;
 use std::path::Path;
@@ -7,6 +8,14 @@ use mime_guess::Mime;
 
 pub fn guess_mime_type<P: AsRef<Path>>(path: P) -> Mime {
     mime_guess::from_path(path).first_or_octet_stream()
+}
+
+pub fn get_file_name<P: AsRef<Path>>(path: P) -> String {
+    path.as_ref()
+        .file_name()
+        .unwrap_or_else(|| OsStr::new("<UNKNOWN>"))
+        .to_string_lossy()
+        .into()
 }
 
 #[cfg(feature = "symlinks")]

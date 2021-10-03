@@ -15,6 +15,7 @@ use super::CacheInner;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) enum UpdateAction {
     RefreshFolder(PathBuf),
+    RefreshFolderRecursive(PathBuf),
     RemoveFolder(PathBuf),
     RenameFolder { from: PathBuf, to: PathBuf },
 }
@@ -23,6 +24,7 @@ impl AsRef<Path> for UpdateAction {
     fn as_ref(&self) -> &Path {
         match self {
             UpdateAction::RefreshFolder(folder) => folder.as_path(),
+            UpdateAction::RefreshFolderRecursive(folder) => folder.as_path(),
             UpdateAction::RemoveFolder(folder) => folder.as_path(),
             UpdateAction::RenameFolder { from, .. } => from.as_path(),
         }
@@ -87,25 +89,25 @@ impl OngoingUpdater {
     }
 }
 
-pub(super) struct InitialUpdater {
+pub(super) struct RecursiveUpdater<'a> {
     queue: VecDeque<AudioFolderShort>,
-    inner: Arc<CacheInner>,
+    inner: &'a CacheInner,
 }
 
-impl InitialUpdater {
-    pub(super) fn new(inner: Arc<CacheInner>) -> Self {
-        let root = AudioFolderShort {
+impl<'a> RecursiveUpdater<'a> {
+    pub(super) fn new(inner: &'a CacheInner, root: Option<AudioFolderShort>) -> Self {
+        let root = root.unwrap_or_else(|| AudioFolderShort {
             name: "root".into(),
             path: Path::new("").into(),
             is_file: false,
             modified: None,
-        };
+        });
         let mut queue = VecDeque::new();
         queue.push_back(root);
-        InitialUpdater { queue, inner }
+        RecursiveUpdater { queue, inner }
     }
 
-    pub(super) fn process(&mut self) {
+    pub(super) fn process(mut self) {
         while let Some(folder_info) = self.queue.pop_front() {
             // process AF
             let full_path = self.inner.base_dir().join(&folder_info.path);

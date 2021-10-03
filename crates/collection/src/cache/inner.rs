@@ -14,11 +14,11 @@ use sled::{
 use crate::{
     audio_folder::{DirType, FolderLister},
     audio_meta::{AudioFolder, TimeStamp},
-    cache::util::split_path,
+    cache::{update::RecursiveUpdater, util::split_path},
     error::{Error, Result},
     position::{PositionItem, PositionRecord, MAX_GROUPS},
-    util::get_meta,
-    FoldersOrdering, Position,
+    util::{get_file_name, get_meta},
+    AudioFolderShort, FoldersOrdering, Position,
 };
 
 use super::{
@@ -264,6 +264,29 @@ impl CacheInner {
 
 // Updating based on fs events
 impl CacheInner {
+    fn force_update_recursive<P: Into<PathBuf>>(&self, folder: P) {
+        let folder = folder.into();
+        self.force_update(&folder, true)
+            .map_err(|e| warn!("Error updating folder in cache: {}", e))
+            .ok()
+            .flatten()
+            .and_then(|af| {
+                if !af.is_file {
+                    // file does not have recursive struct
+                    let af: AudioFolderShort = AudioFolderShort {
+                        name: get_file_name(&folder).into(),
+                        modified: None,
+                        path: folder,
+                        is_file: false,
+                    };
+                    let updater = RecursiveUpdater::new(self, Some(af));
+                    updater.process();
+                }
+
+                Some(())
+            });
+    }
+
     pub(crate) fn proceed_update(&self, update: UpdateAction) {
         debug!("Update action: {:?}", update);
         match update {
@@ -271,6 +294,9 @@ impl CacheInner {
                 self.force_update(&folder, false)
                     .map_err(|e| warn!("Error updating folder in cache: {}", e))
                     .ok();
+            }
+            UpdateAction::RefreshFolderRecursive(folder) => {
+                self.force_update_recursive(folder);
             }
             UpdateAction::RemoveFolder(folder) => {
                 self.remove_tree(&folder)
@@ -289,8 +315,8 @@ impl CacheInner {
                 if new_parent != orig_parent {
                     self.force_update(&new_parent, false).ok();
                 }
-                self.force_update(&to, false).ok();
-                // TODO: we need to update all subfolders new location
+                self.force_update_recursive(to);
+                // TODO: we can do better - no need to rescan file system we can copy from cache
 
                 // TODO: need also to move positions
             }
@@ -309,7 +335,7 @@ impl CacheInner {
             DebouncedEvent::Create(p) => {
                 let col_path = self.strip_base(&p);
                 if self.is_dir(&p) {
-                    snd(UpdateAction::RefreshFolder(col_path.into()));
+                    snd(UpdateAction::RefreshFolderRecursive(col_path.into()));
                     snd(UpdateAction::RefreshFolder(parent_path(col_path)));
                 } else {
                     snd(UpdateAction::RefreshFolder(parent_path(col_path)));
