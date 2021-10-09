@@ -348,7 +348,8 @@ impl Iterator for Search {
                     if self
                         .prev_match
                         .as_ref()
-                        .map(|m| path.starts_with(m))
+                        .and_then(|m| path.strip_prefix(m))
+                        .map(|s| s.contains(std::path::MAIN_SEPARATOR)) // only match was parent path
                         .unwrap_or(false)
                     {
                         continue;
