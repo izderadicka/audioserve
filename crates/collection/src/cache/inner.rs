@@ -18,7 +18,7 @@ use crate::{
     cache::{update::RecursiveUpdater, util::split_path},
     error::{Error, Result},
     position::{PositionItem, PositionRecord, MAX_GROUPS},
-    util::{get_file_name, get_meta},
+    util::{get_file_name, get_meta, get_modified},
     AudioFolderShort, FoldersOrdering, Position,
 };
 
@@ -183,7 +183,7 @@ impl CacheInner {
 
                 if folders.get(&path).ok().flatten().is_none() {
                     warn!("Trying to insert position for unknown folder {}", path);
-                    return Ok(())
+                    return Ok(());
                 }
 
                 let mut folder_rec = pos_folder
@@ -282,6 +282,76 @@ impl CacheInner {
         updater.process();
     }
 
+    fn update_recursive_after_rename(&self, from: &Path, to: &Path) -> Result<()> {
+        let mut delete_batch = Batch::default();
+        let mut insert_batch = Batch::default();
+
+        let update_path = |p: &Path| -> std::result::Result<_, std::path::StripPrefixError> {
+            let p = p.strip_prefix(from)?;
+            //Unfortunatelly join adds traling slash if joined path is empty, which causes problem, so we need to handle this special case
+            if p.to_str().map(|s| s.is_empty()).unwrap_or(false) {
+                return Ok(to.into());
+            }
+            Ok(to.join(p))
+        };
+
+        let mut updated = get_modified(self.base_dir.join(to));
+        debug!("Renamed root modified for {:?}", updated);
+        for item in self.db.scan_prefix(from.to_str().unwrap()) {
+            // safe to unwrap as we insert only valid strings
+            let (k, v) = item?;
+            let mut folder_rec: AudioFolder = bincode::deserialize(&v)?;
+            let p: &Path = Path::new(unsafe { std::str::from_utf8_unchecked(&k) }); // we insert only valid strings as keys
+            let new_key = update_path(p)?;
+            let new_key = new_key.to_str().ok_or_else(|| Error::InvalidFileName)?;
+            trace!(
+                "Processing path {} from key {} in to {:?}",
+                new_key,
+                std::str::from_utf8(&k).unwrap(),
+                to
+            );
+            if let Some(mod_time) = updated {
+                if to.to_str() == Some(new_key) {
+                    // this is root renamed folder, for which mod time has changed
+                    folder_rec.modified = Some(mod_time.into());
+                    debug!(
+                        "Updating modified for {} to {:?}",
+                        new_key, folder_rec.modified
+                    );
+                    updated.take();
+                }
+            }
+            delete_batch.remove(k);
+            for sf in folder_rec.subfolders.iter_mut() {
+                let new_path = update_path(&sf.path)?;
+                sf.path = new_path;
+            }
+            for f in folder_rec.files.iter_mut() {
+                let new_path = update_path(&f.path)?;
+                f.path = new_path;
+            }
+            if let Some(mut d) = folder_rec.description.take() {
+                d.path = update_path(&d.path)?;
+                folder_rec.description = Some(d);
+            }
+
+            if let Some(mut c) = folder_rec.cover.take() {
+                c.path = update_path(&c.path)?;
+                folder_rec.cover = Some(c);
+            }
+
+            insert_batch.insert(new_key, bincode::serialize(&folder_rec)?);
+        }
+
+        self.db
+            .transaction(|db| {
+                db.apply_batch(&delete_batch)?;
+                db.apply_batch(&insert_batch)?;
+                Ok(())
+            })
+            .map_err(Error::from)
+    }
+
     pub(crate) fn proceed_update(&self, update: UpdateAction) {
         debug!("Update action: {:?}", update);
         match update {
@@ -301,17 +371,19 @@ impl CacheInner {
                 //TODO: need also to remove positions
             }
             UpdateAction::RenameFolder { from, to } => {
-                self.remove_tree(&from)
-                    .map_err(|e| warn!("Error removing folder from cache: {}", e))
-                    .ok();
+                if let Err(e) = self.update_recursive_after_rename(&from, &to) {
+                    error!("Faild to do recusrsive rename, error: {}, we will have to do rescan of {:?}", e, &to);
+                    self.remove_tree(&from)
+                        .map_err(|e| warn!("Error removing folder from cache: {}", e))
+                        .ok();
+                    self.force_update_recursive(&to);
+                }
                 let orig_parent = parent_path(&from);
                 let new_parent = parent_path(&to);
                 self.force_update(&orig_parent, false).ok();
                 if new_parent != orig_parent {
                     self.force_update(&new_parent, false).ok();
                 }
-                self.force_update_recursive(to);
-                // TODO: we can do better - no need to rescan file system we can copy from cache
 
                 // TODO: need also to move positions
             }
@@ -413,5 +485,19 @@ impl CacheInner {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trailing_slash() {
+        let p1 = Path::new("kulisak");
+        let p2 = p1.join("");
+        assert_eq!(p1, p2);
+        assert_ne!(p1.to_str(), p2.to_str());
+        assert_eq!(p2.to_str().unwrap(), "kulisak/");
     }
 }

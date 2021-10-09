@@ -1,3 +1,5 @@
+use std::path::StripPrefixError;
+
 use sled::transaction::TransactionError;
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -15,7 +17,7 @@ pub enum Error {
     #[error("Media metadata error: {0}")]
     MediaInfoError(#[from] media_info::Error),
 
-    #[error("Invalid file name - not UTF8")]
+    #[error("Invalid path - not UTF8")]
     InvalidFileName,
 
     #[error("IO Error: {0}")]
@@ -33,6 +35,9 @@ pub enum Error {
 
     #[error("Too many position groups")]
     TooManyGroups,
+
+    #[error("Invalid path: {0}")]
+    InvalidPathPrefix(#[from] StripPrefixError),
 }
 
 impl From<TransactionError<Error>> for Error {
