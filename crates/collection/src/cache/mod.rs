@@ -7,6 +7,7 @@ use crate::{
     audio_folder::FolderLister,
     audio_meta::{AudioFolder, FolderByModification, TimeStamp},
     cache::update::{filter_event, FilteredEvent, RecursiveUpdater},
+    common::{CollectionTrait, PositionsTrait},
     error::{Error, Result},
     position::Position,
     util::get_modified,
@@ -64,52 +65,6 @@ impl CollectionCache {
             update_sender,
             update_receiver: Some(update_receiver),
         })
-    }
-
-    pub fn list_dir<P: AsRef<Path>>(
-        &self,
-        dir_path: P,
-        ordering: FoldersOrdering,
-    ) -> Result<AudioFolder> {
-        let full_path = self.inner.full_path(&dir_path);
-        let ts = get_modified(&full_path);
-        self.inner
-            .get_if_actual(&dir_path, ts)
-            .map(|mut af| {
-                if matches!(ordering, FoldersOrdering::RecentFirst) {
-                    af.subfolders
-                        .sort_unstable_by(|a, b| a.compare_as(ordering, b));
-                }
-                af
-            })
-            .ok_or_else(|| {
-                debug!("Fetching folder {:?} from file system", dir_path.as_ref());
-                self.inner.list_dir(&dir_path, ordering)
-            })
-            .or_else(|r| {
-                match r.as_ref() {
-                    Ok(af_ref) => {
-                        // We should update cache as we got new info
-                        debug!("Updating cache for dir {:?}", full_path);
-                        let mut af = af_ref.clone();
-                        if matches!(ordering, FoldersOrdering::RecentFirst) {
-                            af.subfolders.sort_unstable_by(|a, b| {
-                                a.compare_as(FoldersOrdering::Alphabetical, b)
-                            });
-                        }
-                        self.inner
-                            .update(dir_path, af)
-                            .map_err(|e| error!("Cannot update collection: {}", e))
-                            .ok();
-                    }
-                    Err(e) => {
-                        error!("Got error when fetching folder from file system: {}", e);
-                        // let parent = parent_path(dir_path);
-                        // self.force_update(parent).map_err(|e| error!("Update of parent dir failed: {}", e)).ok();
-                    }
-                }
-                r
-            })
     }
 
     fn db_path<P1: AsRef<Path>, P2: AsRef<Path>>(path: P1, db_dir: P2) -> Result<PathBuf> {
@@ -229,15 +184,64 @@ impl CollectionCache {
         self.inner.get(dir)
     }
 
+    #[allow(dead_code)]
     pub fn force_update<P: AsRef<Path>>(&self, dir_path: P) -> Result<()> {
         self.inner.force_update(dir_path, false).map(|_| ())
     }
+}
 
-    pub fn flush(&self) -> Result<()> {
+impl CollectionTrait for CollectionCache {
+    fn list_dir<P: AsRef<Path>>(
+        &self,
+        dir_path: P,
+        ordering: FoldersOrdering,
+    ) -> Result<AudioFolder> {
+        let full_path = self.inner.full_path(&dir_path);
+        let ts = get_modified(&full_path);
+        self.inner
+            .get_if_actual(&dir_path, ts)
+            .map(|mut af| {
+                if matches!(ordering, FoldersOrdering::RecentFirst) {
+                    af.subfolders
+                        .sort_unstable_by(|a, b| a.compare_as(ordering, b));
+                }
+                af
+            })
+            .ok_or_else(|| {
+                debug!("Fetching folder {:?} from file system", dir_path.as_ref());
+                self.inner.list_dir(&dir_path, ordering)
+            })
+            .or_else(|r| {
+                match r.as_ref() {
+                    Ok(af_ref) => {
+                        // We should update cache as we got new info
+                        debug!("Updating cache for dir {:?}", full_path);
+                        let mut af = af_ref.clone();
+                        if matches!(ordering, FoldersOrdering::RecentFirst) {
+                            af.subfolders.sort_unstable_by(|a, b| {
+                                a.compare_as(FoldersOrdering::Alphabetical, b)
+                            });
+                        }
+                        self.inner
+                            .update(dir_path, af)
+                            .map_err(|e| error!("Cannot update collection: {}", e))
+                            .ok();
+                    }
+                    Err(e) => {
+                        error!("Got error when fetching folder from file system: {}", e);
+                        // let parent = parent_path(dir_path);
+                        // self.force_update(parent).map_err(|e| error!("Update of parent dir failed: {}", e)).ok();
+                    }
+                }
+                r
+            })
+    }
+
+    fn flush(&self) -> Result<()> {
         self.inner.flush()
     }
 
-    pub fn search<S: AsRef<str>>(&self, q: S) -> Search {
+    fn search<S: AsRef<str>>(&self, q: S) -> Search {
         let tokens: Vec<String> = q
             .as_ref()
             .split_whitespace()
@@ -252,7 +256,7 @@ impl CollectionCache {
         }
     }
 
-    pub fn recent(&self, limit: usize) -> Vec<AudioFolderShort> {
+    fn recent(&self, limit: usize) -> Vec<AudioFolderShort> {
         let mut heap = BinaryHeap::with_capacity(limit + 1);
 
         for (key, val) in self.inner.iter_folders().skip(1).filter_map(|r| r.ok()) {
@@ -270,8 +274,8 @@ impl CollectionCache {
 }
 
 // positions
-impl CollectionCache {
-    pub fn insert_position<S, P>(
+impl PositionsTrait for CollectionCache {
+    fn insert_position<S, P>(
         &self,
         group: S,
         path: P,
@@ -285,7 +289,7 @@ impl CollectionCache {
         self.inner.insert_position(group, path, position, ts)
     }
 
-    pub fn get_position<S, P>(&self, group: S, folder: Option<P>) -> Option<Position>
+    fn get_position<S, P>(&self, group: S, folder: Option<P>) -> Option<Position>
     where
         S: AsRef<str>,
         P: AsRef<str>,

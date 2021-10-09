@@ -4,6 +4,7 @@ extern crate log;
 use audio_folder::{FolderLister, FoldersOptions};
 use audio_meta::{AudioFolder, TimeStamp};
 use cache::CollectionCache;
+use common::{Collection, CollectionTrait, PositionsTrait};
 use error::{Error, Result};
 use std::path::{Path, PathBuf};
 
@@ -15,12 +16,13 @@ pub use util::guess_mime_type;
 pub mod audio_folder;
 pub mod audio_meta;
 mod cache;
+pub(crate) mod common;
 pub mod error;
 pub mod position;
 pub mod util;
 
 pub struct Collections {
-    caches: Vec<CollectionCache>,
+    caches: Vec<Collection>,
 }
 
 impl Collections {
@@ -39,12 +41,12 @@ impl Collections {
         let caches = collections_dirs
             .into_iter()
             .map(|collection_path| {
-                CollectionCache::new(collection_path.clone(), db_path, lister.clone()).map(
-                    |mut cache| {
+                CollectionCache::new(collection_path.clone(), db_path, lister.clone())
+                    .map(|mut cache| {
                         cache.run_update_loop();
                         cache
-                    },
-                )
+                    })
+                    .map(|c| Collection::from(c))
             })
             .collect::<Result<Vec<_>>>()?;
         Ok(Collections { caches })
@@ -52,7 +54,7 @@ impl Collections {
 }
 
 impl Collections {
-    fn get_cache(&self, collection: usize) -> Result<&CollectionCache> {
+    fn get_cache(&self, collection: usize) -> Result<&Collection> {
         self.caches
             .get(collection)
             .ok_or_else(|| Error::MissingCollectionCache(collection))
@@ -65,10 +67,6 @@ impl Collections {
         ordering: FoldersOrdering,
     ) -> Result<AudioFolder> {
         self.get_cache(collection)?.list_dir(dir_path, ordering)
-    }
-
-    pub fn force_update<P: AsRef<Path>>(&self, collection: usize, dir_path: P) -> Result<()> {
-        self.get_cache(collection)?.force_update(dir_path)
     }
 
     pub fn flush(&self) -> Result<()> {
