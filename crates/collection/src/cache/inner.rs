@@ -266,6 +266,36 @@ impl CacheInner {
             .ok()
             .flatten()
     }
+
+    pub(crate) fn clean_up_positions(&self) {
+        let mut batch = Batch::default();
+        self.pos_folder
+            .iter()
+            .filter_map(|r| match r {
+                Ok((k, _)) => {
+                    if !self.db.contains_key(&k).unwrap_or(false) {
+                        Some(k)
+                    } else {
+                        None
+                    }
+                }
+                Err(e) => {
+                    error!("Error reading from db: {}", e);
+                    None
+                }
+            })
+            .for_each(|k| {
+                debug!(
+                    "Removing positions for directory {:?} as it does not exists",
+                    std::str::from_utf8(&k)
+                );
+                batch.remove(k);
+            });
+        self.pos_folder
+            .apply_batch(batch)
+            .map_err(|e| error!("Cannot remove positions: {}", e))
+            .ok();
+    }
 }
 
 // Updating based on fs events

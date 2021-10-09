@@ -169,6 +169,9 @@ impl CollectionCache {
                 let updater = RecursiveUpdater::new(&inner, None);
                 updater.process();
 
+                // clean up positions for non existent folders
+                inner.clean_up_positions();
+
                 // Notify about finish of initial scan
                 {
                     let mut started = cond_mtx.lock().unwrap();
