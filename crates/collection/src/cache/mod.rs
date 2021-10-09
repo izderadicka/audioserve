@@ -166,7 +166,7 @@ impl CollectionCache {
                 }
 
                 // inittial scan of directory
-                let mut updater = RecursiveUpdater::new(&inner, None);
+                let updater = RecursiveUpdater::new(&inner, None);
                 updater.process();
 
                 // Notify about finish of initial scan
