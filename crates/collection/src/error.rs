@@ -18,7 +18,7 @@ pub enum Error {
     MediaInfoError(#[from] media_info::Error),
 
     #[error("Invalid path - not UTF8")]
-    InvalidFileName,
+    InvalidPath,
 
     #[error("IO Error: {0}")]
     IOError(#[from] std::io::Error),

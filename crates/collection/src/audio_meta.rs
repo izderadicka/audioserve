@@ -307,7 +307,7 @@ mod libavformat {
                 }),
                 None => {
                     error!("Invalid file name {:?}, not utf-8", path);
-                    Err(Error::InvalidFileName)
+                    Err(Error::InvalidPath)
                 }
             }
         }

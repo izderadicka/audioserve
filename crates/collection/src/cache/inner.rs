@@ -136,18 +136,25 @@ impl CacheInner {
     }
 
     pub(crate) fn remove<P: AsRef<Path>>(&self, dir_path: P) -> Result<Option<IVec>> {
-        let path = dir_path.as_ref().to_str().ok_or(Error::InvalidFileName)?;
+        let path = dir_path.as_ref().to_str().ok_or(Error::InvalidPath)?;
         self.db.remove(path).map_err(Error::from)
     }
 
     pub(crate) fn remove_tree<P: AsRef<Path>>(&self, dir_path: P) -> Result<()> {
-        let path = dir_path.as_ref().to_str().ok_or(Error::InvalidFileName)?;
+        let path = dir_path.as_ref().to_str().ok_or(Error::InvalidPath)?;
+        let pos_batch = self.remove_positions_batch(&dir_path)?;
         let mut batch = Batch::default();
         self.db
             .scan_prefix(path)
             .filter_map(|r| r.ok())
             .for_each(|(key, _)| batch.remove(key));
-        self.db.apply_batch(batch).map_err(Error::from)
+        (self.db.deref(), &self.pos_folder)
+            .transaction(|(db, pos_folder)| {
+                db.apply_batch(&batch)?;
+                pos_folder.apply_batch(&pos_batch)?;
+                Ok(())
+            })
+            .map_err(Error::from)
     }
 
     pub fn flush(&self) -> Result<()> {
@@ -267,6 +274,19 @@ impl CacheInner {
             .flatten()
     }
 
+    pub fn remove_positions_batch<P: AsRef<Path>>(&self, path: P) -> Result<Batch> {
+        let mut batch = Batch::default();
+        self.pos_folder
+            .scan_prefix(path.as_ref().to_str().ok_or_else(|| Error::InvalidPath)?)
+            .filter_map(|r| {
+                r.map_err(|e| error!("Cannot read positions db: {}", e))
+                    .ok()
+            })
+            .for_each(|(k, _)| batch.remove(k));
+
+        Ok(batch)
+    }
+
     pub(crate) fn clean_up_positions(&self) {
         let mut batch = Batch::default();
         self.pos_folder
@@ -333,7 +353,7 @@ impl CacheInner {
             let mut folder_rec: AudioFolder = bincode::deserialize(&v)?;
             let p: &Path = Path::new(unsafe { std::str::from_utf8_unchecked(&k) }); // we insert only valid strings as keys
             let new_key = update_path(p)?;
-            let new_key = new_key.to_str().ok_or_else(|| Error::InvalidFileName)?;
+            let new_key = new_key.to_str().ok_or_else(|| Error::InvalidPath)?;
             trace!(
                 "Processing path {} from key {} in to {:?}",
                 new_key,
@@ -398,7 +418,6 @@ impl CacheInner {
                     .map_err(|e| warn!("Error removing folder from cache: {}", e))
                     .ok();
                 self.force_update(parent_path(&folder), false).ok();
-                //TODO: need also to remove positions
             }
             UpdateAction::RenameFolder { from, to } => {
                 if let Err(e) = self.update_recursive_after_rename(&from, &to) {
