@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    ops::Deref,
     path::{Path, PathBuf},
     time::SystemTime,
 };
@@ -176,9 +177,14 @@ impl CacheInner {
         S: AsRef<str>,
         P: AsRef<str>,
     {
-        (&self.pos_latest, &self.pos_folder)
-            .transaction(|(pos_latest, pos_folder)| {
+        (&self.pos_latest, &self.pos_folder, self.db.deref())
+            .transaction(|(pos_latest, pos_folder, folders)| {
                 let (path, file) = split_path(&path);
+
+                if folders.get(&path).ok().flatten().is_none() {
+                    warn!("Trying to insert position for unknown folder {}", path);
+                    return Ok(())
+                }
 
                 let mut folder_rec = pos_folder
                     .get(&path)
