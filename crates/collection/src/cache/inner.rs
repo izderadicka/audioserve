@@ -15,7 +15,10 @@ use sled::{
 use crate::{
     audio_folder::{DirType, FolderLister},
     audio_meta::{AudioFolder, TimeStamp},
-    cache::{update::RecursiveUpdater, util::split_path},
+    cache::{
+        update::RecursiveUpdater,
+        util::{split_path, update_path},
+    },
     error::{Error, Result},
     position::{PositionItem, PositionRecord, MAX_GROUPS},
     util::{get_file_name, get_meta, get_modified},
@@ -274,7 +277,7 @@ impl CacheInner {
             .flatten()
     }
 
-    pub fn remove_positions_batch<P: AsRef<Path>>(&self, path: P) -> Result<Batch> {
+    fn remove_positions_batch<P: AsRef<Path>>(&self, path: P) -> Result<Batch> {
         let mut batch = Batch::default();
         self.pos_folder
             .scan_prefix(path.as_ref().to_str().ok_or_else(|| Error::InvalidPath)?)
@@ -285,6 +288,54 @@ impl CacheInner {
             .for_each(|(k, _)| batch.remove(k));
 
         Ok(batch)
+    }
+
+    fn remove_positions<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let batch = self.remove_positions_batch(path)?;
+        self.pos_folder
+            .transaction(|pos_folder| pos_folder.apply_batch(&batch).map_err(|e| e.into()))
+            .map_err(Error::from)
+    }
+
+    fn rename_positions(&self, from: &Path, to: &Path) -> Result<()> {
+        let mut delete_batch = Batch::default();
+        let mut insert_batch = Batch::default();
+        let mut group_batch = Batch::default();
+
+        let iter = self
+            .pos_folder
+            .scan_prefix(from.to_str().ok_or_else(|| Error::InvalidPath)?)
+            .filter_map(|r| {
+                r.map_err(|e| error!("Cannot read positions db: {}", e))
+                    .ok()
+            });
+        for (k, v) in iter {
+            delete_batch.remove(k.clone());
+            let new_key = update_path(from, to, Path::new(std::str::from_utf8(&k)?))?;
+            let new_key = new_key.to_str().unwrap();
+            insert_batch.insert(new_key, v);
+        }
+
+        for (k, v) in self.pos_latest.iter().filter_map(|r| {
+            r.map_err(|e| error!("Error reading latest position db: {}", e))
+                .ok()
+        }) {
+            let fld = Path::new(std::str::from_utf8(&v)?);
+            if fld.starts_with(from) {
+                let new_path = update_path(from, to, fld)?;
+                let new_path = new_path.to_str().unwrap(); // was created from UTF8 few lines above
+                group_batch.insert(k, new_path);
+            }
+        }
+
+        (&self.pos_folder, &self.pos_latest)
+            .transaction(|(pos_folder, pos_latest)| {
+                pos_folder.apply_batch(&delete_batch)?;
+                pos_folder.apply_batch(&insert_batch)?;
+                pos_latest.apply_batch(&group_batch)?;
+                Ok(())
+            })
+            .map_err(Error::from)
     }
 
     pub(crate) fn clean_up_positions(&self) {
@@ -336,15 +387,6 @@ impl CacheInner {
         let mut delete_batch = Batch::default();
         let mut insert_batch = Batch::default();
 
-        let update_path = |p: &Path| -> std::result::Result<_, std::path::StripPrefixError> {
-            let p = p.strip_prefix(from)?;
-            //Unfortunatelly join adds traling slash if joined path is empty, which causes problem, so we need to handle this special case
-            if p.to_str().map(|s| s.is_empty()).unwrap_or(false) {
-                return Ok(to.into());
-            }
-            Ok(to.join(p))
-        };
-
         let mut updated = get_modified(self.base_dir.join(to));
         debug!("Renamed root modified for {:?}", updated);
         for item in self.db.scan_prefix(from.to_str().unwrap()) {
@@ -352,7 +394,7 @@ impl CacheInner {
             let (k, v) = item?;
             let mut folder_rec: AudioFolder = bincode::deserialize(&v)?;
             let p: &Path = Path::new(unsafe { std::str::from_utf8_unchecked(&k) }); // we insert only valid strings as keys
-            let new_key = update_path(p)?;
+            let new_key = update_path(from, to, p)?;
             let new_key = new_key.to_str().ok_or_else(|| Error::InvalidPath)?;
             trace!(
                 "Processing path {} from key {} in to {:?}",
@@ -373,20 +415,20 @@ impl CacheInner {
             }
             delete_batch.remove(k);
             for sf in folder_rec.subfolders.iter_mut() {
-                let new_path = update_path(&sf.path)?;
+                let new_path = update_path(from, to, &sf.path)?;
                 sf.path = new_path;
             }
             for f in folder_rec.files.iter_mut() {
-                let new_path = update_path(&f.path)?;
+                let new_path = update_path(from, to, &f.path)?;
                 f.path = new_path;
             }
             if let Some(mut d) = folder_rec.description.take() {
-                d.path = update_path(&d.path)?;
+                d.path = update_path(from, to, &d.path)?;
                 folder_rec.description = Some(d);
             }
 
             if let Some(mut c) = folder_rec.cover.take() {
-                c.path = update_path(&c.path)?;
+                c.path = update_path(from, to, &c.path)?;
                 folder_rec.cover = Some(c);
             }
 
@@ -427,14 +469,21 @@ impl CacheInner {
                         .ok();
                     self.force_update_recursive(&to);
                 }
+                if let Err(e) = self.rename_positions(&from, &to) {
+                    error!(
+                        "Error when renaming positions, will try at least to delete them: {}",
+                        e
+                    );
+                    self.remove_positions(&from)
+                        .map_err(|e| error!("Even deleting positions failed: {}", e))
+                        .ok();
+                }
                 let orig_parent = parent_path(&from);
                 let new_parent = parent_path(&to);
                 self.force_update(&orig_parent, false).ok();
                 if new_parent != orig_parent {
                     self.force_update(&new_parent, false).ok();
                 }
-
-                // TODO: need also to move positions
             }
         }
     }

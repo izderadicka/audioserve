@@ -2,6 +2,19 @@ use std::path::{Path, PathBuf};
 
 use crate::{audio_meta::AudioFolder, AudioFolderShort};
 
+pub fn update_path(
+    from: &Path,
+    to: &Path,
+    p: &Path,
+) -> std::result::Result<PathBuf, std::path::StripPrefixError> {
+    let p = p.strip_prefix(from)?;
+    //Unfortunatelly join adds traling slash if joined path is empty, which causes problem, so we need to handle this special case
+    if p.to_str().map(|s| s.is_empty()).unwrap_or(false) {
+        return Ok(to.into());
+    }
+    Ok(to.join(p))
+}
+
 pub fn deser_audiofolder<T: AsRef<[u8]>>(data: T) -> Option<AudioFolder> {
     bincode::deserialize(data.as_ref())
         .map_err(|e| error!("Error deserializing data from db {}", e))

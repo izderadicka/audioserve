@@ -20,6 +20,9 @@ pub enum Error {
     #[error("Invalid path - not UTF8")]
     InvalidPath,
 
+    #[error("Invalid path: {0}")]
+    InvalidPathNonUtf(#[from] std::str::Utf8Error),
+
     #[error("IO Error: {0}")]
     IOError(#[from] std::io::Error),
 
