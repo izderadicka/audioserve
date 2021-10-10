@@ -268,7 +268,7 @@ fn main() {
 
     debug!("Saving collections db");
     match Arc::try_unwrap(collections) {
-        Ok(c) => c.close(),
+        Ok(c) => drop(c),
         Err(c) => {
             error!(
                 "Cannot close collections, still has {} references",

@@ -98,10 +98,6 @@ impl Collections {
         result.into_iter().find(|r| r.is_err()).unwrap_or(Ok(()))
     }
 
-    pub fn close(self) {
-        self.caches.into_iter().for_each(|c| c.close())
-    }
-
     pub fn search<S: AsRef<str>>(
         &self,
         collection: usize,

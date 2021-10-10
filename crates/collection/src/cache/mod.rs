@@ -272,16 +272,18 @@ impl CollectionTrait for CollectionCache {
             .map(|i| i.into())
             .collect()
     }
+}
 
-    fn close(self) {
+impl Drop for CollectionCache {
+    fn drop(&mut self) {
         self.update_sender.send(None).ok();
-        let inner = self.inner;
-        if let Some(t) = self.thread_updater {
+        if let Some(t) = self.thread_updater.take() {
             t.join().ok();
+            debug!("Update thread joined");
         } else {
             warn!("Join handle is missing");
         }
-        inner
+        self.inner
             .flush()
             .map_err(|e| error!("Final flush failed: {}", e))
             .ok();
