@@ -48,6 +48,8 @@ impl CollectionTrait for CollectionDirect {
         self.searcher
             .search_folder_for_recent(&self.base_dir, limit)
     }
+
+    fn close(self) {}
 }
 
 impl PositionsTrait for CollectionDirect {

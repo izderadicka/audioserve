@@ -22,8 +22,11 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process;
+use std::process::exit;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 mod config;
 mod error;
@@ -257,11 +260,23 @@ fn main() {
     //graceful shutdown of server will wait till transcoding ends, so rather shut it down hard
     runtime.shutdown_timeout(std::time::Duration::from_millis(300));
 
+    thread::spawn(|| {
+        thread::sleep(Duration::from_secs(10));
+        error!("Forced exit");
+        exit(111);
+    });
+
     debug!("Saving collections db");
-    collections
-        .flush()
-        .map_err(|e| error!("Flush of colletions db failed: {}", e))
-        .ok();
+    match Arc::try_unwrap(collections) {
+        Ok(c) => c.close(),
+        Err(c) => {
+            error!(
+                "Cannot close collections, still has {} references",
+                Arc::strong_count(&c)
+            );
+            c.flush().ok(); // flush at least
+        }
+    }
 
     #[cfg(feature = "transcoding-cache")]
     {

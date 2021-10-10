@@ -272,6 +272,20 @@ impl CollectionTrait for CollectionCache {
             .map(|i| i.into())
             .collect()
     }
+
+    fn close(self) {
+        self.update_sender.send(None).ok();
+        let inner = self.inner;
+        if let Some(t) = self.thread_updater {
+            t.join().ok();
+        } else {
+            warn!("Join handle is missing");
+        }
+        inner
+            .flush()
+            .map_err(|e| error!("Final flush failed: {}", e))
+            .ok();
+    }
 }
 
 // positions
