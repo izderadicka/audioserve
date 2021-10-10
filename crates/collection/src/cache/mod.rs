@@ -68,8 +68,9 @@ impl CollectionCache {
     }
 
     fn db_path<P1: AsRef<Path>, P2: AsRef<Path>>(path: P1, db_dir: P2) -> Result<PathBuf> {
-        let p: &Path = path.as_ref();
-        let path_hash = ring::digest::digest(&ring::digest::SHA256, p.to_string_lossy().as_bytes());
+        let p: PathBuf = path.as_ref().canonicalize()?;
+        let key = p.to_string_lossy();
+        let path_hash = ring::digest::digest(&ring::digest::SHA256, key.as_bytes());
         let name_prefix = format!(
             "{:x}",
             u64::from_be_bytes(path_hash.as_ref()[..8].try_into().expect("Invalid size"))
