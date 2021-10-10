@@ -1,12 +1,16 @@
 use crate::{
     audio_meta::{AudioFolder, TimeStamp},
     cache::CollectionCache,
-    no_cache::CollectionDirect,
     error::Result,
+    no_cache::CollectionDirect,
     AudioFolderShort, FoldersOrdering, Position,
 };
 use enum_dispatch::enum_dispatch;
 use std::path::Path;
+
+pub struct CollectionOptions {
+    pub no_cache: bool,
+}
 
 #[enum_dispatch(CollectionTrait, PositionsTrait)]
 pub(crate) enum Collection {
@@ -47,9 +51,10 @@ impl Collection {
         P: AsRef<str> + Send + 'static,
     {
         match self {
-            Collection::CollectionCache(inner) => 
-                inner.insert_position_async(group, path, position, ts).await,
-            
+            Collection::CollectionCache(inner) => {
+                inner.insert_position_async(group, path, position, ts).await
+            }
+
             Collection::CollectionDirect(_) => Ok(()),
         }
     }
@@ -62,7 +67,6 @@ impl Collection {
         match self {
             Collection::CollectionCache(inner) => inner.get_position_async(group, path).await,
             Collection::CollectionDirect(_) => None,
-            
         }
     }
 }

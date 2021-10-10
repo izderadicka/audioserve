@@ -58,9 +58,8 @@ fn create_parser<'a>() -> Parser<'a> {
             .max_values(100)
             .takes_value(true)
             .env("AUDIOSERVE_BASE_DIRS")
-            .value_delimiter(":")
-            .validator_os(is_existing_dir)
-            .help("Root directories for audio books, also referred as collections")
+            .value_delimiter(";")
+            .help("Root directories for audio books, also referred as collections, you can also add :<options> after directory path to change collection behaviour")
 
             )
         .arg(Arg::with_name("no-authentication")
@@ -353,7 +352,7 @@ where
         }
     }
 
-    if let Some(base_dirs) = args.values_of_os("base-dir") {
+    if let Some(base_dirs) = args.values_of("base-dir") {
         for dir in base_dirs {
             config.add_base_dir(dir)?;
         }

@@ -6,6 +6,7 @@ extern crate serde_derive;
 extern crate lazy_static;
 
 use collection::audio_folder::FoldersOptions;
+use collection::common::CollectionOptions;
 use collection::Collections;
 use config::{get_config, init_config};
 use error::{bail, Context, Error};
@@ -15,6 +16,7 @@ use ring::rand::{SecureRandom, SystemRandom};
 use services::{
     auth::SharedSecretAuthenticator, search::Search, ServiceFactory, TranscodingDetails,
 };
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -79,9 +81,22 @@ macro_rules! get_url_path {
 }
 
 fn create_collections() -> Arc<Collections> {
+    let options: HashMap<_, _> = get_config()
+        .base_dirs_options
+        .iter()
+        .map(|(p, o)| {
+            (
+                p.clone(),
+                CollectionOptions {
+                    no_cache: o.no_cache,
+                },
+            )
+        })
+        .collect();
     Arc::new(
         Collections::new_with_detail::<Vec<PathBuf>, _, _>(
             get_config().base_dirs.clone(),
+            options,
             get_config().collections_cache_dir.as_path(),
             FoldersOptions {
                 allow_symlinks: get_config().allow_symlinks,

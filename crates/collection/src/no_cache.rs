@@ -16,6 +16,16 @@ pub(crate) struct CollectionDirect {
     searcher: FoldersSearch,
 }
 
+impl CollectionDirect {
+    pub(crate) fn new(base_dir: PathBuf, lister: FolderLister, allow_symlinks: bool) -> Self {
+        CollectionDirect {
+            base_dir,
+            lister,
+            searcher: FoldersSearch { allow_symlinks },
+        }
+    }
+}
+
 impl CollectionTrait for CollectionDirect {
     fn list_dir<P>(&self, dir_path: P, ordering: crate::FoldersOrdering) -> Result<AudioFolder>
     where

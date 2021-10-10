@@ -52,15 +52,6 @@ pub struct SearchResult {
     pub subfolders: Vec<AudioFolderShort>,
 }
 
-impl SearchResult {
-    pub fn new() -> Self {
-        SearchResult {
-            subfolders: vec![],
-            files: vec![],
-        }
-    }
-}
-
 #[cfg(feature = "folder-download")]
 pub use download_format::DownloadFormat;
 

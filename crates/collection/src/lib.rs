@@ -4,9 +4,13 @@ extern crate log;
 use audio_folder::{FolderLister, FoldersOptions};
 use audio_meta::{AudioFolder, TimeStamp};
 use cache::CollectionCache;
-use common::{Collection, CollectionTrait, PositionsTrait};
+use common::{Collection, CollectionOptions, CollectionTrait, PositionsTrait};
 use error::{Error, Result};
-use std::path::{Path, PathBuf};
+use no_cache::CollectionDirect;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 pub use audio_folder::{list_dir_files_only, parse_chapter_path};
 pub use audio_meta::{init_media_lib, AudioFile, AudioFolderShort, FoldersOrdering, TimeSpan};
@@ -16,7 +20,7 @@ pub use util::guess_mime_type;
 pub mod audio_folder;
 pub mod audio_meta;
 mod cache;
-pub(crate) mod common;
+pub mod common;
 pub mod error;
 pub(crate) mod no_cache;
 pub mod position;
@@ -29,6 +33,7 @@ pub struct Collections {
 impl Collections {
     pub fn new_with_detail<I, P1, P2>(
         collections_dirs: Vec<PathBuf>,
+        collections_options: HashMap<PathBuf, CollectionOptions>,
         db_path: P2,
         opt: FoldersOptions,
     ) -> Result<Self>
@@ -38,16 +43,31 @@ impl Collections {
         P2: AsRef<Path>,
     {
         let db_path = db_path.as_ref();
+        let allow_symlinks = opt.allow_symlinks;
         let lister = FolderLister::new_with_options(opt);
         let caches = collections_dirs
             .into_iter()
-            .map(|collection_path| {
-                CollectionCache::new(collection_path.clone(), db_path, lister.clone())
-                    .map(|mut cache| {
-                        cache.run_update_loop();
-                        cache
-                    })
-                    .map(|c| Collection::from(c))
+            .map(move |collection_path| {
+                let no_cache_opt = collections_options
+                    .get(&collection_path)
+                    .map(|o| o.no_cache)
+                    .unwrap_or(false);
+                if no_cache_opt {
+                    info!("Collection {:?} is not using cache", collection_path);
+                    Ok(CollectionDirect::new(
+                        collection_path.clone(),
+                        lister.clone(),
+                        allow_symlinks,
+                    )
+                    .into())
+                } else {
+                    CollectionCache::new(collection_path.clone(), db_path, lister.clone())
+                        .map(|mut cache| {
+                            cache.run_update_loop();
+                            cache
+                        })
+                        .map(|c| Collection::from(c))
+                }
             })
             .collect::<Result<Vec<_>>>()?;
         Ok(Collections { caches })
