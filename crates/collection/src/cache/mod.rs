@@ -241,7 +241,7 @@ impl CollectionTrait for CollectionCache {
         self.inner.flush()
     }
 
-    fn search<S: AsRef<str>>(&self, q: S) -> Search {
+    fn search<S: AsRef<str>>(&self, q: S) -> Vec<AudioFolderShort> {
         let tokens: Vec<String> = q
             .as_ref()
             .split_whitespace()
@@ -249,11 +249,12 @@ impl CollectionTrait for CollectionCache {
             .map(str::to_lowercase)
             .collect();
         let iter = self.inner.iter_folders();
-        Search {
+        let search = Search {
             tokens,
             iter,
             prev_match: None,
-        }
+        };
+        search.collect()
     }
 
     fn recent(&self, limit: usize) -> Vec<AudioFolderShort> {
@@ -455,7 +456,7 @@ mod tests {
     fn test_search() {
         env_logger::try_init().ok();
         let (col, _tmp_dir) = create_tmp_collection();
-        let res: Vec<_> = col.search("usak kulisak").collect();
+        let res: Vec<_> = col.search("usak kulisak");
         assert_eq!(1, res.len());
         let af = &res[0];
         assert_eq!("kulisak", af.name.as_str());
@@ -464,7 +465,7 @@ mod tests {
         assert!(af.modified.is_some());
         assert!(!af.is_file);
 
-        let res: Vec<_> = col.search("neneneexistuje").collect();
+        let res: Vec<_> = col.search("neneneexistuje");
         assert_eq!(0, res.len());
     }
 

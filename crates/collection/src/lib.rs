@@ -18,6 +18,7 @@ pub mod audio_meta;
 mod cache;
 pub(crate) mod common;
 pub mod error;
+pub(crate) mod no_cache;
 pub mod position;
 pub mod util;
 
@@ -83,7 +84,7 @@ impl Collections {
         q: S,
         ordering: FoldersOrdering,
     ) -> Result<Vec<AudioFolderShort>> {
-        let mut res: Vec<_> = self.get_cache(collection)?.search(q).collect();
+        let mut res = self.get_cache(collection)?.search(q);
 
         res.sort_unstable_by(|a, b| a.compare_as(ordering, b));
         Ok(res)

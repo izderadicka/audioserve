@@ -1,16 +1,17 @@
 use crate::{
     audio_meta::{AudioFolder, TimeStamp},
-    cache::{CollectionCache, Search},
+    cache::CollectionCache,
+    no_cache::CollectionDirect,
     error::Result,
     AudioFolderShort, FoldersOrdering, Position,
 };
 use enum_dispatch::enum_dispatch;
 use std::path::Path;
 
-#[enum_dispatch(CollectionTrait)]
-#[enum_dispatch(PositionsTrait)]
+#[enum_dispatch(CollectionTrait, PositionsTrait)]
 pub(crate) enum Collection {
     CollectionCache,
+    CollectionDirect,
 }
 
 #[enum_dispatch]
@@ -46,9 +47,10 @@ impl Collection {
         P: AsRef<str> + Send + 'static,
     {
         match self {
-            Collection::CollectionCache(inner) => {
-                inner.insert_position_async(group, path, position, ts).await
-            }
+            Collection::CollectionCache(inner) => 
+                inner.insert_position_async(group, path, position, ts).await,
+            
+            Collection::CollectionDirect(_) => Ok(()),
         }
     }
 
@@ -59,6 +61,8 @@ impl Collection {
     {
         match self {
             Collection::CollectionCache(inner) => inner.get_position_async(group, path).await,
+            Collection::CollectionDirect(_) => None,
+            
         }
     }
 }
@@ -71,18 +75,7 @@ pub(crate) trait CollectionTrait {
 
     fn flush(&self) -> Result<()>;
 
-    fn search<S: AsRef<str>>(&self, q: S) -> Search;
+    fn search<S: AsRef<str>>(&self, q: S) -> Vec<AudioFolderShort>;
 
     fn recent(&self, limit: usize) -> Vec<AudioFolderShort>;
 }
-
-// impl Collection {
-
-//     fn list_dir<P>(&self, dir_path: P, ordering: FoldersOrdering) -> Result<AudioFolder>
-//         where P: AsRef<Path>
-//     {
-//        match self {
-//            Collection::Cached(col) => col.list_dir(dir_path, ordering)
-//        }
-//     }
-//     }
