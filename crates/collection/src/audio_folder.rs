@@ -184,7 +184,7 @@ impl FolderLister {
                                         let meta = match get_audio_properties(&audio_file_path) {
                                             Ok(meta) => meta,
                                             Err(e) => {
-                                                error!("Cannot add file because error in extraction audio meta: {}",e);
+                                                error!("Cannot add file {:?} because error in extraction audio meta: {}",path, e);
                                                 continue;
                                             }
                                         };
