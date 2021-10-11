@@ -223,13 +223,9 @@ fn create_parser<'a>() -> Parser<'a> {
         );
     }
 
-    if cfg!(feature = "search-cache") {
-        parser=parser.arg(
-            Arg::with_name("search-cache")
-            .long("search-cache")
-            .help("Caches collections directory structure for quick search, monitors directories for changes")
-        );
-    }
+    parser = parser.arg(Arg::with_name("search-cache").long("search-cache").help(
+        "Deprecated: does nothing. For caching config use :<options> on individual collections dirs params",
+    ));
 
     if cfg!(feature = "transcoding-cache") {
         parser=parser.arg(
@@ -432,12 +428,6 @@ where
             });
         }
     }
-
-    if cfg!(feature = "search-cache")
-        && is_present_or_env("search-cache", "AUDIOSERVE_SEARCH_CACHE")
-    {
-        config.search_cache = true
-    };
 
     #[cfg(feature = "transcoding-cache")]
     {

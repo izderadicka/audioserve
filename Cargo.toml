@@ -68,8 +68,6 @@ shared-positions = ["websock"]
 behind-proxy = ["proxy-headers"]
 # non-default
 transcoding-cache=["simple-file-cache", "tokio-util"]
-# this is for legacy search - keeping around for some time
-search-cache=["cachedirtree"] 
 # for static compilation only
 partially-static = ["collection/partially-static"]
 static = ["collection/static"]

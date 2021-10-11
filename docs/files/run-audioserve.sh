@@ -6,6 +6,5 @@ docker run -d --name audioserve  \
         -e LETSENCRYPT_HOST=audioserve.example.com  \
         --restart unless-stopped \
         izderadicka/audioserve \
-        --search-cache \
 	--transcoding-max-parallel-processes 24 \
         /audiobooks
