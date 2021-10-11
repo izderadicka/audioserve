@@ -461,11 +461,11 @@ mod tests {
 
     #[test]
     fn test_db_path() {
-        let path = Path::new("nejaka/cesta/na/kolekci");
+        let path = Path::new("../../test_data/usak");
         let collection_path = CollectionCache::db_path(path, "databaze").unwrap();
         let name = collection_path.file_name().unwrap().to_string_lossy();
         let name: Vec<_> = name.split('_').collect();
-        assert_eq!("kolekci", name[0]);
+        assert_eq!("usak", name[0]);
         assert_eq!(16, name[1].len());
     }
 
