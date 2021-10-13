@@ -72,7 +72,7 @@ impl CollectionCache {
         let key = p.to_string_lossy();
         let path_hash = ring::digest::digest(&ring::digest::SHA256, key.as_bytes());
         let name_prefix = format!(
-            "{:x}",
+            "{:016x}",
             u64::from_be_bytes(path_hash.as_ref()[..8].try_into().expect("Invalid size"))
         );
         let name = p
