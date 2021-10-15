@@ -271,6 +271,7 @@ impl FolderLister {
                         subfolders,
                         cover,
                         description,
+                        position: None,
                     },
                 )
             }
@@ -344,6 +345,7 @@ impl FolderLister {
                 subfolders: vec![],
                 cover: None,
                 description: None,
+                position: None,
             },
         )
     }

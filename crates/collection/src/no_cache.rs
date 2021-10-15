@@ -27,7 +27,12 @@ impl CollectionDirect {
 }
 
 impl CollectionTrait for CollectionDirect {
-    fn list_dir<P>(&self, dir_path: P, ordering: crate::FoldersOrdering) -> Result<AudioFolder>
+    fn list_dir<P>(
+        &self,
+        dir_path: P,
+        ordering: crate::FoldersOrdering,
+        _group: Option<String>,
+    ) -> Result<AudioFolder>
     where
         P: AsRef<std::path::Path>,
     {

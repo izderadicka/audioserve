@@ -73,7 +73,12 @@ impl Collection {
 
 #[enum_dispatch]
 pub(crate) trait CollectionTrait {
-    fn list_dir<P>(&self, dir_path: P, ordering: FoldersOrdering) -> Result<AudioFolder>
+    fn list_dir<P>(
+        &self,
+        dir_path: P,
+        ordering: FoldersOrdering,
+        group: Option<String>,
+    ) -> Result<AudioFolder>
     where
         P: AsRef<Path>;
 

@@ -1,4 +1,5 @@
 use crate::error::{Error, Result};
+use crate::position::PositionShort;
 use crate::util::{get_file_name, get_modified, guess_mime_type};
 use mime_guess::Mime;
 use serde_derive::{Deserialize, Serialize};
@@ -95,6 +96,10 @@ pub struct AudioFolder {
     pub subfolders: Vec<AudioFolderShort>,
     pub cover: Option<TypedFile>, // cover is file in folder - either jpg or png
     pub description: Option<TypedFile>, // description is file in folder - either txt, html, md
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_deserializing)]
+    #[serde(default)]
+    pub position: Option<PositionShort>, // optional last know playback position in this folder
 }
 
 #[derive(Clone, Copy)]

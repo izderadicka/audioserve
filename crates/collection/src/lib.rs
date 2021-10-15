@@ -86,8 +86,10 @@ impl Collections {
         collection: usize,
         dir_path: P,
         ordering: FoldersOrdering,
+        group: Option<String>,
     ) -> Result<AudioFolder> {
-        self.get_cache(collection)?.list_dir(dir_path, ordering)
+        self.get_cache(collection)?
+            .list_dir(dir_path, ordering, group)
     }
 
     pub fn flush(&self) -> Result<()> {

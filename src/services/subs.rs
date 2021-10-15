@@ -395,9 +395,10 @@ pub fn get_folder(
     folder_path: PathBuf,
     collections: Arc<collection::Collections>,
     ordering: FoldersOrdering,
+    group: Option<String>,
 ) -> ResponseFuture {
     Box::pin(
-        blocking(move || collections.list_dir(collection, &folder_path, ordering))
+        blocking(move || collections.list_dir(collection, &folder_path, ordering, group))
             .map_ok(|res| match res {
                 Ok(folder) => json_response(&folder),
                 Err(_) => resp::not_found(),

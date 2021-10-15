@@ -9,7 +9,7 @@ use crate::{
     cache::update::{filter_event, FilteredEvent, RecursiveUpdater},
     common::{CollectionTrait, PositionsTrait},
     error::{Error, Result},
-    position::Position,
+    position::{Position, PositionShort},
     util::get_modified,
     AudioFolderShort, FoldersOrdering,
 };
@@ -196,11 +196,13 @@ impl CollectionTrait for CollectionCache {
         &self,
         dir_path: P,
         ordering: FoldersOrdering,
+        group: Option<String>,
     ) -> Result<AudioFolder> {
-        let full_path = self.inner.full_path(&dir_path);
+        let dir_path = dir_path.as_ref();
+        let full_path = self.inner.full_path(dir_path);
         let ts = get_modified(&full_path);
         self.inner
-            .get_if_actual(&dir_path, ts)
+            .get_if_actual(dir_path, ts)
             .map(|mut af| {
                 if matches!(ordering, FoldersOrdering::RecentFirst) {
                     af.subfolders
@@ -209,8 +211,8 @@ impl CollectionTrait for CollectionCache {
                 af
             })
             .ok_or_else(|| {
-                debug!("Fetching folder {:?} from file system", dir_path.as_ref());
-                self.inner.list_dir(&dir_path, ordering)
+                debug!("Fetching folder {:?} from file system", dir_path);
+                self.inner.list_dir(dir_path, ordering)
             })
             .or_else(|r| {
                 match r.as_ref() {
@@ -235,6 +237,27 @@ impl CollectionTrait for CollectionCache {
                     }
                 }
                 r
+            })
+            .map(|mut af| {
+                if let Some(group) = group {
+                    let folder = dir_path.to_str();
+                    if let Some(folder) = folder {
+                        let pos = self.get_position(group, Some(folder)).and_then(|p| {
+                            dir_path.join(&p.file).to_str().map(|path| PositionShort {
+                                path: path.to_string(),
+                                timestamp: p.timestamp,
+                                position: p.position,
+                            })
+                        });
+                        af.position = pos;
+                    } else {
+                        warn!(
+                            "Folder path {:?} is not UTF8, cannot get position",
+                            dir_path
+                        )
+                    }
+                }
+                af
             })
     }
 
@@ -449,7 +472,7 @@ mod tests {
         );
         let new_info_name = test_data_dir.join("usak/kulisak/info.txt");
         fs::rename(info_file, new_info_name)?;
-        let af2 = col.list_dir("usak/kulisak", FoldersOrdering::RecentFirst)?;
+        let af2 = col.list_dir("usak/kulisak", FoldersOrdering::RecentFirst, None)?;
         assert_eq!(
             Path::new("usak/kulisak/info.txt"),
             af2.description.unwrap().path

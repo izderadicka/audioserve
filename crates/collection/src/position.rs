@@ -26,7 +26,7 @@ impl PositionItem {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub struct Position {
     pub file: String,
     pub folder: String,
@@ -36,3 +36,10 @@ pub struct Position {
 }
 
 pub(crate) type PositionRecord = HashMap<String, PositionItem>;
+
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
+pub struct PositionShort {
+    pub path: String,
+    pub timestamp: TimeStamp,
+    pub position: f32,
+}

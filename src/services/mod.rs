@@ -482,11 +482,15 @@ impl<C> FileSendService<C> {
                             params,
                         )
                     } else if path.starts_with("/folder/") {
+                        let group = params
+                            .as_ref()
+                            .and_then(|m| m.get("group").map(|i| i.to_string()));
                         get_folder(
                             colllection_index,
                             get_subpath(&path, "/folder/"),
                             collections,
                             ord,
+                            group,
                         )
                     } else if !get_config().disable_folder_download && path.starts_with("/download")
                     {
