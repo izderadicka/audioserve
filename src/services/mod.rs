@@ -6,6 +6,7 @@ use self::subs::{
 };
 use self::transcode::QualityLevel;
 use crate::config::get_config;
+use crate::services::subs::last_position;
 use crate::util::ResponseBuilderExt;
 use crate::{error, util::header2header};
 use bytes::{Bytes, BytesMut};
@@ -454,6 +455,24 @@ impl<C> FileSendService<C> {
                     collections_list()
                 } else if path.starts_with("/transcodings") {
                     transcodings_list()
+                } else if cfg!(feature = "shared-positions") && path.starts_with("/positions") {
+                    // positions API
+                    let mut segments = path.split('/');
+                    segments.next(); // read out first empty segment
+                    segments.next(); // readout positions segment
+                    if let Some(group) = segments.next().map(|g| g.to_owned()) {
+                        debug!("Getting position for group {}", group);
+                        if let Some(last) = segments.next() {
+                            if last == "last" {
+                                //only last position
+                                return last_position(collections.clone(), group);
+                            }
+                        } else {
+                            // all known last positions
+                        }
+                    }
+
+                    resp::fut(resp::not_found)
                 } else if cfg!(feature = "shared-positions") && path.starts_with("/position") {
                     #[cfg(not(feature = "shared-positions"))]
                     unimplemented!();

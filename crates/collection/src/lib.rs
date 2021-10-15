@@ -10,6 +10,7 @@ use no_cache::CollectionDirect;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 pub use audio_folder::{list_dir_files_only, parse_chapter_path};
@@ -247,7 +248,7 @@ impl Collections {
             })
     }
 
-    pub async fn get_last_position_async<S>(&self, group: S) -> Option<Position>
+    pub async fn get_last_position_async<S>(self: Arc<Self>, group: S) -> Option<Position>
     where
         S: AsRef<str> + Send + 'static,
     {

@@ -190,7 +190,7 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseF
                             None
                         }
                         Msg::GenericQuery { group } => {
-                            let last = col.get_last_position_async(group).await;
+                            let last = col.clone().get_last_position_async(group).await;
                             let res = Reply {
                                 folder: None,
                                 last: last.map(PositionCompatible::from),
@@ -203,7 +203,10 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseF
                         }
 
                         Msg::FolderQuery { folder_path } => {
-                            let last = col.get_last_position_async(folder_path.group.clone()).await;
+                            let last = col
+                                .clone()
+                                .get_last_position_async(folder_path.group.clone())
+                                .await;
                             let folder = col
                                 .get_position_async(
                                     folder_path.collection,

@@ -12,7 +12,8 @@ use crate::{
     util::{checked_dec, into_range_bounds, to_satisfiable_range, ResponseBuilderExt},
 };
 use collection::{
-    guess_mime_type, list_dir_files_only, parse_chapter_path, FoldersOrdering, TimeSpan,
+    guess_mime_type, list_dir_files_only, parse_chapter_path, Collections, FoldersOrdering,
+    TimeSpan,
 };
 use futures::prelude::*;
 use futures::{future, ready, Stream};
@@ -504,6 +505,14 @@ pub fn collections_list() -> ResponseFuture {
             .collect(),
     };
     Box::pin(future::ok(json_response(&collections)))
+}
+
+pub fn last_position(collections: Arc<Collections>, group: String) -> ResponseFuture {
+    Box::pin(
+        collections
+            .get_last_position_async(group)
+            .map(|pos| Ok(json_response(&pos))),
+    )
 }
 
 pub fn transcodings_list() -> ResponseFuture {
