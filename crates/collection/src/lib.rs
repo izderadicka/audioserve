@@ -248,6 +248,16 @@ impl Collections {
             })
     }
 
+    pub async fn get_all_positions_for_group_async<S>(self: Arc<Self>, group: S) -> Vec<Position>
+    where
+        S: AsRef<str> + Send + 'static,
+    {
+        let res = vec![];
+        for c in self.caches.iter() {}
+
+        res
+    }
+
     pub async fn get_last_position_async<S>(self: Arc<Self>, group: S) -> Option<Position>
     where
         S: AsRef<str> + Send + 'static,

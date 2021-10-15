@@ -374,6 +374,13 @@ impl CollectionCache {
             .ok()
             .flatten()
     }
+
+    pub async fn get_all_positions_for_group_async<S>(&self, group: S) -> Vec<Position>
+    where
+        S: AsRef<str> + Send + 'static,
+    {
+        todo!()
+    }
 }
 
 pub struct Search {

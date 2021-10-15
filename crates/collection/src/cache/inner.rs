@@ -277,6 +277,26 @@ impl CacheInner {
             .flatten()
     }
 
+    fn get_all_positions_for_group<S>(&self, group: S) -> Vec<Position>
+    where
+        S: AsRef<str>,
+    {
+        self.db
+            .iter()
+            .filter_map(|res| {
+                res.map_err(|e| error!("Error reading from positions db: {}", e))
+                    .ok()
+                    .and_then(|(folder, rec)| {
+                        let rec: PositionRecord = bincode::deserialize(&rec)
+                            .map_err(|e| error!("Position deserialization error: {}", e))
+                            .ok()?;
+                        let folder = String::from_utf8(folder.as_ref().into()).unwrap(); // known to be valid UTF8
+                        rec.get(group.as_ref()).map(|p| p.into_position(folder, 0))
+                    })
+            })
+            .collect()
+    }
+
     fn remove_positions_batch<P: AsRef<Path>>(&self, path: P) -> Result<Batch> {
         let mut batch = Batch::default();
         self.pos_folder
