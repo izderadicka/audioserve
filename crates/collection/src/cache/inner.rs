@@ -294,6 +294,7 @@ impl CacheInner {
                         rec.get(group.as_ref()).map(|p| p.into_position(folder, 0))
                     })
             })
+            .take(1000) //TODO: this is just temporary safety limit, think about better ways to limit
             .collect()
     }
 
