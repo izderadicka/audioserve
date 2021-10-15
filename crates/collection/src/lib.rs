@@ -211,7 +211,7 @@ impl Collections {
     }
 
     pub async fn insert_position_if_newer_async<S, P>(
-        &self,
+        self: Arc<Self>,
         collection: usize,
         group: S,
         path: P,

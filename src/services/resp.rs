@@ -45,5 +45,6 @@ def_resp!(
     not_found(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE);
     method_not_supported(StatusCode::METHOD_NOT_ALLOWED, METHOD_NOT_ALLOWED_MSG);
     bad_request(StatusCode::BAD_REQUEST, BAD_REQUEST_MSG);
-    not_implemented(StatusCode::NOT_IMPLEMENTED, NOT_IMPLEMENTED_MSG)
+    not_implemented(StatusCode::NOT_IMPLEMENTED, NOT_IMPLEMENTED_MSG);
+    created(StatusCode::CREATED, "")
 );

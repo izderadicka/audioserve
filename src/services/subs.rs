@@ -11,9 +11,10 @@ use crate::{
     error::{Error, Result},
     util::{checked_dec, into_range_bounds, to_satisfiable_range, ResponseBuilderExt},
 };
+use bytes::Bytes;
 use collection::{
     guess_mime_type, list_dir_files_only, parse_chapter_path, Collections, FoldersOrdering,
-    TimeSpan,
+    Position, TimeSpan,
 };
 use futures::prelude::*;
 use futures::{future, ready, Stream};
@@ -505,6 +506,39 @@ pub fn collections_list() -> ResponseFuture {
             .collect(),
     };
     Box::pin(future::ok(json_response(&collections)))
+}
+
+pub fn insert_position(
+    collections: Arc<Collections>,
+    group: String,
+    bytes: Bytes,
+) -> ResponseFuture {
+    match serde_json::from_slice::<Position>(&bytes) {
+        Ok(pos) => {
+            let path = if pos.folder.len() > 0 {
+                pos.folder + "/" + &pos.file
+            } else {
+                pos.file
+            };
+            Box::pin(
+                collections
+                    .clone()
+                    .insert_position_if_newer_async(
+                        pos.collection,
+                        group,
+                        path,
+                        pos.position,
+                        pos.timestamp,
+                    )
+                    .map_err(Error::new)
+                    .and_then(|_| resp::fut(resp::created)),
+            )
+        }
+        Err(e) => {
+            error!("Error in position JSON: {}", e);
+            resp::fut(resp::bad_request)
+        }
+    }
 }
 
 pub fn last_position(collections: Arc<Collections>, group: String) -> ResponseFuture {

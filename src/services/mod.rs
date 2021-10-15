@@ -1,8 +1,8 @@
 use self::auth::{AuthResult, Authenticator};
 use self::search::Search;
 use self::subs::{
-    collections_list, get_folder, recent, search, send_file, send_file_simple, transcodings_list,
-    ResponseFuture,
+    collections_list, get_folder, insert_position, recent, search, send_file, send_file_simple,
+    transcodings_list, ResponseFuture,
 };
 use self::transcode::QualityLevel;
 use crate::config::get_config;
@@ -440,39 +440,26 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
 
 impl<C> FileSendService<C> {
     fn process_checked(
-        req: RequestWrapper,
+        mut req: RequestWrapper,
         searcher: Search<String>,
         transcoding: TranscodingDetails,
         collections: Arc<Collections>,
     ) -> ResponseFuture {
         let params = req.params();
-
+        let path = req.path();
         match *req.method() {
             Method::GET => {
-                let path = req.path();
-
                 if path.starts_with("/collections") {
                     collections_list()
                 } else if path.starts_with("/transcodings") {
                     transcodings_list()
                 } else if cfg!(feature = "shared-positions") && path.starts_with("/positions") {
                     // positions API
-                    let mut segments = path.split('/');
-                    segments.next(); // read out first empty segment
-                    segments.next(); // readout positions segment
-                    if let Some(group) = segments.next().map(|g| g.to_owned()) {
-                        debug!("Getting position for group {}", group);
-                        if let Some(last) = segments.next() {
-                            if last == "last" {
-                                //only last position
-                                return last_position(collections, group);
-                            }
-                        } else {
-                            return all_positions(collections, group);
-                        }
+                    match extract_group(path) {
+                        PositionGroup::Group(group) => all_positions(collections, group),
+                        PositionGroup::Last(group) => last_position(collections, group),
+                        PositionGroup::Malformed => resp::fut(resp::not_found),
                     }
-
-                    resp::fut(resp::not_found)
                 } else if cfg!(feature = "shared-positions") && path.starts_with("/position") {
                     #[cfg(not(feature = "shared-positions"))]
                     unimplemented!();
@@ -559,6 +546,31 @@ impl<C> FileSendService<C> {
                 }
             }
 
+            Method::POST => match extract_group(path) {
+                PositionGroup::Group(group) => {
+                    if params
+                        .and_then(|m| {
+                            m.get("Content-Type")
+                                .map(|v| v.as_ref().eq("application/json"))
+                        })
+                        .unwrap_or(false)
+                    {
+                        Box::pin(async move {
+                            match req.body_bytes().await {
+                                Ok(bytes) => insert_position(collections, group, bytes).await,
+                                Err(e) => {
+                                    error!("Error reading POST body: {}", e);
+                                    Ok(resp::bad_request())
+                                }
+                            }
+                        })
+                    } else {
+                        resp::fut(resp::bad_request)
+                    }
+                }
+                _ => resp::fut(resp::not_found),
+            },
+
             _ => resp::fut(resp::method_not_supported),
         }
     }
@@ -630,4 +642,27 @@ fn extract_collection_number(path: &str) -> Result<(&str, usize), ()> {
     } else {
         Ok((path, 0))
     }
+}
+
+enum PositionGroup {
+    Group(String),
+    Last(String),
+    Malformed,
+}
+
+fn extract_group(path: &str) -> PositionGroup {
+    let mut segments = path.split('/');
+    segments.next(); // read out first empty segment
+    segments.next(); // readout positions segment
+    if let Some(group) = segments.next().map(|g| g.to_owned()) {
+        if let Some(last) = segments.next() {
+            if last == "last" {
+                //only last position
+                return PositionGroup::Last(group);
+            }
+        } else {
+            return PositionGroup::Group(group);
+        }
+    }
+    PositionGroup::Malformed
 }
