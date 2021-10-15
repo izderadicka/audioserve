@@ -23,6 +23,8 @@ jobs:
         rustc --version
         cargo check --verbose
     - name: Install build dependencies
-      run: sudo apt-get install -y  openssl libssl-dev pkg-config ffmpeg yasm build-essential wget libbz2-dev zlib1g-dev libavformat-dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y  openssl libssl-dev pkg-config ffmpeg yasm build-essential wget libbz2-dev zlib1g-dev libavformat-dev
     - name: Run unit tests
       run: cargo test --all
