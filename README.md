@@ -124,13 +124,13 @@ Responses' CORS headers are totally permissive, allowing access from all origins
 
 Audioserve is intended to serve personal audio collections of moderate sizes. For sake of simplicity it does not provide any large scale performance optimizations. It's fine to serve couple of users from collections of couple of thousands audiobooks, if they are reasonably organized. That's it, if you're looking for solution for thousands or millions of users, look elsewhere. To compensate for this audioserve is very lightweight and by itself takes minimum of system resources.
 
-Browsing of collections is limited by speed of the file system. As directory listing needs to read audio files metadata (duration and bitrate, eventually chapters), folders with too many files (> 200) will be slow to open. Search is done by walking through collection directory structure, it can be slow - especially the first search (subsequent searches are much, much faster, as directory structure from previous search is cached by OS for some time). Recent audioserve versions provide optional search cache, to speed up search significantly - [see below](#search-cache).
+To compensate for slow file system operation audioserve now by default is using cache system - see below.
 
 But true limiting factor is transcoding - as it's quite CPU intensive. Normally you should run only a handful of transcodings in parallel, not much then 2x - 4x more then number of cores in the machine. For certain usage scenarios enabling of [transcoding cache](#transcoding-cache) can help a bit.
 
-### Search Cache
+### Collections Cache
 
-For fast searches enable search cache with `--search-cache`, it will load directory structure of collections into memory, so searches will be blazingly fast (for price of more occupied memory). Search cache monitors directories and update itself upon changes (make take a while). Also after start of audioserve it takes some time before cache is filled (especially when large collections are used), so search might not work initially.
+For fast searches and fast browsing we use cache (based on fast Rust native key-value store sled). Cache monitors directories and updates itself upon changes (make take a while). Also after start of audioserve it takes some time before cache is filled (especially when large collections are used), so search might not work initially.
 
 ### Transcoding Cache
 
@@ -239,14 +239,13 @@ A more detailed example (audioserve is an entry point to this container, so you 
         -e AUDIOSERVE_SHARED_SECRET=mypass \
         izderadicka/audioserve \
         --ssl-key /audioserve/ssl/audioserve.p12 --ssl-key-password mypass \
-        --search-cache \
         /collection1 /collection2
 
 In the above example, we are adding two different collections of audiobooks (collection1 and collection2).
 Both are made available to the container via `-v` option and then passed to audioserve on command line.
 Also we have maped with `-v` some folder to `/home/audioserve/.audioserve`, where runtime data of audioserve are stored (server secret, caches ...)
 
-We set the shared secret via `AUDIOSERVE_SHARED_SECRET` env.variable and specify use of TLS via `--ssl-key` and `ssl-key-password` (the tests only self-signed key is already prebundled in the image, for real use you'll need to generate your own key, or use reverse proxy that terminates TLS). We also enable search cache with `--search-cache` argument.
+We set the shared secret via `AUDIOSERVE_SHARED_SECRET` env.variable and specify use of TLS via `--ssl-key` and `ssl-key-password` (the tests only self-signed key is already prebundled in the image, for real use you'll need to generate your own key, or use reverse proxy that terminates TLS).
 
 #### Docker Compose Example
 
@@ -345,7 +344,7 @@ Theoretically audioserve can work on MacOS (probably with only few changes in th
 
 ### Compiling without default features or with non-default features
 
-TLS support (feature `tls`), symbolic links (feature `symlinks`) and search cache (feature `search-cache`) and folder download (feature `folder-download`) are default features, but you can compile without them - just add `--no-default-features` option to `cargo build` command. And then evetually choose only features you need.
+TLS support (feature `tls`), symbolic links (feature `symlinks`) and folder download (feature `folder-download`) are default features, but you can compile without them - just add `--no-default-features` option to `cargo build` command. And then evetually choose only features you need.
 To add non-default features (like `transcoding-cache`) compile with this option `--features transcoding-cache` in `cargo build` command.
 
 **Available features:**
@@ -354,7 +353,6 @@ To add non-default features (like `transcoding-cache`) compile with this option 
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | :-----: | ---------------------------------------------------------------------------------------------------------------- |
 | tls                         | Enables TLS support (e.g https) (requires openssl and libssl-dev)                                                                  |   Yes   | --ssl-key --ssl-key-password to define server key                                                                |
 | symlinks                    | Enables to use symbolic links in media folders                                                                                     |   Yes   | Use --allow-symlinks to follow symbolic links                                                                    |
-| search-cache                | Caches structure of media directories for fast search                                                                              |   Yes   | Use --search-cache to enable this cache                                                                          |
 | folder-download             | Enables API endpoint to download content of a folder in tar archive                                                                |   Yes   | Can be disabled with argument --disable-folder-download                                                          |
 | shared-positions            | Clients can share recent playback positions via simple websocket API                                                               |   Yes   |
 | transcoding-cache           | Cache to save transcoded files for fast next use                                                                                   |   No    | Can be disabled by --t-cache-disable and modified by --t-cache-dir --t-cache-size --t-cache-max-files            |

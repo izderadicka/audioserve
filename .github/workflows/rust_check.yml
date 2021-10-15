@@ -10,8 +10,7 @@ env:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
     - uses: Swatinem/rust-cache@v1
@@ -23,3 +22,7 @@ jobs:
       run: |
         rustc --version
         cargo check --verbose
+    - name: Install build dependencies
+      run: sudo apt-get install -y  openssl libssl-dev pkg-config ffmpeg yasm build-essential wget libbz2-dev zlib1g-dev libavformat-dev
+    - name: Run unit tests
+      run: cargo test --all

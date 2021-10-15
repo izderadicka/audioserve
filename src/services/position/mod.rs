@@ -1,20 +1,59 @@
 use super::{RequestWrapper, ResponseFuture};
 use crate::config::get_config;
 use crate::error::{bail, Context, Error};
-use cache::{Cache, Position};
+use collection::audio_meta::TimeStamp;
+use collection::{Collections, Position};
 use futures::future;
 use std::str::FromStr;
+use std::sync::Arc;
 use websock::{self as ws, spawn_websocket_with_timeout};
 
-mod cache;
-
-lazy_static! {
-    static ref CACHE: Cache = Cache::new(100, 100);
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+struct Location {
+    collection: usize,
+    group: String,
+    path: String,
 }
 
-pub async fn save_positions() {
-    if let Err(e) = CACHE.save().await {
-        error!("Cannot save positions to file: {}", e);
+// This is workaround to match old websocket API
+#[derive(Debug, Serialize)]
+struct PositionCompatible {
+    file: String,
+    folder: String,
+    timestamp: TimeStamp,
+    position: f32,
+}
+
+impl From<Position> for PositionCompatible {
+    fn from(p: Position) -> Self {
+        PositionCompatible {
+            file: p.file,
+            timestamp: p.timestamp,
+            position: p.position,
+            folder: p.collection.to_string() + "/" + &p.folder,
+        }
+    }
+}
+
+impl FromStr for Location {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.splitn(3, "/");
+        let group = parts
+            .next()
+            .ok_or_else(|| Error::msg("Missing group part"))?;
+        let collection: usize = parts
+            .next()
+            .ok_or_else(|| Error::msg("Missin collection num"))?
+            .parse()
+            .context("Invalid collection number")?;
+        let path = parts.next().unwrap_or_else(|| "");
+        Ok(Location {
+            group: group.into(),
+            collection,
+            path: path.into(),
+        })
     }
 }
 
@@ -22,11 +61,11 @@ pub async fn save_positions() {
 enum Msg {
     Position {
         position: f32,
-        file_path: Option<String>,
+        file_path: Option<Location>,
         timestamp: Option<u64>,
     },
     FolderQuery {
-        folder_path: String,
+        folder_path: Location,
     },
     GenericQuery {
         group: String,
@@ -35,8 +74,8 @@ enum Msg {
 
 #[derive(Serialize)]
 struct Reply {
-    folder: Option<Position>,
-    last: Option<Position>,
+    folder: Option<PositionCompatible>,
+    last: Option<PositionCompatible>,
 }
 
 impl FromStr for Msg {
@@ -64,14 +103,14 @@ impl FromStr for Msg {
             } else {
                 Ok(Msg::Position {
                     position,
-                    file_path: Some(parts[1].into()),
+                    file_path: Some(parts[1].parse()?),
                     timestamp,
                 })
             }
         } else if parts.len() == 1 {
             if parts[0].find('/').is_some() {
                 Ok(Msg::FolderQuery {
-                    folder_path: parts[0].into(),
+                    folder_path: parts[0].parse()?,
                 })
             } else {
                 Ok(Msg::GenericQuery {
@@ -84,17 +123,17 @@ impl FromStr for Msg {
     }
 }
 
-pub fn position_service(req: RequestWrapper) -> ResponseFuture {
+pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseFuture {
     debug!("We got these headers on websocket: {:?}", req.headers());
-
-    let res = spawn_websocket_with_timeout::<String, _>(
+    //let col = col.clone();
+    let res = spawn_websocket_with_timeout::<Location, _>(
         req.into_request(),
-        |m| {
+        move |m| {
             debug!("Got message {:?}", m);
             let message = m.to_str().map_err(Error::new).and_then(str::parse);
-
+            let col = col.clone();
             match message {
-                Ok(message) => Box::pin(async {
+                Ok(message) => Box::pin(async move {
                     Ok(match message {
                         Msg::Position {
                             position,
@@ -102,15 +141,28 @@ pub fn position_service(req: RequestWrapper) -> ResponseFuture {
                             timestamp,
                         } => {
                             match file_path {
-                                Some(file_path) => {
+                                Some(file_loc) => {
                                     {
                                         let mut p = m.context_ref().write().await;
-                                        *p = file_path.clone();
+                                        *p = file_loc.clone();
                                     }
                                     if let Some(ts) = timestamp {
-                                        CACHE.insert_if_newer(file_path, position, ts).await
+                                        col.insert_position_if_newer_async(
+                                            file_loc.collection,
+                                            file_loc.group,
+                                            file_loc.path,
+                                            position,
+                                            ts.into(),
+                                        )
+                                        .await
                                     } else {
-                                        CACHE.insert(file_path, position).await
+                                        col.insert_position_async(
+                                            file_loc.collection,
+                                            file_loc.group,
+                                            file_loc.path,
+                                            position,
+                                        )
+                                        .await
                                     }
                                     .unwrap_or_else(|e| error!("Cannot insert position: {}", e))
                                 }
@@ -118,10 +170,15 @@ pub fn position_service(req: RequestWrapper) -> ResponseFuture {
                                 None => {
                                     let prev = { m.context_ref().read().await.clone() };
 
-                                    if !prev.is_empty() {
-                                        CACHE.insert(prev, position).await.unwrap_or_else(|e| {
-                                            error!("Cannot insert position: {}", e)
-                                        })
+                                    if !prev.path.is_empty() {
+                                        col.insert_position_async(
+                                            prev.collection,
+                                            prev.group,
+                                            prev.path,
+                                            position,
+                                        )
+                                        .await
+                                        .unwrap_or_else(|e| error!("Cannot insert position: {}", e))
                                     } else {
                                         error!(
                                             "Client sent short position, but there is no context"
@@ -133,8 +190,11 @@ pub fn position_service(req: RequestWrapper) -> ResponseFuture {
                             None
                         }
                         Msg::GenericQuery { group } => {
-                            let last = CACHE.get_last(group).await;
-                            let res = Reply { folder: None, last };
+                            let last = col.get_last_position_async(group).await;
+                            let res = Reply {
+                                folder: None,
+                                last: last.map(PositionCompatible::from),
+                            };
 
                             Some(ws::Message::text(
                                 serde_json::to_string(&res).unwrap(),
@@ -143,12 +203,21 @@ pub fn position_service(req: RequestWrapper) -> ResponseFuture {
                         }
 
                         Msg::FolderQuery { folder_path } => {
-                            let group = Some(folder_path.splitn(2, '/')).and_then(|mut p| p.next());
-                            let last = CACHE.get_last(group.unwrap()).await;
-                            let folder = CACHE.get(&folder_path).await;
+                            let last = col.get_last_position_async(folder_path.group.clone()).await;
+                            let folder = col
+                                .get_position_async(
+                                    folder_path.collection,
+                                    folder_path.group,
+                                    folder_path.path,
+                                )
+                                .await;
                             let res = Reply {
-                                last: if last != folder { last } else { None },
-                                folder,
+                                last: if last != folder {
+                                    last.map(PositionCompatible::from)
+                                } else {
+                                    None
+                                },
+                                folder: folder.map(PositionCompatible::from),
                             };
 
                             Some(ws::Message::text(
@@ -174,12 +243,30 @@ pub fn position_service(req: RequestWrapper) -> ResponseFuture {
 mod test {
     use super::*;
     #[test]
+    fn test_position_location() {
+        let l = Location {
+            group: "group".into(),
+            collection: 1,
+            path: "".into(),
+        };
+        let l1: Location = "group/1".parse().expect("valid path");
+        assert_eq!(l.clone(), l1);
+        let l2: Location = "group/1/".parse().expect("valid path");
+        assert_eq!(l.clone(), l2);
+    }
+
+    #[test]
     fn test_position_msg() {
-        let m1: Msg = "123.1|group/book1/chap1".parse().unwrap();
+        let m1: Msg = "123.1|group/0/book1/chap1".parse().unwrap();
+        let loc = Location {
+            group: "group".into(),
+            collection: 0,
+            path: "book1/chap1".into(),
+        };
         assert_eq!(
             Msg::Position {
                 position: 123.1,
-                file_path: Some("group/book1/chap1".into()),
+                file_path: Some(loc.clone()),
                 timestamp: None
             },
             m1
@@ -201,25 +288,25 @@ mod test {
             m3
         );
 
-        let m5: Msg = "group/book1".parse().unwrap();
-        assert_eq!(
-            Msg::FolderQuery {
-                folder_path: "group/book1".into()
-            },
-            m5
-        );
+        let m5: Msg = "group/1/book1".parse().unwrap();
+        let loc5 = Location {
+            group: "group".into(),
+            collection: 1,
+            path: "book1".into(),
+        };
+        assert_eq!(Msg::FolderQuery { folder_path: loc5 }, m5);
 
         let m6 = "aaa|bbb".parse::<Msg>();
         let m7 = "||".parse::<Msg>();
         assert!(m6.is_err());
         assert!(m7.is_err());
 
-        let m8: Msg = "123.1|group/book1/chap1|123456".parse().unwrap();
+        let m8: Msg = "123.1|group/0/book1/chap1|123456".parse().unwrap();
         assert_eq!(
             m8,
             Msg::Position {
                 position: 123.1,
-                file_path: Some("group/book1/chap1".into()),
+                file_path: Some(loc),
                 timestamp: Some(123456)
             }
         );

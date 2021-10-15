@@ -302,10 +302,9 @@ Response to this query is again websocket text message, this time containing JSO
 
     {
         "file": "audio_file_name",
-        "folder": "audio_folder_path_without_collection_and_group",
+        "folder": "audio_folder_path_without_group_but_with_collection",
         "timestamp": miliseconds_from_epoch,
-        "position": playback_position_in_secs,
-        "collection": collection_number
+        "position": playback_position_in_secs
     }
 
 Example of position query response:
@@ -313,8 +312,9 @@ Example of position query response:
     {
         "folder":{
             "file":"01.kapitola.mp3",
-            "folder":"Adams Douglas/Douglas Adams - Stoparuv pruvodce galaxii (2008)","timestamp":1558016643841,
-            "position":486.859,
-            "collection":0},
+            "folder":"0/Adams Douglas/Douglas Adams - Stoparuv pruvodce galaxii (2008)",
+            "timestamp":1558016643841,
+            "position":486.859
+            },
         "last":null
     }

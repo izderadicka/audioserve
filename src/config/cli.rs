@@ -58,9 +58,8 @@ fn create_parser<'a>() -> Parser<'a> {
             .max_values(100)
             .takes_value(true)
             .env("AUDIOSERVE_BASE_DIRS")
-            .value_delimiter(":")
-            .validator_os(is_existing_dir)
-            .help("Root directories for audio books, also referred as collections")
+            .value_delimiter(";")
+            .help("Root directories for audio books, also referred as collections, you can also add :<options> after directory path to change collection behaviour")
 
             )
         .arg(Arg::with_name("no-authentication")
@@ -224,13 +223,9 @@ fn create_parser<'a>() -> Parser<'a> {
         );
     }
 
-    if cfg!(feature = "search-cache") {
-        parser=parser.arg(
-            Arg::with_name("search-cache")
-            .long("search-cache")
-            .help("Caches collections directory structure for quick search, monitors directories for changes")
-        );
-    }
+    parser = parser.arg(Arg::with_name("search-cache").long("search-cache").help(
+        "Deprecated: does nothing. For caching config use :<options> on individual collections dirs params",
+    ));
 
     if cfg!(feature = "transcoding-cache") {
         parser=parser.arg(
@@ -353,7 +348,7 @@ where
         }
     }
 
-    if let Some(base_dirs) = args.values_of_os("base-dir") {
+    if let Some(base_dirs) = args.values_of("base-dir") {
         for dir in base_dirs {
             config.add_base_dir(dir)?;
         }
@@ -433,12 +428,6 @@ where
             });
         }
     }
-
-    if cfg!(feature = "search-cache")
-        && is_present_or_env("search-cache", "AUDIOSERVE_SEARCH_CACHE")
-    {
-        config.search_cache = true
-    };
 
     #[cfg(feature = "transcoding-cache")]
     {

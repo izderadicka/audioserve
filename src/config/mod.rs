@@ -1,11 +1,13 @@
 pub use self::error::{Error, Result};
 use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
 use crate::util;
+use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::time::Duration;
 
 mod cli;
@@ -241,11 +243,28 @@ impl SslConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BaseDirOptions {
+    pub no_cache: bool,
+}
+
+impl FromStr for BaseDirOptions {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "nc" | "no-cache" => Ok(BaseDirOptions { no_cache: true }),
+            _ => return value_error!("base_dir", format!("invalid option {}", s)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub listen: SocketAddr,
     pub thread_pool: ThreadPoolConfig,
     pub base_dirs: Vec<PathBuf>,
+    pub base_dirs_options: HashMap<PathBuf, BaseDirOptions>,
     pub url_path_prefix: Option<String>,
     pub shared_secret: Option<String>,
     pub limit_rate: Option<f32>,
@@ -264,6 +283,7 @@ pub struct Config {
     pub positions_file: PathBuf,
     pub positions_ws_timeout: Duration,
     pub behind_proxy: bool,
+    pub collections_cache_dir: PathBuf,
 }
 
 impl Config {
@@ -271,10 +291,23 @@ impl Config {
         Transcoder::new(get_config().transcoding.get(transcoding_quality))
     }
 
-    pub fn add_base_dir<P: Into<PathBuf>>(&mut self, p: P) -> Result<()> {
-        let base_dir = p.into();
+    pub fn add_base_dir<P: AsRef<str>>(&mut self, p: P) -> Result<()> {
+        let mut parts = p.as_ref().splitn(2, ':');
+        let base_dir = parts
+            .next()
+            .map(PathBuf::from)
+            .ok_or_else(|| Error::ConfigValue {
+                name: "base_dir",
+                message: "Empty base_dir".into(),
+            })?;
+
         if !base_dir.is_dir() {
             return value_error!("base_dir", "{:?} is not direcrory", base_dir);
+        }
+
+        if let Some(options) = parts.next() {
+            let options: BaseDirOptions = options.parse()?;
+            self.base_dirs_options.insert(base_dir.clone(), options);
         }
         self.base_dirs.push(base_dir);
         Ok(())
@@ -389,6 +422,7 @@ impl Default for Config {
         let data_base_dir = base_data_dir();
         Config {
             base_dirs: vec![],
+            base_dirs_options: HashMap::new(),
             url_path_prefix: None,
             listen: ([0, 0, 0, 0], 3000u16).into(),
             thread_pool: ThreadPoolConfig::default(),
@@ -409,6 +443,7 @@ impl Default for Config {
             positions_file: data_base_dir.join("audioserve.positions"),
             positions_ws_timeout: Duration::from_secs(600),
             behind_proxy: false,
+            collections_cache_dir: data_base_dir.join("col_db"),
         }
     }
 }

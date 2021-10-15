@@ -1,3 +1,4 @@
+use crate::config::get_config;
 use crate::error::{bail, Result};
 use crate::services::RequestWrapper;
 use crate::util::ResponseBuilderExt;
@@ -85,6 +86,11 @@ impl Authenticator for SharedSecretAuthenticator {
                             debug!("Authenticating user");
                             if auth.auth_token_ok(secret) {
                                 debug!("Authentication success");
+                                let cookie_params = if req.is_https() && get_config().cors {
+                                    "SameSite=None; Secure"
+                                } else {
+                                    "SameSite=Lax"
+                                };
                                 let token = auth.new_auth_token();
                                 let resp = Response::builder()
                                     .typed_header(ContentType::text())
@@ -92,10 +98,11 @@ impl Authenticator for SharedSecretAuthenticator {
                                     .header(
                                         SET_COOKIE,
                                         format!(
-                                            "{}={}; Max-Age={}; SameSite=Lax",
+                                            "{}={}; Max-Age={}; {}",
                                             COOKIE_NAME,
                                             token,
-                                            10 * 365 * 24 * 3600
+                                            10 * 365 * 24 * 3600,
+                                            cookie_params
                                         )
                                         .as_str(),
                                     );

@@ -9,7 +9,7 @@ edition = "2018"
 hyper = "0.14"
 tokio = {version="1.2", features=["rt-multi-thread", "time"]}
 futures = "0.3"
-log = {version="0.4", features=["max_level_debug"]}
+log = "0.4"
 tokio-tungstenite = "0.13"
 thiserror = "1.0"
 headers = "0.3"

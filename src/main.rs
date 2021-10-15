@@ -5,6 +5,9 @@ extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
 
+use collection::audio_folder::FoldersOptions;
+use collection::common::CollectionOptions;
+use collection::Collections;
 use config::{get_config, init_config};
 use error::{bail, Context, Error};
 use futures::prelude::*;
@@ -13,13 +16,17 @@ use ring::rand::{SecureRandom, SystemRandom};
 use services::{
     auth::SharedSecretAuthenticator, search::Search, ServiceFactory, TranscodingDetails,
 };
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process;
+use std::process::exit;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 mod config;
 mod error;
@@ -76,7 +83,37 @@ macro_rules! get_url_path {
     };
 }
 
-fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
+fn create_collections() -> Arc<Collections> {
+    let options: HashMap<_, _> = get_config()
+        .base_dirs_options
+        .iter()
+        .map(|(p, o)| {
+            (
+                p.clone(),
+                CollectionOptions {
+                    no_cache: o.no_cache,
+                },
+            )
+        })
+        .collect();
+    Arc::new(
+        Collections::new_with_detail::<Vec<PathBuf>, _, _>(
+            get_config().base_dirs.clone(),
+            options,
+            get_config().collections_cache_dir.as_path(),
+            FoldersOptions {
+                allow_symlinks: get_config().allow_symlinks,
+                chapters_duration: get_config().chapters.duration,
+                chapters_from_duration: get_config().chapters.from_duration,
+                ignore_chapters_meta: get_config().ignore_chapters_meta,
+                no_dir_collaps: get_config().no_dir_collaps,
+            },
+        )
+        .expect("Unable to create collections cache"),
+    )
+}
+
+fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> tokio::runtime::Runtime {
     let cfg = get_config();
 
     let addr = cfg.listen;
@@ -88,8 +125,13 @@ fn start_server(server_secret: Vec<u8>) -> tokio::runtime::Runtime {
             transcodings: Arc::new(AtomicUsize::new(0)),
             max_transcodings: cfg.transcoding.max_parallel_processes,
         };
-        let svc_factory =
-            ServiceFactory::new(authenticator, Search::new(), transcoding, cfg.limit_rate);
+        let svc_factory = ServiceFactory::new(
+            authenticator,
+            Search::new(Some(collections.clone())),
+            transcoding,
+            collections,
+            cfg.limit_rate,
+        );
 
         let server: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> =
             match get_config().ssl.as_ref() {
@@ -185,7 +227,7 @@ fn main() {
     env_logger::init();
     debug!("Started with following config {:?}", get_config());
 
-    services::audio_meta::init_media_lib();
+    collection::init_media_lib();
 
     #[cfg(feature = "transcoding-cache")]
     {
@@ -209,17 +251,32 @@ fn main() {
         }
     };
 
-    let runtime = start_server(server_secret);
+    let collections = create_collections();
+
+    let runtime = start_server(server_secret, collections.clone());
 
     runtime.block_on(terminate_server());
 
-    #[cfg(feature = "shared-positions")]
-    {
-        debug!("Saving shared positions");
-        runtime.block_on(crate::services::position::save_positions());
-    }
     //graceful shutdown of server will wait till transcoding ends, so rather shut it down hard
     runtime.shutdown_timeout(std::time::Duration::from_millis(300));
+
+    thread::spawn(|| {
+        thread::sleep(Duration::from_secs(10));
+        error!("Forced exit");
+        exit(111);
+    });
+
+    debug!("Saving collections db");
+    match Arc::try_unwrap(collections) {
+        Ok(c) => drop(c),
+        Err(c) => {
+            error!(
+                "Cannot close collections, still has {} references",
+                Arc::strong_count(&c)
+            );
+            c.flush().ok(); // flush at least
+        }
+    }
 
     #[cfg(feature = "transcoding-cache")]
     {

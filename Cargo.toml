@@ -1,6 +1,6 @@
 [package]
 name = "audioserve"
-version = "0.15.6"
+version = "0.16.1"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2018"
 
@@ -10,12 +10,11 @@ members = ["crates/*"]
 [dependencies]
 bytes = "1.0"
 env_logger = "0.8"
-log = {version="0.4", features = ["release_max_level_info"]}
+log = {version="0.4", features = ["release_max_level_info", "max_level_trace"]}
 hyper = {version="0.14", features = ["full"]}
 headers = "0.3"
 futures = "0.3"
 mime = "0.3"
-mime_guess = "2.0"
 serde_json = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
@@ -34,8 +33,6 @@ tokio = {version="1.2", features=["full"]}
 
 dirs = "3.0"
 csv = "1.1"
-unicase = "2.6"
-unicase_serde = "0.1.0"
 linked-hash-map = {git="https://github.com/izderadicka/linked-hash-map.git", version="0.5.3", features=["serde_impl"]}
 
 # for tls
@@ -49,7 +46,7 @@ leaky-cauldron = {path="crates/leaky-cauldron"}
 tokio-util = {version="0.6", optional=true}
 
 # this repo dependencies
-media_info = {path="crates/media_info"}
+collection = {path="crates/collection", features=["async"]}
 proxy-headers = {path="crates/proxy-headers", optional=true}
 simple-file-cache = {path="crates/file-cache", features=["asynch"], optional=true }
 async-tar = {path="crates/async-tar", optional=true}
@@ -60,20 +57,20 @@ websock = {path="crates/websock", optional = true}
 nix = "0.20"
 
 [features]
-default = ["tls", "symlinks","search-cache", "folder-download", "shared-positions"]
+default = ["tls", "symlinks", "folder-download", "shared-positions", "behind-proxy"]
 # default
 tls=["tokio-native-tls", "native-tls"]
-symlinks=["cachedirtree/symlinks"]
-search-cache=["cachedirtree"]
+symlinks=["cachedirtree/symlinks", "collection/symlinks"]
+
 folder-download = ["async-tar", "async-zip"]
 folder-download-default-tar =[]
 shared-positions = ["websock"]
+behind-proxy = ["proxy-headers"]
 # non-default
 transcoding-cache=["simple-file-cache", "tokio-util"]
-behind-proxy = ["proxy-headers"]
 # for static compilation only
-partially-static = ["media_info/partially-static"]
-static = ["media_info/static"]
+partially-static = ["collection/partially-static"]
+static = ["collection/static"]
 
 
 

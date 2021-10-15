@@ -527,14 +527,16 @@ export class AudioPlayer {
 
     }
 
-    _updateProgress() {
-        let event = new CustomEvent('timeupdate', {
-            detail: {
-                currentTime: this._player.currentTime + this._timeOffset,
-                totalTime: this.getTotalTime()
-            }
-        });
-        this._rootElem.dispatchEvent(event);
+    _updateProgress(evt) {
+        if (evt !== false && this._player.src) {
+            let event = new CustomEvent('timeupdate', {
+                detail: {
+                    currentTime: this._player.currentTime + this._timeOffset,
+                    totalTime: this.getTotalTime()
+                }
+            });
+            this._rootElem.dispatchEvent(event);
+        }
         if (!this._currentlyDragged) {
             this._updateCacheIndicator();
             let current = this._player.currentTime + this._timeOffset;
@@ -668,7 +670,7 @@ export class AudioPlayer {
             this._player.removeAttribute("src");
             this._player.load();
             this._updateTotal();
-            this._updateProgress();
+            this._updateProgress(false);
             this._hidePlay();
             this._loading.style.display = 'none';
         } else {

@@ -1,8 +1,8 @@
 use self::codecs::*;
 use super::subs::ChunkStream;
-use super::types::AudioFormat;
 use crate::config::get_config;
 use crate::error::{bail, Result};
+use collection::TimeSpan;
 use futures::prelude::*;
 use mime::Mime;
 use std::borrow::Cow;
@@ -19,6 +19,11 @@ use tokio::time::timeout;
 #[cfg(feature = "transcoding-cache")]
 pub mod cache;
 pub mod codecs;
+
+pub struct AudioFormat {
+    pub ffmpeg: &'static str,
+    pub mime: Mime,
+}
 
 pub trait AudioCodec {
     fn quality_args(&self) -> Vec<Cow<'static, str>>;
@@ -162,22 +167,6 @@ impl<S> AsRef<S> for AudioFilePath<S> {
         match self {
             Original(ref f) => f,
             Transcoded(ref f) => f,
-        }
-    }
-}
-
-// part of audio file - from start to start+duration (in ms)
-#[derive(Clone, Copy, Debug)]
-pub struct TimeSpan {
-    pub start: u64,
-    pub duration: Option<u64>,
-}
-
-impl std::fmt::Display for TimeSpan {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
-        match self.duration {
-            Some(d) => write!(f, "{}-{}", self.start, d),
-            None => write!(f, "{}", self.start),
         }
     }
 }
@@ -532,8 +521,8 @@ mod vec_codec {
 
 #[cfg(test)]
 mod tests {
-    use super::super::audio_meta::{get_audio_properties, MediaInfo};
     use super::*;
+    use collection::audio_meta::{get_audio_properties, MediaInfo};
     use std::env::temp_dir;
     use std::fs::remove_file;
     use std::path::Path;

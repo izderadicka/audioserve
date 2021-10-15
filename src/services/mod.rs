@@ -5,11 +5,11 @@ use self::subs::{
     ResponseFuture,
 };
 use self::transcode::QualityLevel;
-use self::types::FoldersOrdering;
 use crate::config::get_config;
 use crate::util::ResponseBuilderExt;
 use crate::{error, util::header2header};
 use bytes::{Bytes, BytesMut};
+use collection::{Collections, FoldersOrdering};
 use futures::prelude::*;
 use futures::{future, TryFutureExt};
 use headers::{
@@ -38,8 +38,6 @@ use std::{
 };
 use url::form_urlencoded;
 
-pub mod audio_folder;
-pub mod audio_meta;
 pub mod auth;
 #[cfg(feature = "shared-positions")]
 pub mod position;
@@ -206,6 +204,34 @@ impl RequestWrapper {
             .query()
             .map(|query| form_urlencoded::parse(query.as_bytes()).collect::<HashMap<_, _>>())
     }
+
+    pub fn is_https(&self) -> bool {
+        if self.is_ssl {
+            return true;
+        }
+        #[cfg(feature = "behind-proxy")]
+        if self.is_behind_proxy {
+            //try scommon  proxy headers
+            let forwarded_https = self
+                .request
+                .headers()
+                .typed_get::<proxy_headers::Forwarded>()
+                .and_then(|fwd| fwd.client_protocol().map(|p| p.as_ref() == "https"))
+                .unwrap_or(false);
+
+            if forwarded_https {
+                return true;
+            }
+
+            return self
+                .request
+                .headers()
+                .get("X-Forwarded-Proto")
+                .map(|v| v.as_bytes() == b"https")
+                .unwrap_or(false);
+        }
+        false
+    }
 }
 #[derive(Clone)]
 pub struct TranscodingDetails {
@@ -218,6 +244,7 @@ pub struct ServiceFactory<T> {
     rate_limitter: Option<Arc<Leaky>>,
     search: Search<String>,
     transcoding: TranscodingDetails,
+    collections: Arc<Collections>,
 }
 
 impl<T> ServiceFactory<T> {
@@ -225,6 +252,7 @@ impl<T> ServiceFactory<T> {
         auth: Option<A>,
         search: Search<String>,
         transcoding: TranscodingDetails,
+        collections: Arc<Collections>,
         rate_limit: Option<f32>,
     ) -> Self
     where
@@ -236,6 +264,7 @@ impl<T> ServiceFactory<T> {
             rate_limitter: rate_limit.map(|l| Arc::new(Leaky::new(l))),
             search,
             transcoding,
+            collections,
         }
     }
 
@@ -249,6 +278,7 @@ impl<T> ServiceFactory<T> {
             rate_limitter: self.rate_limitter.clone(),
             search: self.search.clone(),
             transcoding: self.transcoding.clone(),
+            collections: self.collections.clone(),
             remote_addr,
             is_ssl,
         })
@@ -261,6 +291,7 @@ pub struct FileSendService<T> {
     pub rate_limitter: Option<Arc<Leaky>>,
     pub search: Search<String>,
     pub transcoding: TranscodingDetails,
+    pub collections: Arc<Collections>,
     pub remote_addr: Option<SocketAddr>,
     pub is_ssl: bool,
 }
@@ -356,19 +387,21 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
             }
         };
         //static files
-        if req.path() == "/" {
-            return send_file_simple(
-                &get_config().client_dir,
-                "index.html",
-                Some(APP_STATIC_FILES_CACHE_AGE),
-            );
-        };
-        if req.path() == "/bundle.js" {
-            return send_file_simple(
-                &get_config().client_dir,
-                "bundle.js",
-                Some(APP_STATIC_FILES_CACHE_AGE),
-            );
+        if req.method() == Method::GET {
+            if req.path() == "/" {
+                return send_file_simple(
+                    &get_config().client_dir,
+                    "index.html",
+                    Some(APP_STATIC_FILES_CACHE_AGE),
+                );
+            };
+            if req.path() == "/bundle.js" {
+                return send_file_simple(
+                    &get_config().client_dir,
+                    "bundle.js",
+                    Some(APP_STATIC_FILES_CACHE_AGE),
+                );
+            }
         }
         // from here everything must be authenticated
         let searcher = self.search.clone();
@@ -378,16 +411,27 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
 
         let resp = match self.authenticator {
             Some(ref auth) => {
+                let collections = self.collections.clone();
                 Box::pin(auth.authenticate(req).and_then(move |result| match result {
                     AuthResult::Authenticated { request, .. } => {
-                        FileSendService::<C>::process_checked(request, searcher, transcoding)
+                        FileSendService::<C>::process_checked(
+                            request,
+                            searcher,
+                            transcoding,
+                            collections,
+                        )
                     }
                     AuthResult::LoggedIn(resp) | AuthResult::Rejected(resp) => {
                         Box::pin(future::ok(resp))
                     }
                 }))
             }
-            None => FileSendService::<C>::process_checked(req, searcher, transcoding),
+            None => FileSendService::<C>::process_checked(
+                req,
+                searcher,
+                transcoding,
+                self.collections.clone(),
+            ),
         };
         Box::pin(resp.map_ok(move |r| add_cors_headers(r, origin, cors)))
     }
@@ -398,6 +442,7 @@ impl<C> FileSendService<C> {
         req: RequestWrapper,
         searcher: Search<String>,
         transcoding: TranscodingDetails,
+        collections: Arc<Collections>,
     ) -> ResponseFuture {
         let params = req.params();
 
@@ -413,7 +458,7 @@ impl<C> FileSendService<C> {
                     #[cfg(not(feature = "shared-positions"))]
                     unimplemented!();
                     #[cfg(feature = "shared-positions")]
-                    self::position::position_service(req)
+                    self::position::position_service(req, collections)
                 } else {
                     let (path, colllection_index) = match extract_collection_number(path) {
                         Ok(r) => r,
@@ -437,7 +482,12 @@ impl<C> FileSendService<C> {
                             params,
                         )
                     } else if path.starts_with("/folder/") {
-                        get_folder(base_dir, get_subpath(&path, "/folder/"), ord)
+                        get_folder(
+                            colllection_index,
+                            get_subpath(&path, "/folder/"),
+                            collections,
+                            ord,
+                        )
                     } else if !get_config().disable_folder_download && path.starts_with("/download")
                     {
                         #[cfg(feature = "folder-download")]
