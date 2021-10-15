@@ -515,6 +515,14 @@ pub fn last_position(collections: Arc<Collections>, group: String) -> ResponseFu
     )
 }
 
+pub fn all_positions(collections: Arc<Collections>, group: String) -> ResponseFuture {
+    Box::pin(
+        collections
+            .get_all_positions_for_group_async(group)
+            .map(|pos| Ok(json_response(&pos))),
+    )
+}
+
 pub fn transcodings_list() -> ResponseFuture {
     let transcodings = Transcodings::new();
     Box::pin(future::ok(json_response(&transcodings)))

@@ -69,6 +69,24 @@ impl Collection {
             Collection::CollectionDirect(_) => None,
         }
     }
+
+    pub async fn get_all_positions_for_group_async<S>(
+        &self,
+        group: S,
+        collection_no: usize,
+    ) -> Vec<Position>
+    where
+        S: AsRef<str> + Send + 'static,
+    {
+        match self {
+            Collection::CollectionCache(inner) => {
+                inner
+                    .get_all_positions_for_group_async(group, collection_no)
+                    .await
+            }
+            Collection::CollectionDirect(_) => vec![],
+        }
+    }
 }
 
 #[enum_dispatch]

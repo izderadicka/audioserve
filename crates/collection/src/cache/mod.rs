@@ -375,11 +375,19 @@ impl CollectionCache {
             .flatten()
     }
 
-    pub async fn get_all_positions_for_group_async<S>(&self, group: S) -> Vec<Position>
+    pub async fn get_all_positions_for_group_async<S>(
+        &self,
+        group: S,
+        collection_no: usize,
+    ) -> Vec<Position>
     where
         S: AsRef<str> + Send + 'static,
     {
-        todo!()
+        let inner = self.inner.clone();
+        spawn_blocking(move || inner.get_all_positions_for_group(group, collection_no))
+            .await
+            .map_err(|e| error!("Tokio join error: {}", e))
+            .unwrap_or_default()
     }
 }
 
@@ -569,6 +577,10 @@ mod tests {
             .expect("last position exists");
         assert_eq!(r3.file, "002 - Chapter 3$$2000-3000$$.mp3");
         assert_eq!(r3.position, 0.08);
+
+        // test listing all positions
+        let v = col.inner.get_all_positions_for_group("ivan", 0);
+        assert_eq!(2, v.len());
         Ok(())
     }
 }

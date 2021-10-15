@@ -277,11 +277,15 @@ impl CacheInner {
             .flatten()
     }
 
-    fn get_all_positions_for_group<S>(&self, group: S) -> Vec<Position>
+    pub(crate) fn get_all_positions_for_group<S>(
+        &self,
+        group: S,
+        collection_no: usize,
+    ) -> Vec<Position>
     where
         S: AsRef<str>,
     {
-        self.db
+        self.pos_folder
             .iter()
             .filter_map(|res| {
                 res.map_err(|e| error!("Error reading from positions db: {}", e))
@@ -291,7 +295,8 @@ impl CacheInner {
                             .map_err(|e| error!("Position deserialization error: {}", e))
                             .ok()?;
                         let folder = String::from_utf8(folder.as_ref().into()).unwrap(); // known to be valid UTF8
-                        rec.get(group.as_ref()).map(|p| p.into_position(folder, 0))
+                        rec.get(group.as_ref())
+                            .map(|p| p.into_position(folder, collection_no))
                     })
             })
             .take(1000) //TODO: this is just temporary safety limit, think about better ways to limit

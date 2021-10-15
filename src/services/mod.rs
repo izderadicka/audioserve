@@ -6,7 +6,7 @@ use self::subs::{
 };
 use self::transcode::QualityLevel;
 use crate::config::get_config;
-use crate::services::subs::last_position;
+use crate::services::subs::{all_positions, last_position};
 use crate::util::ResponseBuilderExt;
 use crate::{error, util::header2header};
 use bytes::{Bytes, BytesMut};
@@ -465,10 +465,10 @@ impl<C> FileSendService<C> {
                         if let Some(last) = segments.next() {
                             if last == "last" {
                                 //only last position
-                                return last_position(collections.clone(), group);
+                                return last_position(collections, group);
                             }
                         } else {
-                            // all known last positions
+                            return all_positions(collections, group);
                         }
                     }
 

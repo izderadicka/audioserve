@@ -250,11 +250,13 @@ impl Collections {
 
     pub async fn get_all_positions_for_group_async<S>(self: Arc<Self>, group: S) -> Vec<Position>
     where
-        S: AsRef<str> + Send + 'static,
+        S: AsRef<str> + Send + Clone + 'static,
     {
-        let res = vec![];
-        for c in self.caches.iter() {}
-
+        let mut res = vec![];
+        for (cn, c) in self.caches.iter().enumerate() {
+            let pos = c.get_all_positions_for_group_async(group.clone(), cn).await;
+            res.extend(pos);
+        }
         res
     }
 
