@@ -346,43 +346,6 @@ impl PositionsTrait for CollectionCache {
     }
 }
 
-// positions async
-#[cfg(feature = "async")]
-use tokio::task::spawn_blocking;
-
-#[cfg(feature = "async")]
-impl CollectionCache {
-    pub async fn insert_position_async<S, P>(
-        &self,
-        group: S,
-        path: P,
-        position: f32,
-        ts: Option<TimeStamp>,
-    ) -> Result<()>
-    where
-        S: AsRef<str> + Send + 'static,
-        P: AsRef<str> + Send + 'static,
-    {
-        let inner = self.inner.clone();
-        spawn_blocking(move || inner.insert_position(group, path, position, ts))
-            .await
-            .map_err(Error::from)?
-    }
-
-    pub async fn get_position_async<S, P>(&self, group: S, path: Option<P>) -> Option<Position>
-    where
-        S: AsRef<str> + Send + 'static,
-        P: AsRef<str> + Send + 'static,
-    {
-        let inner = self.inner.clone();
-        spawn_blocking(move || inner.get_position(group, path))
-            .await
-            .map_err(|e| error!("Tokio join error: {}", e))
-            .ok()
-            .flatten()
-    }
-}
-
 pub struct Search {
     tokens: Vec<String>,
     iter: sled::Iter,
@@ -539,12 +502,13 @@ mod tests {
             .as_millis() as u64
             - 10 * 1000)
             .into();
-        col.insert_position(
+        let res = col.insert_position(
             "ivan",
             "01-file.mp3/002 - Chapter 3$$2000-3000$$.mp3",
             0.08,
             Some(ts),
-        )?;
+        );
+        assert!(res.is_err());
         let r2 = col
             .get_position("ivan", Some("01-file.mp3"))
             .expect("position record exists");

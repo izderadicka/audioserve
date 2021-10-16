@@ -7,12 +7,12 @@ use cache::CollectionCache;
 use common::{Collection, CollectionOptions, CollectionTrait, PositionsTrait};
 use error::{Error, Result};
 use no_cache::CollectionDirect;
+#[cfg(feature = "async")]
+use std::sync::Arc;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::Arc,
 };
-use tokio::task::spawn_blocking;
 
 pub use audio_folder::{list_dir_files_only, parse_chapter_path};
 pub use audio_meta::{init_media_lib, AudioFile, AudioFolderShort, FoldersOrdering, TimeSpan};
@@ -192,11 +192,18 @@ impl Collections {
     }
 }
 
+#[cfg(feature = "async")]
+macro_rules! spawn_blocking {
+    ($block:block) => {
+        tokio::task::spawn_blocking(move || $block).await
+    };
+}
+
 // positions async
 #[cfg(feature = "async")]
 impl Collections {
     pub async fn insert_position_async<S, P>(
-        &self,
+        self: Arc<Self>,
         collection: usize,
         group: S,
         path: P,
@@ -206,9 +213,11 @@ impl Collections {
         S: AsRef<str> + Send + 'static,
         P: AsRef<str> + Send + 'static,
     {
-        self.get_cache(collection)?
-            .insert_position_async(group, path, position, None)
-            .await
+        spawn_blocking!({
+            self.get_cache(collection)?
+                .insert_position(group, path, position, None)
+        })
+        .unwrap_or_else(|e| Err(Error::from(e)))
     }
 
     pub async fn insert_position_if_newer_async<S, P>(
@@ -223,13 +232,15 @@ impl Collections {
         S: AsRef<str> + Send + 'static,
         P: AsRef<str> + Send + 'static,
     {
-        self.get_cache(collection)?
-            .insert_position_async(group, path, position, Some(ts))
-            .await
+        spawn_blocking!({
+            self.get_cache(collection)?
+                .insert_position(group, path, position, Some(ts))
+        })
+        .unwrap_or_else(|e| Err(Error::from(e)))
     }
 
     pub async fn get_position_async<S, P>(
-        &self,
+        self: Arc<Self>,
         collection: usize,
         group: S,
         folder: P,
@@ -238,22 +249,28 @@ impl Collections {
         S: AsRef<str> + Send + 'static,
         P: AsRef<str> + Send + 'static,
     {
-        self.get_cache(collection)
-            .map_err(|e| error!("Invalid collection used in get_position: {}", e))
-            .ok()?
-            .get_position_async(group, Some(folder))
-            .await
-            .map(|mut p| {
-                p.collection = collection;
-                p
-            })
+        spawn_blocking!({
+            self.get_cache(collection)
+                .map_err(|e| error!("Invalid collection used in get_position: {}", e))
+                .ok()
+                .and_then(|c| {
+                    c.get_position(group, Some(folder)).map(|mut p| {
+                        p.collection = collection;
+                        p
+                    })
+                })
+        })
+        .unwrap_or_else(|e| {
+            error!("Task join error: {}", e);
+            None
+        })
     }
 
     pub async fn get_all_positions_for_group_async<S>(self: Arc<Self>, group: S) -> Vec<Position>
     where
         S: AsRef<str> + Send + Clone + 'static,
     {
-        spawn_blocking(move || {
+        spawn_blocking!({
             let mut res = vec![];
             for (cn, c) in self.caches.iter().enumerate() {
                 let pos = c.get_all_positions_for_group(group.clone(), cn);
@@ -262,7 +279,6 @@ impl Collections {
             res.sort_unstable_by(|a, b| b.timestamp.cmp(&a.timestamp));
             res
         })
-        .await
         .unwrap_or_else(|e| {
             error!("Task join error: {}", e);
             vec![]
@@ -273,27 +289,30 @@ impl Collections {
     where
         S: AsRef<str> + Send + 'static,
     {
-        let mut res = None;
-        for c in 0..self.caches.len() {
-            let cache = self.get_cache(c).expect("cache available"); // is safe, because we are iterating over known range
-            let g: String = group.as_ref().to_owned();
-            let pos = cache
-                .get_position_async::<_, String>(g, None)
-                .await
-                .map(|mut p| {
+        spawn_blocking!({
+            let mut res = None;
+            for c in 0..self.caches.len() {
+                let cache = self.get_cache(c).expect("cache available"); // is safe, because we are iterating over known range
+                let g: String = group.as_ref().to_owned();
+                let pos = cache.get_position::<_, String>(g, None).map(|mut p| {
                     p.collection = c;
                     p
                 });
-            match (&mut res, pos) {
-                (None, Some(p)) => res = Some(p),
-                (Some(ref prev), Some(p)) => {
-                    if p.timestamp > prev.timestamp {
-                        res = Some(p)
+                match (&mut res, pos) {
+                    (None, Some(p)) => res = Some(p),
+                    (Some(ref prev), Some(p)) => {
+                        if p.timestamp > prev.timestamp {
+                            res = Some(p)
+                        }
                     }
+                    (_, None) => (),
                 }
-                (_, None) => (),
             }
-        }
-        res
+            res
+        })
+        .unwrap_or_else(|e| {
+            error!("Task join error: {}", e);
+            None
+        })
     }
 }

@@ -41,40 +41,6 @@ pub(crate) trait PositionsTrait {
         S: AsRef<str>;
 }
 
-#[cfg(feature = "async")]
-impl Collection {
-    pub async fn insert_position_async<S, P>(
-        &self,
-        group: S,
-        path: P,
-        position: f32,
-        ts: Option<TimeStamp>,
-    ) -> Result<()>
-    where
-        S: AsRef<str> + Send + 'static,
-        P: AsRef<str> + Send + 'static,
-    {
-        match self {
-            Collection::CollectionCache(inner) => {
-                inner.insert_position_async(group, path, position, ts).await
-            }
-
-            Collection::CollectionDirect(_) => Ok(()),
-        }
-    }
-
-    pub async fn get_position_async<S, P>(&self, group: S, path: Option<P>) -> Option<Position>
-    where
-        S: AsRef<str> + Send + 'static,
-        P: AsRef<str> + Send + 'static,
-    {
-        match self {
-            Collection::CollectionCache(inner) => inner.get_position_async(group, path).await,
-            Collection::CollectionDirect(_) => None,
-        }
-    }
-}
-
 #[enum_dispatch]
 pub(crate) trait CollectionTrait {
     fn list_dir<P>(
