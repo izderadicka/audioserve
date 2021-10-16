@@ -356,7 +356,16 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        //Limit rate of requests in configured
+        Box::pin(self.process_request(req).or_else(|e| {
+            error!("Request processing error: {}", e);
+            future::ok(resp::internal_error())
+        }))
+    }
+}
+
+impl<C: 'static> FileSendService<C> {
+    fn process_request(&mut self, req: Request<Body>) -> ResponseFuture {
+        //Limit rate of requests if configured
         if let Some(limiter) = self.rate_limitter.as_ref() {
             if let Err(_) = limiter.start_one() {
                 debug!("Rejecting request due to rate limit");
@@ -435,9 +444,7 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
         };
         Box::pin(resp.map_ok(move |r| add_cors_headers(r, origin, cors)))
     }
-}
 
-impl<C> FileSendService<C> {
     fn process_checked(
         #[allow(unused_mut)] mut req: RequestWrapper,
         searcher: Search<String>,
