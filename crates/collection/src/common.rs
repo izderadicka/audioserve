@@ -35,6 +35,10 @@ pub(crate) trait PositionsTrait {
     where
         S: AsRef<str>,
         P: AsRef<str>;
+
+    fn get_all_positions_for_group<S>(&self, group: S, collection_no: usize) -> Vec<Position>
+    where
+        S: AsRef<str>;
 }
 
 #[cfg(feature = "async")]
@@ -67,24 +71,6 @@ impl Collection {
         match self {
             Collection::CollectionCache(inner) => inner.get_position_async(group, path).await,
             Collection::CollectionDirect(_) => None,
-        }
-    }
-
-    pub async fn get_all_positions_for_group_async<S>(
-        &self,
-        group: S,
-        collection_no: usize,
-    ) -> Vec<Position>
-    where
-        S: AsRef<str> + Send + 'static,
-    {
-        match self {
-            Collection::CollectionCache(inner) => {
-                inner
-                    .get_all_positions_for_group_async(group, collection_no)
-                    .await
-            }
-            Collection::CollectionDirect(_) => vec![],
         }
     }
 }

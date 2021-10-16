@@ -12,6 +12,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+use tokio::task::spawn_blocking;
 
 pub use audio_folder::{list_dir_files_only, parse_chapter_path};
 pub use audio_meta::{init_media_lib, AudioFile, AudioFolderShort, FoldersOrdering, TimeSpan};
@@ -252,12 +253,20 @@ impl Collections {
     where
         S: AsRef<str> + Send + Clone + 'static,
     {
-        let mut res = vec![];
-        for (cn, c) in self.caches.iter().enumerate() {
-            let pos = c.get_all_positions_for_group_async(group.clone(), cn).await;
-            res.extend(pos);
-        }
-        res
+        spawn_blocking(move || {
+            let mut res = vec![];
+            for (cn, c) in self.caches.iter().enumerate() {
+                let pos = c.get_all_positions_for_group(group.clone(), cn);
+                res.extend(pos);
+            }
+            res.sort_unstable_by(|a, b| b.timestamp.cmp(&a.timestamp));
+            res
+        })
+        .await
+        .unwrap_or_else(|e| {
+            error!("Task join error: {}", e);
+            vec![]
+        })
     }
 
     pub async fn get_last_position_async<S>(self: Arc<Self>, group: S) -> Option<Position>
@@ -266,7 +275,7 @@ impl Collections {
     {
         let mut res = None;
         for c in 0..self.caches.len() {
-            let cache = self.get_cache(c).expect("cache availavle"); // is safe, because we are iterating over known range
+            let cache = self.get_cache(c).expect("cache available"); // is safe, because we are iterating over known range
             let g: String = group.as_ref().to_owned();
             let pos = cache
                 .get_position_async::<_, String>(g, None)

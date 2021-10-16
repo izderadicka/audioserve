@@ -77,6 +77,17 @@ impl PositionsTrait for CollectionDirect {
     {
         None
     }
+
+    fn get_all_positions_for_group<S>(
+        &self,
+        _group: S,
+        _collection_no: usize,
+    ) -> Vec<crate::Position>
+    where
+        S: AsRef<str>,
+    {
+        vec![]
+    }
 }
 
 #[derive(PartialEq, Eq)]

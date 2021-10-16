@@ -337,6 +337,13 @@ impl PositionsTrait for CollectionCache {
     {
         self.inner.get_position(group, folder)
     }
+
+    fn get_all_positions_for_group<S>(&self, group: S, collection_no: usize) -> Vec<Position>
+    where
+        S: AsRef<str>,
+    {
+        self.inner.get_all_positions_for_group(group, collection_no)
+    }
 }
 
 // positions async
@@ -373,21 +380,6 @@ impl CollectionCache {
             .map_err(|e| error!("Tokio join error: {}", e))
             .ok()
             .flatten()
-    }
-
-    pub async fn get_all_positions_for_group_async<S>(
-        &self,
-        group: S,
-        collection_no: usize,
-    ) -> Vec<Position>
-    where
-        S: AsRef<str> + Send + 'static,
-    {
-        let inner = self.inner.clone();
-        spawn_blocking(move || inner.get_all_positions_for_group(group, collection_no))
-            .await
-            .map_err(|e| error!("Tokio join error: {}", e))
-            .unwrap_or_default()
     }
 }
 
