@@ -552,10 +552,13 @@ impl<C> FileSendService<C> {
                 #[cfg(feature = "shared-positions")]
                 match extract_group(path) {
                     PositionGroup::Group(group) => {
-                        if params
-                            .and_then(|m| {
-                                m.get("Content-Type")
-                                    .map(|v| v.as_ref().eq("application/json"))
+                        if req
+                            .headers()
+                            .get("Content-Type")
+                            .and_then(|v| {
+                                v.to_str()
+                                    .ok()
+                                    .map(|s| s.to_lowercase().eq("application/json"))
                             })
                             .unwrap_or(false)
                         {
@@ -571,6 +574,7 @@ impl<C> FileSendService<C> {
                                 }
                             })
                         } else {
+                            error!("Not JSON content type");
                             resp::fut(resp::bad_request)
                         }
                     }
