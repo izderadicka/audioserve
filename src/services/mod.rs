@@ -1,12 +1,11 @@
 use self::auth::{AuthResult, Authenticator};
 use self::search::Search;
 use self::subs::{
-    collections_list, get_folder, insert_position, recent, search, send_file, send_file_simple,
-    transcodings_list, ResponseFuture,
+    collections_list, get_folder, recent, search, send_file, send_file_simple, transcodings_list,
+    ResponseFuture,
 };
 use self::transcode::QualityLevel;
 use crate::config::get_config;
-use crate::services::subs::{all_positions, last_position};
 use crate::util::ResponseBuilderExt;
 use crate::{error, util::header2header};
 use bytes::{Bytes, BytesMut};
@@ -440,7 +439,7 @@ impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
 
 impl<C> FileSendService<C> {
     fn process_checked(
-        mut req: RequestWrapper,
+        #[allow(unused_mut)] mut req: RequestWrapper,
         searcher: Search<String>,
         transcoding: TranscodingDetails,
         collections: Arc<Collections>,
@@ -455,11 +454,14 @@ impl<C> FileSendService<C> {
                     transcodings_list()
                 } else if cfg!(feature = "shared-positions") && path.starts_with("/positions") {
                     // positions API
+                    #[cfg(feature = "shared-positions")]
                     match extract_group(path) {
-                        PositionGroup::Group(group) => all_positions(collections, group),
-                        PositionGroup::Last(group) => last_position(collections, group),
+                        PositionGroup::Group(group) => subs::all_positions(collections, group),
+                        PositionGroup::Last(group) => subs::last_position(collections, group),
                         PositionGroup::Malformed => resp::fut(resp::not_found),
                     }
+                    #[cfg(not(feature = "shared-positions"))]
+                    unimplemented!();
                 } else if cfg!(feature = "shared-positions") && path.starts_with("/position") {
                     #[cfg(not(feature = "shared-positions"))]
                     unimplemented!();
@@ -546,30 +548,38 @@ impl<C> FileSendService<C> {
                 }
             }
 
-            Method::POST => match extract_group(path) {
-                PositionGroup::Group(group) => {
-                    if params
-                        .and_then(|m| {
-                            m.get("Content-Type")
-                                .map(|v| v.as_ref().eq("application/json"))
-                        })
-                        .unwrap_or(false)
-                    {
-                        Box::pin(async move {
-                            match req.body_bytes().await {
-                                Ok(bytes) => insert_position(collections, group, bytes).await,
-                                Err(e) => {
-                                    error!("Error reading POST body: {}", e);
-                                    Ok(resp::bad_request())
+            Method::POST => {
+                #[cfg(feature = "shared-positions")]
+                match extract_group(path) {
+                    PositionGroup::Group(group) => {
+                        if params
+                            .and_then(|m| {
+                                m.get("Content-Type")
+                                    .map(|v| v.as_ref().eq("application/json"))
+                            })
+                            .unwrap_or(false)
+                        {
+                            Box::pin(async move {
+                                match req.body_bytes().await {
+                                    Ok(bytes) => {
+                                        subs::insert_position(collections, group, bytes).await
+                                    }
+                                    Err(e) => {
+                                        error!("Error reading POST body: {}", e);
+                                        Ok(resp::bad_request())
+                                    }
                                 }
-                            }
-                        })
-                    } else {
-                        resp::fut(resp::bad_request)
+                            })
+                        } else {
+                            resp::fut(resp::bad_request)
+                        }
                     }
+                    _ => resp::fut(resp::not_found),
                 }
-                _ => resp::fut(resp::not_found),
-            },
+
+                #[cfg(not(feature = "shared-positions"))]
+                resp::fut(resp::method_not_supported)
+            }
 
             _ => resp::fut(resp::method_not_supported),
         }
@@ -644,12 +654,14 @@ fn extract_collection_number(path: &str) -> Result<(&str, usize), ()> {
     }
 }
 
+#[cfg(feature = "shared-positions")]
 enum PositionGroup {
     Group(String),
     Last(String),
     Malformed,
 }
 
+#[cfg(feature = "shared-positions")]
 fn extract_group(path: &str) -> PositionGroup {
     let mut segments = path.split('/');
     segments.next(); // read out first empty segment

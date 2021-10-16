@@ -11,11 +11,7 @@ use crate::{
     error::{Error, Result},
     util::{checked_dec, into_range_bounds, to_satisfiable_range, ResponseBuilderExt},
 };
-use bytes::Bytes;
-use collection::{
-    guess_mime_type, list_dir_files_only, parse_chapter_path, Collections, FoldersOrdering,
-    Position, TimeSpan,
-};
+use collection::{guess_mime_type, parse_chapter_path, FoldersOrdering, TimeSpan};
 use futures::prelude::*;
 use futures::{future, ready, Stream};
 use headers::{AcceptRanges, CacheControl, ContentLength, ContentRange, ContentType, LastModified};
@@ -434,7 +430,11 @@ pub fn download_folder(
             download_name.push_str(format.extension());
 
             match blocking(move || {
-                list_dir_files_only(&base_path, &folder_path, get_config().allow_symlinks)
+                collection::list_dir_files_only(
+                    &base_path,
+                    &folder_path,
+                    get_config().allow_symlinks,
+                )
             })
             .await
             {
@@ -508,12 +508,13 @@ pub fn collections_list() -> ResponseFuture {
     Box::pin(future::ok(json_response(&collections)))
 }
 
+#[cfg(feature = "shared-positions")]
 pub fn insert_position(
-    collections: Arc<Collections>,
+    collections: Arc<collection::Collections>,
     group: String,
-    bytes: Bytes,
+    bytes: bytes::Bytes,
 ) -> ResponseFuture {
-    match serde_json::from_slice::<Position>(&bytes) {
+    match serde_json::from_slice::<collection::Position>(&bytes) {
         Ok(pos) => {
             let path = if pos.folder.len() > 0 {
                 pos.folder + "/" + &pos.file
@@ -541,7 +542,8 @@ pub fn insert_position(
     }
 }
 
-pub fn last_position(collections: Arc<Collections>, group: String) -> ResponseFuture {
+#[cfg(feature = "shared-positions")]
+pub fn last_position(collections: Arc<collection::Collections>, group: String) -> ResponseFuture {
     Box::pin(
         collections
             .get_last_position_async(group)
@@ -549,7 +551,8 @@ pub fn last_position(collections: Arc<Collections>, group: String) -> ResponseFu
     )
 }
 
-pub fn all_positions(collections: Arc<Collections>, group: String) -> ResponseFuture {
+#[cfg(feature = "shared-positions")]
+pub fn all_positions(collections: Arc<collection::Collections>, group: String) -> ResponseFuture {
     Box::pin(
         collections
             .get_all_positions_for_group_async(group)

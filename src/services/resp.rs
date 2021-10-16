@@ -32,6 +32,7 @@ where
 macro_rules! def_resp {
     ($($name:ident ( $code:expr, $msg:expr ));+) => {
         $(
+        #[allow(dead_code)]
         pub fn $name() -> Response<Body> {
             short_response($code, $msg)
         }
