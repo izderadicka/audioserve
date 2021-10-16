@@ -531,8 +531,13 @@ pub fn insert_position(
                         pos.position,
                         pos.timestamp,
                     )
-                    .map_err(Error::new)
-                    .and_then(|_| resp::fut(resp::created)),
+                    .then(|res| match res {
+                        Ok(_) => resp::fut(resp::created),
+                        Err(e) => match e {
+                            collection::error::Error::IgnoredPosition => resp::fut(resp::ignored),
+                            _ => Box::pin(future::err(Error::new(e))),
+                        },
+                    }),
             )
         }
         Err(e) => {

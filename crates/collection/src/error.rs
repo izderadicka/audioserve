@@ -41,6 +41,9 @@ pub enum Error {
 
     #[error("Invalid path: {0}")]
     InvalidPathPrefix(#[from] StripPrefixError),
+
+    #[error("Position cannot be inserted")]
+    IgnoredPosition,
 }
 
 impl From<TransactionError<Error>> for Error {

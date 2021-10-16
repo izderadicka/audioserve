@@ -193,7 +193,7 @@ impl CacheInner {
 
                 if folders.get(&path).ok().flatten().is_none() {
                     warn!("Trying to insert position for unknown folder {}", path);
-                    return Ok(());
+                    return transaction::abort(Error::IgnoredPosition);
                 }
 
                 let mut folder_rec = pos_folder
@@ -211,7 +211,11 @@ impl CacheInner {
                 if let Some(ts) = ts {
                     if let Some(current_record) = folder_rec.get(group.as_ref()) {
                         if current_record.timestamp > ts {
-                            return Ok(());
+                            warn!(
+                                "Position not inserted for folder {} because it's outdated",
+                                path
+                            );
+                            return transaction::abort(Error::IgnoredPosition);
                         }
                     }
                 }
