@@ -567,7 +567,7 @@ mod tests {
         let audio_len = if copy_file.is_some() { 1 } else { 2 };
         let dur = audio_len - seek.map(|s| s.round() as u32).unwrap_or(0);
 
-        match meta.get_audio_info() {
+        match meta.get_audio_info(&None) {
             Some(ai) => assert_eq!(ai.duration, dur),
             None => panic!("Cannot get audio info"),
         }

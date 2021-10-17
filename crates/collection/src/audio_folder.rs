@@ -1,8 +1,10 @@
 use std::borrow::{self, Cow};
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use super::audio_meta::*;
 use crate::util::{get_meta, get_modified, get_real_file_type, guess_mime_type};
@@ -25,6 +27,7 @@ pub struct FoldersOptions {
     pub ignore_chapters_meta: bool,
     pub allow_symlinks: bool,
     pub no_dir_collaps: bool,
+    pub tags: Arc<Option<HashSet<String>>>,
 }
 
 impl Default for FoldersOptions {
@@ -35,6 +38,7 @@ impl Default for FoldersOptions {
             ignore_chapters_meta: false,
             allow_symlinks: false,
             no_dir_collaps: false,
+            tags: Arc::new(None),
         }
     }
 }
@@ -111,7 +115,7 @@ impl FolderLister {
         } else if meta.is_file() && is_audio(path) {
             let meta =
                 get_audio_properties(&path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-            match (meta.get_chapters(), meta.get_audio_info()) {
+            match (meta.get_chapters(), meta.get_audio_info(&self.config.tags)) {
                 (Some(chapters), Some(audio_meta)) => Ok(DirType::File {
                     chapters,
                     audio_meta,
@@ -196,7 +200,7 @@ impl FolderLister {
                                                 &f, path, true,
                                             )?)
                                         } else {
-                                            let meta = meta.get_audio_info();
+                                            let meta = meta.get_audio_info(&self.config.tags);
                                             if self.is_long_file((&meta).as_ref())
                                                 || chapters_file_path(&audio_file_path)
                                                     .map(|p| p.is_file())
@@ -320,6 +324,7 @@ impl FolderLister {
                     AudioMeta {
                         bitrate: audio_meta.bitrate,
                         duration: ((chap.end - chap.start) / 1000) as u32,
+                        tags: None, // TODO: consider extracting metadata from chapters too - but what will make sense?
                     }
                 };
                 Ok(AudioFile {
@@ -601,9 +606,20 @@ mod tests {
         let res = get_audio_properties(&path);
         assert!(res.is_ok());
         let media_info = res.unwrap();
-        let meta = media_info.get_audio_info().unwrap();
+        let req_tags = &["title", "album", "artist", "composer"];
+        let mut tags = HashSet::new();
+        tags.extend(req_tags.into_iter().map(|s| s.to_string()));
+        let tags = Some(tags);
+        let meta = media_info.get_audio_info(&tags).unwrap();
         assert_eq!(meta.bitrate, 220);
         assert_eq!(meta.duration, 2);
+        assert!(meta.tags.is_some());
+        let tags = meta.tags.unwrap();
+
+        assert_eq!("KISS", tags.get("title").unwrap());
+        assert_eq!("Audioserve", tags.get("album").unwrap());
+        assert_eq!("Ivan", tags.get("artist").unwrap());
+        assert!(tags.get("composer").is_none());
     }
 
     #[test]

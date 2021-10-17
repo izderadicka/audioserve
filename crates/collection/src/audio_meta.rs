@@ -3,6 +3,7 @@ use crate::position::PositionShort;
 use crate::util::{get_file_name, get_modified, guess_mime_type};
 use mime_guess::Mime;
 use serde_derive::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::{
     cmp::Ordering,
     path::{Path, PathBuf},
@@ -121,6 +122,7 @@ impl FoldersOrdering {
 pub struct AudioMeta {
     pub duration: u32, // duration in seconds, if available
     pub bitrate: u32,  // bitrate in kB/s
+    pub tags: Option<HashMap<String, String>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -265,14 +267,14 @@ pub fn is_description<P: AsRef<Path>>(path: P) -> bool {
 /// trait to generalize access to media metadata
 /// (so that underlying library can be easily changed)
 pub trait MediaInfo<'a>: Sized {
-    fn get_audio_info(&self) -> Option<AudioMeta>;
+    fn get_audio_info(&self, required_tags: &Option<HashSet<String>>) -> Option<AudioMeta>;
     fn get_chapters(&self) -> Option<Vec<Chapter>>;
     fn has_chapters(&self) -> bool;
 }
 
 mod libavformat {
     use super::*;
-    use std::sync::Once;
+    use std::{collections::HashSet, sync::Once};
 
     static INIT_LIBAV: Once = Once::new();
 
@@ -284,10 +286,11 @@ mod libavformat {
         media_file: media_info::MediaFile,
     }
     impl<'a> MediaInfo<'a> for Info {
-        fn get_audio_info(&self) -> Option<AudioMeta> {
+        fn get_audio_info(&self, required_tags: &Option<HashSet<String>>) -> Option<AudioMeta> {
             Some(AudioMeta {
                 duration: (self.media_file.duration() as f32 / 1000.0).round() as u32,
                 bitrate: self.media_file.bitrate(),
+                tags: self.collect_tags(required_tags),
             })
         }
 
@@ -310,6 +313,17 @@ mod libavformat {
     }
 
     impl Info {
+        fn collect_tags(
+            &self,
+            required_tags: &Option<HashSet<String>>,
+        ) -> Option<HashMap<String, String>> {
+            required_tags.as_ref().map(|tags| {
+                tags.iter()
+                    .filter_map(|tag| self.media_file.meta(tag).map(|v| (tag.to_string(), v)))
+                    .collect()
+            })
+        }
+
         pub fn from_file(path: &Path) -> Result<Info> {
             match path.as_os_str().to_str() {
                 Some(fname) => Ok(Info {

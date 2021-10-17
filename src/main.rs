@@ -107,6 +107,7 @@ fn create_collections() -> Arc<Collections> {
                 chapters_from_duration: get_config().chapters.from_duration,
                 ignore_chapters_meta: get_config().ignore_chapters_meta,
                 no_dir_collaps: get_config().no_dir_collaps,
+                tags: Arc::new(get_config().get_tags()),
             },
         )
         .expect("Unable to create collections cache"),

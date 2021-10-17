@@ -418,8 +418,12 @@ impl Config {
         Ok(())
     }
 
-    pub fn get_tags(&self) -> HashSet<String> {
-        self.tags.clone()
+    pub fn get_tags(&self) -> Option<HashSet<String>> {
+        if self.tags.is_empty() {
+            None
+        } else {
+            Some(self.tags.clone())
+        }
     }
 }
 
