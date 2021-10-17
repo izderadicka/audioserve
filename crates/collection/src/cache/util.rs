@@ -29,6 +29,7 @@ pub fn kv_to_audiofolder<K: AsRef<str>, V: AsRef<[u8]>>(key: K, val: V) -> Audio
         path: path.into(),
         is_file: folder.as_ref().map(|f| f.is_file).unwrap_or(false),
         modified: folder.as_ref().and_then(|f| f.modified),
+        finished: false,
     }
 }
 
@@ -39,11 +40,11 @@ pub fn parent_path<P: AsRef<Path>>(path: P) -> PathBuf {
         .unwrap_or_default()
 }
 
-pub fn split_path<S: AsRef<str>>(p: &S) -> (String, String) {
+pub fn split_path<S: AsRef<str>>(p: &S) -> (&str, &str) {
     let s = p.as_ref();
     match s.rsplit_once('/') {
-        Some((path, file)) => (path.into(), file.into()),
-        None => ("".into(), s.to_owned()),
+        Some((path, file)) => (path, file),
+        None => ("", s),
     }
 }
 

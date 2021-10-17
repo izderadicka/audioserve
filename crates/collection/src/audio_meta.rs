@@ -145,6 +145,8 @@ pub struct AudioFolderShort {
     pub modified: Option<TimeStamp>,
     pub path: PathBuf,
     pub is_file: bool,
+    #[serde(default)]
+    pub finished: bool,
 }
 
 impl AudioFolderShort {
@@ -155,6 +157,7 @@ impl AudioFolderShort {
             path: p.strip_prefix(base_path).unwrap().into(),
             is_file: false,
             modified: None,
+            finished: false,
         }
     }
 
@@ -168,6 +171,7 @@ impl AudioFolderShort {
             name: f.file_name().to_string_lossy().into(),
             is_file,
             modified: get_modified(f.path()).map(|t| t.into()),
+            finished: false,
         })
     }
 
@@ -177,6 +181,7 @@ impl AudioFolderShort {
             path,
             is_file,
             modified: None,
+            finished: false,
         }
     }
 

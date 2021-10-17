@@ -242,7 +242,7 @@ impl CollectionTrait for CollectionCache {
                 if let Some(group) = group {
                     let folder = dir_path.to_str();
                     if let Some(folder) = folder {
-                        let pos = self.get_position(group, Some(folder)).and_then(|p| {
+                        let pos = self.get_position(&group, Some(folder)).and_then(|p| {
                             dir_path.join(&p.file).to_str().map(|path| PositionShort {
                                 path: path.to_string(),
                                 timestamp: p.timestamp,
@@ -250,6 +250,7 @@ impl CollectionTrait for CollectionCache {
                             })
                         });
                         af.position = pos;
+                        self.inner.update_subfolders(group, &mut af.subfolders)
                     } else {
                         warn!(
                             "Folder path {:?} is not UTF8, cannot get position",

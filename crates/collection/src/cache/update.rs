@@ -101,6 +101,7 @@ impl<'a> RecursiveUpdater<'a> {
             path: Path::new("").into(),
             is_file: false,
             modified: None,
+            finished: false,
         });
         let mut queue = VecDeque::new();
         queue.push_back(root);

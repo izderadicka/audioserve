@@ -22,6 +22,7 @@ impl PositionItem {
             timestamp: self.timestamp,
             position: self.position,
             collection,
+            folder_finished: self.folder_finished,
         }
     }
 }
@@ -33,6 +34,8 @@ pub struct Position {
     pub timestamp: TimeStamp,
     pub position: f32,
     pub collection: usize,
+    #[serde(default)]
+    pub folder_finished: bool,
 }
 
 pub(crate) type PositionRecord = HashMap<String, PositionItem>;

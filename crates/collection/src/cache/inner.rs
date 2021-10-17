@@ -108,6 +108,19 @@ impl CacheInner {
             .and_then(|actual| if actual { af } else { None })
     }
 
+    fn get_last_file<P: AsRef<Path>>(&self, dir: P) -> Option<(String, Option<u32>)> {
+        self.get(dir).and_then(|d| {
+            d.files.last().and_then(|p| {
+                p.path.file_name().map(|n| {
+                    (
+                        n.to_str().unwrap().to_owned(),
+                        p.meta.as_ref().map(|m| m.duration),
+                    )
+                })
+            })
+        })
+    }
+
     pub(crate) fn update<P: AsRef<Path>>(&self, dir: P, af: AudioFolder) -> Result<()> {
         let dir = dir
             .as_ref()
@@ -176,6 +189,8 @@ impl CacheInner {
 
 // positions
 impl CacheInner {
+    const EOB_LIMIT: u32 = 10;
+
     pub(crate) fn insert_position<S, P>(
         &self,
         group: S,
@@ -187,61 +202,67 @@ impl CacheInner {
         S: AsRef<str>,
         P: AsRef<str>,
     {
-        (&self.pos_latest, &self.pos_folder, self.db.deref())
-            .transaction(|(pos_latest, pos_folder, folders)| {
-                let (path, file) = split_path(&path);
+        let (path, file) = split_path(&path);
+        if let Some((last_file, last_file_duration)) = self.get_last_file(&path) {
+            (&self.pos_latest, &self.pos_folder)
+                .transaction(move |(pos_latest, pos_folder)| {
+                    let mut folder_rec = pos_folder
+                        .get(&path)
+                        .map_err(|e| error!("Db get error: {}", e))
+                        .ok()
+                        .flatten()
+                        .and_then(|data| {
+                            bincode::deserialize::<PositionRecord>(&data)
+                                .map_err(|e| error!("Db item deserialization error: {}", e))
+                                .ok()
+                        })
+                        .unwrap_or_else(HashMap::new);
 
-                if folders.get(&path).ok().flatten().is_none() {
-                    warn!("Trying to insert position for unknown folder {}", path);
-                    return transaction::abort(Error::IgnoredPosition);
-                }
-
-                let mut folder_rec = pos_folder
-                    .get(&path)
-                    .map_err(|e| error!("Db get error: {}", e))
-                    .ok()
-                    .flatten()
-                    .and_then(|data| {
-                        bincode::deserialize::<PositionRecord>(&data)
-                            .map_err(|e| error!("Db item deserialization error: {}", e))
-                            .ok()
-                    })
-                    .unwrap_or_else(HashMap::new);
-
-                if let Some(ts) = ts {
-                    if let Some(current_record) = folder_rec.get(group.as_ref()) {
-                        if current_record.timestamp > ts {
-                            warn!(
-                                "Position not inserted for folder {} because it's outdated",
-                                path
-                            );
-                            return transaction::abort(Error::IgnoredPosition);
+                    if let Some(ts) = ts {
+                        if let Some(current_record) = folder_rec.get(group.as_ref()) {
+                            if current_record.timestamp > ts {
+                                warn!(
+                                    "Position not inserted for folder {} because it's outdated",
+                                    path
+                                );
+                                return transaction::abort(Error::IgnoredPosition);
+                            }
                         }
                     }
-                }
+                    let this_pos = PositionItem {
+                        folder_finished: file.eq(&last_file)
+                            && last_file_duration
+                                .and_then(|d| d.checked_sub(position.round() as u32))
+                                .map(|dif| dif < CacheInner::EOB_LIMIT)
+                                .unwrap_or(false),
+                        file: file.into(),
+                        timestamp: TimeStamp::now(),
+                        position,
+                    };
 
-                let this_pos = PositionItem {
-                    file: file,
-                    timestamp: TimeStamp::now(),
-                    position,
-                    folder_finished: false,
-                };
+                    if !folder_rec.contains_key(group.as_ref()) && folder_rec.len() >= MAX_GROUPS {
+                        return transaction::abort(Error::TooManyGroups);
+                    }
 
-                if !folder_rec.contains_key(group.as_ref()) && folder_rec.len() >= MAX_GROUPS {
-                    return transaction::abort(Error::TooManyGroups);
-                }
+                    folder_rec.insert(group.as_ref().into(), this_pos);
+                    let rec = match bincode::serialize(&folder_rec) {
+                        Err(e) => return transaction::abort(Error::from(e)),
+                        Ok(res) => res,
+                    };
 
-                folder_rec.insert(group.as_ref().into(), this_pos);
-                let rec = match bincode::serialize(&folder_rec) {
-                    Err(e) => return transaction::abort(Error::from(e)),
-                    Ok(res) => res,
-                };
-
-                pos_folder.insert(path.as_bytes(), rec)?;
-                pos_latest.insert(group.as_ref(), path.as_bytes())?;
-                Ok(())
-            })
-            .map_err(|e| Error::from(e))
+                    pos_folder.insert(path.as_bytes(), rec)?;
+                    pos_latest.insert(group.as_ref(), path.as_bytes())?;
+                    Ok(())
+                })
+                .map_err(|e| Error::from(e))
+        } else {
+            // folder does not have playable file or does not exist in cache
+            warn!(
+                "Trying to insert position for unknown or empty folder {}",
+                path
+            );
+            return Err(Error::IgnoredPosition);
+        }
     }
 
     pub(crate) fn get_position<S, P>(&self, group: S, folder: Option<P>) -> Option<Position>
@@ -279,6 +300,39 @@ impl CacheInner {
             .map_err(|e: TransactionError<Error>| error!("Db transaction error: {}", e))
             .ok()
             .flatten()
+    }
+
+    pub(crate) fn is_finished<S, P>(&self, group: S, dir: P) -> bool
+    where
+        S: AsRef<str>,
+        P: AsRef<str>,
+    {
+        self.pos_folder
+            .get(dir.as_ref())
+            .map_err(|e| error!("Error reading position folder record in db: {}", e))
+            .ok()
+            .flatten()
+            .and_then(|r| {
+                bincode::deserialize::<PositionRecord>(&r)
+                    .map_err(|e| error!("Error deserializing position record {}", e))
+                    .ok()
+            })
+            .and_then(|m| m.get(group.as_ref()).map(|p| p.folder_finished))
+            .unwrap_or(false)
+    }
+
+    pub(crate) fn update_subfolders<S: AsRef<str>>(
+        &self,
+        group: S,
+        subfolders: &mut Vec<AudioFolderShort>,
+    ) {
+        subfolders.iter_mut().for_each(|sf| {
+            sf.finished = sf
+                .path
+                .to_str()
+                .map(|path| self.is_finished(&group, path))
+                .unwrap_or(false)
+        })
     }
 
     pub(crate) fn get_all_positions_for_group<S>(
@@ -408,6 +462,7 @@ impl CacheInner {
             modified: None,
             path: folder,
             is_file: false,
+            finished: false,
         };
         let updater = RecursiveUpdater::new(self, Some(af));
         updater.process();
