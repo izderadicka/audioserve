@@ -465,6 +465,11 @@ impl<C: 'static> FileSendService<C> {
                     match extract_group(path) {
                         PositionGroup::Group(group) => subs::all_positions(collections, group),
                         PositionGroup::Last(group) => subs::last_position(collections, group),
+                        PositionGroup::Path {
+                            collection,
+                            group,
+                            path,
+                        } => subs::folder_position(collections, group, collection, path),
                         PositionGroup::Malformed => resp::fut(resp::not_found),
                     }
                     #[cfg(not(feature = "shared-positions"))]
@@ -666,15 +671,21 @@ fn extract_collection_number(path: &str) -> Result<(&str, usize), ()> {
 }
 
 #[cfg(feature = "shared-positions")]
+#[derive(Debug)]
 enum PositionGroup {
     Group(String),
     Last(String),
+    Path {
+        group: String,
+        collection: usize,
+        path: String,
+    },
     Malformed,
 }
 
 #[cfg(feature = "shared-positions")]
 fn extract_group(path: &str) -> PositionGroup {
-    let mut segments = path.split('/');
+    let mut segments = path.splitn(5, '/');
     segments.next(); // read out first empty segment
     segments.next(); // readout positions segment
     if let Some(group) = segments.next().map(|g| g.to_owned()) {
@@ -682,10 +693,56 @@ fn extract_group(path: &str) -> PositionGroup {
             if last == "last" {
                 //only last position
                 return PositionGroup::Last(group);
+            } else if let Ok(collection) = last.parse::<usize>() {
+                if let Some(path) = segments.next() {
+                    return PositionGroup::Path {
+                        group,
+                        collection,
+                        path: path.into(),
+                    };
+                }
             }
         } else {
             return PositionGroup::Group(group);
         }
     }
     PositionGroup::Malformed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_group() {
+        if let PositionGroup::Group(x) = extract_group("/positions/usak") {
+            assert_eq!(x, "usak");
+        } else {
+            panic!("group does not match")
+        }
+
+        if let PositionGroup::Last(x) = extract_group("/positions/usak/last") {
+            assert_eq!(x, "usak");
+        } else {
+            panic!("group does not match")
+        }
+
+        if let PositionGroup::Path {
+            path,
+            collection,
+            group,
+        } = extract_group("/positions/usak/0/hrabe/drakula")
+        {
+            assert_eq!(group, "usak");
+            assert_eq!(collection, 0);
+            assert_eq!(path, "hrabe/drakula");
+        } else {
+            panic!("group does not match")
+        }
+
+        if let PositionGroup::Malformed = extract_group("/positions/chcip/pes") {
+        } else {
+            panic!("should be invalid")
+        }
+    }
 }

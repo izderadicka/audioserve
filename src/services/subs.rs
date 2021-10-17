@@ -557,6 +557,20 @@ pub fn last_position(collections: Arc<collection::Collections>, group: String) -
 }
 
 #[cfg(feature = "shared-positions")]
+pub fn folder_position(
+    collections: Arc<collection::Collections>,
+    group: String,
+    collection: usize,
+    path: String,
+) -> ResponseFuture {
+    Box::pin(
+        collections
+            .get_position_async(collection, group, path)
+            .map(|pos| Ok(json_response(&pos))),
+    )
+}
+
+#[cfg(feature = "shared-positions")]
 pub fn all_positions(collections: Arc<collection::Collections>, group: String) -> ResponseFuture {
     Box::pin(
         collections
