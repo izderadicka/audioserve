@@ -1,7 +1,7 @@
 pub use self::error::{Error, Result};
 use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
 use crate::util;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs::File;
 use std::io::Read;
@@ -14,6 +14,7 @@ mod cli;
 mod validators;
 #[macro_use]
 mod error;
+pub mod tags;
 
 static mut CONFIG: Option<Config> = None;
 
@@ -284,6 +285,7 @@ pub struct Config {
     pub positions_ws_timeout: Duration,
     pub behind_proxy: bool,
     pub collections_cache_dir: PathBuf,
+    pub tags: HashSet<String>,
 }
 
 impl Config {
@@ -415,6 +417,10 @@ impl Config {
 
         Ok(())
     }
+
+    pub fn get_tags(&self) -> HashSet<String> {
+        self.tags.clone()
+    }
 }
 
 impl Default for Config {
@@ -444,6 +450,7 @@ impl Default for Config {
             positions_ws_timeout: Duration::from_secs(600),
             behind_proxy: false,
             collections_cache_dir: data_base_dir.join("col_db"),
+            tags: HashSet::new(),
         }
     }
 }

@@ -1,3 +1,5 @@
+use std::process::exit;
+
 use super::validators::*;
 use super::*;
 use clap::{crate_authors, crate_name, crate_version, App, Arg};
@@ -59,8 +61,12 @@ fn create_parser<'a>() -> Parser<'a> {
             .takes_value(true)
             .env("AUDIOSERVE_BASE_DIRS")
             .value_delimiter(";")
-            .help("Root directories for audio books, also referred as collections, you can also add :<options> after directory path to change collection behaviour")
+            .help("Root directories for audio books, also referred as collections, you can also add :<options> after directory path to change collection behaviour, use --help-dir-options for more details")
 
+            )
+        .arg(Arg::with_name("help-dir-options")
+            .long("help-dir-options")
+            .help("Prints help for collections directories options")
             )
         .arg(Arg::with_name("no-authentication")
             .long("no-authentication")
@@ -291,6 +297,11 @@ where
     let p = create_parser();
     let args = p.get_matches_from(args);
 
+    if args.is_present("help-dir-options") {
+        print_dir_options_help();
+        exit(0);
+    }
+
     if let Some(dir) = args.value_of_os("data-dir") {
         unsafe {
             BASE_DATA_DIR.take();
@@ -507,10 +518,25 @@ where
     config.check()?;
     if args.is_present("print-config") {
         println!("{}", serde_yaml::to_string(&config).unwrap());
-        std::process::exit(0);
+        exit(0);
     }
 
     Ok(config)
+}
+
+fn print_dir_options_help() {
+    print!(
+        "
+Options can be used to change behaviour of collection directories.
+Option is added after collection path argument separated with : and individual options
+are separated by ;. Example /my/audio:no-cache .
+
+Available options:
+nc or no-cache      directory will not use cache (browsing and search will be slower for large 
+                    collection, playback position sharing and metadata tags will not work)
+
+"
+    )
 }
 
 #[cfg(test)]
