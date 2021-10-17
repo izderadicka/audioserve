@@ -224,6 +224,16 @@ span.subtitle {
     cursor: pointer;
 }
 
+.folder-finished {
+    font-style: italic;
+    }
+
+.folder-finished::after {
+    content: " ✓";
+    font-size: 150%;
+    
+}
+
 @media (max-width: 1024px) {
     h1.top-header {
         font-size: 1.6rem;

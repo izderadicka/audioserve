@@ -166,10 +166,26 @@ $(function () {
         }
     }
 
+    function groupParams(includeOrder=true) {
+        let params = new URLSearchParams();
+        if (ordering != "a" && includeOrder) {
+            params.append("ord", ordering)
+        }
+        const group =  window.localStorage.getItem("audioserve_group");
+        if (group) {
+            params.append("group", group)
+        }
+        params = params.toString();
+        if (params) {
+            params = "?"+params;
+        }
+        return params
+    }
+
     function loadFolder(path, fromHistory = false, scrollTo = null, startPlay = false) {
         $("#info-container").hide();
         ajax({
-            url: collectionUrl + "/folder/" + path + (ordering != "a" ? `?ord=${ordering}` : ""),
+            url: collectionUrl + "/folder/" + path + groupParams(),
         }
         )
             .fail(err => {
@@ -225,7 +241,7 @@ $(function () {
                 subfolders.empty();
                 count.text(data.subfolders.length);
                 for (let subfolder of data.subfolders) {
-                    let item = $('<a class="list-group-item list-group-item-action">')
+                    let item = $(`<a class="list-group-item list-group-item-action ${subfolder.finished ? 'folder-finished' : ''}">`)
                         .attr("href", subfolder.path)
                         .text(subfolder.name);
                     subfolders.append(item);
