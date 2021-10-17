@@ -46,22 +46,28 @@ pub const ALLOWED_TAGS: &[&str] = &[
     VARIANT_BITRATE,
 ];
 
+pub const PREFERRED_TAGS: &[&str] = &[ALBUM, ARTIST, COMPOSER, DATE, GENRE, PERFORMER, TITLE];
+
 pub fn print_tags_help() {
     print!("
 You can define metadata tags, that will be collected from audiofiles and presented via API with folder information.
 Tags that will be same for all audiofiles in folder will be available on folder level, tags that differs per file
-will be present on file level. Tags, you'd like to collect and present should be listed via --tags argument, 
-separated by comma. 
+will be present on file level. 
+You need to opt in for tags to be included, either use --tags argument to include preferred preselected tags or --tags-custom,
+where you can select tags you want separated by comma. 
 
-Available tags are: 
+Preferred tags are: 
 ");
+    print_tags(PREFERRED_TAGS);
 
-    print!(
-        "{}",
-        ALLOWED_TAGS
-            .into_iter()
-            .map(|r| *r)
-            .collect::<Vec<_>>()
-            .join("\n")
-    );
+    println!("\nAvailable tags are:");
+
+    print_tags(ALLOWED_TAGS);
+}
+
+fn print_tags(list: &[&str]) {
+    list.chunks(8).for_each(|c| {
+        let row = c.iter().map(|r| *r).collect::<Vec<_>>().join(", ");
+        println!("{},", row)
+    })
 }

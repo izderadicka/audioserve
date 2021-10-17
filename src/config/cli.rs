@@ -1,5 +1,7 @@
 use std::process::exit;
 
+use crate::config::tags::{print_tags_help, ALLOWED_TAGS, PREFERRED_TAGS};
+
 use super::validators::*;
 use super::*;
 use clap::{crate_authors, crate_name, crate_version, App, Arg};
@@ -67,6 +69,24 @@ fn create_parser<'a>() -> Parser<'a> {
         .arg(Arg::with_name("help-dir-options")
             .long("help-dir-options")
             .help("Prints help for collections directories options")
+            )
+        .arg(Arg::with_name("help-tags")
+            .long("help-tags")
+            .help("Prints help for tags options")
+        )
+        .arg(Arg::with_name("tags")
+            .long("tags")
+            .help("Collects prefered tags from audiofiles, use argument --help-tags for more details")
+            .conflicts_with("tags-custom")
+            )
+        .arg(Arg::with_name("tags-custom")
+            .long("tags-custom")
+            .help("Collects custom tags from audiofiles, list tags searated by comma, use argument --help-tags for more details")
+            .conflicts_with("tags")
+            .takes_value(true)
+            .multiple(true)
+            .use_delimiter(true)
+            .env("AUDIOSERVE_TAGS_CUSTOM")
             )
         .arg(Arg::with_name("no-authentication")
             .long("no-authentication")
@@ -302,6 +322,11 @@ where
         exit(0);
     }
 
+    if args.is_present("help-tags") {
+        print_tags_help();
+        exit(0);
+    }
+
     if let Some(dir) = args.value_of_os("data-dir") {
         unsafe {
             BASE_DATA_DIR.take();
@@ -423,11 +448,25 @@ where
         config.cors = true;
     }
 
+    if let Some(tags) = args.values_of("tags-custom") {
+        for t in tags {
+            if !ALLOWED_TAGS.contains(&t) {
+                arg_error!("tags-custom", "Unknown tag")?
+            }
+            config.tags.insert(t.to_string());
+        }
+    } else if is_present_or_env("tags", "AUDIOSERVE_TAGS") {
+        config
+            .tags
+            .extend(PREFERRED_TAGS.iter().map(|i| i.to_string()));
+    }
+
     if cfg!(feature = "symlinks")
         && is_present_or_env("allow-symlinks", "AUDIOSERVE_ALLOW_SYMLINKS")
     {
         config.allow_symlinks = true
     }
+
     #[cfg(feature = "tls")]
     {
         if let Some(key) = args.value_of("ssl-key") {
