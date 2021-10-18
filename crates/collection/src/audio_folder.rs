@@ -171,7 +171,8 @@ impl FolderLister {
                 let mut subfolders = vec![];
                 let mut cover = None;
                 let mut description = None;
-                let mut tags = None;
+                let tags;
+                let mut is_file = false;
                 let allow_symlinks = self.config.allow_symlinks;
 
                 for item in dir_iter {
@@ -253,6 +254,8 @@ impl FolderLister {
                             let f = self
                                 .list_dir_file(base_dir, full_path, audio_meta, chapters, true)?;
                             files = f.files;
+                            tags = f.tags;
+                            is_file = true;
                         }
                         _ => {
                             return Err(io::Error::new(
@@ -270,7 +273,7 @@ impl FolderLister {
                 extend_audiofolder(
                     &full_path,
                     AudioFolder {
-                        is_file: false,
+                        is_file,
                         modified: None,
                         total_time: None,
                         files,
