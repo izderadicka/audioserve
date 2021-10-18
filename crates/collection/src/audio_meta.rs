@@ -101,6 +101,7 @@ pub struct AudioFolder {
     #[serde(skip_deserializing)]
     #[serde(default)]
     pub position: Option<PositionShort>, // optional last know playback position in this folder
+    pub tags: Option<HashMap<String, String>>, // metadata tags, which are applicable for whole folder
 }
 
 #[derive(Clone, Copy)]
@@ -338,8 +339,8 @@ mod libavformat {
     }
 }
 
-pub fn get_audio_properties(audio_file_name: &Path) -> Result<impl MediaInfo> {
-    libavformat::Info::from_file(audio_file_name)
+pub fn get_audio_properties(audio_file_path: &Path) -> Result<impl MediaInfo> {
+    libavformat::Info::from_file(audio_file_path)
 }
 
 pub fn init_media_lib() {

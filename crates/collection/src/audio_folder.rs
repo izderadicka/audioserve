@@ -1,5 +1,5 @@
 use std::borrow::{self, Cow};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs;
 use std::io;
@@ -171,6 +171,7 @@ impl FolderLister {
                 let mut subfolders = vec![];
                 let mut cover = None;
                 let mut description = None;
+                let mut tags = None;
                 let allow_symlinks = self.config.allow_symlinks;
 
                 for item in dir_iter {
@@ -262,10 +263,11 @@ impl FolderLister {
                     }
                 } else {
                     files.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+                    tags = extract_folder_tags(&mut files);
                     subfolders.sort_unstable_by(|a, b| a.compare_as(ordering, b));
                 }
 
-                self.extend_audiofolder(
+                extend_audiofolder(
                     &full_path,
                     AudioFolder {
                         is_file: false,
@@ -276,6 +278,7 @@ impl FolderLister {
                         cover,
                         description,
                         position: None,
+                        tags,
                     },
                 )
             }
@@ -290,22 +293,6 @@ impl FolderLister {
         }
     }
 
-    fn extend_audiofolder<P: AsRef<Path>>(
-        &self,
-        full_path: P,
-        mut af: AudioFolder,
-    ) -> Result<AudioFolder, io::Error> {
-        let last_modification = get_modified(full_path);
-        let total_time: u32 = af
-            .files
-            .iter()
-            .map(|f| f.meta.as_ref().map(|m| m.duration).unwrap_or(0))
-            .sum();
-        af.modified = last_modification.map(TimeStamp::from);
-        af.total_time = Some(total_time);
-        Ok(af)
-    }
-
     #[allow(clippy::unnecessary_wraps)] // actually as its used in match with function returning results it's better to have Result return type
     fn list_dir_file<P: AsRef<Path>>(
         &self,
@@ -317,6 +304,14 @@ impl FolderLister {
     ) -> Result<AudioFolder, io::Error> {
         let path = full_path.strip_prefix(&base_dir).unwrap();
         let mime = guess_mime_type(&path);
+        let mut tags = None;
+        if self.config.tags.is_some() {
+            let meta = get_audio_properties(&full_path)
+                .map_err(|e| warn!("Error extracting meta from {:?}: {}", full_path, e))
+                .ok()
+                .and_then(|m| m.get_audio_info(&self.config.tags));
+            tags = meta.and_then(|m| m.tags);
+        }
         let files = chapters
             .into_iter()
             .map(|chap| {
@@ -340,7 +335,7 @@ impl FolderLister {
             })
             .collect::<io::Result<Vec<_>>>()?;
 
-        self.extend_audiofolder(
+        extend_audiofolder(
             &full_path,
             AudioFolder {
                 is_file: true,
@@ -351,9 +346,77 @@ impl FolderLister {
                 cover: None,
                 description: None,
                 position: None,
+                tags,
             },
         )
     }
+}
+
+fn extract_folder_tags(files: &mut Vec<AudioFile>) -> Option<HashMap<String, String>> {
+    let mut iter = (&files).iter();
+    let mut folder_tags = iter
+        .next()?
+        .meta
+        .as_ref()?
+        .tags
+        .as_ref()?
+        .clone()
+        .into_iter()
+        .map(|(k, v)| (k, Some(v)))
+        .collect::<HashMap<_, _>>();
+
+    // folder_tags should contain tags, which are present in all files, where tag is present
+    for t in iter {
+        if let Some(file_tags) = t.meta.as_ref().and_then(|m| m.tags.as_ref()) {
+            for (k, v) in file_tags {
+                folder_tags
+                    .entry(k.into())
+                    .and_modify(|folder_val| {
+                        if Some(v) != folder_val.as_ref() {
+                            *folder_val = None
+                        }
+                    })
+                    .or_insert_with(|| Some(v.into()));
+            }
+        }
+    }
+
+    // Clear folder_tags of None values
+    let folder_tags: HashMap<String, String> = folder_tags
+        .into_iter()
+        .filter_map(|(k, v)| v.map(|v| (k, v)))
+        .collect();
+
+    files
+        .iter_mut()
+        .filter_map(|f| f.meta.as_mut().map(|m| &mut m.tags))
+        .for_each(|tags_opt| {
+            if let Some(tags) = tags_opt {
+                for k in folder_tags.keys() {
+                    tags.remove(k);
+                }
+                if tags.is_empty() {
+                    *tags_opt = None;
+                }
+            }
+        });
+
+    Some(folder_tags)
+}
+
+fn extend_audiofolder<P: AsRef<Path>>(
+    full_path: P,
+    mut af: AudioFolder,
+) -> Result<AudioFolder, io::Error> {
+    let last_modification = get_modified(full_path);
+    let total_time: u32 = af
+        .files
+        .iter()
+        .map(|f| f.meta.as_ref().map(|m| m.duration).unwrap_or(0))
+        .sum();
+    af.modified = last_modification.map(TimeStamp::from);
+    af.total_time = Some(total_time);
+    Ok(af)
 }
 
 fn ms_from_time(t: &str) -> Option<u64> {

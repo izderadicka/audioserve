@@ -582,7 +582,8 @@ You can define metadata tags, that will be collected from audiofiles and present
 Tags that will be same for all audiofiles in folder will be available on folder level, tags that differs per file
 will be present on file level. 
 You need to opt in for tags to be included, either use --tags argument to include preferred preselected tags or --tags-custom,
-where you can select tags you want separated by comma. 
+where you can select tags you want separated by comma.
+BE AWARE: if you use or change tags arguments all collection cache has to be rescaned! 
 
 Preferred tags are: 
 ");
