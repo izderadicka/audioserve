@@ -16,6 +16,7 @@ use std::{
 
 pub use audio_folder::{list_dir_files_only, parse_chapter_path};
 pub use audio_meta::{init_media_lib, AudioFile, AudioFolderShort, FoldersOrdering, TimeSpan};
+pub use media_info::tags;
 pub use position::Position;
 pub use util::guess_mime_type;
 

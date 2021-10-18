@@ -1,6 +1,6 @@
 use std::process::exit;
 
-use crate::config::tags::{print_tags_help, ALLOWED_TAGS, PREFERRED_TAGS};
+use collection::tags::{ALLOWED_TAGS, BASIC_TAGS};
 
 use super::validators::*;
 use super::*;
@@ -456,9 +456,7 @@ where
             config.tags.insert(t.to_string());
         }
     } else if is_present_or_env("tags", "AUDIOSERVE_TAGS") {
-        config
-            .tags
-            .extend(PREFERRED_TAGS.iter().map(|i| i.to_string()));
+        config.tags.extend(BASIC_TAGS.iter().map(|i| i.to_string()));
     }
 
     if cfg!(feature = "symlinks")
@@ -576,6 +574,30 @@ nc or no-cache      directory will not use cache (browsing and search will be sl
 
 "
     )
+}
+
+pub fn print_tags_help() {
+    print!("
+You can define metadata tags, that will be collected from audiofiles and presented via API with folder information.
+Tags that will be same for all audiofiles in folder will be available on folder level, tags that differs per file
+will be present on file level. 
+You need to opt in for tags to be included, either use --tags argument to include preferred preselected tags or --tags-custom,
+where you can select tags you want separated by comma. 
+
+Preferred tags are: 
+");
+    print_tags(BASIC_TAGS);
+
+    println!("\nAvailable tags are:");
+
+    print_tags(ALLOWED_TAGS);
+}
+
+fn print_tags(list: &[&str]) {
+    list.chunks(8).for_each(|c| {
+        let row = c.iter().map(|r| *r).collect::<Vec<_>>().join(", ");
+        println!("{},", row)
+    })
 }
 
 #[cfg(test)]

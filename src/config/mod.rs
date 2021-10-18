@@ -14,7 +14,6 @@ mod cli;
 mod validators;
 #[macro_use]
 mod error;
-pub mod tags;
 
 static mut CONFIG: Option<Config> = None;
 
