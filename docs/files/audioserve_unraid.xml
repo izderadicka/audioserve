@@ -1,0 +1,77 @@
+<?xml version="1.0"?>
+<!-- Contributed Unraid configuration by user -->
+<Container version="2">
+  <Name>audioserve</Name>
+  <Repository>izderadicka/audioserve</Repository>
+  <Registry>https://hub.docker.com/r/izderadicka/audioserve/</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://hub.docker.com/r/izderadicka/audioserve/</Support>
+  <Project/>
+  <Overview>Latest released audioserve in Docker image   Converted By Community Applications   Always verify this template (and values) against the dockerhub support page for the container</Overview>
+  <Category/>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/izderadicka/audioserve-android/master/app/src/main/ic_audioserve-web.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled>1633370743</DateInstalled>
+  <DonateText/>
+  <DonateLink/>
+  <Description>Latest released audioserve in Docker image   Converted By Community Applications   Always verify this template (and values) against the dockerhub support page for the container</Description>
+  <Networking>
+    <Mode>bridge</Mode>
+    <Publish>
+      <Port>
+        <HostPort>3000</HostPort>
+        <ContainerPort>3000</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+    </Publish>
+  </Networking>
+  <Data>
+    <Volume>
+      <HostDir>PATH_TO_AUDIOBOOKS</HostDir>
+      <ContainerDir>/audiobooks</ContainerDir>
+      <Mode>rw,shared</Mode>
+    </Volume>
+    <Volume>
+      <HostDir>/mnt/user/appdata/audioserve</HostDir>
+      <ContainerDir>/home/audioserve/.audioserve</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+  </Data>
+  <Environment>
+    <Variable>
+      <Value>PASSWORD*</Value>
+      <Name>AUDIOSERVE_SHARED_SECRET</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>/audiobooks</Value>
+      <Name>AUDIOSERVE_BASE_DIRS</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>99</Value>
+      <Name>PUID</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>100</Value>
+      <Name>PGID</Name>
+      <Mode/>
+    </Variable>
+  </Environment>
+  <Labels/>
+  <Config Name="AUDIOSERVE_SHARED_SECRET" Target="AUDIOSERVE_SHARED_SECRET" Default="" Mode="" Description="Password to access the app &amp;lt;br&amp;gt;&#13;&#10;&#13;&#10;Container Variable: AUDIOSERVE_SHARED_SECRET" Type="Variable" Display="always" Required="false" Mask="false">PASSWORD*</Config>
+  <Config Name="/audiobooks" Target="/audiobooks" Default="" Mode="rw,shared" Description="Path to your audiobooks folder &amp;lt;br&amp;gt;&#13;&#10;Container Path: /audiobooks&#13;&#10;&#13;&#10;" Type="Path" Display="always" Required="false" Mask="false">PATH_TO_AUDIOBOOKS</Config>
+  <Config Name="Appdata" Target="/home/audioserve/.audioserve" Default="" Mode="rw" Description="Container Path: /home/audioserve/.audioserve" Type="Path" Display="always" Required="false" Mask="false">/mnt/user/appdata/audioserve</Config>
+  <Config Name="AUDIOSERVE_BASE_DIRS" Target="AUDIOSERVE_BASE_DIRS" Default="" Mode="" Description="Container Variable: AUDIOSERVE_DATA_DIR. &amp;lt;br&amp;gt;&#13;&#10;&amp;lt;p style=" Type="Variable" Display="advanced-hide" Required="false" Mask="false">/audiobooks</Config>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="Container Variable: PUID" Type="Variable" Display="advanced" Required="false" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Container Variable: PGID" Type="Variable" Display="advanced" Required="false" Mask="false">100</Config>
+  <Config Name="Port" Target="3000" Default="" Mode="tcp" Description="Container Port: 3000" Type="Port" Display="advanced" Required="false" Mask="false">3000</Config>
+</Container>
