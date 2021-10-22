@@ -280,7 +280,6 @@ pub struct Config {
     pub chapters: ChaptersSize,
     pub no_dir_collaps: bool,
     pub ignore_chapters_meta: bool,
-    pub positions_file: PathBuf,
     pub positions_ws_timeout: Duration,
     pub behind_proxy: bool,
     pub collections_cache_dir: PathBuf,
@@ -379,14 +378,6 @@ impl Config {
             );
         };
 
-        if !util::parent_dir_exists(&self.positions_file) {
-            return value_error!(
-                "positions_file",
-                "Parent directory for does not exists for {:?}",
-                self.positions_file
-            );
-        };
-
         if self.ssl.is_some() {
             self.ssl.as_ref().unwrap().check()?
         }
@@ -449,7 +440,6 @@ impl Default for Config {
             chapters: ChaptersSize::default(),
             no_dir_collaps: false,
             ignore_chapters_meta: false,
-            positions_file: data_base_dir.join("audioserve.positions"),
             positions_ws_timeout: Duration::from_secs(600),
             behind_proxy: false,
             collections_cache_dir: data_base_dir.join("col_db"),
