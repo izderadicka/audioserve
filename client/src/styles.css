@@ -234,6 +234,18 @@ span.subtitle {
     
 }
 
+#files-duration {
+    font-size: 66%;
+    margin-left: 0.5em;
+    color: gray;
+}
+
+.file-tags-title {
+    font-size: 80%;
+    color: gray;
+    padding-left: 1em;
+}
+
 @media (max-width: 1024px) {
     h1.top-header {
         font-size: 1.6rem;
