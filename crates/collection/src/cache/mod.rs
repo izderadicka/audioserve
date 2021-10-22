@@ -35,6 +35,7 @@ pub struct CollectionCache {
     pub(crate) inner: Arc<CacheInner>,
     update_sender: Sender<Option<UpdateAction>>,
     update_receiver: Option<Receiver<Option<UpdateAction>>>,
+    force_update: bool,
 }
 
 impl CollectionCache {
@@ -42,6 +43,7 @@ impl CollectionCache {
         path: P1,
         db_dir: P2,
         lister: FolderLister,
+        force_update: bool,
     ) -> Result<CollectionCache> {
         let root_path = path.into();
         let db_path = CollectionCache::db_path(&root_path, &db_dir)?;
@@ -64,6 +66,7 @@ impl CollectionCache {
             cond: Arc::new((Condvar::new(), Mutex::new(false))),
             update_sender,
             update_receiver: Some(update_receiver),
+            force_update,
         })
     }
 
@@ -88,6 +91,7 @@ impl CollectionCache {
         let ongoing_updater = OngoingUpdater::new(update_receiver, inner.clone());
         self.thread_updater = Some(thread::spawn(move || ongoing_updater.run()));
         let cond = self.cond.clone();
+        let force_update = self.force_update;
 
         let thread = thread::spawn(move || {
             let root_path = inner.base_dir();
@@ -122,7 +126,7 @@ impl CollectionCache {
                 }
 
                 // inittial scan of directory
-                let updater = RecursiveUpdater::new(&inner, None);
+                let updater = RecursiveUpdater::new(&inner, None, force_update);
                 updater.process();
 
                 // clean up positions for non existent folders
@@ -398,7 +402,7 @@ mod tests {
         let tmp_dir = TempDir::new("AS_CACHE_TEST").expect("Cannot create temp dir");
         let test_data_dir = Path::new("../../test_data");
         let db_path = tmp_dir.path().join("updater_db");
-        let mut col = CollectionCache::new(test_data_dir, db_path, FolderLister::new())
+        let mut col = CollectionCache::new(test_data_dir, db_path, FolderLister::new(), false)
             .expect("Cannot create CollectionCache");
         col.run_update_loop();
         col.wait_until_inital_scan_is_done();
@@ -431,7 +435,7 @@ mod tests {
         let info_file = test_data_dir.join("usak/kulisak/desc.txt");
         assert!(info_file.exists());
         let db_path = tmp_dir.path().join("updater_db");
-        let col = CollectionCache::new(&test_data_dir, db_path, FolderLister::new())
+        let col = CollectionCache::new(&test_data_dir, db_path, FolderLister::new(), false)
             .expect("Cannot create CollectionCache");
 
         col.force_update("usak/kulisak")?;

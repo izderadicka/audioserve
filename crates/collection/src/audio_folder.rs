@@ -28,6 +28,7 @@ pub struct FoldersOptions {
     pub allow_symlinks: bool,
     pub no_dir_collaps: bool,
     pub tags: Arc<Option<HashSet<String>>>,
+    pub force_cache_update_on_init: bool,
 }
 
 impl Default for FoldersOptions {
@@ -39,6 +40,7 @@ impl Default for FoldersOptions {
             allow_symlinks: false,
             no_dir_collaps: false,
             tags: Arc::new(None),
+            force_cache_update_on_init: false,
         }
     }
 }

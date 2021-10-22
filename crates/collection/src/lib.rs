@@ -47,6 +47,7 @@ impl Collections {
     {
         let db_path = db_path.as_ref();
         let allow_symlinks = opt.allow_symlinks;
+        let force_update = opt.force_cache_update_on_init;
         let lister = FolderLister::new_with_options(opt);
         let caches = collections_dirs
             .into_iter()
@@ -64,12 +65,17 @@ impl Collections {
                     )
                     .into())
                 } else {
-                    CollectionCache::new(collection_path.clone(), db_path, lister.clone())
-                        .map(|mut cache| {
-                            cache.run_update_loop();
-                            cache
-                        })
-                        .map(|c| Collection::from(c))
+                    CollectionCache::new(
+                        collection_path.clone(),
+                        db_path,
+                        lister.clone(),
+                        force_update,
+                    )
+                    .map(|mut cache| {
+                        cache.run_update_loop();
+                        cache
+                    })
+                    .map(|c| Collection::from(c))
                 }
             })
             .collect::<Result<Vec<_>>>()?;

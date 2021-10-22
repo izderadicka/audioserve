@@ -183,11 +183,15 @@ fn create_parser<'a>() -> Parser<'a> {
             .help("Ignore chapters metadata, so files with chapters will not be presented as folders")
             )
         .arg(Arg::with_name("url-path-prefix")
-        .long("url-path-prefix")
-        .takes_value(true)
-        .validator(is_valid_url_path_prefix)
-        .env("AUDIOSERVE_URL_PATH_PREFIX")
-        .help("Base URL is a fixed path that is before audioserve path part, must start with / and not end with /  [default: none]")
+            .long("url-path-prefix")
+            .takes_value(true)
+            .validator(is_valid_url_path_prefix)
+            .env("AUDIOSERVE_URL_PATH_PREFIX")
+            .help("Base URL is a fixed path that is before audioserve path part, must start with / and not end with /  [default: none]")
+            )
+        .arg(Arg::with_name("force-cache-update")
+            .long("force-cache-update")
+            .help("Forces full reload of metadata cache on start")
             );
 
     if cfg!(feature = "behind-proxy") {
@@ -438,6 +442,10 @@ where
 
     if is_present_or_env("cors", "AUDIOSERVE_CORS") {
         config.cors = true;
+    }
+
+    if is_present_or_env("force-cache-update", "AUDIOSERVE_FORCE_CACHE_UPDATE") {
+        config.force_cache_update_on_init = true
     }
 
     if let Some(tags) = args.values_of("tags-custom") {

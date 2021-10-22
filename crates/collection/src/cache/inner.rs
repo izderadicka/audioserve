@@ -464,7 +464,7 @@ impl CacheInner {
             is_file: false,
             finished: false,
         };
-        let updater = RecursiveUpdater::new(self, Some(af));
+        let updater = RecursiveUpdater::new(self, Some(af), false);
         updater.process();
     }
 
