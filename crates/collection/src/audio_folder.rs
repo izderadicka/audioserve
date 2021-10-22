@@ -404,7 +404,11 @@ fn extract_folder_tags(files: &mut Vec<AudioFile>) -> Option<HashMap<String, Str
             }
         });
 
-    Some(folder_tags)
+    if folder_tags.is_empty() {
+        None
+    } else {
+        Some(folder_tags)
+    }
 }
 
 fn extend_audiofolder<P: AsRef<Path>>(
