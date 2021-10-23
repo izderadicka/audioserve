@@ -197,6 +197,10 @@ impl Collections {
         }
         res
     }
+
+    pub fn force_rescan(self: Arc<Self>) {
+        self.caches.iter().for_each(|c| c.signal_rescan())
+    }
 }
 
 #[cfg(feature = "async")]

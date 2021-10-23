@@ -215,6 +215,16 @@ async fn terminate_server() {
     )
 }
 
+#[cfg(unix)]
+async fn watch_for_cache_update_signal(cols: Arc<Collections>) {
+    use tokio::signal::unix::{signal, SignalKind};
+    let mut sigusr1 = signal(SignalKind::user_defined1()).expect("Cannot create SIGINT handler");
+    while let Some(()) = sigusr1.recv().await {
+        info!("Received signal SIGUSR1 for full rescan of caches");
+        cols.clone().force_rescan()
+    }
+}
+
 fn main() {
     #[cfg(unix)]
     {
@@ -256,6 +266,9 @@ fn main() {
     let collections = create_collections();
 
     let runtime = start_server(server_secret, collections.clone());
+
+    #[cfg(unix)]
+    runtime.spawn(watch_for_cache_update_signal(collections.clone()));
 
     runtime.block_on(terminate_server());
 

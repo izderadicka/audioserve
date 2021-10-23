@@ -14,7 +14,7 @@ use crate::{
     AudioFolderShort, FoldersOrdering,
 };
 use crossbeam_channel::{unbounded as channel, Receiver, Sender};
-use notify::{watcher, Watcher};
+use notify::{watcher, DebouncedEvent, Watcher};
 use std::{
     collections::BinaryHeap,
     convert::TryInto,
@@ -30,6 +30,7 @@ mod util;
 
 pub struct CollectionCache {
     thread_loop: Option<thread::JoinHandle<()>>,
+    watcher_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<DebouncedEvent>>>>,
     thread_updater: Option<thread::JoinHandle<()>>,
     cond: Arc<(Condvar, Mutex<bool>)>,
     pub(crate) inner: Arc<CacheInner>,
@@ -62,6 +63,7 @@ impl CollectionCache {
                 update_sender.clone(),
             )?),
             thread_loop: None,
+            watcher_sender: Arc::new(Mutex::new(None)),
             thread_updater: None,
             cond: Arc::new((Condvar::new(), Mutex::new(false))),
             update_sender,
@@ -85,13 +87,14 @@ impl CollectionCache {
         Ok(db_dir.as_ref().join(name.as_ref()))
     }
 
-    pub fn run_update_loop(&mut self) {
+    pub(crate) fn run_update_loop(&mut self) {
         let update_receiver = self.update_receiver.take().expect("run multiple times");
         let inner = self.inner.clone();
         let ongoing_updater = OngoingUpdater::new(update_receiver, inner.clone());
         self.thread_updater = Some(thread::spawn(move || ongoing_updater.run()));
         let cond = self.cond.clone();
-        let force_update = self.force_update;
+        let mut force_update = self.force_update;
+        let watcher_sender = self.watcher_sender.clone();
 
         let thread = thread::spawn(move || {
             let root_path = inner.base_dir();
@@ -101,8 +104,14 @@ impl CollectionCache {
                     let mut started = cond_mtx.lock().unwrap();
                     *started = false;
                 }
+                // Not ready to receive reload signals until scan is done
+                {
+                    let mut ws = watcher_sender.lock().unwrap();
+                    *ws = None;
+                }
                 let (tx, rx) = std::sync::mpsc::channel();
-                let mut watcher = watcher(tx, Duration::from_secs(1))
+
+                let mut watcher = watcher(tx.clone(), Duration::from_secs(1))
                     .map_err(|e| error!("Failed to create fs watcher: {}", e));
                 if let Ok(ref mut watcher) = watcher {
                     watcher
@@ -128,6 +137,7 @@ impl CollectionCache {
                 // inittial scan of directory
                 let updater = RecursiveUpdater::new(&inner, None, force_update);
                 updater.process();
+                force_update = false;
 
                 // clean up positions for non existent folders
                 inner.clean_up_positions();
@@ -137,6 +147,11 @@ impl CollectionCache {
                     let mut started = cond_mtx.lock().unwrap();
                     *started = true;
                     cond_var.notify_all();
+                }
+                // And can wait for rescan signal
+                {
+                    let mut ws = watcher_sender.lock().unwrap();
+                    *ws = Some(tx);
                 }
 
                 info!(
@@ -153,7 +168,8 @@ impl CollectionCache {
                                 FilteredEvent::Ignore => continue,
                                 FilteredEvent::Pass(evt) => evt,
                                 FilteredEvent::Rescan => {
-                                    warn!("Rescaning of collection required");
+                                    info!("Rescaning of collection required");
+                                    force_update = true;
                                     break;
                                 }
                                 FilteredEvent::Error(e, p) => {
@@ -300,6 +316,13 @@ impl CollectionTrait for CollectionCache {
             .into_iter()
             .map(|i| i.into())
             .collect()
+    }
+
+    fn signal_rescan(&self) {
+        if let Ok(tx) = self.watcher_sender.lock() {
+            tx.as_ref()
+                .and_then(|tx| tx.send(DebouncedEvent::Rescan).ok());
+        }
     }
 }
 

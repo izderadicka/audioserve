@@ -57,4 +57,6 @@ pub(crate) trait CollectionTrait {
     fn search<S: AsRef<str>>(&self, q: S) -> Vec<AudioFolderShort>;
 
     fn recent(&self, limit: usize) -> Vec<AudioFolderShort>;
+
+    fn signal_rescan(&self);
 }
