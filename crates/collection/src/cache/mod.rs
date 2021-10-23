@@ -372,6 +372,10 @@ impl PositionsTrait for CollectionCache {
     {
         self.inner.get_all_positions_for_group(group, collection_no)
     }
+
+    fn write_json_positions<F: std::io::Write>(&self, file: &mut F) -> Result<()> {
+        self.inner.write_json_positions(file)
+    }
 }
 
 pub struct Search {
@@ -414,7 +418,11 @@ impl Iterator for Search {
 #[cfg(test)]
 mod tests {
 
-    use std::{fs, time::SystemTime};
+    use std::{
+        fs::{self, File},
+        io::{Read, Write},
+        time::SystemTime,
+    };
 
     use fs_extra::dir::{copy, CopyOptions};
     use tempdir::TempDir;
@@ -477,6 +485,32 @@ mod tests {
         );
         assert!(af2.modified.unwrap() >= ts1);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_positions_json() -> anyhow::Result<()> {
+        env_logger::try_init().ok();
+        let (col, tmp_dir) = create_tmp_collection();
+        col.insert_position("ivan", "02-file.opus", 1.0, None)?;
+        col.insert_position(
+            "ivan",
+            "01-file.mp3/002 - Chapter 3$$2000-3000$$.mp3",
+            0.04,
+            None,
+        )?;
+        let fname = tmp_dir.path().join("pos.json");
+        let mut backup_file = File::create(fname.clone())?;
+        col.write_json_positions(&mut backup_file)?;
+        backup_file.flush()?;
+        drop(backup_file);
+        let mut f = File::open(fname)?;
+        let mut data = String::new();
+        let read = f.read_to_string(&mut data)?;
+        assert!(read > 40);
+        println!("DATA:\n {}", data);
+        let json = serde_json::from_str::<serde_json::Map<_, _>>(&data)?;
+        assert_eq!(2, json.len());
         Ok(())
     }
 

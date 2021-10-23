@@ -44,6 +44,9 @@ pub enum Error {
 
     #[error("Position cannot be inserted")]
     IgnoredPosition,
+
+    #[error("JSON error: {0}")]
+    JsonError(#[from] serde_json::Error),
 }
 
 impl From<TransactionError<Error>> for Error {

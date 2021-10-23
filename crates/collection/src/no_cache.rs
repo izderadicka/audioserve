@@ -90,6 +90,10 @@ impl PositionsTrait for CollectionDirect {
     {
         vec![]
     }
+
+    fn write_json_positions<F: std::io::Write>(&self, _file: &mut F) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(PartialEq, Eq)]

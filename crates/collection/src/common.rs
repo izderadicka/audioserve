@@ -39,6 +39,8 @@ pub(crate) trait PositionsTrait {
     fn get_all_positions_for_group<S>(&self, group: S, collection_no: usize) -> Vec<Position>
     where
         S: AsRef<str>;
+
+    fn write_json_positions<F: std::io::Write>(&self, file: &mut F) -> Result<()>;
 }
 
 #[enum_dispatch]

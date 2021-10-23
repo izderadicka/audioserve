@@ -451,6 +451,28 @@ impl CacheInner {
             .map_err(|e| error!("Cannot remove positions: {}", e))
             .ok();
     }
+
+    pub(crate) fn write_json_positions<F: std::io::Write>(&self, mut file: &mut F) -> Result<()> {
+        write!(file, "{{")?;
+        for (idx, res) in self.pos_folder.iter().enumerate() {
+            match res {
+                Ok((k, v)) => {
+                    let folder = std::str::from_utf8(&k)?;
+                    let res: PositionRecord = bincode::deserialize(&v)?;
+                    write!(file, "\"{}\":", folder)?;
+                    serde_json::to_writer(&mut file, &res)?;
+                    if idx < self.pos_folder.len() - 1 {
+                        write!(file, ",\n")?;
+                    } else {
+                        write!(file, "\n")?;
+                    }
+                }
+                Err(e) => error!("Error when reading from position db: {}", e),
+            }
+        }
+        write!(file, "}}")?;
+        Ok(())
+    }
 }
 
 // Updating based on fs events

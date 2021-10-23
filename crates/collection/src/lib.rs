@@ -326,4 +326,22 @@ impl Collections {
             None
         })
     }
+
+    pub async fn backup_positions<P: Into<PathBuf>>(self: Arc<Self>, backup_file: P) -> Result<()> {
+        use std::io::Write;
+        let fname: PathBuf = backup_file.into();
+        let mut f = std::fs::File::create(fname)?;
+        write!(f, "{{")?;
+        for (idx, c) in self.caches.iter().enumerate() {
+            write!(f, "\"{}\":", idx)?;
+            c.write_json_positions(&mut f)?;
+            if idx < self.caches.len() - 1 {
+                write!(f, ",\n")?;
+            } else {
+                write!(f, "\n")?;
+            }
+        }
+        write!(f, "}}")?;
+        Ok(())
+    }
 }
