@@ -242,6 +242,12 @@ fn create_parser<'a>() -> Parser<'a> {
             .validator(is_number)
             .env("AUDIOSERVE_POSITIONS_WS_TIMEOUT")
             .help("Timeout in seconds for idle websocket connection use for playback position sharing [default 600s]")
+        )
+        .arg(
+            Arg::with_name("positions-restore")
+            .long("positions-restore")
+            .requires("positions-backup-file")
+            .help("Restores positions from backup JSON file")
         );
     }
 
@@ -536,6 +542,11 @@ where
 
     if is_present_or_env("ignore-chapters-meta", "AUDIOSERVE_IGNORE_CHAPTERS_META") {
         config.ignore_chapters_meta = true;
+    }
+
+    if is_present_or_env("positions-restore", "AUDIOSERVE_POSITIONS_RESTORE") {
+        config.positions_restore = true;
+        no_authentication_confirmed = true;
     }
 
     if let Some(positions_backup_file) = args.value_of_os("positions-backup-file") {

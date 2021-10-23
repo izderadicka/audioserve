@@ -83,8 +83,17 @@ macro_rules! get_url_path {
     };
 }
 
-fn create_collections() -> Arc<Collections> {
-    let options: HashMap<_, _> = get_config()
+fn create_folder_options() -> (FoldersOptions, HashMap<PathBuf, CollectionOptions>) {
+    let fo = FoldersOptions {
+        allow_symlinks: get_config().allow_symlinks,
+        chapters_duration: get_config().chapters.duration,
+        chapters_from_duration: get_config().chapters.from_duration,
+        ignore_chapters_meta: get_config().ignore_chapters_meta,
+        no_dir_collaps: get_config().no_dir_collaps,
+        tags: Arc::new(get_config().get_tags()),
+        force_cache_update_on_init: get_config().force_cache_update_on_init,
+    };
+    let co: HashMap<_, _> = get_config()
         .base_dirs_options
         .iter()
         .map(|(p, o)| {
@@ -96,23 +105,33 @@ fn create_collections() -> Arc<Collections> {
             )
         })
         .collect();
+
+    (fo, co)
+}
+
+fn create_collections() -> Arc<Collections> {
+    let (fo, co) = create_folder_options();
     Arc::new(
         Collections::new_with_detail::<Vec<PathBuf>, _, _>(
             get_config().base_dirs.clone(),
-            options,
+            co,
             get_config().collections_cache_dir.as_path(),
-            FoldersOptions {
-                allow_symlinks: get_config().allow_symlinks,
-                chapters_duration: get_config().chapters.duration,
-                chapters_from_duration: get_config().chapters.from_duration,
-                ignore_chapters_meta: get_config().ignore_chapters_meta,
-                no_dir_collaps: get_config().no_dir_collaps,
-                tags: Arc::new(get_config().get_tags()),
-                force_cache_update_on_init: get_config().force_cache_update_on_init,
-            },
+            fo,
         )
         .expect("Unable to create collections cache"),
     )
+}
+
+fn restore_positions<P: AsRef<Path>>(backup_file: P) -> anyhow::Result<()> {
+    let (fo, co) = create_folder_options();
+    Collections::restore_positions::<Vec<PathBuf>, _, _, _>(
+        get_config().base_dirs.clone(),
+        co,
+        get_config().collections_cache_dir.as_path(),
+        fo,
+        backup_file,
+    )
+    .map_err(Error::new)
 }
 
 fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> tokio::runtime::Runtime {
@@ -258,6 +277,18 @@ fn main() {
     debug!("Started with following config {:?}", get_config());
 
     collection::init_media_lib();
+
+    if get_config().positions_restore {
+        restore_positions(
+            get_config()
+                .positions_backup_file
+                .clone()
+                .expect("Missing backup file argument"),
+        )
+        .map_err(|e| error!("Error while restoring positions: {}", e))
+        .ok();
+        return;
+    }
 
     #[cfg(feature = "transcoding-cache")]
     {

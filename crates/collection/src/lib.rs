@@ -7,10 +7,12 @@ use cache::CollectionCache;
 use common::{Collection, CollectionOptions, CollectionTrait, PositionsTrait};
 use error::{Error, Result};
 use no_cache::CollectionDirect;
+use serde_json::{Map, Value};
 #[cfg(feature = "async")]
 use std::sync::Arc;
 use std::{
     collections::HashMap,
+    fs::File,
     path::{Path, PathBuf},
 };
 
@@ -19,6 +21,8 @@ pub use audio_meta::{init_media_lib, AudioFile, AudioFolderShort, FoldersOrderin
 pub use media_info::tags;
 pub use position::Position;
 pub use util::guess_mime_type;
+
+use crate::common::PositionsData;
 
 pub mod audio_folder;
 pub mod audio_meta;
@@ -230,12 +234,60 @@ impl Collections {
         db_path: P2,
         opt: FoldersOptions,
         backup_file: P3,
-    ) where
+    ) -> Result<()>
+    where
         I: IntoIterator<Item = P1>,
         P1: Into<PathBuf>,
         P2: AsRef<Path>,
         P3: AsRef<Path>,
     {
+        let mut data: Map<String, Value> =
+            serde_json::from_reader(std::io::BufReader::new(File::open(backup_file)?))?;
+
+        let db_path = db_path.as_ref();
+        let force_update = opt.force_cache_update_on_init;
+        let lister = FolderLister::new_with_options(opt);
+        let threads = collections_dirs
+            .into_iter()
+            .filter_map(move |collection_path| {
+                let no_cache_opt = collections_options
+                    .get(&collection_path)
+                    .map(|o| o.no_cache)
+                    .unwrap_or(false);
+                if !no_cache_opt {
+                    collection_path
+                        .to_str()
+                        .and_then(|path| data.remove(path))
+                        .and_then(|v| {
+                            if let Value::Object(v) = v {
+                                CollectionCache::restore_positions(
+                                    collection_path.clone(),
+                                    db_path,
+                                    lister.clone(),
+                                    force_update,
+                                    PositionsData::V1(v),
+                                )
+                                .map_err(|e| {
+                                    error!("Failed to restore positions from backup: {}", e)
+                                })
+                                .ok()
+                            } else {
+                                None
+                            }
+                        })
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        threads.into_iter().for_each(|t| {
+            t.join()
+                .map_err(|_| error!("Positions restore thread failed"))
+                .ok();
+        });
+
+        Ok(())
     }
 }
 

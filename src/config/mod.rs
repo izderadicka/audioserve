@@ -286,6 +286,7 @@ pub struct Config {
     pub tags: HashSet<String>,
     pub force_cache_update_on_init: bool,
     pub positions_backup_file: Option<PathBuf>,
+    pub positions_restore: bool,
 }
 
 impl Config {
@@ -448,6 +449,7 @@ impl Default for Config {
             tags: HashSet::new(),
             force_cache_update_on_init: false,
             positions_backup_file: None,
+            positions_restore: false,
         }
     }
 }
