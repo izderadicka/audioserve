@@ -223,6 +223,20 @@ impl Collections {
         write!(f, "}}")?;
         Ok(())
     }
+
+    pub fn restore_positions<I, P1, P2, P3>(
+        collections_dirs: Vec<PathBuf>,
+        collections_options: HashMap<PathBuf, CollectionOptions>,
+        db_path: P2,
+        opt: FoldersOptions,
+        backup_file: P3,
+    ) where
+        I: IntoIterator<Item = P1>,
+        P1: Into<PathBuf>,
+        P2: AsRef<Path>,
+        P3: AsRef<Path>,
+    {
+    }
 }
 
 #[cfg(feature = "async")]

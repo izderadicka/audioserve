@@ -82,6 +82,20 @@ impl CacheInner {
     pub(crate) fn iter_folders(&self) -> sled::Iter {
         self.db.iter()
     }
+
+    pub(crate) fn clean_up_folders(&self) {
+        for key in self.iter_folders().filter_map(|e| e.ok()).map(|(k, _)| k) {
+            if let Ok(rel_path) = std::str::from_utf8(&key) {
+                let full_path = self.base_dir.join(rel_path);
+                if !full_path.exists() {
+                    debug!("Removing {:?} from collection cache db", full_path);
+                    self.remove(rel_path)
+                        .map_err(|e| error!("cannot remove revord from db: {}", e))
+                        .ok();
+                }
+            }
+        }
+    }
 }
 
 impl CacheInner {

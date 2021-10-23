@@ -87,6 +87,34 @@ impl CollectionCache {
         Ok(db_dir.as_ref().join(name.as_ref()))
     }
 
+    pub(crate) fn restore_positions<P1: Into<PathBuf>, P2: AsRef<Path>>(
+        path: P1,
+        db_dir: P2,
+        lister: FolderLister,
+        force_update: bool,
+        backup_data: PositionsData,
+    ) -> Result<thread::JoinHandle<()>> {
+        let col = CollectionCache::new(path, db_dir, lister, force_update)?;
+        let inner = col.inner.clone();
+        let thread = thread::spawn(move || {
+            // clean up non-exitent directories
+            inner.clean_up_folders();
+
+            // inittial scan of directory
+            let updater = RecursiveUpdater::new(&inner, None, force_update);
+            updater.process();
+
+            // clean up positions for non existent folders
+            inner.clean_up_positions();
+
+            inner
+                .read_json_positions(backup_data)
+                .map_err(|e| error!("Restore of collection {:?} failed: {}", inner.base_dir(), e))
+                .ok();
+        });
+        Ok(thread)
+    }
+
     pub(crate) fn run_update_loop(&mut self) {
         let update_receiver = self.update_receiver.take().expect("run multiple times");
         let inner = self.inner.clone();
@@ -121,18 +149,7 @@ impl CollectionCache {
                 }
 
                 // clean up non-exitent directories
-                for key in inner.iter_folders().filter_map(|e| e.ok()).map(|(k, _)| k) {
-                    if let Ok(rel_path) = std::str::from_utf8(&key) {
-                        let full_path = root_path.join(rel_path);
-                        if !full_path.exists() {
-                            debug!("Removing {:?} from collection cache db", full_path);
-                            inner
-                                .remove(rel_path)
-                                .map_err(|e| error!("cannot remove revord from db: {}", e))
-                                .ok();
-                        }
-                    }
-                }
+                inner.clean_up_folders();
 
                 // inittial scan of directory
                 let updater = RecursiveUpdater::new(&inner, None, force_update);
