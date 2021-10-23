@@ -47,6 +47,9 @@ pub enum Error {
 
     #[error("JSON error: {0}")]
     JsonError(#[from] serde_json::Error),
+
+    #[error("JSON schema error: {0}")]
+    JsonSchemaError(String),
 }
 
 impl From<TransactionError<Error>> for Error {

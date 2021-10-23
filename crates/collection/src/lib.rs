@@ -201,6 +201,24 @@ impl Collections {
     pub fn force_rescan(self: Arc<Self>) {
         self.caches.iter().for_each(|c| c.signal_rescan())
     }
+
+    pub fn backup_positions<P: Into<PathBuf>>(&self, backup_file: P) -> Result<()> {
+        use std::io::Write;
+        let fname: PathBuf = backup_file.into();
+        let mut f = std::fs::File::create(fname)?;
+        write!(f, "{{")?;
+        for (idx, c) in self.caches.iter().enumerate() {
+            write!(f, "\"{:?}\":", c.base_dir())?;
+            c.write_json_positions(&mut f)?;
+            if idx < self.caches.len() - 1 {
+                write!(f, ",\n")?;
+            } else {
+                write!(f, "\n")?;
+            }
+        }
+        write!(f, "}}")?;
+        Ok(())
+    }
 }
 
 #[cfg(feature = "async")]
@@ -327,21 +345,16 @@ impl Collections {
         })
     }
 
-    pub async fn backup_positions<P: Into<PathBuf>>(self: Arc<Self>, backup_file: P) -> Result<()> {
-        use std::io::Write;
-        let fname: PathBuf = backup_file.into();
-        let mut f = std::fs::File::create(fname)?;
-        write!(f, "{{")?;
-        for (idx, c) in self.caches.iter().enumerate() {
-            write!(f, "\"{}\":", idx)?;
-            c.write_json_positions(&mut f)?;
-            if idx < self.caches.len() - 1 {
-                write!(f, ",\n")?;
-            } else {
-                write!(f, "\n")?;
+    pub async fn backup_positions_async<P>(self: Arc<Self>, backup_file: P) -> Result<()> 
+    where P : Into<PathBuf> + Send + 'static
+    {
+        spawn_blocking!(
+            {
+                self.backup_positions(backup_file)
+
             }
-        }
-        write!(f, "}}")?;
-        Ok(())
+        )
+        .unwrap_or_else(|e| Err(Error::from(e)))
+        
     }
 }

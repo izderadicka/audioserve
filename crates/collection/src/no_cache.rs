@@ -5,7 +5,7 @@ use std::time::SystemTime;
 
 use crate::audio_folder::FolderLister;
 use crate::audio_meta::AudioFolder;
-use crate::common::{CollectionTrait, PositionsTrait};
+use crate::common::{CollectionTrait, PositionsData, PositionsTrait};
 use crate::error::{Error, Result};
 use crate::util::get_real_file_type;
 use crate::AudioFolderShort;
@@ -55,6 +55,12 @@ impl CollectionTrait for CollectionDirect {
     }
 
     fn signal_rescan(&self) {}
+
+    fn base_dir(&self)-> &Path {
+        self.base_dir.as_path()
+    }
+
+    
 }
 
 impl PositionsTrait for CollectionDirect {
@@ -94,6 +100,12 @@ impl PositionsTrait for CollectionDirect {
     fn write_json_positions<F: std::io::Write>(&self, _file: &mut F) -> Result<()> {
         Ok(())
     }
+
+    fn read_json_positions(&self, _data: PositionsData)->Result<()> {
+        Ok(())
+    }
+
+    
 }
 
 #[derive(PartialEq, Eq)]

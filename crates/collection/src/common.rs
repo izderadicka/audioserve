@@ -6,7 +6,13 @@ use crate::{
     AudioFolderShort, FoldersOrdering, Position,
 };
 use enum_dispatch::enum_dispatch;
+use serde_json::{Map, Value};
 use std::path::Path;
+
+pub enum PositionsData {
+    Legacy(()),
+    V1(Map<String,Value>)
+}
 
 pub struct CollectionOptions {
     pub no_cache: bool,
@@ -41,6 +47,8 @@ pub(crate) trait PositionsTrait {
         S: AsRef<str>;
 
     fn write_json_positions<F: std::io::Write>(&self, file: &mut F) -> Result<()>;
+
+    fn read_json_positions(&self, data: PositionsData) -> Result<()>;
 }
 
 #[enum_dispatch]
@@ -61,4 +69,6 @@ pub(crate) trait CollectionTrait {
     fn recent(&self, limit: usize) -> Vec<AudioFolderShort>;
 
     fn signal_rescan(&self);
+
+    fn base_dir(&self) -> &Path;
 }

@@ -7,7 +7,7 @@ use crate::{
     audio_folder::FolderLister,
     audio_meta::{AudioFolder, FolderByModification, TimeStamp},
     cache::update::{filter_event, FilteredEvent, RecursiveUpdater},
-    common::{CollectionTrait, PositionsTrait},
+    common::{CollectionTrait, PositionsData, PositionsTrait},
     error::{Error, Result},
     position::{Position, PositionShort},
     util::get_modified,
@@ -324,6 +324,10 @@ impl CollectionTrait for CollectionCache {
                 .and_then(|tx| tx.send(DebouncedEvent::Rescan).ok());
         }
     }
+
+    fn base_dir(&self) -> &Path {
+        self.inner.base_dir()
+    }
 }
 
 impl Drop for CollectionCache {
@@ -376,6 +380,10 @@ impl PositionsTrait for CollectionCache {
     fn write_json_positions<F: std::io::Write>(&self, file: &mut F) -> Result<()> {
         self.inner.write_json_positions(file)
     }
+
+    fn read_json_positions(&self, data: PositionsData) -> Result<()> {
+        self.inner.read_json_positions(data)
+    }
 }
 
 pub struct Search {
@@ -425,7 +433,10 @@ mod tests {
     };
 
     use fs_extra::dir::{copy, CopyOptions};
+    use serde_json::Value;
     use tempdir::TempDir;
+
+    use crate::position::PositionItem;
 
     use super::*;
 
@@ -511,6 +522,27 @@ mod tests {
         println!("DATA:\n {}", data);
         let json = serde_json::from_str::<serde_json::Map<_, _>>(&data)?;
         assert_eq!(2, json.len());
+        let v = json
+            .get("")
+            .and_then(|v| {
+                if let Value::Object(map) = v {
+                    map.get("ivan")
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+        let pos: PositionItem = serde_json::from_value(v.clone())?;
+        assert_eq!(1.0, pos.position);
+
+        // recovery to same collection should work
+        col.read_json_positions(PositionsData::V1(json.clone()))?;
+
+        // and also it should work for new collection
+        let (col2, _tmp2) = create_tmp_collection();
+        assert!(col2.get_position::<_, String>("ivan", None).is_none());
+        col2.read_json_positions(PositionsData::V1(json))?;
+        assert_eq!(2, col2.get_all_positions_for_group("ivan", 0).len());
         Ok(())
     }
 

@@ -7,23 +7,16 @@ use std::{
 
 use crossbeam_channel::Sender;
 use notify::DebouncedEvent;
+use serde_json::Value;
 use sled::{
     transaction::{self, TransactionError, Transactional},
     Batch, Db, IVec, Tree,
 };
 
-use crate::{
-    audio_folder::{DirType, FolderLister},
-    audio_meta::{AudioFolder, TimeStamp},
-    cache::{
+use crate::{AudioFolderShort, FoldersOrdering, Position, audio_folder::{DirType, FolderLister}, audio_meta::{AudioFolder, TimeStamp}, cache::{
         update::RecursiveUpdater,
         util::{split_path, update_path},
-    },
-    error::{Error, Result},
-    position::{PositionItem, PositionRecord, MAX_GROUPS},
-    util::{get_file_name, get_meta, get_modified},
-    AudioFolderShort, FoldersOrdering, Position,
-};
+    }, common::PositionsData, error::{Error, Result}, position::{PositionItem, PositionRecord, MAX_GROUPS}, util::{get_file_name, get_meta, get_modified}};
 
 use super::{
     update::UpdateAction,
@@ -221,7 +214,7 @@ impl CacheInner {
                     if let Some(ts) = ts {
                         if let Some(current_record) = folder_rec.get(group.as_ref()) {
                             if current_record.timestamp > ts {
-                                warn!(
+                                info!(
                                     "Position not inserted for folder {} because it's outdated",
                                     path
                                 );
@@ -471,6 +464,32 @@ impl CacheInner {
             }
         }
         write!(file, "}}")?;
+        Ok(())
+    }
+
+    // It may not be much efficient, but it's simple and it's ok, as restore from will be rarely used
+    pub(crate) fn read_json_positions(&self, data: PositionsData)->Result<()> {
+
+        match data {
+            PositionsData::Legacy(_) => todo!(),
+            PositionsData::V1(json) => {
+                for (folder, rec) in json.into_iter() {
+                    if let Value::Object(map) = rec {
+                        
+                        for (group, v) in map.into_iter() {
+                            let item: PositionItem = serde_json::from_value(v)?;
+                            let path = folder.clone() + "/" + &item.file;
+                            self.insert_position(group, path, item.position, Some(item.timestamp))?;
+
+                        }
+                    } else {
+                        return Err(Error::JsonSchemaError(format!("Expected object for key {}", folder)))
+                    }
+
+                }
+            }
+        }
+
         Ok(())
     }
 }
