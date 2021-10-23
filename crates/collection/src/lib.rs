@@ -208,7 +208,11 @@ impl Collections {
         let mut f = std::fs::File::create(fname)?;
         write!(f, "{{")?;
         for (idx, c) in self.caches.iter().enumerate() {
-            write!(f, "\"{:?}\":", c.base_dir())?;
+            write!(
+                f,
+                "\"{}\":",
+                c.base_dir().to_str().ok_or_else(|| Error::InvalidPath)?
+            )?;
             c.write_json_positions(&mut f)?;
             if idx < self.caches.len() - 1 {
                 write!(f, ",\n")?;
@@ -345,16 +349,11 @@ impl Collections {
         })
     }
 
-    pub async fn backup_positions_async<P>(self: Arc<Self>, backup_file: P) -> Result<()> 
-    where P : Into<PathBuf> + Send + 'static
+    pub async fn backup_positions_async<P>(self: Arc<Self>, backup_file: P) -> Result<()>
+    where
+        P: Into<PathBuf> + Send + 'static,
     {
-        spawn_blocking!(
-            {
-                self.backup_positions(backup_file)
-
-            }
-        )
-        .unwrap_or_else(|e| Err(Error::from(e)))
-        
+        spawn_blocking!({ self.backup_positions(backup_file) })
+            .unwrap_or_else(|e| Err(Error::from(e)))
     }
 }

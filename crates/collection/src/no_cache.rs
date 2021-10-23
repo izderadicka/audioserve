@@ -56,11 +56,9 @@ impl CollectionTrait for CollectionDirect {
 
     fn signal_rescan(&self) {}
 
-    fn base_dir(&self)-> &Path {
+    fn base_dir(&self) -> &Path {
         self.base_dir.as_path()
     }
-
-    
 }
 
 impl PositionsTrait for CollectionDirect {
@@ -101,11 +99,9 @@ impl PositionsTrait for CollectionDirect {
         Ok(())
     }
 
-    fn read_json_positions(&self, _data: PositionsData)->Result<()> {
+    fn read_json_positions(&self, _data: PositionsData) -> Result<()> {
         Ok(())
     }
-
-    
 }
 
 #[derive(PartialEq, Eq)]

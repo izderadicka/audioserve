@@ -11,7 +11,7 @@ use std::path::Path;
 
 pub enum PositionsData {
     Legacy(()),
-    V1(Map<String,Value>)
+    V1(Map<String, Value>),
 }
 
 pub struct CollectionOptions {

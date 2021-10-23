@@ -229,6 +229,14 @@ fn create_parser<'a>() -> Parser<'a> {
 
     if cfg!(feature = "shared-positions") {
         parser = parser.arg(
+            Arg::with_name("positions-backup-file")
+            .long("positions-backup-file")
+            .takes_value(true)
+            .validator_os(parent_dir_exists)
+            .env("AUDIOSERVE_POSITIONS_BACKUP_FILE")
+            .help("File to back up last listened positions (can be used to restore positions in case of troubles or migration) [default is None]"),
+        )
+        .arg(
             Arg::with_name("positions-ws-timeout")
             .long("positions-ws-timeout")
             .validator(is_number)
@@ -528,6 +536,10 @@ where
 
     if is_present_or_env("ignore-chapters-meta", "AUDIOSERVE_IGNORE_CHAPTERS_META") {
         config.ignore_chapters_meta = true;
+    }
+
+    if let Some(positions_backup_file) = args.value_of_os("positions-backup-file") {
+        config.positions_backup_file = Some(positions_backup_file.into());
     }
 
     if let Some(positions_ws_timeout) = args.value_of("positions-ws-timeout") {

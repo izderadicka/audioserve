@@ -285,6 +285,7 @@ pub struct Config {
     pub collections_cache_dir: PathBuf,
     pub tags: HashSet<String>,
     pub force_cache_update_on_init: bool,
+    pub positions_backup_file: Option<PathBuf>,
 }
 
 impl Config {
@@ -446,6 +447,7 @@ impl Default for Config {
             collections_cache_dir: data_base_dir.join("col_db"),
             tags: HashSet::new(),
             force_cache_update_on_init: false,
+            positions_backup_file: None,
         }
     }
 }

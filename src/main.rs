@@ -225,6 +225,24 @@ async fn watch_for_cache_update_signal(cols: Arc<Collections>) {
     }
 }
 
+#[cfg(unix)]
+async fn watch_for_positions_backup_signal(cols: Arc<Collections>) {
+    use tokio::signal::unix::{signal, SignalKind};
+    let mut sigusr2 = signal(SignalKind::user_defined2()).expect("Cannot create SIGINT handler");
+    while let Some(()) = sigusr2.recv().await {
+        info!("Received signal SIGUSR2 for positions backup");
+        if let Some(backup_file) = get_config().positions_backup_file.clone() {
+            cols.clone()
+                .backup_positions_async(backup_file)
+                .await
+                .map_err(|e| error!("Backup of positions failed: {}", e))
+                .ok();
+        } else {
+            warn!("positions backup file is not setup");
+        }
+    }
+}
+
 fn main() {
     #[cfg(unix)]
     {
@@ -268,7 +286,10 @@ fn main() {
     let runtime = start_server(server_secret, collections.clone());
 
     #[cfg(unix)]
-    runtime.spawn(watch_for_cache_update_signal(collections.clone()));
+    {
+        runtime.spawn(watch_for_cache_update_signal(collections.clone()));
+        runtime.spawn(watch_for_positions_backup_signal(collections.clone()));
+    }
 
     runtime.block_on(terminate_server());
 
