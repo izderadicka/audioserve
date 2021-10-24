@@ -7,7 +7,7 @@ extern crate lazy_static;
 
 use collection::audio_folder::FoldersOptions;
 use collection::common::CollectionOptions;
-use collection::Collections;
+use collection::{BackupFile, Collections};
 use config::{get_config, init_config};
 use error::{bail, Context, Error};
 use futures::prelude::*;
@@ -121,9 +121,9 @@ fn create_collections() -> Arc<Collections> {
     )
 }
 
-fn restore_positions<P: AsRef<Path>>(backup_file: P) -> anyhow::Result<()> {
+fn restore_positions<P: AsRef<Path>>(backup_file: BackupFile<P>) -> anyhow::Result<()> {
     let (fo, co) = create_folder_options();
-    Collections::restore_positions::<Vec<PathBuf>, _, _, _>(
+    Collections::restore_positions(
         get_config().base_dirs.clone(),
         co,
         get_config().collections_cache_dir.as_path(),
@@ -277,11 +277,12 @@ fn main() -> anyhow::Result<()> {
     collection::init_media_lib();
 
     if get_config().positions_restore {
+        let backup_file = BackupFile::V1(get_config()
+        .positions_backup_file
+        .clone()
+        .expect("Missing backup file argument"));
         restore_positions(
-            get_config()
-                .positions_backup_file
-                .clone()
-                .expect("Missing backup file argument"),
+            backup_file
         )
         .context("Error while restoring position")?;
 

@@ -6,6 +6,7 @@ use audio_meta::{AudioFolder, TimeStamp};
 use cache::CollectionCache;
 use common::{Collection, CollectionOptions, CollectionTrait, PositionsTrait};
 use error::{Error, Result};
+use legacy_pos::LegacyPositions;
 use no_cache::CollectionDirect;
 use serde_json::{Map, Value};
 #[cfg(feature = "async")]
@@ -14,6 +15,7 @@ use std::{
     collections::HashMap,
     fs::File,
     path::{Path, PathBuf},
+    thread::JoinHandle,
 };
 
 pub use audio_folder::{list_dir_files_only, parse_chapter_path};
@@ -22,13 +24,14 @@ pub use media_info::tags;
 pub use position::Position;
 pub use util::guess_mime_type;
 
-use crate::common::PositionsData;
+use crate::{common::PositionsData, position::PositionItem};
 
 pub mod audio_folder;
 pub mod audio_meta;
 mod cache;
 pub mod common;
 pub mod error;
+mod legacy_pos;
 pub(crate) mod no_cache;
 pub mod position;
 pub mod util;
@@ -235,25 +238,64 @@ impl Collections {
         Ok(())
     }
 
-    pub fn restore_positions<I, P1, P2, P3>(
+    pub fn restore_positions<P2, P3>(
         collections_dirs: Vec<PathBuf>,
         collections_options: HashMap<PathBuf, CollectionOptions>,
         db_path: P2,
         opt: FoldersOptions,
-        backup_file: P3,
+        backup_file: BackupFile<P3>,
     ) -> Result<()>
     where
-        I: IntoIterator<Item = P1>,
-        P1: Into<PathBuf>,
         P2: AsRef<Path>,
         P3: AsRef<Path>,
     {
+        let force_update = opt.force_cache_update_on_init;
+        let lister = FolderLister::new_with_options(opt);
+
+        let threads = match backup_file {
+            BackupFile::V1(backup_file) => Collections::restore_positions_v1(
+                collections_dirs,
+                collections_options,
+                db_path,
+                lister,
+                force_update,
+                backup_file,
+            ),
+            BackupFile::Legacy(backup_file) => Collections::restore_positions_legacy(
+                collections_dirs,
+                collections_options,
+                db_path,
+                lister,
+                force_update,
+                backup_file,
+            ),
+        }?;
+
+        threads.into_iter().for_each(|t| {
+            t.join()
+                .map_err(|_| error!("Positions restore thread failed"))
+                .ok();
+        });
+
+        Ok(())
+    }
+
+    fn restore_positions_v1<P2, P3>(
+        collections_dirs: Vec<PathBuf>,
+        collections_options: HashMap<PathBuf, CollectionOptions>,
+        db_path: P2,
+        lister: FolderLister,
+        force_update: bool,
+        backup_file: P3,
+    ) -> Result<Vec<JoinHandle<()>>>
+    where
+        P2: AsRef<Path>,
+        P3: AsRef<Path>,
+    {
+        let db_path = db_path.as_ref();
         let mut data: Map<String, Value> =
             serde_json::from_reader(std::io::BufReader::new(File::open(backup_file)?))?;
 
-        let db_path = db_path.as_ref();
-        let force_update = opt.force_cache_update_on_init;
-        let lister = FolderLister::new_with_options(opt);
         let threads = collections_dirs
             .into_iter()
             .filter_map(move |collection_path| {
@@ -288,14 +330,106 @@ impl Collections {
             })
             .collect::<Vec<_>>();
 
-        threads.into_iter().for_each(|t| {
-            t.join()
-                .map_err(|_| error!("Positions restore thread failed"))
-                .ok();
-        });
-
-        Ok(())
+        Ok(threads)
     }
+
+    fn restore_positions_legacy<P2, P3>(
+        collections_dirs: Vec<PathBuf>,
+        collections_options: HashMap<PathBuf, CollectionOptions>,
+        db_path: P2,
+        lister: FolderLister,
+        force_update: bool,
+        backup_file: P3,
+    ) -> Result<Vec<JoinHandle<()>>>
+    where
+        P2: AsRef<Path>,
+        P3: AsRef<Path>,
+    {
+        let db_path = db_path.as_ref();
+        let data: LegacyPositions =
+            serde_json::from_reader(std::io::BufReader::new(File::open(backup_file)?))?;
+
+        let mut col_positions: HashMap<usize, HashMap<String, HashMap<String, PositionItem>>> =
+            HashMap::new();
+        for (group, m) in data.table.into_iter() {
+            for (col_path, pos) in m.into_iter() {
+                let segs = col_path.split_once('/').ok_or_else(|| {
+                    Error::JsonDataError("Invalid path, missing collection".into())
+                })?;
+
+                let col_no: usize = segs
+                    .0
+                    .parse()
+                    .map_err(|_| Error::JsonDataError("Collection is not number".into()))?;
+                let path = segs.1.to_string();
+                let item = PositionItem {
+                    file: pos.file,
+                    position: pos.position,
+                    timestamp: pos.timestamp.into(),
+                    folder_finished: false,
+                };
+
+                col_positions
+                    .entry(col_no)
+                    .or_default()
+                    .entry(path)
+                    .or_default()
+                    .entry(group.clone())
+                    .and_modify(|e| {
+                        if item.timestamp > e.timestamp {
+                            *e = item.clone();
+                        }
+                    })
+                    .or_insert(item);
+            }
+        }
+
+        todo!()
+
+        // let threads = collections_dirs
+        //     .into_iter()
+        //     .filter_map(move |collection_path| {
+        //         let no_cache_opt = collections_options
+        //             .get(&collection_path)
+        //             .map(|o| o.no_cache)
+        //             .unwrap_or(false);
+        //         if !no_cache_opt {
+        //             collection_path
+        //                 .to_str()
+        //                 .and_then(|path| data.remove(path))
+        //                 .and_then(|v| {
+        //                     if let Value::Object(v) = v {
+        //                         CollectionCache::restore_positions(
+        //                             collection_path.clone(),
+        //                             db_path,
+        //                             lister.clone(),
+        //                             force_update,
+        //                             PositionsData::V1(v),
+        //                         )
+        //                         .map_err(|e| {
+        //                             error!("Failed to restore positions from backup: {}", e)
+        //                         })
+        //                         .ok()
+        //                     } else {
+        //                         None
+        //                     }
+        //                 })
+        //         } else {
+        //             None
+        //         }
+        //     })
+        //     .collect::<Vec<_>>();
+
+        // Ok(threads)
+    }
+}
+
+pub enum BackupFile<P>
+where
+    P: AsRef<Path>,
+{
+    V1(P),
+    Legacy(P),
 }
 
 #[cfg(feature = "async")]

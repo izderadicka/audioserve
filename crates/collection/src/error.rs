@@ -50,6 +50,9 @@ pub enum Error {
 
     #[error("JSON schema error: {0}")]
     JsonSchemaError(String),
+
+    #[error("JSON schema error: {0}")]
+    JsonDataError(String),
 }
 
 impl From<TransactionError<Error>> for Error {
