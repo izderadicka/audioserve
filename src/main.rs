@@ -22,7 +22,6 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process;
-use std::process::exit;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::thread;
@@ -262,7 +261,7 @@ async fn watch_for_positions_backup_signal(cols: Arc<Collections>) {
     }
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     #[cfg(unix)]
     {
         if nix::unistd::getuid().is_root() {
@@ -270,8 +269,7 @@ fn main() {
         }
     }
     if let Err(e) = init_config() {
-        eprintln!("Config/Arguments error: {}", e);
-        process::exit(1)
+        return Err(Error::msg(format!("Config/Arguments error: {}", e)));
     };
     env_logger::init();
     debug!("Started with following config {:?}", get_config());
@@ -285,9 +283,13 @@ fn main() {
                 .clone()
                 .expect("Missing backup file argument"),
         )
-        .map_err(|e| error!("Error while restoring positions: {}", e))
-        .ok();
-        return;
+        .context("Error while restoring position")?;
+
+        let msg =
+            "Positions restoration is finished, exiting program, restart it now without --positions-restore arg";
+        info!("{}", msg);
+        println!("{}", msg);
+        return Ok(());
     }
 
     #[cfg(feature = "transcoding-cache")]
@@ -306,10 +308,7 @@ fn main() {
     }
     let server_secret = match generate_server_secret(&get_config().secret_file) {
         Ok(s) => s,
-        Err(e) => {
-            error!("Error creating/reading secret: {}", e);
-            process::exit(2)
-        }
+        Err(e) => return Err(Error::msg(format!("Error creating/reading secret: {}", e))),
     };
 
     let collections = create_collections();
@@ -328,9 +327,13 @@ fn main() {
     runtime.shutdown_timeout(std::time::Duration::from_millis(300));
 
     thread::spawn(|| {
-        thread::sleep(Duration::from_secs(10));
-        error!("Forced exit");
-        exit(111);
+        const FINISH_LIMIT: u64 = 10;
+        thread::sleep(Duration::from_secs(FINISH_LIMIT));
+        error!(
+            "Forced exit, program is not finishing with limit of {}s",
+            FINISH_LIMIT
+        );
+        process::exit(111);
     });
 
     debug!("Saving collections db");
@@ -357,4 +360,6 @@ fn main() {
     }
 
     info!("Server finished");
+
+    Ok(())
 }

@@ -213,6 +213,7 @@ impl CacheInner {
         path: P,
         position: f32,
         ts: Option<TimeStamp>,
+        use_ts: bool,
     ) -> Result<()>
     where
         S: AsRef<str>,
@@ -242,6 +243,11 @@ impl CacheInner {
                                     path
                                 );
                                 return transaction::abort(Error::IgnoredPosition);
+                            } else {
+                                debug!(
+                                    "Updating position record {} dated {:?} with new from {:?}",
+                                    path, current_record.timestamp, ts
+                                );
                             }
                         }
                     }
@@ -252,7 +258,11 @@ impl CacheInner {
                                 .map(|dif| dif < CacheInner::EOB_LIMIT)
                                 .unwrap_or(false),
                         file: file.into(),
-                        timestamp: TimeStamp::now(),
+                        timestamp: if use_ts && ts.is_some() {
+                            ts.unwrap()
+                        } else {
+                            TimeStamp::now()
+                        },
                         position,
                     };
 
@@ -499,8 +509,26 @@ impl CacheInner {
                     if let Value::Object(map) = rec {
                         for (group, v) in map.into_iter() {
                             let item: PositionItem = serde_json::from_value(v)?;
-                            let path = folder.clone() + "/" + &item.file;
-                            self.insert_position(group, path, item.position, Some(item.timestamp))?;
+                            let path = if folder.is_empty() {
+                                item.file
+                            } else {
+                                folder.clone() + "/" + &item.file
+                            };
+                            trace!("Inserting position {} ts {:?}", path, item.timestamp);
+                            self.insert_position(
+                                group,
+                                path,
+                                item.position,
+                                Some(item.timestamp),
+                                true,
+                            )
+                            .or_else(|e| {
+                                if matches!(e, Error::IgnoredPosition) {
+                                    Ok(())
+                                } else {
+                                    Err(e)
+                                }
+                            })?;
                         }
                     } else {
                         return Err(Error::JsonSchemaError(format!(

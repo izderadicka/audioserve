@@ -376,7 +376,7 @@ impl PositionsTrait for CollectionCache {
         S: AsRef<str>,
         P: AsRef<str>,
     {
-        self.inner.insert_position(group, path, position, ts)
+        self.inner.insert_position(group, path, position, ts, false)
     }
 
     fn get_position<S, P>(&self, group: S, folder: Option<P>) -> Option<Position>
