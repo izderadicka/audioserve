@@ -277,14 +277,13 @@ fn main() -> anyhow::Result<()> {
     collection::init_media_lib();
 
     if get_config().positions_restore {
-        let backup_file = BackupFile::V1(get_config()
-        .positions_backup_file
-        .clone()
-        .expect("Missing backup file argument"));
-        restore_positions(
-            backup_file
-        )
-        .context("Error while restoring position")?;
+        let backup_file = BackupFile::V1(
+            get_config()
+                .positions_backup_file
+                .clone()
+                .expect("Missing backup file argument"),
+        );
+        restore_positions(backup_file).context("Error while restoring position")?;
 
         let msg =
             "Positions restoration is finished, exiting program, restart it now without --positions-restore arg";
