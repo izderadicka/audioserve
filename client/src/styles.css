@@ -235,9 +235,17 @@ span.subtitle {
 }
 
 #files-duration {
-    font-size: 66%;
-    margin-left: 0.5em;
+    font-size: 50%;
     color: gray;
+}
+
+#info-tags {
+    width: 330px;
+    float: right;
+}
+
+#info-tags table {
+    border: 1px lightgray solid;
 }
 
 .file-tags-title {

@@ -208,7 +208,7 @@ $(function () {
                     table.append(tbody);
                     
                     for (const [name, value] of Object.entries(data.tags)) {
-                        tbody.append($(`<tr><td>${name}</td><td>${value}</td></tr>`));
+                        tbody.append($(`<tr><th>${name}</th><td>${value}</td></tr>`));
                     }
                     $("#info-tags").append(table);
                     $("#info-container").show();
