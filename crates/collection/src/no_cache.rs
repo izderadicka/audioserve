@@ -67,6 +67,7 @@ impl PositionsTrait for CollectionDirect {
         _group: S,
         _path: P,
         _position: f32,
+        _folder_finished: bool,
         _ts: Option<crate::audio_meta::TimeStamp>,
     ) -> Result<()>
     where

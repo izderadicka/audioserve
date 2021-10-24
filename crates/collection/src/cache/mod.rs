@@ -370,13 +370,15 @@ impl PositionsTrait for CollectionCache {
         group: S,
         path: P,
         position: f32,
+        finished: bool,
         ts: Option<TimeStamp>,
     ) -> Result<()>
     where
         S: AsRef<str>,
         P: AsRef<str>,
     {
-        self.inner.insert_position(group, path, position, ts, false)
+        self.inner
+            .insert_position(group, path, position, finished, ts, false)
     }
 
     fn get_position<S, P>(&self, group: S, folder: Option<P>) -> Option<Position>
@@ -520,11 +522,12 @@ mod tests {
     fn test_positions_json() -> anyhow::Result<()> {
         env_logger::try_init().ok();
         let (col, tmp_dir) = create_tmp_collection();
-        col.insert_position("ivan", "02-file.opus", 1.0, None)?;
+        col.insert_position("ivan", "02-file.opus", 1.0, false, None)?;
         col.insert_position(
             "ivan",
             "01-file.mp3/002 - Chapter 3$$2000-3000$$.mp3",
             0.04,
+            false,
             None,
         )?;
         let fname = tmp_dir.path().join("pos.json");
@@ -594,7 +597,7 @@ mod tests {
     fn test_position() -> anyhow::Result<()> {
         env_logger::try_init().ok();
         let (col, _tmp_dir) = create_tmp_collection();
-        col.insert_position("ivan", "02-file.opus", 1.0, None)?;
+        col.insert_position("ivan", "02-file.opus", 1.0, false, None)?;
         let r1 = col
             .get_position("ivan", Some(""))
             .expect("position record exists");
@@ -604,6 +607,7 @@ mod tests {
             "ivan",
             "01-file.mp3/002 - Chapter 3$$2000-3000$$.mp3",
             0.04,
+            false,
             None,
         )?;
         // test insert position with old timestamp, should not be inserted
@@ -617,6 +621,7 @@ mod tests {
             "ivan",
             "01-file.mp3/002 - Chapter 3$$2000-3000$$.mp3",
             0.08,
+            false,
             Some(ts),
         );
         assert!(res.is_err());
@@ -636,6 +641,7 @@ mod tests {
             "ivan",
             "01-file.mp3/002 - Chapter 3$$2000-3000$$.mp3",
             0.08,
+            false,
             Some(ts),
         )?;
 

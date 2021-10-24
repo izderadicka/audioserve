@@ -529,6 +529,7 @@ pub fn insert_position(
                         group,
                         path,
                         pos.position,
+                        pos.folder_finished,
                         pos.timestamp,
                     )
                     .then(|res| match res {

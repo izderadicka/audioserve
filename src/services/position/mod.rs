@@ -152,6 +152,7 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseF
                                             file_loc.group,
                                             file_loc.path,
                                             position,
+                                            false,
                                             ts.into(),
                                         )
                                         .await
@@ -161,6 +162,7 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseF
                                             file_loc.group,
                                             file_loc.path,
                                             position,
+                                            false,
                                         )
                                         .await
                                     }
@@ -176,6 +178,7 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseF
                                             prev.group,
                                             prev.path,
                                             position,
+                                            false,
                                         )
                                         .await
                                         .unwrap_or_else(|e| error!("Cannot insert position: {}", e))

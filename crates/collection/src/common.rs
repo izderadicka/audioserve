@@ -31,6 +31,7 @@ pub(crate) trait PositionsTrait {
         group: S,
         path: P,
         position: f32,
+        finished: bool,
         ts: Option<TimeStamp>,
     ) -> Result<()>
     where

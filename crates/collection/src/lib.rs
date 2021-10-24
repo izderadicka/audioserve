@@ -138,13 +138,14 @@ impl Collections {
         group: S,
         path: P,
         position: f32,
+        folder_finished: bool,
     ) -> Result<()>
     where
         S: AsRef<str>,
         P: AsRef<str>,
     {
         self.get_cache(collection)?
-            .insert_position(group, path, position, None)
+            .insert_position(group, path, position, folder_finished, None)
     }
 
     pub fn insert_position_if_newer<S, P>(
@@ -153,14 +154,20 @@ impl Collections {
         group: S,
         path: P,
         position: f32,
+        folder_finished: bool,
         ts: TimeStamp,
     ) -> Result<()>
     where
         S: AsRef<str>,
         P: AsRef<str>,
     {
-        self.get_cache(collection)?
-            .insert_position(group, path, position, Some(ts))
+        self.get_cache(collection)?.insert_position(
+            group,
+            path,
+            position,
+            folder_finished,
+            Some(ts),
+        )
     }
 
     pub fn get_position<S, P>(&self, collection: usize, group: S, folder: P) -> Option<Position>
@@ -307,14 +314,20 @@ impl Collections {
         group: S,
         path: P,
         position: f32,
+        folder_finished: bool,
     ) -> Result<()>
     where
         S: AsRef<str> + Send + 'static,
         P: AsRef<str> + Send + 'static,
     {
         spawn_blocking!({
-            self.get_cache(collection)?
-                .insert_position(group, path, position, None)
+            self.get_cache(collection)?.insert_position(
+                group,
+                path,
+                position,
+                folder_finished,
+                None,
+            )
         })
         .unwrap_or_else(|e| Err(Error::from(e)))
     }
@@ -325,6 +338,7 @@ impl Collections {
         group: S,
         path: P,
         position: f32,
+        folder_finished: bool,
         ts: TimeStamp,
     ) -> Result<()>
     where
@@ -332,8 +346,13 @@ impl Collections {
         P: AsRef<str> + Send + 'static,
     {
         spawn_blocking!({
-            self.get_cache(collection)?
-                .insert_position(group, path, position, Some(ts))
+            self.get_cache(collection)?.insert_position(
+                group,
+                path,
+                position,
+                folder_finished,
+                Some(ts),
+            )
         })
         .unwrap_or_else(|e| Err(Error::from(e)))
     }

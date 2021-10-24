@@ -212,6 +212,7 @@ impl CacheInner {
         group: S,
         path: P,
         position: f32,
+        finished: bool,
         ts: Option<TimeStamp>,
         use_ts: bool,
     ) -> Result<()>
@@ -252,11 +253,12 @@ impl CacheInner {
                         }
                     }
                     let this_pos = PositionItem {
-                        folder_finished: file.eq(&last_file)
-                            && last_file_duration
-                                .and_then(|d| d.checked_sub(position.round() as u32))
-                                .map(|dif| dif < CacheInner::EOB_LIMIT)
-                                .unwrap_or(false),
+                        folder_finished: finished
+                            || (file.eq(&last_file)
+                                && last_file_duration
+                                    .and_then(|d| d.checked_sub(position.round() as u32))
+                                    .map(|dif| dif < CacheInner::EOB_LIMIT)
+                                    .unwrap_or(false)),
                         file: file.into(),
                         timestamp: if use_ts && ts.is_some() {
                             ts.unwrap()
@@ -519,6 +521,7 @@ impl CacheInner {
                                 group,
                                 path,
                                 item.position,
+                                item.folder_finished,
                                 Some(item.timestamp),
                                 true,
                             )
