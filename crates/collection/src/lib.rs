@@ -17,6 +17,7 @@ use std::{
     path::{Path, PathBuf},
     thread::JoinHandle,
 };
+use util::is_no_cache_collection;
 
 pub use audio_folder::{list_dir_files_only, parse_chapter_path};
 pub use audio_meta::{init_media_lib, AudioFile, AudioFolderShort, FoldersOrdering, TimeSpan};
@@ -59,11 +60,7 @@ impl Collections {
         let caches = collections_dirs
             .into_iter()
             .map(move |collection_path| {
-                let no_cache_opt = collections_options
-                    .get(&collection_path)
-                    .map(|o| o.no_cache)
-                    .unwrap_or(false);
-                if no_cache_opt {
+                if is_no_cache_collection(&collections_options, &collection_path) {
                     info!("Collection {:?} is not using cache", collection_path);
                     Ok(CollectionDirect::new(
                         collection_path.clone(),
@@ -299,11 +296,7 @@ impl Collections {
         let threads = collections_dirs
             .into_iter()
             .filter_map(move |collection_path| {
-                let no_cache_opt = collections_options
-                    .get(&collection_path)
-                    .map(|o| o.no_cache)
-                    .unwrap_or(false);
-                if !no_cache_opt {
+                if !is_no_cache_collection(&collections_options, &collection_path) {
                     collection_path
                         .to_str()
                         .and_then(|path| data.remove(path))
@@ -384,43 +377,36 @@ impl Collections {
             }
         }
 
-        todo!()
+        let threads = collections_dirs
+            .into_iter()
+            .enumerate()
+            .filter_map(move |(col_no, collection_path)| {
+                if !is_no_cache_collection(&collections_options, &collection_path) {
+                    col_positions.remove(&col_no).and_then(|v| {
+                        // HACK: This is just dirty trick to get same structure as for current positions JSON
+                        //    but I hope it did not mind, because it's just migration function to be used once
+                        let json_data =
+                            serde_json::to_string(&v).expect("Serialization should not fail");
+                        let json: Map<String, Value> = serde_json::from_str(&json_data)
+                            .expect("Deserialiation should not fail");
 
-        // let threads = collections_dirs
-        //     .into_iter()
-        //     .filter_map(move |collection_path| {
-        //         let no_cache_opt = collections_options
-        //             .get(&collection_path)
-        //             .map(|o| o.no_cache)
-        //             .unwrap_or(false);
-        //         if !no_cache_opt {
-        //             collection_path
-        //                 .to_str()
-        //                 .and_then(|path| data.remove(path))
-        //                 .and_then(|v| {
-        //                     if let Value::Object(v) = v {
-        //                         CollectionCache::restore_positions(
-        //                             collection_path.clone(),
-        //                             db_path,
-        //                             lister.clone(),
-        //                             force_update,
-        //                             PositionsData::V1(v),
-        //                         )
-        //                         .map_err(|e| {
-        //                             error!("Failed to restore positions from backup: {}", e)
-        //                         })
-        //                         .ok()
-        //                     } else {
-        //                         None
-        //                     }
-        //                 })
-        //         } else {
-        //             None
-        //         }
-        //     })
-        //     .collect::<Vec<_>>();
+                        CollectionCache::restore_positions(
+                            collection_path.clone(),
+                            db_path,
+                            lister.clone(),
+                            force_update,
+                            PositionsData::V1(json),
+                        )
+                        .map_err(|e| error!("Failed to restore positions from backup: {}", e))
+                        .ok()
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
 
-        // Ok(threads)
+        Ok(threads)
     }
 }
 
