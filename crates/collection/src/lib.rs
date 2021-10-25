@@ -346,15 +346,14 @@ impl Collections {
             HashMap::new();
         for (group, m) in data.table.into_iter() {
             for (col_path, pos) in m.into_iter() {
-                let segs = col_path.split_once('/').ok_or_else(|| {
-                    Error::JsonDataError("Invalid path, missing collection".into())
-                })?;
+                let (col_no, path) = col_path
+                    .split_once('/')
+                    .unwrap_or_else(|| (col_path.as_str(), ""));
 
-                let col_no: usize = segs
-                    .0
+                let col_no: usize = col_no
                     .parse()
                     .map_err(|_| Error::JsonDataError("Collection is not number".into()))?;
-                let path = segs.1.to_string();
+                let path = path.to_string();
                 let item = PositionItem {
                     file: pos.file,
                     position: pos.position,

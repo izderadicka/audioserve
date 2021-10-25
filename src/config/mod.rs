@@ -259,6 +259,28 @@ impl FromStr for BaseDirOptions {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PositionsBackupFormat {
+    None,
+    Legacy,
+    V1,
+}
+
+impl FromStr for PositionsBackupFormat {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "legacy" => Ok(PositionsBackupFormat::Legacy),
+            "v1" => Ok(PositionsBackupFormat::V1),
+            _ => Err(Error::ConfigValue {
+                name: "positions-restore",
+                message: "Invalid version".into(),
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub listen: SocketAddr,
@@ -286,7 +308,7 @@ pub struct Config {
     pub tags: HashSet<String>,
     pub force_cache_update_on_init: bool,
     pub positions_backup_file: Option<PathBuf>,
-    pub positions_restore: bool,
+    pub positions_restore: PositionsBackupFormat,
 }
 
 impl Config {
@@ -449,7 +471,7 @@ impl Default for Config {
             tags: HashSet::new(),
             force_cache_update_on_init: false,
             positions_backup_file: None,
-            positions_restore: false,
+            positions_restore: PositionsBackupFormat::None,
         }
     }
 }

@@ -234,7 +234,7 @@ fn create_parser<'a>() -> Parser<'a> {
             .takes_value(true)
             .validator_os(parent_dir_exists)
             .env("AUDIOSERVE_POSITIONS_BACKUP_FILE")
-            .help("File to back up last listened positions (can be used to restore positions in case of troubles or migration) [default is None]"),
+            .help("File to back up last listened positions (can be used to restore positions as well, so has two slightly different uses) [default is None]"),
         )
         .arg(
             Arg::with_name("positions-ws-timeout")
@@ -246,8 +246,11 @@ fn create_parser<'a>() -> Parser<'a> {
         .arg(
             Arg::with_name("positions-restore")
             .long("positions-restore")
+            .takes_value(true)
+            .possible_values(&["legacy", "v1"])
+            .env("AUDIOSERVE_POSITIONS_RESTORE")
             .requires("positions-backup-file")
-            .help("Restores positions from backup JSON file")
+            .help("Restores positions from backup JSON file, value is version of file legacy is before audioserve v0.16,  v1 is current")
         );
     }
 
@@ -544,8 +547,8 @@ where
         config.ignore_chapters_meta = true;
     }
 
-    if is_present_or_env("positions-restore", "AUDIOSERVE_POSITIONS_RESTORE") {
-        config.positions_restore = true;
+    if let Some(ps) = args.value_of("positions-restore") {
+        config.positions_restore = ps.parse().expect("Value was checked by clap");
         no_authentication_confirmed = true;
     }
 

@@ -27,6 +27,8 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+use crate::config::PositionsBackupFormat;
+
 mod config;
 mod error;
 mod services;
@@ -276,13 +278,17 @@ fn main() -> anyhow::Result<()> {
 
     collection::init_media_lib();
 
-    if get_config().positions_restore {
-        let backup_file = BackupFile::V1(
-            get_config()
-                .positions_backup_file
-                .clone()
-                .expect("Missing backup file argument"),
-        );
+    if !matches!(get_config().positions_restore, PositionsBackupFormat::None) {
+        let backup_file = get_config()
+            .positions_backup_file
+            .clone()
+            .expect("Missing backup file argument");
+        let backup_file = match get_config().positions_restore {
+            PositionsBackupFormat::None => unreachable!(),
+            PositionsBackupFormat::Legacy => BackupFile::Legacy(backup_file),
+            PositionsBackupFormat::V1 => BackupFile::V1(backup_file),
+        };
+
         restore_positions(backup_file).context("Error while restoring position")?;
 
         let msg =
