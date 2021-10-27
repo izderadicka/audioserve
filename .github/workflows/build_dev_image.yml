@@ -1,0 +1,14 @@
+name: Build Unstable Image
+on:
+  schedule:
+    - cron: 0/5 * * * *
+    
+jobs:
+  audioserve-build:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: test
+      run: |
+        echo "Starting build"
+        docker --version
+    
