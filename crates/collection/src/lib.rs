@@ -345,14 +345,21 @@ impl Collections {
         let mut col_positions: HashMap<usize, HashMap<String, HashMap<String, PositionItem>>> =
             HashMap::new();
         for (group, m) in data.table.into_iter() {
+            //HACK: handle error in clent, which caused invalid positions to be inserted
+            if group.starts_with("null") {
+                continue;
+            }
             for (col_path, pos) in m.into_iter() {
                 let (col_no, path) = col_path
                     .split_once('/')
                     .unwrap_or_else(|| (col_path.as_str(), ""));
 
-                let col_no: usize = col_no
-                    .parse()
-                    .map_err(|_| Error::JsonDataError("Collection is not number".into()))?;
+                let col_no: usize = col_no.parse().map_err(|_| {
+                    Error::JsonDataError(format!(
+                        "Collection {} in {} is not number",
+                        col_no, col_path
+                    ))
+                })?;
                 let path = path.to_string();
                 let item = PositionItem {
                     file: pos.file,
