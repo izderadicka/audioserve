@@ -7,7 +7,7 @@ extern crate lazy_static;
 
 use collection::audio_folder::FoldersOptions;
 use collection::common::CollectionOptions;
-use collection::Collections;
+use collection::{BackupFile, Collections};
 use config::{get_config, init_config};
 use error::{bail, Context, Error};
 use futures::prelude::*;
@@ -22,11 +22,12 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process;
-use std::process::exit;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+
+use crate::config::PositionsBackupFormat;
 
 mod config;
 mod error;
@@ -83,8 +84,17 @@ macro_rules! get_url_path {
     };
 }
 
-fn create_collections() -> Arc<Collections> {
-    let options: HashMap<_, _> = get_config()
+fn create_folder_options() -> (FoldersOptions, HashMap<PathBuf, CollectionOptions>) {
+    let fo = FoldersOptions {
+        allow_symlinks: get_config().allow_symlinks,
+        chapters_duration: get_config().chapters.duration,
+        chapters_from_duration: get_config().chapters.from_duration,
+        ignore_chapters_meta: get_config().ignore_chapters_meta,
+        no_dir_collaps: get_config().no_dir_collaps,
+        tags: Arc::new(get_config().get_tags()),
+        force_cache_update_on_init: get_config().force_cache_update_on_init,
+    };
+    let co: HashMap<_, _> = get_config()
         .base_dirs_options
         .iter()
         .map(|(p, o)| {
@@ -96,21 +106,33 @@ fn create_collections() -> Arc<Collections> {
             )
         })
         .collect();
+
+    (fo, co)
+}
+
+fn create_collections() -> Arc<Collections> {
+    let (fo, co) = create_folder_options();
     Arc::new(
         Collections::new_with_detail::<Vec<PathBuf>, _, _>(
             get_config().base_dirs.clone(),
-            options,
+            co,
             get_config().collections_cache_dir.as_path(),
-            FoldersOptions {
-                allow_symlinks: get_config().allow_symlinks,
-                chapters_duration: get_config().chapters.duration,
-                chapters_from_duration: get_config().chapters.from_duration,
-                ignore_chapters_meta: get_config().ignore_chapters_meta,
-                no_dir_collaps: get_config().no_dir_collaps,
-            },
+            fo,
         )
         .expect("Unable to create collections cache"),
     )
+}
+
+fn restore_positions<P: AsRef<Path>>(backup_file: BackupFile<P>) -> anyhow::Result<()> {
+    let (fo, co) = create_folder_options();
+    Collections::restore_positions(
+        get_config().base_dirs.clone(),
+        co,
+        get_config().collections_cache_dir.as_path(),
+        fo,
+        backup_file,
+    )
+    .map_err(Error::new)
 }
 
 fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> tokio::runtime::Runtime {
@@ -213,7 +235,35 @@ async fn terminate_server() {
     )
 }
 
-fn main() {
+#[cfg(unix)]
+async fn watch_for_cache_update_signal(cols: Arc<Collections>) {
+    use tokio::signal::unix::{signal, SignalKind};
+    let mut sigusr1 = signal(SignalKind::user_defined1()).expect("Cannot create SIGINT handler");
+    while let Some(()) = sigusr1.recv().await {
+        info!("Received signal SIGUSR1 for full rescan of caches");
+        cols.clone().force_rescan()
+    }
+}
+
+#[cfg(unix)]
+async fn watch_for_positions_backup_signal(cols: Arc<Collections>) {
+    use tokio::signal::unix::{signal, SignalKind};
+    let mut sigusr2 = signal(SignalKind::user_defined2()).expect("Cannot create SIGINT handler");
+    while let Some(()) = sigusr2.recv().await {
+        info!("Received signal SIGUSR2 for positions backup");
+        if let Some(backup_file) = get_config().positions_backup_file.clone() {
+            cols.clone()
+                .backup_positions_async(backup_file)
+                .await
+                .map_err(|e| error!("Backup of positions failed: {}", e))
+                .ok();
+        } else {
+            warn!("positions backup file is not setup");
+        }
+    }
+}
+
+fn main() -> anyhow::Result<()> {
     #[cfg(unix)]
     {
         if nix::unistd::getuid().is_root() {
@@ -221,13 +271,32 @@ fn main() {
         }
     }
     if let Err(e) = init_config() {
-        eprintln!("Config/Arguments error: {}", e);
-        process::exit(1)
+        return Err(Error::msg(format!("Config/Arguments error: {}", e)));
     };
     env_logger::init();
     debug!("Started with following config {:?}", get_config());
 
     collection::init_media_lib();
+
+    if !matches!(get_config().positions_restore, PositionsBackupFormat::None) {
+        let backup_file = get_config()
+            .positions_backup_file
+            .clone()
+            .expect("Missing backup file argument");
+        let backup_file = match get_config().positions_restore {
+            PositionsBackupFormat::None => unreachable!(),
+            PositionsBackupFormat::Legacy => BackupFile::Legacy(backup_file),
+            PositionsBackupFormat::V1 => BackupFile::V1(backup_file),
+        };
+
+        restore_positions(backup_file).context("Error while restoring position")?;
+
+        let msg =
+            "Positions restoration is finished, exiting program, restart it now without --positions-restore arg";
+        info!("{}", msg);
+        println!("{}", msg);
+        return Ok(());
+    }
 
     #[cfg(feature = "transcoding-cache")]
     {
@@ -245,15 +314,18 @@ fn main() {
     }
     let server_secret = match generate_server_secret(&get_config().secret_file) {
         Ok(s) => s,
-        Err(e) => {
-            error!("Error creating/reading secret: {}", e);
-            process::exit(2)
-        }
+        Err(e) => return Err(Error::msg(format!("Error creating/reading secret: {}", e))),
     };
 
     let collections = create_collections();
 
     let runtime = start_server(server_secret, collections.clone());
+
+    #[cfg(unix)]
+    {
+        runtime.spawn(watch_for_cache_update_signal(collections.clone()));
+        runtime.spawn(watch_for_positions_backup_signal(collections.clone()));
+    }
 
     runtime.block_on(terminate_server());
 
@@ -261,9 +333,13 @@ fn main() {
     runtime.shutdown_timeout(std::time::Duration::from_millis(300));
 
     thread::spawn(|| {
-        thread::sleep(Duration::from_secs(10));
-        error!("Forced exit");
-        exit(111);
+        const FINISH_LIMIT: u64 = 10;
+        thread::sleep(Duration::from_secs(FINISH_LIMIT));
+        error!(
+            "Forced exit, program is not finishing with limit of {}s",
+            FINISH_LIMIT
+        );
+        process::exit(111);
     });
 
     debug!("Saving collections db");
@@ -290,4 +366,6 @@ fn main() {
     }
 
     info!("Server finished");
+
+    Ok(())
 }

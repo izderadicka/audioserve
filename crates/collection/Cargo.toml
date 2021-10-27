@@ -1,6 +1,6 @@
 [package]
 name = "collection"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2018"
 
@@ -20,6 +20,7 @@ sled = {version="0.34", features=["compression"]}
 thiserror = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
+serde_json = "1.0"
 lazy_static = "1.4"
 log="0.4"
 regex = "1.5"

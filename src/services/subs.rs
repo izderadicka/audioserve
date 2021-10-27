@@ -11,9 +11,7 @@ use crate::{
     error::{Error, Result},
     util::{checked_dec, into_range_bounds, to_satisfiable_range, ResponseBuilderExt},
 };
-use collection::{
-    guess_mime_type, list_dir_files_only, parse_chapter_path, FoldersOrdering, TimeSpan,
-};
+use collection::{guess_mime_type, parse_chapter_path, FoldersOrdering, TimeSpan};
 use futures::prelude::*;
 use futures::{future, ready, Stream};
 use headers::{AcceptRanges, CacheControl, ContentLength, ContentRange, ContentType, LastModified};
@@ -395,9 +393,10 @@ pub fn get_folder(
     folder_path: PathBuf,
     collections: Arc<collection::Collections>,
     ordering: FoldersOrdering,
+    group: Option<String>,
 ) -> ResponseFuture {
     Box::pin(
-        blocking(move || collections.list_dir(collection, &folder_path, ordering))
+        blocking(move || collections.list_dir(collection, &folder_path, ordering, group))
             .map_ok(|res| match res {
                 Ok(folder) => json_response(&folder),
                 Err(_) => resp::not_found(),
@@ -431,7 +430,11 @@ pub fn download_folder(
             download_name.push_str(format.extension());
 
             match blocking(move || {
-                list_dir_files_only(&base_path, &folder_path, get_config().allow_symlinks)
+                collection::list_dir_files_only(
+                    &base_path,
+                    &folder_path,
+                    get_config().allow_symlinks,
+                )
             })
             .await
             {
@@ -503,6 +506,78 @@ pub fn collections_list() -> ResponseFuture {
             .collect(),
     };
     Box::pin(future::ok(json_response(&collections)))
+}
+
+#[cfg(feature = "shared-positions")]
+pub fn insert_position(
+    collections: Arc<collection::Collections>,
+    group: String,
+    bytes: bytes::Bytes,
+) -> ResponseFuture {
+    match serde_json::from_slice::<collection::Position>(&bytes) {
+        Ok(pos) => {
+            let path = if pos.folder.len() > 0 {
+                pos.folder + "/" + &pos.file
+            } else {
+                pos.file
+            };
+            Box::pin(
+                collections
+                    .clone()
+                    .insert_position_if_newer_async(
+                        pos.collection,
+                        group,
+                        path,
+                        pos.position,
+                        pos.folder_finished,
+                        pos.timestamp,
+                    )
+                    .then(|res| match res {
+                        Ok(_) => resp::fut(resp::created),
+                        Err(e) => match e {
+                            collection::error::Error::IgnoredPosition => resp::fut(resp::ignored),
+                            _ => Box::pin(future::err(Error::new(e))),
+                        },
+                    }),
+            )
+        }
+        Err(e) => {
+            error!("Error in position JSON: {}", e);
+            resp::fut(resp::bad_request)
+        }
+    }
+}
+
+#[cfg(feature = "shared-positions")]
+pub fn last_position(collections: Arc<collection::Collections>, group: String) -> ResponseFuture {
+    Box::pin(
+        collections
+            .get_last_position_async(group)
+            .map(|pos| Ok(json_response(&pos))),
+    )
+}
+
+#[cfg(feature = "shared-positions")]
+pub fn folder_position(
+    collections: Arc<collection::Collections>,
+    group: String,
+    collection: usize,
+    path: String,
+) -> ResponseFuture {
+    Box::pin(
+        collections
+            .get_position_async(collection, group, path)
+            .map(|pos| Ok(json_response(&pos))),
+    )
+}
+
+#[cfg(feature = "shared-positions")]
+pub fn all_positions(collections: Arc<collection::Collections>, group: String) -> ResponseFuture {
+    Box::pin(
+        collections
+            .get_all_positions_for_group_async(group)
+            .map(|pos| Ok(json_response(&pos))),
+    )
 }
 
 pub fn transcodings_list() -> ResponseFuture {

@@ -92,19 +92,29 @@ impl OngoingUpdater {
 pub(super) struct RecursiveUpdater<'a> {
     queue: VecDeque<AudioFolderShort>,
     inner: &'a CacheInner,
+    force_update: bool,
 }
 
 impl<'a> RecursiveUpdater<'a> {
-    pub(super) fn new(inner: &'a CacheInner, root: Option<AudioFolderShort>) -> Self {
+    pub(super) fn new(
+        inner: &'a CacheInner,
+        root: Option<AudioFolderShort>,
+        force_update: bool,
+    ) -> Self {
         let root = root.unwrap_or_else(|| AudioFolderShort {
             name: "root".into(),
             path: Path::new("").into(),
             is_file: false,
             modified: None,
+            finished: false,
         });
         let mut queue = VecDeque::new();
         queue.push_back(root);
-        RecursiveUpdater { queue, inner }
+        RecursiveUpdater {
+            queue,
+            inner,
+            force_update,
+        }
     }
 
     pub(super) fn process(mut self) {
@@ -112,7 +122,11 @@ impl<'a> RecursiveUpdater<'a> {
             // process AF
             let full_path = self.inner.base_dir().join(&folder_info.path);
             let mod_ts = get_modified(full_path);
-            let af = match self.inner.get_if_actual(&folder_info.path, mod_ts) {
+            let af = match if self.force_update {
+                None
+            } else {
+                self.inner.get_if_actual(&folder_info.path, mod_ts)
+            } {
                 None => match self.inner.force_update(&folder_info.path, true) {
                     Ok(af) => {
                         af.unwrap() // safe to unwrap as we set ret param

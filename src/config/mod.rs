@@ -1,7 +1,7 @@
 pub use self::error::{Error, Result};
 use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
 use crate::util;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs::File;
 use std::io::Read;
@@ -259,6 +259,28 @@ impl FromStr for BaseDirOptions {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PositionsBackupFormat {
+    None,
+    Legacy,
+    V1,
+}
+
+impl FromStr for PositionsBackupFormat {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "legacy" => Ok(PositionsBackupFormat::Legacy),
+            "v1" => Ok(PositionsBackupFormat::V1),
+            _ => Err(Error::ConfigValue {
+                name: "positions-restore",
+                message: "Invalid version".into(),
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub listen: SocketAddr,
@@ -280,10 +302,13 @@ pub struct Config {
     pub chapters: ChaptersSize,
     pub no_dir_collaps: bool,
     pub ignore_chapters_meta: bool,
-    pub positions_file: PathBuf,
     pub positions_ws_timeout: Duration,
     pub behind_proxy: bool,
     pub collections_cache_dir: PathBuf,
+    pub tags: HashSet<String>,
+    pub force_cache_update_on_init: bool,
+    pub positions_backup_file: Option<PathBuf>,
+    pub positions_restore: PositionsBackupFormat,
 }
 
 impl Config {
@@ -378,14 +403,6 @@ impl Config {
             );
         };
 
-        if !util::parent_dir_exists(&self.positions_file) {
-            return value_error!(
-                "positions_file",
-                "Parent directory for does not exists for {:?}",
-                self.positions_file
-            );
-        };
-
         if self.ssl.is_some() {
             self.ssl.as_ref().unwrap().check()?
         }
@@ -415,6 +432,14 @@ impl Config {
 
         Ok(())
     }
+
+    pub fn get_tags(&self) -> Option<HashSet<String>> {
+        if self.tags.is_empty() {
+            None
+        } else {
+            Some(self.tags.clone())
+        }
+    }
 }
 
 impl Default for Config {
@@ -440,10 +465,13 @@ impl Default for Config {
             chapters: ChaptersSize::default(),
             no_dir_collaps: false,
             ignore_chapters_meta: false,
-            positions_file: data_base_dir.join("audioserve.positions"),
             positions_ws_timeout: Duration::from_secs(600),
             behind_proxy: false,
             collections_cache_dir: data_base_dir.join("col_db"),
+            tags: HashSet::new(),
+            force_cache_update_on_init: false,
+            positions_backup_file: None,
+            positions_restore: PositionsBackupFormat::None,
         }
     }
 }

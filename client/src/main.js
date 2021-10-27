@@ -166,10 +166,26 @@ $(function () {
         }
     }
 
+    function groupParams(includeOrder=true) {
+        let params = new URLSearchParams();
+        if (ordering != "a" && includeOrder) {
+            params.append("ord", ordering)
+        }
+        const group =  window.localStorage.getItem("audioserve_group");
+        if (group) {
+            params.append("group", group)
+        }
+        params = params.toString();
+        if (params) {
+            params = "?"+params;
+        }
+        return params
+    }
+
     function loadFolder(path, fromHistory = false, scrollTo = null, startPlay = false) {
         $("#info-container").hide();
         ajax({
-            url: collectionUrl + "/folder/" + path + (ordering != "a" ? `?ord=${ordering}` : ""),
+            url: collectionUrl + "/folder/" + path + groupParams(),
         }
         )
             .fail(err => {
@@ -184,6 +200,20 @@ $(function () {
             })
             .then(data => {
                 $("#search-form input").val("");
+
+                $("#info-tags").empty();
+                if (data.tags) {
+                    const table = $('<table class="table table-striped table-borderless">');
+                    const tbody = $('<tbody>');
+                    table.append(tbody);
+                    
+                    for (const [name, value] of Object.entries(data.tags)) {
+                        tbody.append($(`<tr><th>${name}</th><td>${value}</td></tr>`));
+                    }
+                    $("#info-tags").append(table);
+                    $("#info-container").show();
+                }
+
                 if (data.cover) {
                     $("#info-cover").show().attr('src', collectionUrl + "/cover/" + data.cover.path);
                     $("#info-container").show();
@@ -225,7 +255,7 @@ $(function () {
                 subfolders.empty();
                 count.text(data.subfolders.length);
                 for (let subfolder of data.subfolders) {
-                    let item = $('<a class="list-group-item list-group-item-action">')
+                    let item = $(`<a class="list-group-item list-group-item-action ${subfolder.finished ? 'folder-finished' : ''}">`)
                         .attr("href", subfolder.path)
                         .text(subfolder.name);
                     subfolders.append(item);
@@ -237,8 +267,12 @@ $(function () {
                 }
                 let files = $("#files");
                 let fcount = $("#files-count");
+                let filesDuration = $("#files-duration")
                 files.empty();
                 fcount.text(data.files.length);
+                if (data.total_time) {
+                    filesDuration.text(formatTime(data.total_time));
+                }
                 for (let file of data.files) {
                     calcTranscoding(file);
                     let item = $('<a class="list-group-item list-group-item-action">')
@@ -258,6 +292,11 @@ $(function () {
                     }
                     if (file.trans != '0') {
                         item.append($("<span>").addClass("transcoded"));
+                    }
+                    if (file.meta && file.meta.tags && file.meta.tags.title) {
+                        const title = $('<div class="file-tags-title">');
+                        title.text(file.meta.tags.title)
+                        item.append($(title))
                     }
                 }
                 if (data.files.length) {

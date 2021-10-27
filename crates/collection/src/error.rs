@@ -41,6 +41,18 @@ pub enum Error {
 
     #[error("Invalid path: {0}")]
     InvalidPathPrefix(#[from] StripPrefixError),
+
+    #[error("Position cannot be inserted")]
+    IgnoredPosition,
+
+    #[error("JSON error: {0}")]
+    JsonError(#[from] serde_json::Error),
+
+    #[error("JSON schema error: {0}")]
+    JsonSchemaError(String),
+
+    #[error("JSON schema error: {0}")]
+    JsonDataError(String),
 }
 
 impl From<TransactionError<Error>> for Error {

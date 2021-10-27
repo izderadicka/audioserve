@@ -42,6 +42,8 @@
                 <label for="btn-ord-recent">Recent First</label>
               </a>
               <div class="dropdown-divider"></div>
+              <a class="dropdown-item" id="recent-btn">Recently Changed</a>
+              <div class="dropdown-divider"></div>
               <a class="dropdown-item" id="logout-link">Log out</a>
           </li>
         </ul>
@@ -53,9 +55,6 @@
         <form id="search-form">
           <input name="search" id="search-input" type="text" placeholder="Search">
         </form>
-      </div>
-      <div id="recent-area">
-        <button type="button" class="btn btn-primary btn-sm" id="recent-btn">Recent</button>
       </div>
       <div id="collections">
         <label for="current_collection">Collection: </label>
@@ -79,9 +78,11 @@
       <h3 class="expanded" data-toggle="collapse" data-target="#info-box" aria-expanded="true">
         Info
       </h3>
-      <div id="info-box" class="collapse show">
+      <div id="info-box" class="collapse">
+        
         <p>
           <img id="info-cover">
+          <div id="info-tags"></div>
           <span id="info-desc">
           </span>
         </p>
@@ -104,6 +105,7 @@
       <h3 class="expanded" data-toggle="collapse" data-target="#files-box" aria-expanded="true">
         Files
         <span class="badge badge-primary" id="files-count"></span>
+        <span class="" id="files-duration"></span>
         <a id="folder-download-link" class="folder-download" target="_self"><span class="download"></span></a>
         <div class="position-sync" id="position-sync-btn"></div>
       </h3>

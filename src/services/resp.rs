@@ -11,6 +11,8 @@ const ACCESS_DENIED_MSG: &str = "Access denied";
 const METHOD_NOT_ALLOWED_MSG: &str = "Method not supported";
 const BAD_REQUEST_MSG: &str = "Bad request";
 const NOT_IMPLEMENTED_MSG: &str = "Not Implemented";
+const INTERNAL_SERVER_ERROR: &str = "Internal server error";
+const UNPROCESSABLE_ENTITY: &str = "Ignored";
 
 fn short_response(status: StatusCode, msg: &'static str) -> Response<Body> {
     Response::builder()
@@ -32,6 +34,7 @@ where
 macro_rules! def_resp {
     ($($name:ident ( $code:expr, $msg:expr ));+) => {
         $(
+        #[allow(dead_code)]
         pub fn $name() -> Response<Body> {
             short_response($code, $msg)
         }
@@ -45,5 +48,8 @@ def_resp!(
     not_found(StatusCode::NOT_FOUND, NOT_FOUND_MESSAGE);
     method_not_supported(StatusCode::METHOD_NOT_ALLOWED, METHOD_NOT_ALLOWED_MSG);
     bad_request(StatusCode::BAD_REQUEST, BAD_REQUEST_MSG);
-    not_implemented(StatusCode::NOT_IMPLEMENTED, NOT_IMPLEMENTED_MSG)
+    not_implemented(StatusCode::NOT_IMPLEMENTED, NOT_IMPLEMENTED_MSG);
+    created(StatusCode::CREATED, "");
+    internal_error(StatusCode::INTERNAL_SERVER_ERROR, INTERNAL_SERVER_ERROR);
+    ignored(StatusCode::UNPROCESSABLE_ENTITY, UNPROCESSABLE_ENTITY)
 );

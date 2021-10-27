@@ -1,8 +1,10 @@
 use std::borrow::{self, Cow};
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use super::audio_meta::*;
 use crate::util::{get_meta, get_modified, get_real_file_type, guess_mime_type};
@@ -25,6 +27,8 @@ pub struct FoldersOptions {
     pub ignore_chapters_meta: bool,
     pub allow_symlinks: bool,
     pub no_dir_collaps: bool,
+    pub tags: Arc<Option<HashSet<String>>>,
+    pub force_cache_update_on_init: bool,
 }
 
 impl Default for FoldersOptions {
@@ -35,6 +39,8 @@ impl Default for FoldersOptions {
             ignore_chapters_meta: false,
             allow_symlinks: false,
             no_dir_collaps: false,
+            tags: Arc::new(None),
+            force_cache_update_on_init: false,
         }
     }
 }
@@ -111,7 +117,7 @@ impl FolderLister {
         } else if meta.is_file() && is_audio(path) {
             let meta =
                 get_audio_properties(&path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-            match (meta.get_chapters(), meta.get_audio_info()) {
+            match (meta.get_chapters(), meta.get_audio_info(&self.config.tags)) {
                 (Some(chapters), Some(audio_meta)) => Ok(DirType::File {
                     chapters,
                     audio_meta,
@@ -167,6 +173,8 @@ impl FolderLister {
                 let mut subfolders = vec![];
                 let mut cover = None;
                 let mut description = None;
+                let tags;
+                let mut is_file = false;
                 let allow_symlinks = self.config.allow_symlinks;
 
                 for item in dir_iter {
@@ -196,7 +204,7 @@ impl FolderLister {
                                                 &f, path, true,
                                             )?)
                                         } else {
-                                            let meta = meta.get_audio_info();
+                                            let meta = meta.get_audio_info(&self.config.tags);
                                             if self.is_long_file((&meta).as_ref())
                                                 || chapters_file_path(&audio_file_path)
                                                     .map(|p| p.is_file())
@@ -248,6 +256,8 @@ impl FolderLister {
                             let f = self
                                 .list_dir_file(base_dir, full_path, audio_meta, chapters, true)?;
                             files = f.files;
+                            tags = f.tags;
+                            is_file = true;
                         }
                         _ => {
                             return Err(io::Error::new(
@@ -258,19 +268,22 @@ impl FolderLister {
                     }
                 } else {
                     files.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+                    tags = extract_folder_tags(&mut files);
                     subfolders.sort_unstable_by(|a, b| a.compare_as(ordering, b));
                 }
 
-                self.extend_audiofolder(
+                extend_audiofolder(
                     &full_path,
                     AudioFolder {
-                        is_file: false,
+                        is_file,
                         modified: None,
                         total_time: None,
                         files,
                         subfolders,
                         cover,
                         description,
+                        position: None,
+                        tags,
                     },
                 )
             }
@@ -285,22 +298,6 @@ impl FolderLister {
         }
     }
 
-    fn extend_audiofolder<P: AsRef<Path>>(
-        &self,
-        full_path: P,
-        mut af: AudioFolder,
-    ) -> Result<AudioFolder, io::Error> {
-        let last_modification = get_modified(full_path);
-        let total_time: u32 = af
-            .files
-            .iter()
-            .map(|f| f.meta.as_ref().map(|m| m.duration).unwrap_or(0))
-            .sum();
-        af.modified = last_modification.map(TimeStamp::from);
-        af.total_time = Some(total_time);
-        Ok(af)
-    }
-
     #[allow(clippy::unnecessary_wraps)] // actually as its used in match with function returning results it's better to have Result return type
     fn list_dir_file<P: AsRef<Path>>(
         &self,
@@ -312,6 +309,14 @@ impl FolderLister {
     ) -> Result<AudioFolder, io::Error> {
         let path = full_path.strip_prefix(&base_dir).unwrap();
         let mime = guess_mime_type(&path);
+        let mut tags = None;
+        if self.config.tags.is_some() {
+            let meta = get_audio_properties(&full_path)
+                .map_err(|e| warn!("Error extracting meta from {:?}: {}", full_path, e))
+                .ok()
+                .and_then(|m| m.get_audio_info(&self.config.tags));
+            tags = meta.and_then(|m| m.tags);
+        }
         let files = chapters
             .into_iter()
             .map(|chap| {
@@ -319,6 +324,7 @@ impl FolderLister {
                     AudioMeta {
                         bitrate: audio_meta.bitrate,
                         duration: ((chap.end - chap.start) / 1000) as u32,
+                        tags: None, // TODO: consider extracting metadata from chapters too - but what will make sense?
                     }
                 };
                 Ok(AudioFile {
@@ -334,7 +340,7 @@ impl FolderLister {
             })
             .collect::<io::Result<Vec<_>>>()?;
 
-        self.extend_audiofolder(
+        extend_audiofolder(
             &full_path,
             AudioFolder {
                 is_file: true,
@@ -344,9 +350,82 @@ impl FolderLister {
                 subfolders: vec![],
                 cover: None,
                 description: None,
+                position: None,
+                tags,
             },
         )
     }
+}
+
+fn extract_folder_tags(files: &mut Vec<AudioFile>) -> Option<HashMap<String, String>> {
+    let mut iter = (&files).iter();
+    let mut folder_tags = iter
+        .next()?
+        .meta
+        .as_ref()?
+        .tags
+        .as_ref()?
+        .clone()
+        .into_iter()
+        .map(|(k, v)| (k, Some(v)))
+        .collect::<HashMap<_, _>>();
+
+    // folder_tags should contain tags, which are present in all files, where tag is present
+    for t in iter {
+        if let Some(file_tags) = t.meta.as_ref().and_then(|m| m.tags.as_ref()) {
+            for (k, v) in file_tags {
+                folder_tags
+                    .entry(k.into())
+                    .and_modify(|folder_val| {
+                        if Some(v) != folder_val.as_ref() {
+                            *folder_val = None
+                        }
+                    })
+                    .or_insert_with(|| Some(v.into()));
+            }
+        }
+    }
+
+    // Clear folder_tags of None values
+    let folder_tags: HashMap<String, String> = folder_tags
+        .into_iter()
+        .filter_map(|(k, v)| v.map(|v| (k, v)))
+        .collect();
+
+    files
+        .iter_mut()
+        .filter_map(|f| f.meta.as_mut().map(|m| &mut m.tags))
+        .for_each(|tags_opt| {
+            if let Some(tags) = tags_opt {
+                for k in folder_tags.keys() {
+                    tags.remove(k);
+                }
+                if tags.is_empty() {
+                    *tags_opt = None;
+                }
+            }
+        });
+
+    if folder_tags.is_empty() {
+        None
+    } else {
+        Some(folder_tags)
+    }
+}
+
+fn extend_audiofolder<P: AsRef<Path>>(
+    full_path: P,
+    mut af: AudioFolder,
+) -> Result<AudioFolder, io::Error> {
+    let last_modification = get_modified(full_path);
+    let total_time: u32 = af
+        .files
+        .iter()
+        .map(|f| f.meta.as_ref().map(|m| m.duration).unwrap_or(0))
+        .sum();
+    af.modified = last_modification.map(TimeStamp::from);
+    af.total_time = Some(total_time);
+    Ok(af)
 }
 
 fn ms_from_time(t: &str) -> Option<u64> {
@@ -599,9 +678,20 @@ mod tests {
         let res = get_audio_properties(&path);
         assert!(res.is_ok());
         let media_info = res.unwrap();
-        let meta = media_info.get_audio_info().unwrap();
+        let req_tags = &["title", "album", "artist", "composer"];
+        let mut tags = HashSet::new();
+        tags.extend(req_tags.into_iter().map(|s| s.to_string()));
+        let tags = Some(tags);
+        let meta = media_info.get_audio_info(&tags).unwrap();
         assert_eq!(meta.bitrate, 220);
         assert_eq!(meta.duration, 2);
+        assert!(meta.tags.is_some());
+        let tags = meta.tags.unwrap();
+
+        assert_eq!("KISS", tags.get("title").unwrap());
+        assert_eq!("Audioserve", tags.get("album").unwrap());
+        assert_eq!("Ivan", tags.get("artist").unwrap());
+        assert!(tags.get("composer").is_none());
     }
 
     #[test]

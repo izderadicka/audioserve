@@ -5,7 +5,7 @@ use std::time::SystemTime;
 
 use crate::audio_folder::FolderLister;
 use crate::audio_meta::AudioFolder;
-use crate::common::{CollectionTrait, PositionsTrait};
+use crate::common::{CollectionTrait, PositionsData, PositionsTrait};
 use crate::error::{Error, Result};
 use crate::util::get_real_file_type;
 use crate::AudioFolderShort;
@@ -27,7 +27,12 @@ impl CollectionDirect {
 }
 
 impl CollectionTrait for CollectionDirect {
-    fn list_dir<P>(&self, dir_path: P, ordering: crate::FoldersOrdering) -> Result<AudioFolder>
+    fn list_dir<P>(
+        &self,
+        dir_path: P,
+        ordering: crate::FoldersOrdering,
+        _group: Option<String>,
+    ) -> Result<AudioFolder>
     where
         P: AsRef<std::path::Path>,
     {
@@ -48,6 +53,12 @@ impl CollectionTrait for CollectionDirect {
         self.searcher
             .search_folder_for_recent(&self.base_dir, limit)
     }
+
+    fn signal_rescan(&self) {}
+
+    fn base_dir(&self) -> &Path {
+        self.base_dir.as_path()
+    }
 }
 
 impl PositionsTrait for CollectionDirect {
@@ -56,6 +67,7 @@ impl PositionsTrait for CollectionDirect {
         _group: S,
         _path: P,
         _position: f32,
+        _folder_finished: bool,
         _ts: Option<crate::audio_meta::TimeStamp>,
     ) -> Result<()>
     where
@@ -71,6 +83,25 @@ impl PositionsTrait for CollectionDirect {
         P: AsRef<str>,
     {
         None
+    }
+
+    fn get_all_positions_for_group<S>(
+        &self,
+        _group: S,
+        _collection_no: usize,
+    ) -> Vec<crate::Position>
+    where
+        S: AsRef<str>,
+    {
+        vec![]
+    }
+
+    fn write_json_positions<F: std::io::Write>(&self, _file: &mut F) -> Result<()> {
+        Ok(())
+    }
+
+    fn read_json_positions(&self, _data: PositionsData) -> Result<()> {
+        Ok(())
     }
 }
 

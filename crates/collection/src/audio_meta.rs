@@ -1,7 +1,9 @@
 use crate::error::{Error, Result};
+use crate::position::PositionShort;
 use crate::util::{get_file_name, get_modified, guess_mime_type};
 use mime_guess::Mime;
 use serde_derive::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::{
     cmp::Ordering,
     path::{Path, PathBuf},
@@ -95,6 +97,11 @@ pub struct AudioFolder {
     pub subfolders: Vec<AudioFolderShort>,
     pub cover: Option<TypedFile>, // cover is file in folder - either jpg or png
     pub description: Option<TypedFile>, // description is file in folder - either txt, html, md
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_deserializing)]
+    #[serde(default)]
+    pub position: Option<PositionShort>, // optional last know playback position in this folder
+    pub tags: Option<HashMap<String, String>>, // metadata tags, which are applicable for whole folder
 }
 
 #[derive(Clone, Copy)]
@@ -116,6 +123,7 @@ impl FoldersOrdering {
 pub struct AudioMeta {
     pub duration: u32, // duration in seconds, if available
     pub bitrate: u32,  // bitrate in kB/s
+    pub tags: Option<HashMap<String, String>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -140,6 +148,8 @@ pub struct AudioFolderShort {
     pub modified: Option<TimeStamp>,
     pub path: PathBuf,
     pub is_file: bool,
+    #[serde(default)]
+    pub finished: bool,
 }
 
 impl AudioFolderShort {
@@ -150,6 +160,7 @@ impl AudioFolderShort {
             path: p.strip_prefix(base_path).unwrap().into(),
             is_file: false,
             modified: None,
+            finished: false,
         }
     }
 
@@ -163,6 +174,7 @@ impl AudioFolderShort {
             name: f.file_name().to_string_lossy().into(),
             is_file,
             modified: get_modified(f.path()).map(|t| t.into()),
+            finished: false,
         })
     }
 
@@ -172,6 +184,7 @@ impl AudioFolderShort {
             path,
             is_file,
             modified: None,
+            finished: false,
         }
     }
 
@@ -255,14 +268,14 @@ pub fn is_description<P: AsRef<Path>>(path: P) -> bool {
 /// trait to generalize access to media metadata
 /// (so that underlying library can be easily changed)
 pub trait MediaInfo<'a>: Sized {
-    fn get_audio_info(&self) -> Option<AudioMeta>;
+    fn get_audio_info(&self, required_tags: &Option<HashSet<String>>) -> Option<AudioMeta>;
     fn get_chapters(&self) -> Option<Vec<Chapter>>;
     fn has_chapters(&self) -> bool;
 }
 
 mod libavformat {
     use super::*;
-    use std::sync::Once;
+    use std::{collections::HashSet, sync::Once};
 
     static INIT_LIBAV: Once = Once::new();
 
@@ -274,10 +287,11 @@ mod libavformat {
         media_file: media_info::MediaFile,
     }
     impl<'a> MediaInfo<'a> for Info {
-        fn get_audio_info(&self) -> Option<AudioMeta> {
+        fn get_audio_info(&self, required_tags: &Option<HashSet<String>>) -> Option<AudioMeta> {
             Some(AudioMeta {
                 duration: (self.media_file.duration() as f32 / 1000.0).round() as u32,
                 bitrate: self.media_file.bitrate(),
+                tags: self.collect_tags(required_tags),
             })
         }
 
@@ -300,6 +314,17 @@ mod libavformat {
     }
 
     impl Info {
+        fn collect_tags(
+            &self,
+            required_tags: &Option<HashSet<String>>,
+        ) -> Option<HashMap<String, String>> {
+            required_tags.as_ref().map(|tags| {
+                tags.iter()
+                    .filter_map(|tag| self.media_file.meta(tag).map(|v| (tag.to_string(), v)))
+                    .collect()
+            })
+        }
+
         pub fn from_file(path: &Path) -> Result<Info> {
             match path.as_os_str().to_str() {
                 Some(fname) => Ok(Info {
@@ -314,8 +339,8 @@ mod libavformat {
     }
 }
 
-pub fn get_audio_properties(audio_file_name: &Path) -> Result<impl MediaInfo> {
-    libavformat::Info::from_file(audio_file_name)
+pub fn get_audio_properties(audio_file_path: &Path) -> Result<impl MediaInfo> {
+    libavformat::Info::from_file(audio_file_path)
 }
 
 pub fn init_media_lib() {
