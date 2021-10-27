@@ -1,14 +1,21 @@
 name: Build Unstable Image
 on:
   schedule:
-    - cron: 0/5 * * * *
-    
+    - cron: 0 2 * * *
+  workflow_dispatch:
 jobs:
   audioserve-build:
     runs-on: ubuntu-20.04
     steps:
-    - name: test
+    - name: Check docker
       run: |
         echo "Starting build"
         docker --version
+    - uses: actions/checkout@v2
+    - name: Build image
+      run: docker build --tag izderadicka/audioserve:unstable --build-arg "features=transcoding-cache" .
+    - name: Publish image
+      run: |
+        docker login -u ${{secrets.DOCKERHUB_USER}} -p ${{secrets.DOCKERHUB_PASSWORD}}
+        docker push izderadicka/audioserve:unstable
     
