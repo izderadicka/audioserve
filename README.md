@@ -5,7 +5,7 @@
 
 [ [**DEMO AVAILABLE** - shared secret: mypass] ](https://audioserve.zderadicka.eu)
 
-**Version 0.16 bring a LOT of changes, so I recommend to read README even for existing users**
+**Version 0.16 brings a LOT of changes, so I recommend to read README even for existing users**
 
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalistic design.
 
@@ -46,7 +46,7 @@ By default symbolic(soft) links are not followed in the collections directory (b
 Initially I though that everything can be just served from the file system.  However experience with the program and users feedback have revealed two major problems with this approach:
 
 - for larger collections search was slow
-- for folder with many audiofiles folder (over couple hundred) was loading slowly (because we have to collect basic audio metadata - duration and bitrate for each file)
+- for folder with many audiofiles (over couple hundred) was loading slowly (because we have to collect basic audio metadata - duration and bitrate for each file)
 
 So I implemented caching of collection data into embeded key-value database (using [sled](https://github.com/spacejam/sled)). I'm quite happy with it now, it really makes audioserve **superfast**.
 
