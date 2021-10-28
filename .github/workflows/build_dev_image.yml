@@ -35,4 +35,14 @@ jobs:
       run: |
         docker login -u ${{secrets.DOCKERHUB_USER}} -p ${{secrets.DOCKERHUB_PASSWORD}}
         docker push izderadicka/audioserve:unstable
-    
+    - name: ssh to VM and redeploy
+      uses: appleboy/ssh-action@master
+      with:
+        host: audioserve.zderadicka.eu
+        username: ${{ secrets.AUDIOSERVE_USERNAME }}
+        key: ${{ secrets.AUDIOSERVE_KEY }}
+        script: |
+          docker rm -f audioserve || true
+          docker pull izderadicka/audioserve:unstable
+          ./run-audioserve.sh
+
