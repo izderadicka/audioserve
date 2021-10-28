@@ -282,6 +282,7 @@ impl FromStr for PositionsBackupFormat {
 
 #[cfg(feature = "shared-positions")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub struct PositionsConfig {
     pub ws_timeout: Duration,
     pub backup_file: Option<PathBuf>,
