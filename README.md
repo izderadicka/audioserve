@@ -1,15 +1,17 @@
 # Audioserve
 
-[![Build Status](https://travis-ci.org/izderadicka/audioserve.svg?branch=master)](https://travis-ci.org/izderadicka/audioserve)
+[![Build](https://github.com/izderadicka/audioserve/actions/workflows/rust_check.yml/badge.svg)](https://github.com/izderadicka/audioserve/actions/workflows/rust_check.yml)
 [![Docker Pulls](https://img.shields.io/docker/pulls/izderadicka/audioserve)](https://hub.docker.com/repository/docker/izderadicka/audioserve)
 
 [ [**DEMO AVAILABLE** - shared secret: mypass] ](https://audioserve.zderadicka.eu)
+
+**Version 0.16 bring a LOT of changes, so I recommend to read README even for existing users**
 
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalistic design.
 
 Server is written in Rust, default web client (HTML5 + Javascript) is intended for modern browsers (latest Firefox or Chrome) and is integrated with the server. There is also [Android client](https://github.com/izderadicka/audioserve-android) and API for custom clients.
 
-For some background and video demo check this article [Audioserve Audiobooks Server - Stupidly Simple or Simply Stupid?](http://zderadicka.eu/audioserve-audiobooks-server-stupidly-simple-or-simply-stupid)
+For some background and video demo check this article(bit old but gives main motivation behind it) [Audioserve Audiobooks Server - Stupidly Simple or Simply Stupid?](http://zderadicka.eu/audioserve-audiobooks-server-stupidly-simple-or-simply-stupid)
 
 If you will install audioserve and make it available on Internet do not [underestimate security](#security-best-practices).
 
@@ -17,12 +19,12 @@ Like audioserve and want to start quickly and easily and securely? Try [this sim
 
 ## Media Library
 
-Audioserve is intended to serve files from directory in exactly same structure (recently with some support for .m4b and similar single file audiobooks), audio tags are not considered. So recommended structure is:
+Audioserve is intended to serve files from directory in exactly same structure (with support for .m4b and similar single file audiobooks, where chapters are presented as virtual files), audio tags are not used for browsing, only optionally they can be displayed. Recommended directory structure of collections is:
 
     Author Last Name, First Name/Audio Book Name
     Author Last Name, First Name/Series Name/Audio Book Name
 
-Files should be named so they are in right alphabetical order - ideal is:
+Files should be named so they are in right alphabetical order - ideally prefixed with padded number:
 
     001 - First Chapter Name.opus
     002 - Second Chapter Name.opus
@@ -35,25 +37,56 @@ In folders you can have additional metadata files - first available image (jpeg 
 
 Search is done for folder names only (not individual files, neither audio metadata tags).
 
-You can have several libraries/ collections - just use several root directories as audioserve start parameters. In client you can switch between collections in the client. Typical usage will be to have separate collections for different languages.
+You can have several collections/libraries - just use several collection directories as audioserve command arguments. In client you can switch between collections. Typical usage will be to have separate collections for different languages.
 
 By default symbolic(soft) links are not followed in the collections directory (because if incorrectly used it can have quite negative impact on search and browse), but they can be enabled by `--allow-symlinks` program argument.
 
-### Single file audiobooks and chapters
+### Collections cache
 
-Recently better support for .m4b (one big file with chapters metadata) and similar was added. Such file is presented as a folder, which contains chapters (if you do not like this feature you can disable with `--ignore-chapters-meta` argument).
+Initially I though that everything can be just served from the file system.  However experience with the program and users feedback have revealed two major problems with this approach:
 
-Also long audiofile without chapters metadata, can be split into equaly sized parts/chapters (this has a slight disadvantage as split can be in middle of word). To enable later use `--chapters-from-duration` to set a limit, from which it should be used, and `chapters-duration` to set a duration of a part. Also for large files, which do not have chapters metadata, you can easily supply them in a separate file, with same name as the audio file but with additional extension `.chapters` - so it looks like `your_audiobook.mp3.chapters`. This file is simple CSV file (with header), where first column is chapter title, second is chapter start time, third (and last) is the chapter end time. Time is either in seconds (like `23.836`) or in `HH:MM:SS.mmm` format (like `02:35:23.386`).
+- for larger collections search was slow
+- for folder with many audiofiles folder (over couple hundred) was loading slowly (because we have to collect basic audio metadata - duration and bitrate for each file)
 
-There are some small glitches with this approach - search still works on directories only and cover and description metadata are yet not working (plan is to extract them from the audio file metadata). Apart of that chapters behaves like other audio files - can be transcoded to lower bitrates, seeked within etc.
+So I implemented caching of collection data into embeded key-value database (using [sled](https://github.com/spacejam/sled)). I'm quite happy with it now, it really makes audioserve **superfast**.
 
-If chaptered file is a single file in a directory (and there are no other subdirectories), then chapters are presented within this directory, as if they were files in this directory. This can help overcome above mentioned limitations - as search will work on directory name and also cover and description is shown from this directory - so this would be preferred way of placing .m4b files. If you do not like this new feature you can disable by `--no-dir-collaps` option.
+However it brings bit more complexity into the program. Here are main things to consider:
 
-Also beware that web client will often load same part of chapter again if you're seeking within it (especially Firefox with m4b), so it's definitely not bandwidth optimal (similar issue appears when often seeking in transcoded file).
+- On start audioserve scans and caches collection directories. If it is first scan it can take quite some time (depending on size of collection, can be tens of minutes for larger collections). Until scan is complete search might not work reliably. Also on running audioserve you can enforce full collections rescan by sending signal `sigusr1` to the program.
+- audioserve is watching for collection directories changes (using inotify on linux) so if you change something in collection - add, change, rename, delete folders/files - changes will propagate to running audioserve automatically - you will just need to wait a small amount of time - like 15 secs, before changes are visible in the program. For large collections you should increase the limit of inotify watchers in linux:
+
+```shell
+cat /proc/sys/fs/inotify/max_user_watches
+# use whatever higher number matches your requirement
+echo fs.inotify.max_user_watches=1048576 | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
+- cache is indeed binded with collection directory (hash of absolute normalized path is used as an identification for related cache) - so if you change collection directory path cache will also change (and old cache will still hang there - so some manual clean up might be needed).
+- if you do not want to cache particular collection you can add `:no-cache` option after collection directory argument. However then position sharing and metadata tags will also not work for that collection and search will be slow. 
+
+### Single file audiobooks and their chapters
+
+audioserve also supports single file audiobooks like  .m4b (one big file with chapters metadata) and similar (.mp3 can also contain chapters metadata). Such file is presented as a folder (with name of original file), which contains chapters as "virtual" files (chapters behaves like other audio files - can be transcoded to lower bitrates, seeked within etc.) (if you do not like this feature you can disable with `--ignore-chapters-meta` argument, I have seen some .mp3 files, which contained bad chapters metadata).
+
+Also long audiofile without chapters metadata, can be split into equaly sized parts/chapters (this has a slight disadvantage as split can be in middle of word). To enable this use `--chapters-from-duration` to set a limit, from which it should be used, and `chapters-duration` to set a duration of a part. Also for large files, which do not have chapters metadata, you can easily supply them in a separate file, with same name as the audio file but with additional extension `.chapters` - so it looks like `your_audiobook.mp3.chapters`. This file is simple CSV file (with header), where first column is chapter title, second is chapter start time, third (and last) is the chapter end time. Time is either in seconds (like `23.836`) or in `HH:MM:SS.mmm` format (like `02:35:23.386`).
+
+If chaptered file is a single file in a directory (and there are no other subdirectories), then chapters are presented within this directory, as if they were files in this directory and cover and description is shown from this directory. If you do not like this feature you can disable by `--no-dir-collaps` option.
+
+Also note that web client will often load same part of chapter again if you're seeking within it (especially Firefox with m4b), so it's definitely not bandwidth optimal (similar issue appears when often seeking in transcoded file).
+
+### Audio files metadata tags
+
+audioserve is using directory structure for navigation and searching. This is one of key design decisions and it will not change.  Main reason is because tags are just one big mess for audiobooks, everybody uses them in sligthly different way, so they are not reliable.  This was key reason why I started work on audioserve - to see my collection is the same way in which I stored it on disk. I do not want to bother with tags cleanup.
+
+However with new collection cache there is possibility to scan tags and display them in web client (not yet in Android). Just for display purpose, no special functionality is related to tags.
+
+It's optional you'll need to start audioserve with `--tags` or `--tags-custom` (here you list tags you're interested in - use `--help-tags` for list of supported tags).
+
+This is the algorithm for scanning tags: tags are scanned for all files in the folder, if particular tag (like artist) is same for all files in the folder it is put on folder level, othewise is stays with the file. For chapterized big audiofile its tags are put on folder level (virtual folder representing this file). Chapter tags are not collected (in all .m4b I saw only tag was title, which is anyhow used for chapter virtual file name).
 
 ## Sharing playback positions between clients
 
-Recently (from version 0.10) audioserve supports sharing playback positions between clients. This is basically used to continue listening on next client, from where you left on previous one. It's supported in the included web client and in the recent Android client (from version 0.8). In order to enable position sharing you'll need to define 'device group' in the client (on login dialog in web client and in settings in Android client) - group is just an arbitrary name and devices within same group will share playback position.
+Audioserve supports sharing playback positions between clients. This is basically used to continue listening on next client, from where you left on previous one. It's supported in the included web client and in the recent Android client (from version 0.8). In order to enable position sharing you'll need to define 'device group' in the client (on login dialog in web client and in settings in Android client) - group is just an arbitrary name and devices within same group will share playback position.
 
 After you have several active devices with same group name, you'll be notified when you click play and there is more recent playback position in the group and you can choose if jump to this latest position or continue with current position. There is also option to check latest position directly (in web client it's icon in the folder header, in Android client it's in options menu).
 
@@ -127,10 +160,6 @@ Audioserve is intended to serve personal audio collections of moderate sizes. Fo
 To compensate for slow file system operation audioserve now by default is using cache system - see below.
 
 But true limiting factor is transcoding - as it's quite CPU intensive. Normally you should run only a handful of transcodings in parallel, not much then 2x - 4x more then number of cores in the machine. For certain usage scenarios enabling of [transcoding cache](#transcoding-cache) can help a bit.
-
-### Collections Cache
-
-For fast searches and fast browsing we use cache (based on fast Rust native key-value store sled). Cache monitors directories and updates itself upon changes (make take a while). Also after start of audioserve it takes some time before cache is filled (especially when large collections are used), so search might not work initially.
 
 ### Transcoding Cache
 
