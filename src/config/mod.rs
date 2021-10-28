@@ -280,6 +280,43 @@ impl FromStr for PositionsBackupFormat {
     }
 }
 
+#[cfg(feature = "shared-positions")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PositionsConfig {
+    pub ws_timeout: Duration,
+    pub backup_file: Option<PathBuf>,
+    pub restore: PositionsBackupFormat,
+    pub backup_schedule: Option<String>,
+}
+
+#[cfg(feature = "shared-positions")]
+impl Default for PositionsConfig {
+    fn default() -> Self {
+        Self {
+            ws_timeout: Duration::from_secs(600),
+            backup_file: None,
+            restore: PositionsBackupFormat::None,
+            backup_schedule: None,
+        }
+    }
+}
+
+#[cfg(feature = "shared-positions")]
+impl PositionsConfig {
+    pub fn check(&self) -> Result<()> {
+        if self.ws_timeout < Duration::from_secs(60) {
+            return value_error!("positions-ws-timeout", "Timeout must be at least 60s");
+        }
+
+        if let Some(schedule) = self.backup_schedule.as_ref() {
+            if crate::util::parse_cron(schedule).is_err() {
+                return value_error!("positions-backup-schedule", "Invalid cron expression");
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -302,13 +339,12 @@ pub struct Config {
     pub chapters: ChaptersSize,
     pub no_dir_collaps: bool,
     pub ignore_chapters_meta: bool,
-    pub positions_ws_timeout: Duration,
+    #[cfg(feature = "shared-positions")]
+    pub positions: PositionsConfig,
     pub behind_proxy: bool,
     pub collections_cache_dir: PathBuf,
     pub tags: HashSet<String>,
     pub force_cache_update_on_init: bool,
-    pub positions_backup_file: Option<PathBuf>,
-    pub positions_restore: PositionsBackupFormat,
 }
 
 impl Config {
@@ -383,10 +419,6 @@ impl Config {
             );
         }
 
-        if self.positions_ws_timeout < Duration::from_secs(60) {
-            return value_error!("positions-ws-timeout", "Timeout must be at least 60s");
-        }
-
         if !self.client_dir.is_dir() {
             return value_error!(
                 "client_dir",
@@ -410,6 +442,8 @@ impl Config {
         self.transcoding.check()?;
         self.thread_pool.check()?;
         self.chapters.check()?;
+        #[cfg(feature = "shared-positions")]
+        self.positions.check()?;
 
         if self.base_dirs.is_empty() {
             return value_error!(
@@ -465,14 +499,12 @@ impl Default for Config {
             chapters: ChaptersSize::default(),
             no_dir_collaps: false,
             ignore_chapters_meta: false,
-            positions_ws_timeout: Duration::from_secs(600),
             behind_proxy: false,
             collections_cache_dir: data_base_dir.join("col_db"),
             tags: HashSet::new(),
             force_cache_update_on_init: false,
-            positions_backup_file: None,
-            positions_restore: PositionsBackupFormat::None,
-            //positions_backup_schedule: None,
+            #[cfg(feature = "shared-positions")]
+            positions: Default::default(),
         }
     }
 }

@@ -239,7 +239,7 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseF
                 }
             }
         },
-        get_config().positions_ws_timeout,
+        get_config().positions.ws_timeout,
     );
 
     Box::pin(future::ok(res))

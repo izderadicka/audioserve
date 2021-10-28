@@ -251,6 +251,14 @@ fn create_parser<'a>() -> Parser<'a> {
             .env("AUDIOSERVE_POSITIONS_RESTORE")
             .requires("positions-backup-file")
             .help("Restores positions from backup JSON file, value is version of file legacy is before audioserve v0.16,  v1 is current")
+        )
+        .arg(
+            Arg::with_name("positions-backup-schedule")
+            .long("positions-backup-schedule")
+            .takes_value(true)
+            .env("AUDIOSERVE_POSITIONS_BACKUP_SCHEDULE")
+            .requires("positions-backup-file")
+            .help("Sets regular schedule for backing up playback position - should be cron expression m h dom mon dow- minute (m), hour (h), day of month (dom), month (mon) day of week (dow)")
         );
     }
 
@@ -547,17 +555,24 @@ where
         config.ignore_chapters_meta = true;
     }
 
-    if let Some(ps) = args.value_of("positions-restore") {
-        config.positions_restore = ps.parse().expect("Value was checked by clap");
-        no_authentication_confirmed = true;
-    }
+    #[cfg(feature = "shared-positions")]
+    {
+        if let Some(ps) = args.value_of("positions-restore") {
+            config.positions.restore = ps.parse().expect("Value was checked by clap");
+            no_authentication_confirmed = true;
+        }
 
-    if let Some(positions_backup_file) = args.value_of_os("positions-backup-file") {
-        config.positions_backup_file = Some(positions_backup_file.into());
-    }
+        if let Some(positions_backup_file) = args.value_of_os("positions-backup-file") {
+            config.positions.backup_file = Some(positions_backup_file.into());
+        }
 
-    if let Some(positions_ws_timeout) = args.value_of("positions-ws-timeout") {
-        config.positions_ws_timeout = Duration::from_secs(positions_ws_timeout.parse().unwrap())
+        if let Some(positions_ws_timeout) = args.value_of("positions-ws-timeout") {
+            config.positions.ws_timeout = Duration::from_secs(positions_ws_timeout.parse().unwrap())
+        }
+
+        if let Some(positions_backup_schedule) = args.value_of("positions-backup-schedule") {
+            config.positions.backup_schedule = Some(positions_backup_schedule.into());
+        }
     }
 
     if !no_authentication_confirmed && config.shared_secret.is_none() {
