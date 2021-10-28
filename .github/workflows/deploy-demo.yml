@@ -18,4 +18,4 @@ jobs:
           script: |
             docker rm -f audioserve || true
             docker pull izderadicka/audioserve:unstable
-            ./run_audioserve.sh
+            ./run-audioserve.sh
