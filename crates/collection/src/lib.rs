@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::{
     collections::HashMap,
     fs::File,
+    io::{Read, Write},
     path::{Path, PathBuf},
     thread::JoinHandle,
 };
@@ -37,6 +38,32 @@ pub(crate) mod no_cache;
 pub mod position;
 pub mod util;
 
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+fn check_version<P: AsRef<Path>>(db_dir: P) -> Result<()> {
+    let db_dir = db_dir.as_ref();
+    let version_file = db_dir.join(".version");
+    if version_file.exists() {
+        let mut col_db_version = String::new();
+        File::open(version_file)?.read_to_string(&mut col_db_version)?;
+        if col_db_version != VERSION {
+            warn!(
+                "Your collection cache {:?} is version {}, which is different from current {}, \
+            if experiencing problems delete it and restore positions from backup",
+                db_dir, col_db_version, VERSION
+            );
+        }
+    } else {
+        if !db_dir.exists() {
+            std::fs::create_dir_all(db_dir)?
+        }
+        let mut f = File::create(version_file)?;
+        f.write_all(VERSION.as_bytes())?;
+    }
+
+    Ok(())
+}
+
 pub struct Collections {
     caches: Vec<Collection>,
 }
@@ -53,6 +80,7 @@ impl Collections {
         P1: Into<PathBuf>,
         P2: AsRef<Path>,
     {
+        check_version(&db_path)?;
         let db_path = db_path.as_ref();
         let allow_symlinks = opt.allow_symlinks;
         let force_update = opt.force_cache_update_on_init;
@@ -214,7 +242,6 @@ impl Collections {
     }
 
     pub fn backup_positions<P: Into<PathBuf>>(&self, backup_file: P) -> Result<()> {
-        use std::io::Write;
         let fname: PathBuf = backup_file.into();
         let mut f = std::fs::File::create(fname)?;
         write!(f, "{{")?;
@@ -246,6 +273,7 @@ impl Collections {
         P2: AsRef<Path>,
         P3: AsRef<Path>,
     {
+        check_version(&db_path)?;
         let force_update = opt.force_cache_update_on_init;
         let lister = FolderLister::new_with_options(opt);
 
