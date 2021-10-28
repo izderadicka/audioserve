@@ -89,3 +89,9 @@ pub fn strip_prefix_of<'a>(needle: &str, haystack: &'a str) -> Option<&'a str> {
         None
     }
 }
+
+#[cfg(feature = "shared-positions")]
+pub fn parse_cron<S: AsRef<str>>(exp: S) -> crate::error::Result<cron::Schedule> {
+    let exp = format!("0 {} *", exp.as_ref());
+    exp.parse().map_err(crate::Error::from)
+}

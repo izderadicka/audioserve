@@ -39,11 +39,11 @@ linked-hash-map = {git="https://github.com/izderadicka/linked-hash-map.git", ver
 tokio-native-tls = {version="0.3", optional=true}
 native-tls = {version="0.2", optional=true}
 
-cachedirtree = {path="crates/cachedirtree", optional=true}
-
 leaky-cauldron = {path="crates/leaky-cauldron"}
-
 tokio-util = {version="0.6", optional=true}
+cron = {version="0.9", optional=true}
+chrono = {version="0.4", optional=true}
+
 
 # this repo dependencies
 collection = {path="crates/collection", features=["async"]}
@@ -60,11 +60,11 @@ nix = "0.20"
 default = ["tls", "symlinks", "folder-download", "shared-positions", "behind-proxy"]
 # default
 tls=["tokio-native-tls", "native-tls"]
-symlinks=["cachedirtree/symlinks", "collection/symlinks"]
+symlinks=["collection/symlinks"]
 
 folder-download = ["async-tar", "async-zip"]
 folder-download-default-tar =[]
-shared-positions = ["websock"]
+shared-positions = ["websock", "cron", "chrono"]
 behind-proxy = ["proxy-headers"]
 # non-default
 transcoding-cache=["simple-file-cache", "tokio-util"]

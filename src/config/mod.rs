@@ -472,6 +472,7 @@ impl Default for Config {
             force_cache_update_on_init: false,
             positions_backup_file: None,
             positions_restore: PositionsBackupFormat::None,
+            //positions_backup_schedule: None,
         }
     }
 }

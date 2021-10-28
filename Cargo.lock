@@ -75,9 +75,10 @@ dependencies = [
  "async-tar",
  "async-zip",
  "bytes",
- "cachedirtree",
+ "chrono",
  "clap",
  "collection",
+ "cron",
  "csv",
  "data-encoding",
  "dirs",
@@ -318,6 +319,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81156fece84ab6a9f2afdb109ce3ae577e42b1228441eded99bd77f627953b1a"
 dependencies = [
  "cfg-if 1.0.0",
+]
+
+[[package]]
+name = "cron"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e009ed0b762cf7a967a34dfdc67d5967d3f828f12901d37081432c3dd1668f8f"
+dependencies = [
+ "chrono",
+ "nom 4.1.1",
+ "once_cell",
 ]
 
 [[package]]
@@ -1269,6 +1281,15 @@ dependencies = [
 
 [[package]]
 name = "nom"
+version = "4.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c349f68f25f596b9f44cf0e7c69752a5c633b0550c3ff849518bfba0233774a"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
+name = "nom"
 version = "6.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7413f999671bd4745a7b624bd370a569fb6bc574b23c83a3c5ed2e453f3d5e2"
@@ -1487,7 +1508,7 @@ dependencies = [
  "http",
  "lazy_static",
  "log",
- "nom",
+ "nom 6.1.2",
 ]
 
 [[package]]

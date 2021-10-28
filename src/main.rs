@@ -238,7 +238,7 @@ async fn terminate_server() {
 #[cfg(unix)]
 async fn watch_for_cache_update_signal(cols: Arc<Collections>) {
     use tokio::signal::unix::{signal, SignalKind};
-    let mut sigusr1 = signal(SignalKind::user_defined1()).expect("Cannot create SIGINT handler");
+    let mut sigusr1 = signal(SignalKind::user_defined1()).expect("Cannot create SIGUSR1 handler");
     while let Some(()) = sigusr1.recv().await {
         info!("Received signal SIGUSR1 for full rescan of caches");
         cols.clone().force_rescan()
@@ -246,19 +246,33 @@ async fn watch_for_cache_update_signal(cols: Arc<Collections>) {
 }
 
 #[cfg(unix)]
+#[cfg(feature = "shared-positions")]
 async fn watch_for_positions_backup_signal(cols: Arc<Collections>) {
     use tokio::signal::unix::{signal, SignalKind};
-    let mut sigusr2 = signal(SignalKind::user_defined2()).expect("Cannot create SIGINT handler");
-    while let Some(()) = sigusr2.recv().await {
-        info!("Received signal SIGUSR2 for positions backup");
-        if let Some(backup_file) = get_config().positions_backup_file.clone() {
+    let cron = crate::util::parse_cron("0/1 * * * *").expect("invalid cron expression");
+    let next_dur = move || {
+        cron.upcoming(chrono::Utc)
+            .next()
+            .and_then(|d| (d - chrono::Utc::now()).to_std().ok())
+            .unwrap_or_else(|| Duration::from_secs(u64::MAX))
+    };
+    let mut sigusr2 = signal(SignalKind::user_defined2()).expect("Cannot create SIGUSR2 handler");
+
+    loop {
+        let res = tokio::time::timeout(next_dur(), sigusr2.recv()).await;
+        match res {
+            Ok(None) => break,
+            Ok(Some(())) => info!("Received signal SIGUSR2 for positions backup"),
+            Err(_) => debug!("scheduled positions backup"),
+        }
+        if let Some(backup_file) = get_config().positions_backup_file.as_ref() {
             cols.clone()
                 .backup_positions_async(backup_file)
                 .await
                 .map_err(|e| error!("Backup of positions failed: {}", e))
                 .ok();
         } else {
-            warn!("positions backup file is not setup");
+            error!("Positions backup file not configured")
         }
     }
 }
