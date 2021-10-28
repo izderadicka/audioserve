@@ -7,7 +7,7 @@ extern crate lazy_static;
 
 use collection::audio_folder::FoldersOptions;
 use collection::common::CollectionOptions;
-use collection::{BackupFile, Collections};
+use collection::Collections;
 use config::{get_config, init_config};
 use error::{bail, Context, Error};
 use futures::prelude::*;
@@ -26,8 +26,6 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-
-use crate::config::PositionsBackupFormat;
 
 mod config;
 mod error;
@@ -123,7 +121,8 @@ fn create_collections() -> Arc<Collections> {
     )
 }
 
-fn restore_positions<P: AsRef<Path>>(backup_file: BackupFile<P>) -> anyhow::Result<()> {
+#[cfg(feature = "shared-positions")]
+fn restore_positions<P: AsRef<Path>>(backup_file: collection::BackupFile<P>) -> anyhow::Result<()> {
     let (fo, co) = create_folder_options();
     Collections::restore_positions(
         get_config().base_dirs.clone(),
@@ -238,7 +237,7 @@ async fn terminate_server() {
 #[cfg(unix)]
 async fn watch_for_cache_update_signal(cols: Arc<Collections>) {
     use tokio::signal::unix::{signal, SignalKind};
-    let mut sigusr1 = signal(SignalKind::user_defined1()).expect("Cannot create SIGINT handler");
+    let mut sigusr1 = signal(SignalKind::user_defined1()).expect("Cannot create SIGUSR1 handler");
     while let Some(()) = sigusr1.recv().await {
         info!("Received signal SIGUSR1 for full rescan of caches");
         cols.clone().force_rescan()
@@ -246,19 +245,37 @@ async fn watch_for_cache_update_signal(cols: Arc<Collections>) {
 }
 
 #[cfg(unix)]
+#[cfg(feature = "shared-positions")]
 async fn watch_for_positions_backup_signal(cols: Arc<Collections>) {
     use tokio::signal::unix::{signal, SignalKind};
-    let mut sigusr2 = signal(SignalKind::user_defined2()).expect("Cannot create SIGINT handler");
-    while let Some(()) = sigusr2.recv().await {
-        info!("Received signal SIGUSR2 for positions backup");
-        if let Some(backup_file) = get_config().positions_backup_file.clone() {
+    let mut cron = get_config()
+        .positions
+        .backup_schedule
+        .as_ref()
+        .map(|s| crate::util::parse_cron(s).expect("invalid cron expression"));
+    let mut next_dur = move || {
+        cron.as_mut()
+            .and_then(|cron| cron.upcoming(chrono::Utc).next())
+            .map(|d| (d - chrono::Utc::now()).to_std().unwrap_or_else(|_| Duration::from_millis(100)))
+            .unwrap_or_else(|| Duration::from_secs(u64::MAX))
+    };
+    let mut sigusr2 = signal(SignalKind::user_defined2()).expect("Cannot create SIGUSR2 handler");
+
+    loop {
+        let res = tokio::time::timeout(next_dur(), sigusr2.recv()).await;
+        match res {
+            Ok(None) => break,
+            Ok(Some(())) => info!("Received signal SIGUSR2 for positions backup"),
+            Err(_) => debug!("scheduled positions backup"),
+        }
+        if let Some(backup_file) = get_config().positions.backup_file.as_ref() {
             cols.clone()
                 .backup_positions_async(backup_file)
                 .await
                 .map_err(|e| error!("Backup of positions failed: {}", e))
                 .ok();
         } else {
-            warn!("positions backup file is not setup");
+            error!("Positions backup file not configured")
         }
     }
 }
@@ -278,15 +295,23 @@ fn main() -> anyhow::Result<()> {
 
     collection::init_media_lib();
 
-    if !matches!(get_config().positions_restore, PositionsBackupFormat::None) {
+    #[cfg(feature = "shared-positions")]
+    if !matches!(
+        get_config().positions.restore,
+        config::PositionsBackupFormat::None
+    ) {
         let backup_file = get_config()
-            .positions_backup_file
+            .positions
+            .backup_file
             .clone()
             .expect("Missing backup file argument");
-        let backup_file = match get_config().positions_restore {
-            PositionsBackupFormat::None => unreachable!(),
-            PositionsBackupFormat::Legacy => BackupFile::Legacy(backup_file),
-            PositionsBackupFormat::V1 => BackupFile::V1(backup_file),
+
+        use collection::BackupFile;
+        use config::PositionsBackupFormat::*;
+        let backup_file = match get_config().positions.restore {
+            None => unreachable!(),
+            Legacy => BackupFile::Legacy(backup_file),
+            V1 => BackupFile::V1(backup_file),
         };
 
         restore_positions(backup_file).context("Error while restoring position")?;
@@ -324,6 +349,7 @@ fn main() -> anyhow::Result<()> {
     #[cfg(unix)]
     {
         runtime.spawn(watch_for_cache_update_signal(collections.clone()));
+        #[cfg(feature = "shared-positions")]
         runtime.spawn(watch_for_positions_backup_signal(collections.clone()));
     }
 

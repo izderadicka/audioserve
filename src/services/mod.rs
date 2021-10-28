@@ -710,11 +710,11 @@ fn extract_group(path: &str) -> PositionGroup {
 }
 
 #[cfg(test)]
+#[cfg(feature = "shared-positions")]
 mod tests {
     use super::*;
 
     #[test]
-    #[cfg(feature = "shared-positions")]
     fn test_extract_group() {
         if let PositionGroup::Group(x) = extract_group("/positions/usak") {
             assert_eq!(x, "usak");
