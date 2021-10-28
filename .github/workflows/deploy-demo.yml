@@ -15,4 +15,7 @@ jobs:
           host: audioserve.zderadicka.eu
           username: ${{ secrets.AUDIOSERVE_USERNAME }}
           key: ${{ secrets.AUDIOSERVE_KEY }}
-          script: date
+          script: |
+            docker rm -f audioserve
+            docker pull izderadicka/audioserve:unstable
+            ./run_audioserve
