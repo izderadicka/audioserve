@@ -241,7 +241,6 @@ span.subtitle {
 
 #info-tags {
     width: 330px;
-    float: right;
 }
 
 #info-tags table {
@@ -253,6 +252,25 @@ span.subtitle {
     color: gray;
     padding-left: 1em;
 }
+
+.active .file-tags-title{
+    color: lightgray;
+}
+
+ #main-content {
+    display: flex;
+    flex-wrap: nowrap;
+    flex-direction: row;
+  }
+
+  #info-sidebar {
+    max-width: 360px;
+  }
+
+  #collection-browser {
+    width: 100%;
+    margin-right: 3em;
+  }
 
 @media (max-width: 1024px) {
     h1.top-header {
@@ -271,6 +289,10 @@ span.subtitle {
         float: none;
         text-align: left;
         width: 100%;
+    }
+
+    #main-content {
+        flex-direction: column;
     }
 }
 

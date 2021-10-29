@@ -334,11 +334,14 @@ $(function () {
                         showInView(target);
                         playFile(target, !startPlay, time);
                     }
-                } else {
-                    // TODO: At some right momemts check if user want to continue at last positions
-                    // something after lost of whole window focus for longer time and after whole app
-                    // reload
-                    // checkRecent();
+                } else if (data.position) {
+                    let target = $(`#files a[href="${data.position.path}"]`);
+                    if (target.length) {
+                        restoredPosition = !startPlay;
+                        let time = data.position.position || 0;
+                        showInView(target);
+                        playFile(target, !startPlay, time);
+                    }
                 }
             });
     }
@@ -551,7 +554,7 @@ $(function () {
             duration: target.data("duration"),
             transcoded: trans && trans != '0'
         });
-        player.src = fullUrl;
+        // player.src = fullUrl;
         if (startTime) {
             player.jumpToTime(startTime);
         }
