@@ -256,7 +256,11 @@ async fn watch_for_positions_backup_signal(cols: Arc<Collections>) {
     let mut next_dur = move || {
         cron.as_mut()
             .and_then(|cron| cron.upcoming(chrono::Local).next())
-            .map(|d| (d - chrono::Local::now()).to_std().unwrap_or_else(|_| Duration::from_millis(100)))
+            .map(|d| {
+                (d - chrono::Local::now())
+                    .to_std()
+                    .unwrap_or_else(|_| Duration::from_millis(100))
+            })
             .unwrap_or_else(|| Duration::from_secs(u64::MAX))
     };
     let mut sigusr2 = signal(SignalKind::user_defined2()).expect("Cannot create SIGUSR2 handler");
