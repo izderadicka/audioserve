@@ -476,7 +476,7 @@ impl<C: 'static> FileSendService<C> {
                                 .unwrap_or(false);
                             subs::folder_position(collections, group, collection, path, recursive)
                         }
-                        PositionGroup::Malformed => resp::fut(resp::not_found),
+                        PositionGroup::Malformed => resp::fut(resp::bad_request),
                     }
                     #[cfg(not(feature = "shared-positions"))]
                     unimplemented!();
@@ -568,35 +568,39 @@ impl<C: 'static> FileSendService<C> {
 
             Method::POST => {
                 #[cfg(feature = "shared-positions")]
-                match extract_group(path) {
-                    PositionGroup::Group(group) => {
-                        if req
-                            .headers()
-                            .get("Content-Type")
-                            .and_then(|v| {
-                                v.to_str()
-                                    .ok()
-                                    .map(|s| s.to_lowercase().eq("application/json"))
-                            })
-                            .unwrap_or(false)
-                        {
-                            Box::pin(async move {
-                                match req.body_bytes().await {
-                                    Ok(bytes) => {
-                                        subs::insert_position(collections, group, bytes).await
+                if path.starts_with("/positions") {
+                    match extract_group(path) {
+                        PositionGroup::Group(group) => {
+                            if req
+                                .headers()
+                                .get("Content-Type")
+                                .and_then(|v| {
+                                    v.to_str()
+                                        .ok()
+                                        .map(|s| s.to_lowercase().eq("application/json"))
+                                })
+                                .unwrap_or(false)
+                            {
+                                Box::pin(async move {
+                                    match req.body_bytes().await {
+                                        Ok(bytes) => {
+                                            subs::insert_position(collections, group, bytes).await
+                                        }
+                                        Err(e) => {
+                                            error!("Error reading POST body: {}", e);
+                                            Ok(resp::bad_request())
+                                        }
                                     }
-                                    Err(e) => {
-                                        error!("Error reading POST body: {}", e);
-                                        Ok(resp::bad_request())
-                                    }
-                                }
-                            })
-                        } else {
-                            error!("Not JSON content type");
-                            resp::fut(resp::bad_request)
+                                })
+                            } else {
+                                error!("Not JSON content type");
+                                resp::fut(resp::bad_request)
+                            }
                         }
+                        _ => resp::fut(resp::bad_request),
                     }
-                    _ => resp::fut(resp::not_found),
+                } else {
+                    resp::fut(resp::not_found)
                 }
 
                 #[cfg(not(feature = "shared-positions"))]
