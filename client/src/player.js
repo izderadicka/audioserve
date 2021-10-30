@@ -42,7 +42,7 @@ function isHidden(el) {
     return (style.display === 'none')
 }
 
-function  touchToEvent (touch, type) {
+function touchToEvent(touch, type) {
     return {
         target: touch.target,
         clientX: touch.clientX,
@@ -136,7 +136,7 @@ class ControlButton {
                         this._onChange(evt);
                     }
                 };
-                window.addEventListener("touchmove", handler, {"passive": false});
+                window.addEventListener("touchmove", handler, { "passive": false });
                 window.addEventListener("touchend", (event) => {
                     let t = myTouch(event);
                     if (t) {
@@ -190,7 +190,7 @@ class ControlButton {
         const progress = this.scaleValueInverse(v) * 100;
         this._volumeProgress.style.height = progress + '%';
         this._digits.innerText = this.formatDigits(v);
-        this._value = v; 
+        this._value = v;
     }
 
 }
@@ -198,7 +198,7 @@ class ControlButton {
 class VolumeButton extends ControlButton {
 
     updateVolume(volume) {
-        this.value =volume;
+        this.value = volume;
         if (volume >= 0.5) {
             this._icon.attributes.d.value = VOLUME_FULL;
         } else if (volume < 0.5 && volume > 0.05) {
@@ -209,11 +209,11 @@ class VolumeButton extends ControlButton {
     }
 
     formatDigits(v) {
-        return (100*v).toFixed(0)
+        return (100 * v).toFixed(0)
     }
 
     scaleValue(v) {
-        return Math.pow(v,2)
+        return Math.pow(v, 2)
     }
 
     scaleValueInverse(v) {
@@ -234,9 +234,9 @@ class SpeedButton extends ControlButton {
         }
         else if (speed >= 0.5 && speed < 0.9) {
             spd(SPEED_2);
-        } else if ( speed >= 0.9 && speed < 1.2) {
+        } else if (speed >= 0.9 && speed < 1.2) {
             spd(SPEED_3);
-        } else if ( speed >= 1.2 && speed < 2.1) {
+        } else if (speed >= 1.2 && speed < 2.1) {
             spd(SPEED_4);
         } else {
             spd(SPEED_5);
@@ -244,7 +244,7 @@ class SpeedButton extends ControlButton {
     }
 
     scaleValue(v) {
-        return Math.round(10 * (v * 2.7 + 0.3))/ 10;
+        return Math.round(10 * (v * 2.7 + 0.3)) / 10;
     }
 
     scaleValueInverse(v) {
@@ -283,8 +283,8 @@ export class AudioPlayer {
             localStorage.setItem('audioserve_speed', speed);
         });
         this._speedBtn.updateSpeed(parseFloat(localStorage.getItem('audioserve_speed')) || 1.0);
-    
-        
+
+
         this._currentTime = audioPlayer.querySelector('.current-time');
         this._totalTime = audioPlayer.querySelector('.total-time');
         this._cacheIndicator = audioPlayer.querySelector('.player-cache');
@@ -351,7 +351,7 @@ export class AudioPlayer {
             }
         }, { passive: true });
 
-        
+
         sliderTime.addEventListener('click', (evt) => {
             if (!this._currentlyDragged && !evt.target.className.includes("cache")) {
                 this._onMoveSlider(evt, true);
@@ -426,7 +426,7 @@ export class AudioPlayer {
                     return `UNKNOWN_${code}`;
             };
             let e = this._player.error;
-            let msg = e.message? `${codeName(e.code)} : ${e.message}` : codeName(e.code);
+            let msg = e.message ? `${codeName(e.code)} : ${e.message}` : codeName(e.code);
             console.log("Player error: " + msg);
             this.pause();
             alert("Player error:\n" + msg);
@@ -564,6 +564,11 @@ export class AudioPlayer {
         }
     }
 
+    getProgressTime() {
+        const pct = parseFloat(this._progress.style.width);
+        return (pct/100) * this.knownDuration;
+    }
+
     _onMoveSlider(event, jump = false) {
 
         let k = getCoefficient(event, this._currentlyDragged);
@@ -653,6 +658,25 @@ export class AudioPlayer {
         } else {
             this.pause();
         }
+    }
+
+    resetAndSetPosition(startTime, duration) {
+            this.knownDuration = duration;
+
+        this._player.removeAttribute("src");
+        this._player.pause();
+
+        this._totalTime.textContent = formatTime(this.knownDuration);
+        // HACK: this is an ugly hack
+        window.setTimeout( () => {
+        let current = startTime;
+        let percent = (current / this.knownDuration) * 100;
+        if (percent > 100) percent = 100;
+        if (isNaN(percent)) percent = 0;
+        this._progress.style.width = percent + '%';
+        this._currentTime.textContent = formatTime(current);
+        this._showPlay();
+        }, 10);
     }
 
     setUrl(url, options) {

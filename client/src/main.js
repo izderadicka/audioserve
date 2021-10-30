@@ -20,7 +20,7 @@ $(function () {
         console.log(`Running audioserve web client version ${AUDIOSERVE_VERSION}`);
         baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname.length > 1 ? window.location.pathname : ""}`;
         if (baseUrl.endsWith('/')) {
-            baseUrl = baseUrl.substr(0, baseUrl.length-1);
+            baseUrl = baseUrl.substr(0, baseUrl.length - 1);
         }
     }
 
@@ -34,7 +34,7 @@ $(function () {
     let pendingCall = null;
     let pendingSpinner = null;
     let transcodingLimit = 58;
-    let transcoding = isApple() ? "0":"m"; //Do not select default transcoding for Apple devices
+    let transcoding = isApple() ? "0" : "m"; //Do not select default transcoding for Apple devices
     let ordering = "a";
     let transcodingLimits = { l: 38, m: 56, h: 76 };
     let restoredPosition = false;
@@ -108,7 +108,7 @@ $(function () {
                 }
 
                 // opens websocket if group is defined
-                if (sync.groupPrefix && ! sync.active) {
+                if (sync.groupPrefix && !sync.active) {
                     $('#position-sync-btn').show();
                 } else if (!sync.groupPrefix && sync.active) {
                     sync.close();
@@ -166,18 +166,18 @@ $(function () {
         }
     }
 
-    function groupParams(includeOrder=true) {
+    function groupParams(includeOrder = true) {
         let params = new URLSearchParams();
         if (ordering != "a" && includeOrder) {
             params.append("ord", ordering)
         }
-        const group =  window.localStorage.getItem("audioserve_group");
+        const group = window.localStorage.getItem("audioserve_group");
         if (group) {
             params.append("group", group)
         }
         params = params.toString();
         if (params) {
-            params = "?"+params;
+            params = "?" + params;
         }
         return params
     }
@@ -206,7 +206,7 @@ $(function () {
                     const table = $('<table class="table table-striped table-borderless">');
                     const tbody = $('<tbody>');
                     table.append(tbody);
-                    
+
                     for (const [name, value] of Object.entries(data.tags)) {
                         tbody.append($(`<tr><th>${name}</th><td>${value}</td></tr>`));
                     }
@@ -424,7 +424,7 @@ $(function () {
             let item = $('<li class="breadcrumb-item">');
             if (i == segments.length - 1) {
                 item.addClass("active");
-            } 
+            }
             let partPath = segments.slice(0, i + 1).join('/');
             item.append($(`<a href="#${partPath}">${segments[i]}</a></li>`));
             bc.append(item);
@@ -470,10 +470,10 @@ $(function () {
                     const normName = (n) => {
                         n = n.replace(/\$\$[\d\-]+\$\$/, '');
                         let idx = n.indexOf("$$");
-                        if (idx>=0) {
-                            n = n.slice(idx+2);
+                        if (idx >= 0) {
+                            n = n.slice(idx + 2);
                         }
-                        
+
                         const extIndex = n.lastIndexOf('.');
                         if (extIndex > 0) {
                             n = n.substr(0, extIndex);
@@ -495,9 +495,9 @@ $(function () {
                         if (item.folder == window.localStorage.getItem("audioserve_folder")) {
                             let target = $(`#files a[href="${itemPath}"]`);
                             if (target.length) {
-                            restoredPosition = false;
-                            showInView(target);
-                            playFile(target, false, item.position);
+                                restoredPosition = false;
+                                showInView(target);
+                                playFile(target, false, item.position);
                             } else {
                                 console.error(`File ${itemPath} is missing from current folder`)
                             }
@@ -537,10 +537,12 @@ $(function () {
             .catch((e) => console.error(e));
     };
 
-    player.beforePlay = () => {
+    const standardBeforePlay = () => {
         restoredPosition = false;
         return checkRecent();
     };
+
+    player.beforePlay = standardBeforePlay;
 
     function playFile(target, paused, startTime) {
 
@@ -549,20 +551,49 @@ $(function () {
         let path = target.attr("href");
         window.localStorage.setItem("audioserve_file", path);
         const trans = target.data("transcoded");
+        const transcoded = trans && trans != '0';
+        const duration = target.data("duration");
         let fullUrl = collectionUrl + "/audio/" + path + `?trans=${trans}`;
-        player.setUrl(fullUrl, {
-            duration: target.data("duration"),
-            transcoded: trans && trans != '0'
-        });
-        // player.src = fullUrl;
-        if (startTime) {
-            player.jumpToTime(startTime);
-        }
-        if (!paused) {
+
+
+        if (paused) {
+            // we do not want to start player yet,  just prepare it to play
+            player.resetAndSetPosition(startTime,
+                duration)
+            player.beforePlay = () => {
+                player.setUrl(fullUrl, {
+                    duration,
+                    transcoded
+                });
+                player.beforePlay = standardBeforePlay;
+                const pos = player.getProgressTime();
+                if (pos) {
+                    // I have decided to play
+                    window.localStorage.setItem("audioserve_time", pos);
+                    player.jumpToTime(pos);
+                }
+                const res = player.play(standardBeforePlay);
+                if (res.catch) {
+                    res.catch(e => console.error("Play failed", e));
+                }
+                return Promise.resolve(false);
+            }
+
+        } else {
+
+            player.setUrl(fullUrl, {
+                duration,
+                transcoded
+            });
+            // player.src = fullUrl;
+            if (startTime) {
+                player.jumpToTime(startTime);
+            }
             let res = player.play();
             if (res.catch) {
                 res.catch(e => console.error("Play failed", e));
             }
+
         }
     }
 
@@ -811,8 +842,8 @@ $(function () {
 
     const reloadCurrentFolder = (fromHistory, resetPlayer) => {
         if (resetPlayer) clearPlayer();
-        let folder = window.localStorage.getItem("audioserve_folder") ||"";
-        if (!fromHistory && location.hash && location.hash.length>1) {
+        let folder = window.localStorage.getItem("audioserve_folder") || "";
+        if (!fromHistory && location.hash && location.hash.length > 1) {
             folder = decodeURIComponent(location.hash.slice(1));
             location.hash = "";
         }
