@@ -330,6 +330,23 @@ impl CacheInner {
             .flatten()
     }
 
+    pub(crate) fn get_positions_recursive<S, P>(
+        &self,
+        group: S,
+        folder: P,
+        collection_no: usize,
+    ) -> Vec<Position>
+    where
+        S: AsRef<str>,
+        P: AsRef<str>,
+    {
+        CacheInner::positions_from_iter(
+            self.pos_folder.scan_prefix(folder.as_ref()),
+            group,
+            collection_no,
+        )
+    }
+
     pub(crate) fn is_finished<S, P>(&self, group: S, dir: P) -> bool
     where
         S: AsRef<str>,
@@ -363,6 +380,27 @@ impl CacheInner {
         })
     }
 
+    fn positions_from_iter<I, S>(iter: I, group: S, collection_no: usize) -> Vec<Position>
+    where
+        I: Iterator<Item = std::result::Result<(sled::IVec, sled::IVec), sled::Error>>,
+        S: AsRef<str>,
+    {
+        iter.filter_map(|res| {
+            res.map_err(|e| error!("Error reading from positions db: {}", e))
+                .ok()
+                .and_then(|(folder, rec)| {
+                    let rec: PositionRecord = bincode::deserialize(&rec)
+                        .map_err(|e| error!("Position deserialization error: {}", e))
+                        .ok()?;
+                    let folder = String::from_utf8(folder.as_ref().into()).unwrap(); // known to be valid UTF8
+                    rec.get(group.as_ref())
+                        .map(|p| p.into_position(folder, collection_no))
+                })
+        })
+        .take(1000) //TODO: this is just temporary safety limit, think about better ways to limit
+        .collect()
+    }
+
     pub(crate) fn get_all_positions_for_group<S>(
         &self,
         group: S,
@@ -371,22 +409,7 @@ impl CacheInner {
     where
         S: AsRef<str>,
     {
-        self.pos_folder
-            .iter()
-            .filter_map(|res| {
-                res.map_err(|e| error!("Error reading from positions db: {}", e))
-                    .ok()
-                    .and_then(|(folder, rec)| {
-                        let rec: PositionRecord = bincode::deserialize(&rec)
-                            .map_err(|e| error!("Position deserialization error: {}", e))
-                            .ok()?;
-                        let folder = String::from_utf8(folder.as_ref().into()).unwrap(); // known to be valid UTF8
-                        rec.get(group.as_ref())
-                            .map(|p| p.into_position(folder, collection_no))
-                    })
-            })
-            .take(1000) //TODO: this is just temporary safety limit, think about better ways to limit
-            .collect()
+        CacheInner::positions_from_iter(self.pos_folder.iter(), group, collection_no)
     }
 
     fn remove_positions_batch<P: AsRef<Path>>(&self, path: P) -> Result<Batch> {

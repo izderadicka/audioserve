@@ -511,6 +511,29 @@ impl Collections {
         .unwrap_or_else(|e| Err(Error::from(e)))
     }
 
+    pub async fn get_positions_recursive_async<S, P>(
+        self: Arc<Self>,
+        collection: usize,
+        group: S,
+        folder: P,
+    ) -> Vec<Position>
+    where
+        S: AsRef<str> + Send + 'static,
+        P: AsRef<str> + Send + 'static,
+    {
+        spawn_blocking!({
+            self.get_cache(collection)
+                .map_err(|e| error!("Invalid collection used in get_position: {}", e))
+                .ok()
+                .map(|c| c.get_positions_recursive(group, folder, collection))
+                .unwrap_or_else(|| vec![])
+        })
+        .unwrap_or_else(|e| {
+            error!("Task join error: {}", e);
+            vec![]
+        })
+    }
+
     pub async fn get_position_async<S, P>(
         self: Arc<Self>,
         collection: usize,

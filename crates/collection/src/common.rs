@@ -43,6 +43,16 @@ pub(crate) trait PositionsTrait {
         S: AsRef<str>,
         P: AsRef<str>;
 
+    fn get_positions_recursive<S, P>(
+        &self,
+        group: S,
+        folder: P,
+        collection_no: usize,
+    ) -> Vec<Position>
+    where
+        S: AsRef<str>,
+        P: AsRef<str>;
+
     fn get_all_positions_for_group<S>(&self, group: S, collection_no: usize) -> Vec<Position>
     where
         S: AsRef<str>;

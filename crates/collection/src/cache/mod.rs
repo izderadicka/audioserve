@@ -403,6 +403,20 @@ impl PositionsTrait for CollectionCache {
     fn read_json_positions(&self, data: PositionsData) -> Result<()> {
         self.inner.read_json_positions(data)
     }
+
+    fn get_positions_recursive<S, P>(
+        &self,
+        group: S,
+        folder: P,
+        collection_no: usize,
+    ) -> Vec<Position>
+    where
+        S: AsRef<str>,
+        P: AsRef<str>,
+    {
+        self.inner
+            .get_positions_recursive(group, folder, collection_no)
+    }
 }
 
 pub struct Search {
@@ -654,6 +668,12 @@ mod tests {
         // test listing all positions
         let v = col.inner.get_all_positions_for_group("ivan", 0);
         assert_eq!(2, v.len());
+
+        let v = col.inner.get_positions_recursive("ivan", "", 0);
+        assert_eq!(2, v.len());
+
+        let v = col.inner.get_positions_recursive("ivan", "01-file.mp3", 0);
+        assert_eq!(1, v.len());
         Ok(())
     }
 }

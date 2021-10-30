@@ -469,7 +469,13 @@ impl<C: 'static> FileSendService<C> {
                             collection,
                             group,
                             path,
-                        } => subs::folder_position(collections, group, collection, path),
+                        } => {
+                            let recursive = req
+                                .params()
+                                .map(|p| p.get("rec").is_some())
+                                .unwrap_or(false);
+                            subs::folder_position(collections, group, collection, path, recursive)
+                        }
                         PositionGroup::Malformed => resp::fut(resp::not_found),
                     }
                     #[cfg(not(feature = "shared-positions"))]

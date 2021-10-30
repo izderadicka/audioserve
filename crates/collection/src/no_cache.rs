@@ -103,6 +103,19 @@ impl PositionsTrait for CollectionDirect {
     fn read_json_positions(&self, _data: PositionsData) -> Result<()> {
         Ok(())
     }
+
+    fn get_positions_recursive<S, P>(
+        &self,
+        _group: S,
+        _folder: P,
+        _collection_no: usize,
+    ) -> Vec<crate::Position>
+    where
+        S: AsRef<str>,
+        P: AsRef<str>,
+    {
+        vec![]
+    }
 }
 
 #[derive(PartialEq, Eq)]
