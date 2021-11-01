@@ -5,6 +5,7 @@ use collection::{AudioFile, AudioFolderShort};
 
 #[derive(Debug, Serialize)]
 pub struct CollectionsInfo {
+    pub version: &'static str,
     pub folder_download: bool,
     pub shared_positions: bool,
     pub count: u32,

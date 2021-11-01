@@ -488,10 +488,11 @@ fn json_response<T: serde::Serialize>(data: &T) -> Response {
         .unwrap()
 }
 
-const UKNOWN_NAME: &str = "unknown";
+const UNKNOWN_NAME: &str = "unknown";
 
 pub fn collections_list() -> ResponseFuture {
     let collections = CollectionsInfo {
+        version: env!("CARGO_PKG_VERSION"),
         folder_download: !get_config().disable_folder_download,
         shared_positions: if cfg!(feature = "shared-positions") {
             true
@@ -502,7 +503,11 @@ pub fn collections_list() -> ResponseFuture {
         names: get_config()
             .base_dirs
             .iter()
-            .map(|p| p.file_name().and_then(OsStr::to_str).unwrap_or(UKNOWN_NAME))
+            .map(|p| {
+                p.file_name()
+                    .and_then(OsStr::to_str)
+                    .unwrap_or(UNKNOWN_NAME)
+            })
             .collect(),
     };
     Box::pin(future::ok(json_response(&collections)))

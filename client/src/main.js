@@ -78,6 +78,7 @@ $(function () {
         return ajax({ url: baseUrl + "/collections" })
             .then(data => {
                 debug("Collections", data);
+                console.log("Connected to audioserve version " + data.version);
                 collections = data.names;
                 console.assert(data.names.length > 0);
                 console.assert(collections.length == data.count, "Invalid collections response - count does not fit");
