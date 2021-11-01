@@ -250,9 +250,11 @@ Web client is bundled with server. It provides simple interface (using bootstrap
 Otherwise it's rather minimalistic (following KISS principle).
 
 It's tested on Firefox and Chrome (on Linux and Android, should work on Windows, on OSX too on these browsers).
+Also should work on on recent MS Edge browser(I'm not testing it on Edge, but seems to work and since it's now also based on Chromium should not be issue).
+
 On iOS default transcoding (opus+ogg) is not working - so switch transcoding off or try custom transcoding profile.
 
-Web client is not working on MS Edge(this might be fixed in future) and IE (which will never be supported).
+Web client is not working on MS IE (which will never be supported).
 
 ## Android client;l           
 
