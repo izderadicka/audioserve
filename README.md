@@ -256,7 +256,7 @@ On iOS default transcoding (opus+ogg) is not working - so switch transcoding off
 
 Web client is not working on MS IE (which will never be supported).
 
-## Android client;l           
+## Android client        
 
 Android client code is [available on github](https://github.com/izderadicka/audioserve-android).
 
@@ -272,9 +272,9 @@ Easiest way how to test audioserve (but do not use `--no-authentication` in prod
 
     docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve --no-authentication /audiobooks
 
-Then open <http://localhost:3000> - and browse your collection. This is indeed the very minimal configuration of audioserve and **should not be used in production**. For real deployment you'd like provide provide more command line parameters (or environment variables or your custom config file) - see more complex example below.
+Then open <http://localhost:3000> - and browse your collection. This is indeed the very minimal configuration of audioserve and **should not be used in production**. For real deployment you'd like provide provide more command line arguments (or environment variables or your custom config file) - see more complex example below.
 
-There is also `izderadicka/audioserve:unstable` image, which is automatically built overnight from current master branch (so it contains latest features, but may have some issues) And of course you can build your own image very easily with provided `Dockerfile`, just run:
+There is also `izderadicka/audioserve:unstable` image, which is automatically built overnight from current master branch (so it contains latest features, but may have some issues). And of course you can build your own image very easily with provided `Dockerfile`, just run:
 
     docker build --tag audioserve .
 
