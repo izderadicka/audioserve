@@ -1,15 +1,16 @@
 audioserve API
 ==============
 
-audioserve API is simple HTTP API with mostly JSON loads. For updating/quering recent playback positions WebSocket connection is used with simple text based messages.
+audioserve API is simple HTTP REST like API with mostly JSON loads. 
+For updating/querying recent playback positions WebSocket connection is used with simple text based messages. Recently there is also REST API for playback positions.
 
-Authetication
+Authentication
 -------------
 
 A token is used for authentication, the token can be used as cookie with key `audioserve_token` 
 or as HTTP header `Authorization: Bearer token_value`.  Token is signed by server secret key and contains
 maximum validity time (token validity period can be set on the audioserve server) . If no or invalid token is provided
-API endpoints return 401 Unauthorised HTTP response code.
+API endpoints return `401 Unauthorised` HTTP response code.
 
 Token is received from server when client proves knowledge of shared secret. For this api endpoint `authenticate` is available.
 
@@ -30,7 +31,7 @@ Salted shared secret is calculated as:
 * these bytes are hashed with SHA-256
 * random bytes are encoded with base64 encoding
 * hash is encoded with base64 encoding
-* resulting secret is string concation of "encoded random" + "|" + "encoded hash"
+* resulting secret is string concation of three strings : "encoded random" + "|" + "encoded hash"
 
 API endpoints
 ----------------------
@@ -41,10 +42,11 @@ All are GET requests with valid token, 401 Unauthorised is returned, if token is
 
 Sample URL: https://your_server_name:3000/collections
 
-Returns list of available collections (collection is a directory provided as parameter to audioserve server). 
+Returns list of available collections (collection is a directory provided as parameter to audioserve server). It should be first call to server, after client authenticates itself.
 
 ```json
     {
+    "version":"0.16.3",
     "folder_download": true,
     "shared_positions": true,
     "count":2,
@@ -54,6 +56,7 @@ Returns list of available collections (collection is a directory provided as par
         }
 ```
 
+`version` - version of audioserve server
 `folder_download` - is folder download is enabled on the server
 `shared_positions` - is shared positions feature enabled on server (e.g /position location accepting web socket connection)
 `count` - number of collections
@@ -63,7 +66,7 @@ Returns list of available collections (collection is a directory provided as par
 
 Sample URL: https://your_server_name:3000/transcodings
 
-Gets current transcoding settings.
+Gets current transcoding settings. Normally should be called after `collections` call, unless client is not interested in transcoding capabilities at all.
 
 ```json
     {
@@ -83,21 +86,21 @@ Gets current transcoding settings.
     }
 ```
 
-There are 3 possible level of transcoding `low`, `medium`, `high`, each with name of transcoding and expected for resulting data stream - for details about transcoding general [README.md](../README.md). `max_transcodings` is maximum number of trancoding processes, that can run on server in parallel. If this maximum is reached server returns 503 Service Unavailable -  it's client responsibility to retry later.
+There are 3 possible level of transcoding `low`, `medium`, `high`, each with name of transcoding and expected for resulting audio stream - for details about transcoding consult main [README.md](../README.md). `max_transcodings` is maximum number of transcoding processes, that can run on server in parallel. If this maximum is reached server returns `503 Service Unavailable` -  it's client responsibility to retry later.
 
-**folder**
+**folder/{folder_path}**
 
 Sample URL: https://your_server_name:3000/folder/  
 Sample URL: https://your_server_name:3000/folder/author_name/audio_book  
 Sample URL: https://your_server_name:3000/1/folder/author_name/audio_book?ord=m  
 
 Lists available subfolders or audio files in the folder. Path starts either with `/collection number` + `/folder/` 
- (list of collections can be retrieved by API endpoint `collections`) or directly with `/folder/`, which uses then 
- collection 0 as default.
+ (list of collections can be retrieved by API endpoint `collections`) or directly with `/folder/`, which means  
+ collection 0 is used as default (it's backward compatibility feature, new clients are encouraged to always include collection number). This is probably most 
  URL has optional query parameter `ord`, meaning ordering of subfolders, two values are now supported:
 
-* `a` alphabetical
-* `m` recent first (using folder mtime)
+- `a` alphabetical
+- `m` recent first (using folder mtime)
 
 Returns JSON:
 
