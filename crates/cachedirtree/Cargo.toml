@@ -7,7 +7,7 @@ authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 ego-tree="0.6"
 bit-vec = "0.6"
 notify = "4.0"
-derive_builder = "0.9"
+derive_builder = "0.10"
 
 
 [dependencies.log]
@@ -15,7 +15,7 @@ version = "0.4"
 
 
 [dev-dependencies]
-env_logger = "0.8"
+env_logger = "0.9"
 
 [features]
 default=["symlinks"]

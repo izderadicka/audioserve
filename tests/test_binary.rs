@@ -5,11 +5,10 @@ use escargot::CargoBuild;
 use headers::HeaderValue;
 use reqwest::{blocking::Client, header::HeaderMap, StatusCode};
 use serde_json::Value;
+use std::io;
 
-const BASE_URL: &str = "http://localhost:3000";
-
-fn make_url(path: &str) -> String {
-    BASE_URL.to_string() + path
+fn make_url(path: &str, port: u16) -> String {
+    format!("http://localhost:{}", port) + path
 }
 
 fn extract_value<'a>(mut v: &'a Value, path: &str) -> Result<&'a Value> {
@@ -91,6 +90,7 @@ macro_rules! assert_header {
 #[test]
 #[ignore]
 fn test_binary() -> Result<()> {
+    let tmp_dir = tempdir::TempDir::new("audioserve_bin_test")?;
     let bin = CargoBuild::new()
         .bin("audioserve")
         .features("transcoding-cache partially-static")
@@ -98,11 +98,19 @@ fn test_binary() -> Result<()> {
 
     eprintln!("Binary is at {:?}", bin.path());
 
+    let port: u16 = 3333;
+    let listen_on = format!("127.0.0.1:{}", port);
+
     let mut cmd = bin.command();
     cmd.args(&[
         "--no-authentication",
         "--listen",
-        "127.0.0.1:3000",
+        listen_on.as_str(),
+        "--data-dir",
+        tmp_dir
+            .path()
+            .to_str()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Invalid temp path"))?,
         "test_data",
     ])
     .env("RUST_LOG", "audioserve=debug");
@@ -116,7 +124,7 @@ fn test_binary() -> Result<()> {
     let mut retries = 5;
 
     loop {
-        let r = client.get(&make_url("")).send();
+        let r = client.get(&make_url("", port)).send();
         match r {
             Ok(r) => {
                 resp = r;
@@ -136,7 +144,7 @@ fn test_binary() -> Result<()> {
 
     let jg = |path| -> Result<Value> {
         client
-            .get(&make_url(path))
+            .get(&make_url(path, port))
             .send()?
             .json::<Value>()
             .map_err(Error::new)
@@ -186,7 +194,9 @@ fn test_binary() -> Result<()> {
         extract_value(&root_folder, "files[1].mime").and_then(string_value)?
     );
 
-    let res = client.get(&make_url("/audio/03-file.mka?trans=l")).send()?;
+    let res = client
+        .get(&make_url("/audio/03-file.mka?trans=l", port))
+        .send()?;
     assert_eq!(StatusCode::OK, res.status());
     assert_header!(res, "Content-Type", "audio/ogg");
     assert_header!(res, "transfer-encoding", "chunked");
@@ -195,7 +205,7 @@ fn test_binary() -> Result<()> {
     let mut range_headers = HeaderMap::new();
     range_headers.insert("Range", HeaderValue::from_str("bytes=0-100")?);
     let res = client
-        .get(&make_url("/audio/02-file.opus?trans=0"))
+        .get(&make_url("/audio/02-file.opus?trans=0", port))
         .headers(range_headers)
         .send()?;
     assert_header!(res, "Content-Type", "audio/ogg");

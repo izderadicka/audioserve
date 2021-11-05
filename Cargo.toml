@@ -9,7 +9,7 @@ members = ["crates/*"]
 
 [dependencies]
 bytes = "1.0"
-env_logger = "0.8"
+env_logger = "0.9"
 log = {version="0.4", features = ["release_max_level_info", "max_level_trace"]}
 hyper = {version="0.14", features = ["full"]}
 headers = "0.3"
@@ -31,7 +31,7 @@ data-encoding = "2.3"
 regex = "1.4"
 tokio = {version="1.2", features=["full"]}
 
-dirs = "3.0"
+dirs = "4.0"
 csv = "1.1"
 linked-hash-map = {git="https://github.com/izderadicka/linked-hash-map.git", version="0.5.3", features=["serde_impl"]}
 
@@ -54,7 +54,7 @@ async-zip = {path="crates/async-zip", optional=true}
 websock = {path="crates/websock", optional = true}
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.20"
+nix = "0.23"
 
 [features]
 default = ["tls", "symlinks", "folder-download", "shared-positions", "behind-proxy"]
@@ -82,3 +82,4 @@ codegen-units = 1
 [dev-dependencies]
 reqwest = {version="0.11", features=['blocking', 'json']}
 escargot = "0.5" 
+tempdir = "0.3"
