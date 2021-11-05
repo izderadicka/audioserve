@@ -1,8 +1,10 @@
 #!/bin/bash
 set -e -x
 BUILD_DIR="_static_build"
+TARGET=x86_64-unknown-linux-musl
+export HOME=/root
 
-cargo build --target x86_64-alpine-linux-musl --release ${CARGO_ARGS} --features static,${FEATURES}
+cargo build --target $TARGET --release ${CARGO_ARGS} --features static,${FEATURES}
 cd client
 npm install
 npm run build
@@ -18,7 +20,7 @@ fi
 
 mkdir -p $BUILD_DIR/$AS_DIR/client
 
-cp target/x86_64-alpine-linux-musl/release/audioserve $BUILD_DIR/$AS_DIR
+cp target/$TARGET/release/audioserve $BUILD_DIR/$AS_DIR
 cp -r client/dist $BUILD_DIR/$AS_DIR/client
 
 cd $BUILD_DIR
