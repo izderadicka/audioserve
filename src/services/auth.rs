@@ -68,8 +68,8 @@ const COOKIE_NAME: &str = "audioserve_token";
 impl Authenticator for SharedSecretAuthenticator {
     type Credentials = ();
     fn authenticate(&self, mut req: RequestWrapper) -> AuthFuture<()> {
-        fn deny() -> AuthResult<()> {
-            AuthResult::Rejected(resp::deny())
+        fn deny() -> Result<AuthResult<()>> {
+            Ok(AuthResult::Rejected(resp::deny()))
         }
         // this is part where client can authenticate itself and get token
         if req.method() == Method::POST && req.path() == "/authenticate" {
@@ -79,9 +79,32 @@ impl Authenticator for SharedSecretAuthenticator {
                 match req.body_bytes().await {
                     Err(e) => bail!(e),
                     Ok(b) => {
-                        let params = form_urlencoded::parse(b.as_ref())
-                            .into_owned()
-                            .collect::<HashMap<String, String>>();
+                        let content_type = req
+                            .headers()
+                            .get("Content-Type")
+                            .and_then(|v| v.to_str().ok())
+                            .map(|s| s.to_lowercase());
+                        let params = if let Some(ct) = content_type {
+                            if ct.starts_with("application/x-www-form-urlencoded") {
+                                form_urlencoded::parse(b.as_ref())
+                                    .into_owned()
+                                    .collect::<HashMap<String, String>>()
+                            } else if ct.starts_with("application/json") {
+                                match serde_json::from_slice::<HashMap<String, String>>(&b) {
+                                    Ok(m) => m,
+                                    Err(e) => {
+                                        error!("Invalid JSON: {}", e);
+                                        return deny();
+                                    }
+                                }
+                            } else {
+                                error!("Invalid content type {}", ct);
+                                return deny();
+                            }
+                        } else {
+                            error!("Content-Type header is missing");
+                            return deny();
+                        };
                         if let Some(secret) = params.get("secret") {
                             debug!("Authenticating user");
                             if auth.auth_token_ok(secret) {
@@ -116,14 +139,14 @@ impl Authenticator for SharedSecretAuthenticator {
                                 // Let's not return failure immediately, because somebody is using wrong shared secret
                                 // Legitimate user can wait a bit, but for brute force attack it can be advantage not to reply quickly
                                 sleep(Duration::from_millis(500)).await;
-                                Ok(deny())
+                                deny()
                             }
                         } else {
                             error!(
                                 "Invalid authentication: missing shared secret, client: {:?}",
                                 req.remote_addr()
                             );
-                            Ok(deny())
+                            deny()
                         }
                     }
                 }
@@ -147,7 +170,7 @@ impl Authenticator for SharedSecretAuthenticator {
                     req.path(),
                     req.remote_addr()
                 );
-                return Box::pin(future::ok(deny()));
+                return Box::pin(future::ready(deny()));
             }
             if !self.secrets.token_ok(&token.unwrap()) {
                 error!(
@@ -155,7 +178,7 @@ impl Authenticator for SharedSecretAuthenticator {
                     req.path(),
                     req.remote_addr()
                 );
-                return Box::pin(future::ok(deny()));
+                return Box::pin(future::ready(deny()));
             }
         }
         // If everything is ok we return credentials (in this case they are just unit type) and we return back request
@@ -333,10 +356,18 @@ mod tests {
         assert!(new_token.validity() - now() <= 24 * 3600);
     }
 
-    fn build_request(body: impl Into<Body>) -> RequestWrapper {
+    fn build_request(body: impl Into<Body>, json: bool) -> RequestWrapper {
         let b = body.into();
         let req = Request::builder()
             .method(Method::POST)
+            .header(
+                "Content-Type",
+                if json {
+                    "application/json"
+                } else {
+                    "application/x-www-form-urlencoded"
+                },
+            )
             .uri("/authenticate")
             .body(b)
             .unwrap();
@@ -377,6 +408,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_json_login() {
+        env_logger::try_init().ok();
+        init_default_config();
+        let sec = "MamelukLetiNaMesic74328";
+        let aut = SharedSecretAuthenticator::new(
+            sec.into(),
+            (&b"kjhfdakjjhafjhshjkjyuewqy87jkhakcjdsjk"[..]).into(),
+            24,
+        );
+        let mut smap = HashMap::new();
+        smap.insert("secret".to_string(), shared_secret(sec));
+        let body = serde_json::to_string(&smap).expect("JSON serialization error");
+        let req = build_request(body, true);
+        let res = aut
+            .authenticate(req)
+            .await
+            .expect("authentication procedure internal error");
+
+        if let AuthResult::LoggedIn(res) = res {
+            assert_eq!(res.status(), StatusCode::OK);
+        } else {
+            panic!("Authentication failure");
+        }
+    }
+
+    #[tokio::test]
     async fn test_authenticator_login() {
         env_logger::try_init().ok();
         let invalid_secret = "secret=aaaaa";
@@ -385,7 +442,7 @@ mod tests {
 
         let ss = shared_secret_form(shared);
         let aut = SharedSecretAuthenticator::new(shared.into(), (&b"123456"[..]).into(), 24);
-        let req = build_request(ss);
+        let req = build_request(ss, false);
         let res = aut
             .authenticate(req)
             .await
@@ -417,7 +474,7 @@ mod tests {
             panic!("Authentication should succeed")
         }
 
-        let wrap = build_request(invalid_secret);
+        let wrap = build_request(invalid_secret, false);
 
         let res = aut
             .authenticate(wrap)
