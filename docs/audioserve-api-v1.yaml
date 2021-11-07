@@ -194,15 +194,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Ordering"
-        - name: group
-          description: |
-            Playback position sharing group.
-            If present last know position for the folder can be included in response
-          required: false
-          in: query
-          schema:
-            type: string
-          example: ivan
+        - $ref: "#/components/parameters/Group"
       responses:
         '200':
           description: Success -  returns JSON object describing audio folder
@@ -266,15 +258,7 @@ paths:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Path"
         - $ref: "#/components/parameters/Ordering"
-        - name: group
-          description: |
-            Playback position sharing group.
-            If present last know position for the folder can be included in response
-          required: false
-          in: query
-          schema:
-            type: string
-          example: ivan
+        - $ref: "#/components/parameters/Group"
       responses:
         '200':
           description: Success -  returns JSON object describing audio folder
@@ -503,6 +487,79 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
                              
+  /{col_id}/search:
+    get:
+      tags:
+        - "Collections"
+      description: |
+        Search collection - search for terms with collection paths (path only not metadata tags).
+        Search is looking only for folders (including virtual folders for chaptered files).
+      parameters:
+        - $ref: "#/components/parameters/CollectionId"
+        - $ref: "#/components/parameters/Ordering"
+        - name: q
+          in: query
+          required: true
+          description: |
+            Search terms (separated by space). Looks for all terms on folder path.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success -  all found folders within this collection
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items: 
+                      $ref: "#/components/schemas/AudioFile"
+                  subfolders:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Subfolder"
+              example: >-
+                {"files":[],"subfolders":[{"name":"Around The World in Eighty Days","modified":1613824559416,"path":"Verne Jules/Around The World in Eighty Days","is_file":false,"finished":false},
+                {"name":"Austene Jane","modified":1613941742570,"path":"Austene Jane","is_file":false,"finished":false}]}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /{col_id}/download/{path}:
+    get:
+      tags:
+        - "Collections"
+      description: Downloads content of folder as an archive (zip or tar)
+      parameters:
+        - $ref: "#/components/parameters/CollectionId"
+        - $ref: "#/components/parameters/Path"
+        - name: fmt
+          in: query
+          description: |-
+            Archive format - zip(default) or tar
+          schema:
+            type: string
+            enum: [zip, tar]
+          example: zip
+      responses:
+        "200":
+          description: Success
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+                description: zip archive
+            application/x-tar:
+              schema:
+                type: string
+                format: binary
+                description: tar archive
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
 components:
   schemas:
@@ -644,6 +701,17 @@ components:
       schema:
         type: string
         enum: [a, m]
+    Group:
+      name: group
+      description: |
+        Playback position sharing group.
+        If present last know position for the folder can be included in response
+      required: false
+      in: query
+      schema:
+        type: string
+      example: ivan
+
   responses:
     NotFound:
       description: The specified resource was not found
