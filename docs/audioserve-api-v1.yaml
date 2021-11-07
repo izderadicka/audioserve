@@ -8,11 +8,22 @@ servers:
     description: Public demo server
   - url: http://localhost:3000
     description: Your local test server
-paths:
 
+tags:
+- name: "Authentication"
+  description: Authentication endpoint
+- name: "Collections"
+  description: Audio collections browsing and playing
+- name: Positions
+  description: Playback position
+
+
+paths:
 # authentication endpoint
   /authenticate:
     post:
+      tags:
+        - "Authentication"
       description: Authentication to server via shared secret
       security: [] # no security as this is an authentication endpoint
       requestBody:
@@ -25,14 +36,9 @@ paths:
                 secret:
                   type: string
                   description: Salted shared secret
+                  example: "w8lTEszPU3idF9sEawmRR3Ps3IVdMEnnaFZj5DV5tqY=|6+iBRdZRz/o6fvwHiEuS2sgDZS6YCw7wNHVX59YCh50="
               required:
                 - "secret"
-
-            examples:
-              sample:
-                description: Salted shared secred `mypass`
-                value:
-                  secret: "w8lTEszPU3idF9sEawmRR3Ps3IVdMEnnaFZj5DV5tqY=|6+iBRdZRz/o6fvwHiEuS2sgDZS6YCw7wNHVX59YCh50="
             
           application/json:
             schema:
@@ -66,6 +72,8 @@ paths:
   # collections end point
   /collections/:
     get:
+      tags:
+        - "Collections"
       description: List of available audio collection
       responses:
         "200":
@@ -105,6 +113,8 @@ paths:
 # transcodings endpoint
   /transcodings/:
     get:
+      tags:
+        - "Collections"
       description: Describes available transcodinds settings on server
       responses:
         '200':
@@ -135,6 +145,8 @@ paths:
   # Cover endpoint
   /{col_id}/cover/{path}:
     get:
+      tags:
+        - "Collections"
       description: Returns cover image for indicated `path`
       parameters:
         - $ref: "#/components/parameters/CollectionId"
@@ -155,6 +167,8 @@ paths:
       
   /{col_id}/desc/{path}:
     get:
+      tags:
+        - "Collections"
       description: Returns description file
       parameters:
         - $ref: "#/components/parameters/CollectionId"
@@ -174,9 +188,12 @@ paths:
 
   /{col_id}/folder/:
     get:
+      tags:
+        - "Collections"
       description: Gets root folder of the collection
       parameters:
         - $ref: "#/components/parameters/CollectionId"
+        - $ref: "#/components/parameters/Ordering"
         - name: group
           description: |
             Playback position sharing group.
@@ -242,10 +259,13 @@ paths:
               
   /{col_id}/folder/{path}:
     get:
+      tags:
+        - "Collections"
       description: Gets content of audio folder
       parameters:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Path"
+        - $ref: "#/components/parameters/Ordering"
         - name: group
           description: |
             Playback position sharing group.
@@ -348,23 +368,83 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
       
-  /0/audio/Austene Jane/Pride And Prejudice/prideandprejudice_22_austen_64kb.mp3:
+  /{col_id}/audio/{path}:
     get:
-      description: Auto generated using Swagger Inspector
+      tags:
+        - "Collections"
+      description: Streams (possibly transcoded) audio file
       parameters:
+        - $ref: "#/components/parameters/CollectionId"
+        - $ref: "#/components/parameters/Path"
+          example: Austene Jane/Pride And Prejudice/prideandprejudice_22_austen_64kb.mp3
         - name: seek
           in: query
+          description: |-
+            Stars playback as <seek> seconds from beginning of file.
+            Beware overusing this parameter, as it can cause quite ineffective usage
+            of bandwidth and transcoding (which each seek like this part of file from
+            seek position is send again)
           schema:
-            type: string
-          example: '223.299'
+            type: number
+            format: float
+          example: 223.299
         - name: trans
           in: query
+          description: |-
+            Required transcoding of the file **l**ow, **m**edium or **h**igh
+            as described by `/transcodings` endpoint response
+            If omitted or set to **0** no transcoding is done
           schema:
             type: string
+            enum: [l, m, h, "0"]
           example: m
+        - name: range
+          in: header
+          description: |-
+            Optionally client can request range of bytes from file, will only work if
+            file is not actually transcoded.
+            Range is standard HTTP header as per [RFC 7233](https://datatracker.ietf.org/doc/html/rfc7233) 
+          schema:
+            type: string
+          example: bytes=14286848-
+          
       responses:
         '200':
-          description: Auto generated using Swagger Inspector     
+          description: Success - audio is sent in response body
+          content:
+            "audio:*":
+              example: N/A
+              schema:
+                type: string
+                format: binary
+                description: |-
+                  Audio stream in original or transcoded version.
+                  If size of stream is not know (transcoded stream) response body is chunked
+          headers:
+            x-transcode:
+              description: If file is transcoded contains information about transcoding
+              schema:
+                type: string
+              example: codec=opus-in-ogg; bitrate=48
+        '206':
+          description: "Success - part of audio file, if Range: bytes were requested"
+          content:
+            "audio/*":
+              example: N/A
+              schema:
+                type: string
+                format: binary
+          headers:
+            content-range:
+              description: Bytes range returned in response to request header `Range`
+              schema:
+                type: string
+              example: bytes 14286848-14296697/14296698
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+                             
 
 components:
   schemas:
@@ -428,12 +508,7 @@ components:
           description: Cover image
           $ref: "#/components/schemas/TypedFile"
         description:
-          type: object
-          properties:
-            path:
-              type: string
-            mime:
-              type: string
+          $ref: "#/components/schemas/TypedFile"
         tags: 
           type: object
           nullable: true
@@ -457,9 +532,18 @@ components:
       required: true
       schema:
         type: string
-        format: path
+        # format: path # non-standard type
         maxLength: 512
-    
+    Ordering:
+      name: ord
+      in: query
+      description: |-
+        ordering of subfolders, two values are now supported:
+        - `a` alphabetical (default if not present)
+        - `m` recent first (using folder mtime)
+      schema:
+        type: string
+        enum: [a, m]
   responses:
     NotFound:
       description: The specified resource was not found
