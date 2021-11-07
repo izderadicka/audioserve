@@ -209,7 +209,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Subfolder"
+                $ref: "#/components/schemas/AudioFolder"
               example: >-
                 {
                   "is_file": false,
@@ -281,7 +281,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Subfolder"
+                $ref: "#/components/schemas/AudioFolder"
               examples:
                 "Author folder":
                   value: >-
@@ -361,6 +361,64 @@ paths:
                         "genre": "speech",
                         "artist": "H. G. Wells",
                         "album": "The Invisible Man"
+                      }
+                    }
+                "m4b folder": 
+                  value: >-
+                    {
+                      "is_file": true,
+                      "modified": 1615456636344,
+                      "total_time": 63547,
+                      "files": [
+                          {
+                              "name": "000 - Chapter_1",
+                              "path": "Stoker Bram/Dracula/Dracula.m4b$$000 - Chapter_1$$0-1020288$$.m4b",
+                              "meta": {
+                                  "duration": 1020,
+                                  "bitrate": 54,
+                                  "tags": null
+                              },
+                              "mime": "audio/m4b",
+                              "section": {
+                                  "start": 0,
+                                  "duration": 1020288
+                              }
+                          },
+                          {
+                              "name": "001 - Chapter_2",
+                              "path": "Stoker Bram/Dracula/Dracula.m4b$$001 - Chapter_2$$1020288-2029004$$.m4b",
+                              "meta": {
+                                  "duration": 1008,
+                                  "bitrate": 54,
+                                  "tags": null
+                              },
+                              "mime": "audio/m4b",
+                              "section": {
+                                  "start": 1020288,
+                                  "duration": 1008716
+                              }
+                          }
+                      ],
+                      "subfolders": [],
+                      "cover": {
+                          "path": "Stoker Bram/Dracula/800px-Dracula-First-Edition-1897_(cropped).jpg",
+                          "mime": "image/jpeg"
+                      },
+                      "description": {
+                          "path": "Stoker Bram/Dracula/info.txt",
+                          "mime": "text/plain"
+                      },
+                      "position": {
+                          "path": "Stoker Bram/Dracula/Dracula.m4b$$004 - Chapter_5$$3452020-4080784$$.m4b",
+                          "timestamp": 1635963253408,
+                          "position": 111.82
+                      },
+                      "tags": {
+                          "title": "Dracula",
+                          "album": "Dracula",
+                          "genre": "Audio Book",
+                          "date": "2014",
+                          "artist": "Bram Stoker"
                       }
                     }
         "401":
@@ -503,7 +561,7 @@ components:
         files:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/AudioFile"
         cover:
           description: Cover image
           $ref: "#/components/schemas/TypedFile"
@@ -513,6 +571,48 @@ components:
           type: object
           nullable: true
           description: Metadata tags for this folders - map of name to value
+    AudioFile:
+      type: object
+      properties:
+        "name": 
+          type: string
+          example: "000 - Chapter_1"
+        "path": 
+          type: string
+          example: "Stoker Bram/Dracula/Dracula.m4b$$000 - Chapter_1$$0-1020288$$.m4b"
+        "meta":
+          type: object
+          nullable: true
+          properties:
+            "duration":
+              type: integer
+              description: Duration of audio file in seconds
+              example: 1020,
+            "bitrate": 
+              type: integer
+              description: Encoding bitrate of file - original, before transcoding 
+              example: 54,
+            "tags":
+              type: object
+              description: Metadata tags as map of name to value
+              nullable: true
+        "mime": 
+          type: string
+          description: Mite type of audio file (before transcoding)
+          example: "audio/m4b"
+        "section":
+          type: object
+          nullable: true
+          description: For big chaptered files this is start and duration (in milliseconds) of chapter with the file
+          properties:
+            "start": 
+              type: integer
+              description: Start of chapter in ms
+              example: 0
+            "duration": 
+              type: integer
+              description: Duration of chapter in ms
+              example: 1020288
   
   parameters:
     CollectionId:
