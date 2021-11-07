@@ -453,6 +453,10 @@ impl Config {
             );
         }
 
+        if self.base_dirs.len() > 100 {
+            return value_error!("base_dirs", "Too many collections directories (max is 100)");
+        }
+
         for d in &self.base_dirs {
             if !d.is_dir() {
                 return value_error!("base_dir", "{:?} is not direcrory", d);
