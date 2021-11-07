@@ -1,0 +1,487 @@
+openapi: 3.0.1
+info:
+  title: audioserve API
+  description: REST API for audioserve
+  version: 1.0.0
+servers:
+  - url: https://audioserve.zderadicka.eu
+    description: Public demo server
+  - url: http://localhost:3000
+    description: Your local test server
+paths:
+
+# authentication endpoint
+  /authenticate:
+    post:
+      description: Authentication to server via shared secret
+      security: [] # no security as this is an authentication endpoint
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                secret:
+                  type: string
+                  description: Salted shared secret
+              required:
+                - "secret"
+
+            examples:
+              sample:
+                description: Salted shared secred `mypass`
+                value:
+                  secret: "w8lTEszPU3idF9sEawmRR3Ps3IVdMEnnaFZj5DV5tqY=|6+iBRdZRz/o6fvwHiEuS2sgDZS6YCw7wNHVX59YCh50="
+            
+          application/json:
+            schema:
+              type: object
+              properties:
+                secret:
+                  type: string
+                  description: Salted shared secret
+              required:
+                - "secret"
+
+            examples:
+              sample:
+                description: Salted shared secred `mypass`
+                value:
+                  secret: "w8lTEszPU3idF9sEawmRR3Ps3IVdMEnnaFZj5DV5tqY=|6+iBRdZRz/o6fvwHiEuS2sgDZS6YCw7wNHVX59YCh50="
+      responses:
+        "200":
+          description: Successfull authentication, response contains authentication token
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                '0':
+                  value: >-
+                    E114Vfv45RowIr0bFMNiJFRsPweZfINmhfTUFFy1Er8AAAAAY2drA/2XKsZSMnsc3a+yRIKjQIFaAEOcROCaTYR1jUjo6ow1
+        "401":
+          description: Failed authentication
+
+  # collections end point
+  /collections/:
+    get:
+      description: List of available audio collection
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  names:
+                    description: Names of available collections
+                    type: array
+                    maxLength: 100
+                    items:
+                      type: string
+                  count:
+                    type: integer
+                    minimum: 1
+                    maximum: 100
+                    description: Size of names array
+                  folder_download:
+                    type: boolean
+                    description: Is folder download endpoint enabled on server?
+                  shared_positions:
+                    type: boolean
+                    description: Is playback position API enabled on server?
+                  version:
+                    type: string
+                    description: Version of audioserve (and thus also version of API)
+              examples:
+                '0':
+                  value: >-
+                    {"version":"0.16.3","folder_download":true,"shared_positions":true,"count":1,"names":["audiobooks"]}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+# transcodings endpoint
+  /transcodings/:
+    get:
+      description: Describes available transcodinds settings on server
+      responses:
+        '200':
+          description: Success - returns transcodings settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  high:
+                    $ref:  "#/components/schemas/Transcoding"
+                  low:
+                    $ref:  "#/components/schemas/Transcoding"
+                  medium:
+                    $ref:  "#/components/schemas/Transcoding"
+                  max_transcodings:
+                    type: integer
+                    description: Maximum number of parallel transcodings allowed by server
+                    minimum: 2
+                    maximum: 100
+              examples:
+                '0':
+                  value: >-
+                    {"max_transcodings":24,"low":{"bitrate":32,"name":"opus-in-ogg"},"medium":{"bitrate":48,"name":"opus-in-ogg"},"high":{"bitrate":64,"name":"opus-in-ogg"}}
+        "401":
+          $ref:  "#/components/responses/Unauthorized"
+  
+  # Cover endpoint
+  /{col_id}/cover/{path}:
+    get:
+      description: Returns cover image for indicated `path`
+      parameters:
+        - $ref: "#/components/parameters/CollectionId"
+        - $ref: "#/components/parameters/Path"
+          
+      responses:
+        '200':
+          description: Success - returns image binary - jpeg or png
+          content:
+            "audio/*":
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"    
+      
+  /{col_id}/desc/{path}:
+    get:
+      description: Returns description file
+      parameters:
+        - $ref: "#/components/parameters/CollectionId"
+        - $ref: "#/components/parameters/Path"
+      responses:
+        '200':
+          description: Success - returns description text - plain, html or markdown
+          content:
+            "text/*":
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+
+  /{col_id}/folder/:
+    get:
+      description: Gets root folder of the collection
+      parameters:
+        - $ref: "#/components/parameters/CollectionId"
+        - name: group
+          description: |
+            Playback position sharing group.
+            If present last know position for the folder can be included in response
+          required: false
+          in: query
+          schema:
+            type: string
+          example: ivan
+      responses:
+        '200':
+          description: Success -  returns JSON object describing audio folder
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subfolder"
+              example: >-
+                {
+                  "is_file": false,
+                  "modified": 1613948393506,
+                  "total_time": 0,
+                  "files": [],
+                  "subfolders": [
+                    {
+                      "name": "Austene Jane",
+                      "modified": 1613941742570,
+                      "path": "Austene Jane",
+                      "is_file": false,
+                      "finished": false
+                    },
+                    {
+                      "name": "Chesterton Gilbert Keith",
+                      "modified": 1613824355322,
+                      "path": "Chesterton Gilbert Keith",
+                      "is_file": false,
+                      "finished": false
+                    },
+                    {
+                      "name": "Doyle Arthur Conan",
+                      "modified": 1613825015324,
+                      "path": "Doyle Arthur Conan",
+                      "is_file": false,
+                      "finished": false
+                    }
+                    {
+                      "name": "Wells H G",
+                      "modified": 1613902871789,
+                      "path": "Wells H G",
+                      "is_file": false,
+                      "finished": false
+                    }
+                  ],
+                  "cover": null,
+                  "description": {
+                    "path": "welcome.md",
+                    "mime": "text/markdown"
+                  },
+                  "tags": null
+                }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+              
+  /{col_id}/folder/{path}:
+    get:
+      description: Gets content of audio folder
+      parameters:
+        - $ref: "#/components/parameters/CollectionId"
+        - $ref: "#/components/parameters/Path"
+        - name: group
+          description: |
+            Playback position sharing group.
+            If present last know position for the folder can be included in response
+          required: false
+          in: query
+          schema:
+            type: string
+          example: ivan
+      responses:
+        '200':
+          description: Success -  returns JSON object describing audio folder
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subfolder"
+              examples:
+                "Author folder":
+                  value: >-
+                    {
+                      "is_file": false,
+                      "modified": 1613902871789,
+                      "total_time": 0,
+                      "files": [],
+                      "subfolders": [
+                        {
+                          "name": "Invisible Man",
+                          "modified": 1613902936821,
+                          "path": "Wells H G/Invisible Man",
+                          "is_file": false,
+                          "finished": false
+                        }
+                      ],
+                      "cover": {
+                        "path": "Wells H G/H.G._Wells_by_Beresford.jpg",
+                        "mime": "image/jpeg"
+                      },
+                      "description": {
+                        "path": "Wells H G/info.txt",
+                        "mime": "text/plain"
+                      },
+                      "tags": null
+                    }
+                "Audiobook folder":
+                  value: >-
+                    {
+                      "is_file": false,
+                      "modified": 1613902936821,
+                      "total_time": 18079,
+                      "files": [
+                        {
+                          "name": "invisibleman_01_wells_64kb.mp3",
+                          "path": "Wells H G/Invisible Man/invisibleman_01_wells_64kb.mp3",
+                          "meta": {
+                            "duration": 1362,
+                            "bitrate": 64,
+                            "tags": {
+                              "title": "01 - Chapters I and II"
+                            }
+                          },
+                          "mime": "audio/mpeg",
+                          "section": null
+                        },
+                        {
+                          "name": "invisibleman_02_wells_64kb.mp3",
+                          "path": "Wells H G/Invisible Man/invisibleman_02_wells_64kb.mp3",
+                          "meta": {
+                            "duration": 1482,
+                            "bitrate": 64,
+                            "tags": {
+                              "title": "02 - Chapters III and IV"
+                            }
+                          },
+                          "mime": "audio/mpeg",
+                          "section": null
+                        }
+                      ],
+                      "subfolders": [],
+                      "cover": {
+                        "path": "Wells H G/Invisible Man/220px-Wells_-_The_Invisible_Man_-_Pearson_cover_1897.jpg",
+                        "mime": "image/jpeg"
+                      },
+                      "description": {
+                        "path": "Wells H G/Invisible Man/info.html",
+                        "mime": "text/html"
+                      },
+                      "position": {
+                        "path": "Wells H G/Invisible Man/invisibleman_09_wells_64kb.mp3",
+                        "timestamp": 1635427462226,
+                        "position": 1324.175
+                      },
+                      "tags": {
+                        "genre": "speech",
+                        "artist": "H. G. Wells",
+                        "album": "The Invisible Man"
+                      }
+                    }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+      
+  /0/audio/Austene Jane/Pride And Prejudice/prideandprejudice_22_austen_64kb.mp3:
+    get:
+      description: Auto generated using Swagger Inspector
+      parameters:
+        - name: seek
+          in: query
+          schema:
+            type: string
+          example: '223.299'
+        - name: trans
+          in: query
+          schema:
+            type: string
+          example: m
+      responses:
+        '200':
+          description: Auto generated using Swagger Inspector     
+
+components:
+  schemas:
+    Transcoding:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of transcoding in form of audio_codec-in-container, for instance opus-in-ogg
+        bitrate:
+          type: integer
+          description: Average bitrate of the transcoding in kbps
+          minimum: 0
+    TypedFile:
+      type: object
+      properties:
+        path:
+          type: string
+          description: path to the file with collection
+          maxLength: 512
+        mime:
+          type: string
+          description: mime type of the file
+    Subfolder:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        is_file:
+          type: boolean
+          description: Is virtual folder - e.g. representing big chapterized file (.m4b etc.)
+        modified:
+          type: number
+          description: last modification timestamp (unix time in miliseconds)
+        finished:
+          type: boolean
+          description: was folder listened to the end (by given group, valid only if group parameter was provided)
+    AudioFolder:
+      type: object
+      properties:
+        is_file:
+          type: boolean
+          description: Is virtual folder - e.g. representing big chapterized file (.m4b etc.)
+        modified:
+          type: number
+          description: last modification timestamp (unix time in miliseconds)
+        total_time:
+          type: integer
+          description: Total playback time of the audiofolder in seconds
+        subfolders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Subfolder"
+        files:
+          type: array
+          items:
+            type: object
+        cover:
+          description: Cover image
+          $ref: "#/components/schemas/TypedFile"
+        description:
+          type: object
+          properties:
+            path:
+              type: string
+            mime:
+              type: string
+        tags: 
+          type: object
+          nullable: true
+          description: Metadata tags for this folders - map of name to value
+  
+  parameters:
+    CollectionId:
+      name: col_id
+      description: id of collection, is index of collection from `names` array returned by `/collections` endpoint
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 100
+      example: 0
+    Path:
+      name: path
+      description:  path to the item (as returned in by API, do not forget to urlencode the value)
+      in: path
+      required: true
+      schema:
+        type: string
+        format: path
+        maxLength: 512
+    
+  responses:
+    NotFound:
+      description: The specified resource was not found
+      content:
+        text/plain:
+          schema: 
+            type: string
+          example: Not Found
+    Unauthorized:
+      description: Not authorized to access this resurce, authentication token invalid or missing
+      content:
+        text/plain:
+          schema: 
+            type: string
+          example:  Access denied
+
+  securitySchemes:
+    bearerAuth:            # arbitrary name for the security scheme
+      type: http
+      scheme: bearer
+      bearerFormat: Custom
+      description: audioserve custom authentication scheme, get token from /authenticate endpoint
+
+security:
+  - bearerAuth: []
