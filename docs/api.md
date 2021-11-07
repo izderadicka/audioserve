@@ -4,6 +4,15 @@ audioserve API
 audioserve API is simple HTTP REST like API with mostly JSON loads. 
 For updating/querying recent playback positions WebSocket connection is used with simple text based messages. Recently there is also REST API for playback positions.
 
+REST API
+--------
+Rest API for audioserve is defined in [OpenAPI 3 specification](audioserve-api-v1.yaml) **work in progress**
+
+You can also see [specification in Swagger UI](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/izderadicka/audioserve/master/docs/audioserve-api-v1.yaml)
+
+Sections below is bit outdated and will be updated after OpenAPI definition is finished.
+
+
 Authentication
 -------------
 
