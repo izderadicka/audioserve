@@ -510,16 +510,29 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  files:
-                    type: array
-                    items: 
-                      $ref: "#/components/schemas/AudioFile"
-                  subfolders:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Subfolder"
+                $ref: "#/components/schemas/SearchResult"
+              example: >-
+                {"files":[],"subfolders":[{"name":"Around The World in Eighty Days","modified":1613824559416,"path":"Verne Jules/Around The World in Eighty Days","is_file":false,"finished":false},
+                {"name":"Austene Jane","modified":1613941742570,"path":"Austene Jane","is_file":false,"finished":false}]}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /{col_id}/recent:
+    get:
+      tags:
+        - "Collections"
+      description: |
+        Lists top 64 most recent folders in the collection (based on folder modification time). 
+        Sorted by folder modification time descendently - e.g most recent is first.
+      parameters:
+        - $ref: "#/components/parameters/CollectionId"
+      responses:
+        '200':
+          description: Success -  most recent folders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResult"
               example: >-
                 {"files":[],"subfolders":[{"name":"Around The World in Eighty Days","modified":1613824559416,"path":"Verne Jules/Around The World in Eighty Days","is_file":false,"finished":false},
                 {"name":"Austene Jane","modified":1613941742570,"path":"Austene Jane","is_file":false,"finished":false}]}
@@ -670,7 +683,17 @@ components:
               type: integer
               description: Duration of chapter in ms
               example: 1020288
-  
+    SearchResult:
+      type: object
+      properties:
+        files:
+          type: array
+          items: 
+            $ref: "#/components/schemas/AudioFile"
+        subfolders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Subfolder"
   parameters:
     CollectionId:
       name: col_id
