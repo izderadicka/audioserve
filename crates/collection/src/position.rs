@@ -63,6 +63,8 @@ pub struct PositionShort {
     pub position: f32,
 }
 
+pub(crate) type PositionsCollector = Collector<Position>;
+
 pub(crate) struct Collector<T> {
     heap: BinaryHeap<Reverse<T>>,
     max_size: usize,
