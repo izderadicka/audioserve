@@ -573,6 +573,55 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+  
+  /positions/{group}:
+    get:
+      tags:
+        - Positions
+      description: Get recent positions for the group
+      responses:
+        "200":
+          description: |-
+            List of recent positions for given group.
+            Ordered from most recent.
+            Limited to 1000 items max.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Position"
+                maxItems: 1000
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Positions
+      description: Updates recent position for given group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Position"
+      responses:
+        "201":
+          description: Position updated
+  /positions/{group}/last:
+    get:
+      tags:
+        - Positions
+      description: Last recent position for this group 
+      responses:
+        "200":
+          description: |-
+            Last recent position or null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Position"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
 components:
   schemas:
@@ -694,6 +743,38 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Subfolder"
+    Position:
+      type: object
+      description: Playback position
+      nullable: true
+      properties:
+        timestamp:
+          type: integer
+          format: int64
+          description: Position timestamp - unix time in ms
+        collection:
+          type: integer
+          format: int32
+          description: Collection number (index in names from response in /collections endpoint)
+        folder: 
+          type: string
+          description: Audio folder path
+        file: 
+          type: string
+          description: Audio file (or chapter)
+        folder_finished: 
+          type: boolean
+          description: Folder was listened to the end
+        position:
+          type: number 
+          format: float
+          description: Position in audiofile in seconds
+      required:
+        - timestamp
+        - collection
+        - folder
+        - file
+        - position
   parameters:
     CollectionId:
       name: col_id
@@ -755,7 +836,7 @@ components:
     bearerAuth:            # arbitrary name for the security scheme
       type: http
       scheme: bearer
-      bearerFormat: Custom
+      bearerFormat: custom
       description: audioserve custom authentication scheme, get token from /authenticate endpoint
 
 security:
