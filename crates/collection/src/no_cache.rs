@@ -7,6 +7,7 @@ use crate::audio_folder::FolderLister;
 use crate::audio_meta::AudioFolder;
 use crate::common::{CollectionTrait, PositionsData, PositionsTrait};
 use crate::error::{Error, Result};
+use crate::position::PositionsCollector;
 use crate::util::get_real_file_type;
 use crate::AudioFolderShort;
 
@@ -89,11 +90,10 @@ impl PositionsTrait for CollectionDirect {
         &self,
         _group: S,
         _collection_no: usize,
-    ) -> Vec<crate::Position>
-    where
+        _res: &mut PositionsCollector,
+    ) where
         S: AsRef<str>,
     {
-        vec![]
     }
 
     fn write_json_positions<F: std::io::Write>(&self, _file: &mut F) -> Result<()> {
@@ -109,12 +109,11 @@ impl PositionsTrait for CollectionDirect {
         _group: S,
         _folder: P,
         _collection_no: usize,
-    ) -> Vec<crate::Position>
-    where
+        _res: &mut PositionsCollector,
+    ) where
         S: AsRef<str>,
         P: AsRef<str>,
     {
-        vec![]
     }
 }
 

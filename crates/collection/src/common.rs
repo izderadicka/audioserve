@@ -3,6 +3,7 @@ use crate::{
     cache::CollectionCache,
     error::Result,
     no_cache::CollectionDirect,
+    position::PositionsCollector,
     AudioFolderShort, FoldersOrdering, Position,
 };
 use enum_dispatch::enum_dispatch;
@@ -48,13 +49,17 @@ pub(crate) trait PositionsTrait {
         group: S,
         folder: P,
         collection_no: usize,
-    ) -> Vec<Position>
-    where
+        res: &mut PositionsCollector,
+    ) where
         S: AsRef<str>,
         P: AsRef<str>;
 
-    fn get_all_positions_for_group<S>(&self, group: S, collection_no: usize) -> Vec<Position>
-    where
+    fn get_all_positions_for_group<S>(
+        &self,
+        group: S,
+        collection_no: usize,
+        res: &mut PositionsCollector,
+    ) where
         S: AsRef<str>;
 
     fn write_json_positions<F: std::io::Write>(&self, file: &mut F) -> Result<()>;

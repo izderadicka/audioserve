@@ -22,7 +22,7 @@ use crate::{
     },
     common::PositionsData,
     error::{Error, Result},
-    position::{PositionItem, PositionRecord, MAX_GROUPS},
+    position::{PositionItem, PositionRecord, PositionsCollector, MAX_GROUPS},
     util::{get_file_name, get_meta, get_modified},
     AudioFolderShort, FoldersOrdering, Position,
 };
@@ -335,8 +335,8 @@ impl CacheInner {
         group: S,
         folder: P,
         collection_no: usize,
-    ) -> Vec<Position>
-    where
+        res: &mut PositionsCollector,
+    ) where
         S: AsRef<str>,
         P: AsRef<str>,
     {
@@ -344,6 +344,7 @@ impl CacheInner {
             self.pos_folder.scan_prefix(folder.as_ref()),
             group,
             collection_no,
+            res,
         )
     }
 
@@ -380,8 +381,12 @@ impl CacheInner {
         })
     }
 
-    fn positions_from_iter<I, S>(iter: I, group: S, collection_no: usize) -> Vec<Position>
-    where
+    fn positions_from_iter<I, S>(
+        iter: I,
+        group: S,
+        collection_no: usize,
+        res: &mut PositionsCollector,
+    ) where
         I: Iterator<Item = std::result::Result<(sled::IVec, sled::IVec), sled::Error>>,
         S: AsRef<str>,
     {
@@ -397,19 +402,18 @@ impl CacheInner {
                         .map(|p| p.into_position(folder, collection_no))
                 })
         })
-        .take(1000) //TODO: this is just temporary safety limit, think about better ways to limit
-        .collect()
+        .for_each(|p| res.add(p))
     }
 
     pub(crate) fn get_all_positions_for_group<S>(
         &self,
         group: S,
         collection_no: usize,
-    ) -> Vec<Position>
-    where
+        res: &mut PositionsCollector,
+    ) where
         S: AsRef<str>,
     {
-        CacheInner::positions_from_iter(self.pos_folder.iter(), group, collection_no)
+        CacheInner::positions_from_iter(self.pos_folder.iter(), group, collection_no, res)
     }
 
     fn remove_positions_batch<P: AsRef<Path>>(&self, path: P) -> Result<Batch> {

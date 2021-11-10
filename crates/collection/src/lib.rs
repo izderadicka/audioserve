@@ -26,7 +26,10 @@ pub use media_info::tags;
 pub use position::Position;
 pub use util::guess_mime_type;
 
-use crate::{common::PositionsData, position::PositionItem};
+use crate::{
+    common::PositionsData,
+    position::{PositionItem, PositionsCollector},
+};
 
 pub mod audio_folder;
 pub mod audio_meta;
@@ -39,6 +42,7 @@ pub mod position;
 pub mod util;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const MAX_POSITIONS: usize = 1_000;
 
 fn check_version<P: AsRef<Path>>(db_dir: P) -> Result<()> {
     let db_dir = db_dir.as_ref();
@@ -522,11 +526,12 @@ impl Collections {
         P: AsRef<str> + Send + 'static,
     {
         spawn_blocking!({
+            let mut res = PositionsCollector::new(MAX_POSITIONS);
             self.get_cache(collection)
                 .map_err(|e| error!("Invalid collection used in get_position: {}", e))
                 .ok()
-                .map(|c| c.get_positions_recursive(group, folder, collection))
-                .unwrap_or_else(|| vec![])
+                .map(|c| c.get_positions_recursive(group, folder, collection, &mut res));
+            res.into_vec()
         })
         .unwrap_or_else(|e| {
             error!("Task join error: {}", e);
@@ -566,13 +571,11 @@ impl Collections {
         S: AsRef<str> + Send + Clone + 'static,
     {
         spawn_blocking!({
-            let mut res = vec![];
+            let mut res = PositionsCollector::new(MAX_POSITIONS);
             for (cn, c) in self.caches.iter().enumerate() {
-                let pos = c.get_all_positions_for_group(group.clone(), cn);
-                res.extend(pos);
+                c.get_all_positions_for_group(group.clone(), cn, &mut res);
             }
-            res.sort_unstable_by(|a, b| b.timestamp.cmp(&a.timestamp));
-            res
+            res.into_vec()
         })
         .unwrap_or_else(|e| {
             error!("Task join error: {}", e);

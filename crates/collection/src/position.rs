@@ -78,6 +78,7 @@ impl<T: Ord> Collector<T> {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn with_capacity(max_size: usize, capacity: usize) -> Self {
         Collector {
             heap: BinaryHeap::with_capacity(capacity),

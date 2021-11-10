@@ -9,7 +9,7 @@ use crate::{
     cache::update::{filter_event, FilteredEvent, RecursiveUpdater},
     common::{CollectionTrait, PositionsData, PositionsTrait},
     error::{Error, Result},
-    position::{Position, PositionShort},
+    position::{Position, PositionShort, PositionsCollector},
     util::get_modified,
     AudioFolderShort, FoldersOrdering,
 };
@@ -389,11 +389,16 @@ impl PositionsTrait for CollectionCache {
         self.inner.get_position(group, folder)
     }
 
-    fn get_all_positions_for_group<S>(&self, group: S, collection_no: usize) -> Vec<Position>
-    where
+    fn get_all_positions_for_group<S>(
+        &self,
+        group: S,
+        collection_no: usize,
+        res: &mut PositionsCollector,
+    ) where
         S: AsRef<str>,
     {
-        self.inner.get_all_positions_for_group(group, collection_no)
+        self.inner
+            .get_all_positions_for_group(group, collection_no, res)
     }
 
     fn write_json_positions<F: std::io::Write>(&self, file: &mut F) -> Result<()> {
@@ -409,13 +414,13 @@ impl PositionsTrait for CollectionCache {
         group: S,
         folder: P,
         collection_no: usize,
-    ) -> Vec<Position>
-    where
+        res: &mut PositionsCollector,
+    ) where
         S: AsRef<str>,
         P: AsRef<str>,
     {
         self.inner
-            .get_positions_recursive(group, folder, collection_no)
+            .get_positions_recursive(group, folder, collection_no, res)
     }
 }
 
@@ -576,7 +581,9 @@ mod tests {
         let (col2, _tmp2) = create_tmp_collection();
         assert!(col2.get_position::<_, String>("ivan", None).is_none());
         col2.read_json_positions(PositionsData::V1(json))?;
-        assert_eq!(2, col2.get_all_positions_for_group("ivan", 0).len());
+        let mut res = PositionsCollector::new(100);
+        col2.get_all_positions_for_group("ivan", 0, &mut res);
+        assert_eq!(2, res.into_vec().len());
         Ok(())
     }
 
@@ -666,14 +673,18 @@ mod tests {
         assert_eq!(r3.position, 0.08);
 
         // test listing all positions
-        let v = col.inner.get_all_positions_for_group("ivan", 0);
-        assert_eq!(2, v.len());
+        let mut res = PositionsCollector::new(10);
+        col.inner.get_all_positions_for_group("ivan", 0, &mut res);
+        assert_eq!(2, res.into_vec().len());
 
-        let v = col.inner.get_positions_recursive("ivan", "", 0);
-        assert_eq!(2, v.len());
+        let mut res = PositionsCollector::new(10);
+        col.inner.get_positions_recursive("ivan", "", 0, &mut res);
+        assert_eq!(2, res.into_vec().len());
 
-        let v = col.inner.get_positions_recursive("ivan", "01-file.mp3", 0);
-        assert_eq!(1, v.len());
+        let mut res = PositionsCollector::new(10);
+        col.inner
+            .get_positions_recursive("ivan", "01-file.mp3", 0, &mut res);
+        assert_eq!(1, res.into_vec().len());
         Ok(())
     }
 }
