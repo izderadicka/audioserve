@@ -569,11 +569,12 @@ pub fn folder_position(
     collection: usize,
     path: String,
     recursive: bool,
+    filter: Option<collection::PositionFilter>,
 ) -> ResponseFuture {
     if recursive {
         Box::pin(
             collections
-                .get_positions_recursive_async(collection, group, path, None)
+                .get_positions_recursive_async(collection, group, path, filter)
                 .map(|pos| Ok(json_response(&pos))),
         )
     } else {
@@ -586,10 +587,14 @@ pub fn folder_position(
 }
 
 #[cfg(feature = "shared-positions")]
-pub fn all_positions(collections: Arc<collection::Collections>, group: String) -> ResponseFuture {
+pub fn all_positions(
+    collections: Arc<collection::Collections>,
+    group: String,
+    filter: Option<collection::PositionFilter>,
+) -> ResponseFuture {
     Box::pin(
         collections
-            .get_all_positions_for_group_async(group, None)
+            .get_all_positions_for_group_async(group, filter)
             .map(|pos| Ok(json_response(&pos))),
     )
 }

@@ -484,7 +484,14 @@ impl<C: 'static> FileSendService<C> {
                     // positions API
                     #[cfg(feature = "shared-positions")]
                     match extract_group(path) {
-                        PositionGroup::Group(group) => subs::all_positions(collections, group),
+                        PositionGroup::Group(group) => match position_params(&params) {
+                            Ok(p) => subs::all_positions(collections, group, Some(p)),
+
+                            Err(e) => {
+                                error!("Invalid timestamp param: {}", e);
+                                resp::fut(resp::bad_request)
+                            }
+                        },
                         PositionGroup::Last(group) => subs::last_position(collections, group),
                         PositionGroup::Path {
                             collection,
@@ -492,7 +499,22 @@ impl<C: 'static> FileSendService<C> {
                             path,
                         } => {
                             let recursive = req.params().exists("rec");
-                            subs::folder_position(collections, group, collection, path, recursive)
+                            let filter = match position_params(&params) {
+                                Ok(p) => p,
+
+                                Err(e) => {
+                                    error!("Invalid timestamp param: {}", e);
+                                    return resp::fut(resp::bad_request);
+                                }
+                            };
+                            subs::folder_position(
+                                collections,
+                                group,
+                                collection,
+                                path,
+                                recursive,
+                                Some(filter),
+                            )
                         }
                         PositionGroup::Malformed => resp::fut(resp::bad_request),
                     }
@@ -703,6 +725,32 @@ enum PositionGroup {
         path: String,
     },
     Malformed,
+}
+
+#[cfg(feature = "shared-positions")]
+fn position_params(params: &QueryParams) -> error::Result<collection::PositionFilter> {
+    use collection::{audio_meta::TimeStamp, PositionFilter};
+
+    fn get_ts_param(params: &QueryParams, name: &str) -> Result<Option<TimeStamp>, anyhow::Error> {
+        Ok(if let Some(ts) = params.get(name) {
+            Some(ts.parse::<u64>().map_err(error::Error::new)?).map(TimeStamp::from)
+        } else {
+            None
+        })
+    }
+
+    let finished = params.exists("finished");
+    let unfinished = params.exists("unfinished");
+    let finished = match (finished, unfinished) {
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        _ => None,
+    };
+
+    let from = get_ts_param(params, "from")?;
+    let to = get_ts_param(params, "to")?;
+
+    Ok(PositionFilter::new(finished, from, to))
 }
 
 #[cfg(feature = "shared-positions")]
