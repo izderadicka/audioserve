@@ -39,7 +39,6 @@ paths:
                   example: "w8lTEszPU3idF9sEawmRR3Ps3IVdMEnnaFZj5DV5tqY=|6+iBRdZRz/o6fvwHiEuS2sgDZS6YCw7wNHVX59YCh50="
               required:
                 - "secret"
-            
           application/json:
             schema:
               type: object
@@ -86,7 +85,7 @@ paths:
                   names:
                     description: Names of available collections
                     type: array
-                    maxLength: 100
+                    maxItems: 100
                     items:
                       type: string
                   count:
@@ -579,6 +578,12 @@ paths:
       tags:
         - Positions
       description: Get recent positions for the group
+      parameters:
+        - $ref: "#/components/parameters/GroupInPath"
+        - $ref: "#/components/parameters/Finished"
+        - $ref: "#/components/parameters/Unfinished"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
       responses:
         "200":
           description: |-
@@ -597,6 +602,8 @@ paths:
     post:
       tags:
         - Positions
+      parameters:
+        - $ref: "#/components/parameters/GroupInPath"
       description: Updates recent position for given group
       requestBody:
         required: true
@@ -607,10 +614,15 @@ paths:
       responses:
         "201":
           description: Position updated
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   /positions/{group}/last:
     get:
       tags:
         - Positions
+      parameters:
+        - $ref: "#/components/parameters/GroupInPath"
       description: Last recent position for this group 
       responses:
         "200":
@@ -815,6 +827,45 @@ components:
       schema:
         type: string
       example: ivan
+    GroupInPath:
+      name: group
+      description: |
+        Playback position sharing group.
+      required: true
+      in: path
+      schema:
+        type: string
+      example: ivan
+    Finished:
+      name: finished
+      description: Filters only positions for finished folders
+      required: false
+      in: query
+      schema:
+        type: boolean
+    Unfinished:
+      name: unfinished
+      description: Filters only positions for unfinished folders
+      required: false
+      in: query
+      schema:
+        type: boolean
+    From:
+      name: from
+      description: Filters positions that are older than this timestamp  (unix time in ms)
+      required: false
+      in: query
+      schema:
+        type: integer
+        format: int64
+    To:
+      name: to
+      description: Filters positions that are newer or equal than this timestamp  (unix time in ms)
+      required: false
+      in: query
+      schema:
+        type: integer
+        format: int64
 
   responses:
     NotFound:
