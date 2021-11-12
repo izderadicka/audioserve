@@ -96,13 +96,13 @@ impl CollectorFilter<Position> for PositionFilter {
         let before = self
             .to
             .as_ref()
-            .map(|before| item.timestamp < *before)
+            .map(|before| item.timestamp >= *before)
             .unwrap_or(true);
 
         let after = self
             .from
             .as_ref()
-            .map(|after| item.timestamp >= *after)
+            .map(|after| item.timestamp < *after)
             .unwrap_or(true);
 
         finished && before && after
