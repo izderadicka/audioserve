@@ -77,6 +77,24 @@ impl Display for RemoteIpAddr {
     }
 }
 
+pub struct QueryParams<'a> {
+    params: Option<HashMap<Cow<'a, str>, Cow<'a, str>>>,
+}
+
+impl<'a> QueryParams<'a> {
+    pub fn get<S: AsRef<str>>(&self, name: S) -> Option<&Cow<'_, str>> {
+        self.params.as_ref().and_then(|m| m.get(name.as_ref()))
+    }
+
+    pub fn exists<S: AsRef<str>>(&self, name: S) -> bool {
+        self.get(name).is_some()
+    }
+
+    pub fn get_string<S: AsRef<str>>(&self, name: S) -> Option<String> {
+        self.get(name).map(|s| s.to_string())
+    }
+}
+
 pub struct RequestWrapper {
     request: Request<Body>,
     path: String,
@@ -198,11 +216,14 @@ impl RequestWrapper {
         self.request
     }
 
-    pub fn params(&self) -> Option<HashMap<Cow<str>, Cow<str>>> {
-        self.request
-            .uri()
-            .query()
-            .map(|query| form_urlencoded::parse(query.as_bytes()).collect::<HashMap<_, _>>())
+    pub fn params(&self) -> QueryParams<'_> {
+        QueryParams {
+            params: self
+                .request
+                .uri()
+                .query()
+                .map(|query| form_urlencoded::parse(query.as_bytes()).collect::<HashMap<_, _>>()),
+        }
     }
 
     pub fn is_https(&self) -> bool {
@@ -470,10 +491,7 @@ impl<C: 'static> FileSendService<C> {
                             group,
                             path,
                         } => {
-                            let recursive = req
-                                .params()
-                                .map(|p| p.get("rec").is_some())
-                                .unwrap_or(false);
+                            let recursive = req.params().exists("rec");
                             subs::folder_position(collections, group, collection, path, recursive)
                         }
                         PositionGroup::Malformed => resp::fut(resp::bad_request),
@@ -496,8 +514,8 @@ impl<C: 'static> FileSendService<C> {
 
                     let base_dir = &get_config().base_dirs[colllection_index];
                     let ord = params
-                        .as_ref()
-                        .and_then(|p| p.get("ord").map(|l| FoldersOrdering::from_letter(l)))
+                        .get("ord")
+                        .map(|l| FoldersOrdering::from_letter(l))
                         .unwrap_or(FoldersOrdering::Alphabetical);
                     if path.starts_with("/audio/") {
                         FileSendService::<C>::serve_audio(
@@ -508,9 +526,7 @@ impl<C: 'static> FileSendService<C> {
                             params,
                         )
                     } else if path.starts_with("/folder/") {
-                        let group = params
-                            .as_ref()
-                            .and_then(|m| m.get("group").map(|i| i.to_string()));
+                        let group = params.get_string("group");
                         get_folder(
                             colllection_index,
                             get_subpath(&path, "/folder/"),
@@ -523,8 +539,7 @@ impl<C: 'static> FileSendService<C> {
                         #[cfg(feature = "folder-download")]
                         {
                             let format = params
-                                .as_ref()
-                                .and_then(|p| p.get("fmt"))
+                                .get("fmt")
                                 .and_then(|f| f.parse::<types::DownloadFormat>().ok())
                                 .unwrap_or_default();
                             subs::download_folder(
@@ -539,8 +554,8 @@ impl<C: 'static> FileSendService<C> {
                             resp::fut(resp::not_found)
                         }
                     } else if path == "/search" {
-                        if let Some(search_string) = params.and_then(|mut p| p.remove("q")) {
-                            search(colllection_index, searcher, search_string.into_owned(), ord)
+                        if let Some(search_string) = params.get_string("q") {
+                            search(colllection_index, searcher, search_string, ord)
                         } else {
                             error!("q parameter is missing in search");
                             resp::fut(resp::not_found)
@@ -616,7 +631,7 @@ impl<C: 'static> FileSendService<C> {
         base_dir: &'static Path,
         path: &str,
         transcoding: TranscodingDetails,
-        mut params: Option<HashMap<std::borrow::Cow<str>, std::borrow::Cow<str>>>,
+        params: QueryParams,
     ) -> ResponseFuture {
         debug!(
             "Received request with following headers {:?}",
@@ -640,12 +655,9 @@ impl<C: 'static> FileSendService<C> {
 
             None => None,
         };
-        let seek: Option<f32> = params
-            .as_mut()
-            .and_then(|p| p.remove("seek"))
-            .and_then(|s| s.parse().ok());
+        let seek: Option<f32> = params.get("seek").and_then(|s| s.parse().ok());
         let transcoding_quality: Option<QualityLevel> = params
-            .and_then(|mut p| p.remove("trans"))
+            .get("trans")
             .and_then(|t| QualityLevel::from_letter(&t));
 
         send_file(

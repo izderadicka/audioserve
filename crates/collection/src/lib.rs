@@ -23,7 +23,7 @@ use util::is_no_cache_collection;
 pub use audio_folder::{list_dir_files_only, parse_chapter_path};
 pub use audio_meta::{init_media_lib, AudioFile, AudioFolderShort, FoldersOrdering, TimeSpan};
 pub use media_info::tags;
-pub use position::Position;
+pub use position::{Position, PositionFilter};
 pub use util::guess_mime_type;
 
 use crate::{
@@ -520,13 +520,17 @@ impl Collections {
         collection: usize,
         group: S,
         folder: P,
+        filter: Option<PositionFilter>,
     ) -> Vec<Position>
     where
         S: AsRef<str> + Send + 'static,
         P: AsRef<str> + Send + 'static,
     {
         spawn_blocking!({
-            let mut res = PositionsCollector::new(MAX_POSITIONS);
+            let mut res = PositionsCollector::with_optional_filter(
+                MAX_POSITIONS,
+                filter.and_then(|f| f.into_option()),
+            );
             self.get_cache(collection)
                 .map_err(|e| error!("Invalid collection used in get_position: {}", e))
                 .ok()
@@ -566,12 +570,19 @@ impl Collections {
         })
     }
 
-    pub async fn get_all_positions_for_group_async<S>(self: Arc<Self>, group: S) -> Vec<Position>
+    pub async fn get_all_positions_for_group_async<S>(
+        self: Arc<Self>,
+        group: S,
+        filter: Option<PositionFilter>,
+    ) -> Vec<Position>
     where
         S: AsRef<str> + Send + Clone + 'static,
     {
         spawn_blocking!({
-            let mut res = PositionsCollector::new(MAX_POSITIONS);
+            let mut res = PositionsCollector::with_optional_filter(
+                MAX_POSITIONS,
+                filter.and_then(|f| f.into_option()),
+            );
             for (cn, c) in self.caches.iter().enumerate() {
                 c.get_all_positions_for_group(group.clone(), cn, &mut res);
             }

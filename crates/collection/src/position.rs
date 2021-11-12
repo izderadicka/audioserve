@@ -63,33 +63,112 @@ pub struct PositionShort {
     pub position: f32,
 }
 
-pub(crate) type PositionsCollector = Collector<Position>;
+pub(crate) type PositionsCollector = Collector<Position, PositionFilter>;
 
-pub(crate) struct Collector<T> {
-    heap: BinaryHeap<Reverse<T>>,
-    max_size: usize,
+pub struct PositionFilter {
+    finished: Option<bool>,
+    from: Option<TimeStamp>,
+    to: Option<TimeStamp>,
 }
 
-impl<T: Ord> Collector<T> {
+impl PositionFilter {
+    pub fn new(finished: Option<bool>, from: Option<TimeStamp>, to: Option<TimeStamp>) -> Self {
+        Self { finished, from, to }
+    }
+
+    pub(crate) fn into_option(self) -> Option<Self> {
+        if self.finished.is_none() && self.from.is_none() && self.to.is_none() {
+            None
+        } else {
+            Some(self)
+        }
+    }
+}
+
+impl CollectorFilter<Position> for PositionFilter {
+    fn filter(&self, item: &Position) -> bool {
+        let finished = self
+            .finished
+            .as_ref()
+            .map(|finished| *finished == item.folder_finished)
+            .unwrap_or(true);
+
+        let before = self
+            .to
+            .as_ref()
+            .map(|before| item.timestamp < *before)
+            .unwrap_or(true);
+
+        let after = self
+            .from
+            .as_ref()
+            .map(|after| item.timestamp >= *after)
+            .unwrap_or(true);
+
+        finished && before && after
+    }
+}
+
+pub(crate) trait CollectorFilter<T> {
+    fn filter(&self, item: &T) -> bool;
+}
+
+impl<F, T> CollectorFilter<T> for F
+where
+    F: Fn(&T) -> bool,
+{
+    fn filter(&self, item: &T) -> bool {
+        self(item)
+    }
+}
+pub(crate) struct Collector<T, F> {
+    heap: BinaryHeap<Reverse<T>>,
+    max_size: usize,
+    filter: Option<F>,
+}
+
+impl<T, F> Collector<T, F>
+where
+    T: Ord,
+    F: CollectorFilter<T>,
+{
+    #[allow(dead_code)]
     pub(crate) fn new(max_size: usize) -> Self {
         Collector {
             heap: BinaryHeap::new(),
             max_size,
+            filter: None,
         }
     }
 
     #[allow(dead_code)]
-    pub(crate) fn with_capacity(max_size: usize, capacity: usize) -> Self {
+    pub(crate) fn with_capacity_and_filter(max_size: usize, capacity: usize, filter: F) -> Self {
         Collector {
             heap: BinaryHeap::with_capacity(capacity),
             max_size,
+            filter: Some(filter),
+        }
+    }
+
+    pub(crate) fn with_optional_filter(max_size: usize, filter: Option<F>) -> Self {
+        Collector {
+            heap: BinaryHeap::new(),
+            max_size,
+            filter: filter,
         }
     }
 
     pub(crate) fn add(&mut self, item: T) {
-        self.heap.push(Reverse(item));
-        if self.heap.len() > self.max_size {
-            self.heap.pop();
+        if self
+            .filter
+            .as_ref()
+            .map(|f| f.filter(&item))
+            .unwrap_or(true)
+        {
+            self.heap.push(Reverse(item));
+            if self.heap.len() > self.max_size {
+                self.heap.pop();
+            }
         }
     }
 
@@ -105,10 +184,10 @@ mod tests {
 
     #[test]
     fn test_collector() {
-        let data = vec![1, 7, 5, 9, 0, 8, 3, 2, 4, 6];
-        let mut c = Collector::with_capacity(4, 5);
+        let data: Vec<i32> = vec![1, 7, 5, 9, 0, 8, 3, 2, 4, 6];
+        let mut c = Collector::with_capacity_and_filter(4, 5, |i: &i32| *i != 7);
         data.iter().for_each(|i| c.add(*i));
         let res = c.into_vec();
-        assert_eq!(vec![9, 8, 7, 6], res);
+        assert_eq!(vec![9, 8, 6, 5], res);
     }
 }

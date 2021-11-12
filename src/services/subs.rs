@@ -573,7 +573,7 @@ pub fn folder_position(
     if recursive {
         Box::pin(
             collections
-                .get_positions_recursive_async(collection, group, path)
+                .get_positions_recursive_async(collection, group, path, None)
                 .map(|pos| Ok(json_response(&pos))),
         )
     } else {
@@ -589,7 +589,7 @@ pub fn folder_position(
 pub fn all_positions(collections: Arc<collection::Collections>, group: String) -> ResponseFuture {
     Box::pin(
         collections
-            .get_all_positions_for_group_async(group)
+            .get_all_positions_for_group_async(group, None)
             .map(|pos| Ok(json_response(&pos))),
     )
 }
