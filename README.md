@@ -17,6 +17,37 @@ If you will install audioserve and make it available on Internet do not [underes
 
 Like audioserve and want to start quickly and easily and securely? Try [this simple guide](docs/deploy.md) to have audioserve up and running for free in no time.
 
+## TOC
+- [Audioserve](#audioserve)
+  - [TOC](#toc)
+  - [Media Library](#media-library)
+    - [Collections cache](#collections-cache)
+    - [Single file audiobooks and their chapters](#single-file-audiobooks-and-their-chapters)
+    - [Audio files metadata tags](#audio-files-metadata-tags)
+  - [Sharing playback positions between clients](#sharing-playback-positions-between-clients)
+  - [Security](#security)
+    - [TLS/SSL](#tlsssl)
+      - [Reverse proxy](#reverse-proxy)
+    - [Limit Requests Rate](#limit-requests-rate)
+    - [CORS](#cors)
+    - [Security Best Practices](#security-best-practices)
+  - [Performance](#performance)
+    - [Transcoding Cache](#transcoding-cache)
+  - [Transcoding](#transcoding)
+  - [Command line](#command-line)
+  - [Web client](#web-client)
+  - [Android client](#android-client)
+  - [API](#api)
+  - [Installation](#installation)
+    - [Docker Image](#docker-image)
+      - [Running audioserve in Docker as different user](#running-audioserve-in-docker-as-different-user)
+      - [Docker Compose Example](#docker-compose-example)
+    - [Static build (Linux)](#static-build-linux)
+    - [Local build (Linux)](#local-build-linux)
+    - [Other platforms](#other-platforms)
+    - [Compiling without default features or with non-default features](#compiling-without-default-features-or-with-non-default-features)
+  - [License](#license)
+
 ## Media Library
 
 Audioserve is intended to serve files from directory in exactly same structure (with support for .m4b and similar single file audiobooks, where chapters are presented as virtual files), audio tags are not used for browsing, only optionally they can be displayed. Recommended directory structure of collections is:
