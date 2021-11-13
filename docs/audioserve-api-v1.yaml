@@ -24,7 +24,18 @@ paths:
     post:
       tags:
         - "Authentication"
-      description: Authentication to server via shared secret
+      description: |- 
+        Authentication to server via salted shared secret
+
+        Salted shared secret is calculated as:
+          * shared secret is encoded as UTF-8 bytes
+          * client generates 32 random bytes
+          * secret is concatenated with random bytes (secret+random_bytes)
+          * these bytes are hashed with SHA-256
+          * random bytes are encoded with base64 encoding
+          * hash is encoded with base64 encoding
+          * resulting secret is string concation of three strings : "encoded random" + "|" + "encoded hash"
+
       security: [] # no security as this is an authentication endpoint
       requestBody:
         required: true
@@ -62,7 +73,9 @@ paths:
     get:
       tags:
         - "Collections"
-      description: List of available audio collection
+      description: |-
+        Returns list of available collections (collection is a directory provided as parameter to audioserve server). 
+        It should be first call to server, after client authenticates itself.
       responses:
         "200":
           description: Success
@@ -92,8 +105,7 @@ paths:
                     type: string
                     description: Version of audioserve (and thus also version of API)
               example:
-                value:
-                  {"version":"0.16.3","folder_download":true,"shared_positions":true,"count":1,"names":["audiobooks"]}
+                {"version":"0.16.3","folder_download":true,"shared_positions":true,"count":1,"names":["audiobooks"]}
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -102,7 +114,13 @@ paths:
     get:
       tags:
         - "Collections"
-      description: Describes available transcodinds settings on server
+      description: |-
+        Gets current transcoding settings on the server.
+        Server has 3 transcodings presets: `high`, `medium`, `low` (or no transcoding), between which client can choose, when 
+        streaming audofile. 
+        If `max_transcodings` is reached server returns `503 Service Unavailable` -  it's client responsibility to retry later.
+        Normally should be called after `collections` call, unless client is not interested in transcoding capabilities at all.
+
       responses:
         '200':
           description: Success - returns transcodings settings
@@ -123,8 +141,7 @@ paths:
                     minimum: 2
                     maximum: 100
               example:
-                value:
-                  {"max_transcodings":24,"low":{"bitrate":32,"name":"opus-in-ogg"},"medium":{"bitrate":48,"name":"opus-in-ogg"},"high":{"bitrate":64,"name":"opus-in-ogg"}}
+                {"max_transcodings":24,"low":{"bitrate":32,"name":"opus-in-ogg"},"medium":{"bitrate":48,"name":"opus-in-ogg"},"high":{"bitrate":64,"name":"opus-in-ogg"}}
         "401":
           $ref:  "#/components/responses/Unauthorized"
   
@@ -133,7 +150,9 @@ paths:
     get:
       tags:
         - "Collections"
-      description: Returns cover image for indicated `path`
+      description: | 
+        Returns cover image for indicated `path` (if exists)
+        Path for cover should be taken from object returend by `folder` endpoint.
       parameters:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Path"
@@ -142,7 +161,7 @@ paths:
         '200':
           description: Success - returns image binary - jpeg or png
           content:
-            "audio/*":
+            "image/*":
               schema:
                 type: string
                 format: binary
@@ -155,7 +174,9 @@ paths:
     get:
       tags:
         - "Collections"
-      description: Returns description file
+      description: |
+        Returns description file (if exists)
+        Path for description file should be taken from object returend by `folder` endpoint.
       parameters:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Path"
@@ -176,7 +197,9 @@ paths:
     get:
       tags:
         - "Collections"
-      description: Gets root folder of the collection
+      description: | 
+        List contents of  root folder of the collection.
+        See `/{col_id}/folder/{path}` for more detailed description.
       parameters:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Ordering"
@@ -189,49 +212,48 @@ paths:
               schema:
                 $ref: "#/components/schemas/AudioFolder"
               example:
-                value: 
-                  {
-                    "is_file": false,
-                    "modified": 1613948393506,
-                    "total_time": 0,
-                    "files": [],
-                    "subfolders": [
-                      {
-                        "name": "Austene Jane",
-                        "modified": 1613941742570,
-                        "path": "Austene Jane",
-                        "is_file": false,
-                        "finished": false
-                      },
-                      {
-                        "name": "Chesterton Gilbert Keith",
-                        "modified": 1613824355322,
-                        "path": "Chesterton Gilbert Keith",
-                        "is_file": false,
-                        "finished": false
-                      },
-                      {
-                        "name": "Doyle Arthur Conan",
-                        "modified": 1613825015324,
-                        "path": "Doyle Arthur Conan",
-                        "is_file": false,
-                        "finished": false
-                      },
-                      {
-                        "name": "Wells H G",
-                        "modified": 1613902871789,
-                        "path": "Wells H G",
-                        "is_file": false,
-                        "finished": false
-                      }
-                    ],
-                    "cover": null,
-                    "description": {
-                      "path": "welcome.md",
-                      "mime": "text/markdown"
+                {
+                  "is_file": false,
+                  "modified": 1613948393506,
+                  "total_time": 0,
+                  "files": [],
+                  "subfolders": [
+                    {
+                      "name": "Austene Jane",
+                      "modified": 1613941742570,
+                      "path": "Austene Jane",
+                      "is_file": false,
+                      "finished": false
                     },
-                    "tags": null
-                  }
+                    {
+                      "name": "Chesterton Gilbert Keith",
+                      "modified": 1613824355322,
+                      "path": "Chesterton Gilbert Keith",
+                      "is_file": false,
+                      "finished": false
+                    },
+                    {
+                      "name": "Doyle Arthur Conan",
+                      "modified": 1613825015324,
+                      "path": "Doyle Arthur Conan",
+                      "is_file": false,
+                      "finished": false
+                    },
+                    {
+                      "name": "Wells H G",
+                      "modified": 1613902871789,
+                      "path": "Wells H G",
+                      "is_file": false,
+                      "finished": false
+                    }
+                  ],
+                  "cover": null,
+                  "description": {
+                    "path": "welcome.md",
+                    "mime": "text/markdown"
+                  },
+                  "tags": null
+                }
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -240,7 +262,11 @@ paths:
     get:
       tags:
         - "Collections"
-      description: Gets content of audio folder
+      description: |
+        Lists available subfolders or audio files in the folder.
+        Response contains arrays `files` and/or `subfolders` (each can be null or empty array). 
+        Subfolders can be listed using this API endpoint, `files` contains playable files -  
+        their `path` should be used with `audio` endpoint for streaming file content.
       parameters:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Path"
@@ -401,7 +427,26 @@ paths:
     get:
       tags:
         - "Collections"
-      description: Streams (possibly transcoded) audio file
+      description: | 
+        Streams (possibly transcoded) audio file
+
+        File is sent either directly  (in this case [http bytes range](https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests) 
+        is supported - but only one range per response)  
+        or transcoded  (in this case response content is [chunck encoded](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding) 
+        and its length is not known in advance). Transcoding is triggered by query string paramater `trans`.
+
+        Typical usecase is that client loads transcoding parameters from `transcodings` endpoint 
+        and then for each audio file decides if transcoding is required or not based on `mime` and `bitrate` values 
+        available in folder listing.
+
+        Transcoded files can be also seek for playback start-  query string parameter `seek` can contain start of stream in seconds (related to 
+        normal begining of file).  Plain, not transcoded files cannot be seeked in this way (they support byte ranges, which are 
+        usually enough for a player to seek efficiently). So `seek` can be used only with `trans`.
+
+        Number of transcoding processing is limited on server, as it is lengthy and resources demanding (mainly CPU) 
+        process. If maximum number of transcodings is already used, this endpoint will return HTTP response 503 Service Unavailable. 
+        It's client responsibility to handle such cases.
+
       parameters:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Path"
@@ -473,6 +518,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "503":
+          description: Number of transcodings over limit
                              
   /{col_id}/search:
     get:
@@ -481,6 +528,10 @@ paths:
       description: |
         Search collection - search for terms with collection paths (path only not metadata tags).
         Search is looking only for folders (including virtual folders for chaptered files).
+
+        Search term is split to words and each word is searched in full path (relative collection root - 
+        the path you see in folder listing).
+        First path that includes all words in added to results (and it's subfolders are not searched further).
       parameters:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Ordering"
@@ -499,9 +550,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/SearchResult"
               example: 
-                value:
-                  {"files":[],"subfolders":[{"name":"Around The World in Eighty Days","modified":1613824559416,"path":"Verne Jules/Around The World in Eighty Days","is_file":false,"finished":false},
-                  {"name":"Austene Jane","modified":1613941742570,"path":"Austene Jane","is_file":false,"finished":false}]}
+                {"files":[],"subfolders":[{"name":"Around The World in Eighty Days","modified":1613824559416,"path":"Verne Jules/Around The World in Eighty Days","is_file":false,"finished":false},
+                {"name":"Austene Jane","modified":1613941742570,"path":"Austene Jane","is_file":false,"finished":false}]}
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -522,9 +572,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/SearchResult"
               example: 
-                value:
-                  {"files":[],"subfolders":[{"name":"Around The World in Eighty Days","modified":1613824559416,"path":"Verne Jules/Around The World in Eighty Days","is_file":false,"finished":false},
-                  {"name":"Austene Jane","modified":1613941742570,"path":"Austene Jane","is_file":false,"finished":false}]}
+                {"files":[],"subfolders":[{"name":"Around The World in Eighty Days","modified":1613824559416,"path":"Verne Jules/Around The World in Eighty Days","is_file":false,"finished":false},
+                {"name":"Austene Jane","modified":1613941742570,"path":"Austene Jane","is_file":false,"finished":false}]}
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -532,7 +581,14 @@ paths:
     get:
       tags:
         - "Collections"
-      description: Downloads content of folder as an archive (zip or tar)
+      description: | 
+        Downloads content of folder as an archive (zip or tar)
+        Downloads all files (audio files, cover, description) from this folder as an archive (zip or tar). 
+        Default format of the archive is zip, tar archive is also supported - format can be chosen by `fmt` query parameter 
+        Also if you want to change default format by compiling audioserve with `folder-download-default-tar` feature.
+
+        This endpoint can be disabled, if audioserve is compiled without default feature `folder-download` 
+        or with command line argument `--disable-folder-download` .
       parameters:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Path"
@@ -587,6 +643,33 @@ paths:
                 items:
                   $ref: "#/components/schemas/Position"
                 maxItems: 1000
+              example:
+                [
+                  {
+                    "timestamp": 1636726423847,
+                    "collection": 0,
+                    "folder": "Wells H G/Invisible Man",
+                    "file": "invisibleman_09_wells_64kb.mp3",
+                    "folder_finished": false,
+                    "position": 1395.955
+                  },
+                  {
+                    "timestamp": 1636484689121,
+                    "collection": 0,
+                    "folder": "Stevenson Robert Louis/Treasure Island",
+                    "file": "treasureisland_04_stevenson_64kb.mp3",
+                    "folder_finished": false,
+                    "position": 38.555
+                  },
+                  {
+                    "timestamp": 1636484567281,
+                    "collection": 0,
+                    "folder": "Stoker Bram/Dracula",
+                    "file": "Dracula.m4b$$004 - Chapter_5$$3452020-4080784$$.m4b",
+                    "folder_finished": false,
+                    "position": 195.34
+                  }
+                ]
         "401":
           $ref: "#/components/responses/Unauthorized"
     post:
@@ -606,6 +689,15 @@ paths:
           description: Position updated
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "422": 
+          description: Post ignored - either there no such folder/file or there is newer position there
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Ignored
 
   /positions/{group}/last:
     get:
@@ -622,6 +714,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Position"
+              examples:
+                Position for group exists:
+                  value:
+                    {
+                      "timestamp": 1636793358494,
+                      "collection": 0,
+                      "folder": "Wells H G/Invisible Man",
+                      "file": "invisibleman_09_wells_64kb.mp3",
+                      "folder_finished": false,
+                      "position": 130
+                    }
+                No last position:
+                  value: null
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -656,14 +761,49 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Position"
+                oneOf:
+                  - $ref: "#/components/schemas/Position"
+                  - type: array
+                    items:
+                      $ref: "#/components/schemas/Position"
+                    maxItems: 1000
+              examples:
+                Without rec parameter:
+                  description: Returns single position or null
+                  value:
+                    {
+                      "timestamp": 1636793358494,
+                      "collection": 0,
+                      "folder": "Wells H G/Invisible Man",
+                      "file": "invisibleman_09_wells_64kb.mp3",
+                      "folder_finished": false,
+                      "position": 130
+                    }
+                With rec parameter:
+                  description: Returns list of positions
+                  value:
+                    [
+                      {
+                        "timestamp": 1636793358494,
+                        "collection": 0,
+                        "folder": "Wells H G/Invisible Man",
+                        "file": "invisibleman_09_wells_64kb.mp3",
+                        "folder_finished": false,
+                        "position": 130
+                      }
+                    ]    
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
 
 components:
   schemas:
     Transcoding:
       type: object
+      required:
+        - "name"
+        - "bitrate"
       properties:
         name:
           type: string
@@ -674,6 +814,10 @@ components:
           minimum: 0
     TypedFile:
       type: object
+      nullable: true
+      required:
+        - "path"
+        - "mime"
       properties:
         path:
           type: string
@@ -684,6 +828,9 @@ components:
           description: mime type of the file
     Subfolder:
       type: object
+      required:
+        - "name"
+        - "path"
       properties:
         name:
           type: string
@@ -729,6 +876,10 @@ components:
           description: Metadata tags for this folders - map of name to value
     AudioFile:
       type: object
+      required:
+        - "name"
+        - "path"
+        - "mime"
       properties:
         "name": 
           type: string
@@ -754,12 +905,14 @@ components:
               nullable: true
         "mime": 
           type: string
-          description: Mite type of audio file (before transcoding)
+          description: Mime type of audio file (before transcoding)
           example: "audio/m4b"
         "section":
           type: object
           nullable: true
-          description: For big chaptered files this is start and duration (in milliseconds) of chapter with the file
+          description: | 
+            For chapter chunk out from big chaptered file (like .m4b) 
+            this is start and duration (in milliseconds) of chapter with the that file
           properties:
             "start": 
               type: integer
@@ -776,6 +929,7 @@ components:
           type: array
           items: 
             $ref: "#/components/schemas/AudioFile"
+          description: Not used now, only subfolders are searched
         subfolders:
           type: array
           items:
@@ -788,7 +942,11 @@ components:
         timestamp:
           type: integer
           format: int64
-          description: Position timestamp - unix time in ms
+          description: |-
+            Position timestamp - unix time in ms
+            Timestamp is generated on server, so if you post new  position 
+            it is used to check, if there is not newer position, 
+            but actual value then is assigned by server
         collection:
           type: integer
           format: int32
@@ -812,6 +970,15 @@ components:
         - folder
         - file
         - position
+      example:
+        {
+          "timestamp": 1636726423847,
+          "collection": 0,
+          "folder": "Wells H G/Invisible Man",
+          "file": "invisibleman_09_wells_64kb.mp3",
+          "folder_finished": false,
+          "position": 1395.955
+        }
     SharedSecret:
       type: object
       properties:
@@ -862,7 +1029,7 @@ components:
       in: query
       schema:
         type: string
-      example: ivan
+      example: your_group
     GroupInPath:
       name: group
       description: |
@@ -871,7 +1038,7 @@ components:
       in: path
       schema:
         type: string
-      example: ivan
+      example: your_group
     Finished:
       name: finished
       description: Filters only positions for finished folders
@@ -902,6 +1069,7 @@ components:
       schema:
         type: integer
         format: int64
+      example: 1636484567281
 
   responses:
     NotFound:
@@ -918,6 +1086,14 @@ components:
           schema: 
             type: string
           example:  Access denied
+    InvalidRequest:
+      description: Invalid request - either invalid parameters or body
+      content:
+        text/plain:
+          schema:
+            type: string
+          example: Bad request
+    
 
   securitySchemes:
     bearerAuth:            # arbitrary name for the security scheme

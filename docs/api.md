@@ -13,8 +13,8 @@ You can also see [specification in Swagger UI](https://petstore.swagger.io/?url=
 Sections below is bit outdated and will be updated after OpenAPI definition is finished.
 
 
-Authentication
--------------
+Authentication API
+------------------
 
 A token is used for authentication, the token can be used as cookie with key `audioserve_token` 
 or as HTTP header `Authorization: Bearer token_value`.  Token is signed by server secret key and contains
@@ -23,149 +23,20 @@ API endpoints return `401 Unauthorised` HTTP response code.
 
 Token is received from server when client proves knowledge of shared secret. For this api endpoint `authenticate` is available.
 
-**authenticate**
 
-Sample URL: https://your_server_name:3000/authenticate
+Collections API
+----------------
 
-POST request, Content-Type: application/x-www-form-urlencoded, parameter `secret`, which contains salted shared secret
+API is described in [OAS3 yaml file](audioserve-api-v1.yaml). 
+Some endpoints are specific for given collection - so their path starts with parameter `col_id`.  
+Actually for historical reasons this parameter is optional and collection 0 is then default, however it's now recommended to be explicit.
 
-Response code 200, Content-Type: text/plain,  whole response is the token  
-Response code 401 Unauthorised - invalid shared secret  
 
-Salted shared secret is calculated as:
+### Note on chaptered audiofiles (.m4b and similar)
 
-* shared secret is encoded as UTF-8 bytes
-* client generates 32 random bytes
-* secret is concatenated with random bytes (secret+random_bytes)
-* these bytes are hashed with SHA-256
-* random bytes are encoded with base64 encoding
-* hash is encoded with base64 encoding
-* resulting secret is string concation of three strings : "encoded random" + "|" + "encoded hash"
-
-API endpoints
-----------------------
-
-All are GET requests with valid token, 401 Unauthorised is returned, if token is missing or invalid
-
-**collections**
-
-Sample URL: https://your_server_name:3000/collections
-
-Returns list of available collections (collection is a directory provided as parameter to audioserve server). It should be first call to server, after client authenticates itself.
-
-```json
-    {
-    "version":"0.16.3",
-    "folder_download": true,
-    "shared_positions": true,
-    "count":2,
-    "names":[
-        "test_audiobooks_eng",
-        "test_audiobooks"]
-        }
-```
-
-`version` - version of audioserve server
-`folder_download` - is folder download is enabled on the server
-`shared_positions` - is shared positions feature enabled on server (e.g /position location accepting web socket connection)
-`count` - number of collections
-`names` - array of collection names
-
-**transcodings**
-
-Sample URL: https://your_server_name:3000/transcodings
-
-Gets current transcoding settings. Normally should be called after `collections` call, unless client is not interested in transcoding capabilities at all.
-
-```json
-    {
-    "max_transcodings":8,
-    "low":{
-        "bitrate":32,
-        "name":"opus-in-ogg"
-        },
-    "medium":{
-        "bitrate":48,
-        "name":"opus-in-ogg"
-        },
-    "high":{
-        "bitrate":64,
-        "name":"opus-in-ogg"
-        }
-    }
-```
-
-There are 3 possible level of transcoding `low`, `medium`, `high`, each with name of transcoding and expected for resulting audio stream - for details about transcoding consult main [README.md](../README.md). `max_transcodings` is maximum number of transcoding processes, that can run on server in parallel. If this maximum is reached server returns `503 Service Unavailable` -  it's client responsibility to retry later.
-
-**folder/{folder_path}**
-
-Sample URL: https://your_server_name:3000/folder/  
-Sample URL: https://your_server_name:3000/folder/author_name/audio_book  
-Sample URL: https://your_server_name:3000/1/folder/author_name/audio_book?ord=m  
-
-Lists available subfolders or audio files in the folder. Path starts either with `/collection number` + `/folder/` 
- (list of collections can be retrieved by API endpoint `collections`) or directly with `/folder/`, which means  
- collection 0 is used as default (it's backward compatibility feature, new clients are encouraged to always include collection number). This is probably most 
- URL has optional query parameter `ord`, meaning ordering of subfolders, two values are now supported:
-
-- `a` alphabetical
-- `m` recent first (using folder mtime)
-
-Returns JSON:
-
- ```json
- {
-    "files":
-        [{
-            "name":"5 pomerancovych jaderek.mp3",
-            "path":"Doyle Arthur Conan/5 pomerancovych jaderek.mp3",
-            "meta":{
-                "duration":2518,
-                "bitrate":80
-                },
-            "mime":"audio/mpeg",
-            "section": null
-        },
-        {
-            "name":"Barvir na penzi.opus",
-            "path":"Doyle Arthur Conan/Barvir na penzi.opus",
-            "meta":{
-                "duration":1612,
-                "bitrate":31},
-            "mime":"audio/ogg",
-            "section": null
-        }],
-    "subfolders":
-        [{
-            "name":"Berylova korunka",
-            "path":"Doyle Arthur Conan/Berylova korunka",
-            "is_file": false
-        },
-        {
-            "name":"Domaci pacient",
-            "path":"Doyle Arthur Conan/Domaci pacient",
-            "is_file": false
-        }],
-    "cover":
-        {
-            "path":"Doyle Arthur Conan/Arthur_Conany_Doyle_by_Walter_Benington,_1914.png",
-            "mime":"image/png"
-        },
-    "description":
-        {
-            "path":"Doyle Arthur Conan/author.html",
-            "mime":"text/html"
-        }
-}
-```
-
-Data contains `files` and/or `subfolders` (each can be null or empty array). Subfolders can be listed using this API endpoint
-using path `/folder/` + `path` (for collection 0) or `/x/folder/` + `path` (for collection x). Root folder of collection is retrieved with path `/folder/` (collection 0) or `/x/folder` (for colections x, x>=0).
-
-`files` contains playable files -  `path` should be used with `audio` endpoint - see below - in similar way as in listing subfolders.  `meta` contains some metadata about audio file - `duration` in seconds and `bitrate` in kbps. `mime` is mime type
-of the audio file and `section` is only used with chapters extracted from single file audiobook (then it contains `start` and `duration` of the chapters in ms).
-
-`subfolders` entries contain also field `is_file`, which is true for single file chaptered audibooks (.m4b format for instance) that are presented as folders. Listing of such file's chapters is done via this endpoint.  The only difference against regular directory is that artificial file entries are created for chapters - name is chapter name and path is in form `path/to/audiobook.m4b/Chapter_name$$1000-2000$$.m4b`, where numbers between `$$` are start and end of the chapter in milliseconds. There is also alternative form of path when containing directory is collapsed/skipped `path/to/audiobook.m4b$$Chapter_name$$1000-2000$$.m4b` using `$$` separator. Also each such file has data in `section` key with start of chapter and its duration in milliseconds. Here is example of such entry:
+Chaptered audibooks (.m4b format for instance)  are presented as folders. Listing of such file's chapters is done via `/{col_id}/folder/{path}` endpoint.  
+The only difference against regular directory is that artificial file entries are created for chapters - name is chapter name and path is in form `path/to/audiobook.m4b/Chapter_name$$1000-2000$$.m4b`, where numbers between `$$` are start and end of the chapter in milliseconds. 
+There is also alternative form of path when containing directory is collapsed/skipped, which is used to truncate the path if there is only one such audiofile in the directory: `path/to/audiobook.m4b$$Chapter_name$$1000-2000$$.m4b` using `$$` separator (notice $$ is used instead of path separator). Also each such file has data in `section` key with start of chapter and its duration in milliseconds. Here is example of such entry:
 
 ```json
 {
@@ -176,90 +47,16 @@ of the audio file and `section` is only used with chapters extracted from single
     "section":{"start":0,"duration":1020288}}
 ```
 
-Folder can contain additional information `cover`, which is cover image (first .jpg or .png file encountered in the folder) and text information `description` (first .txt, .html, .md file encoutered in the folder). Both can be null, if there is no appropriate file and if not null, file can be retrieved in appropriate API end point by using the `path`.
 
+Positions API
+-------------
 
-**download**
+Positions API is also described in [OAS3 yaml file](audioserve-api-v1.yaml),  it's REST API, which enables to store last playback position per folder and per group (concept of sharing position with a group was explained in [main README](../README.md) or below).
 
-Sample URL: https://your_server_name:3000/download/author_name/audio_book  
-Sample URL: https://your_server_name:3000/1/download/author_name/audio_book?fmt=tar
+There is also alternative (older) API using websocket and combination of custom text messages and JSON.  Main advantage of old API is it's wire efficiency, only few bytes are transferred for each position update. This older API is used in current clients.
 
-Downloads all files (audio files, cover, description) from this folder as an archive. The path to folder is same as in folder list endpoint `folder` - so it can start with collection number. Default format of the archive is zip, tar archive is also supported - format can be chosen by `fmt` query parameter (values `tar` or `zip`). Also if you want to change default format by compiling audioserve with `folder-download-default-tar` feature.
-
-This endpoint can be disabled, if audioserve is compiled without default feature `folder-download` or with command line argument `--disable-folder-download` .
-
-**search**
-
-Sample URL: https://your_server_name:3000/search?q=holmes  
-Sample URL: https://your_server_name:3000/1/search?q=adams&ord=m
-
-Searches collection - only one collection is searched - so it can be prefixed with with collection number to search right collection (`/x/search`).  Search term is in query string paramater `q`. It returns list of folders (and files,
-but search is not implemented for file names now), which can be used is same way as in folder listing.
-URL can contain optional `ord` query parameter, meaning ordering of results, same as in `folder` endpoint.
-
-```json
-{
-    "files":[],
-    "subfolders":
-    [{
-        "name":"The Adventures of Sherlock Holmes",
-        "path":"Doyle, Arthur Conan/The Adventures of Sherlock Holmes"
-    },
-    {
-        "name":"The Return of Sherlock Holmes",
-        "path":"Doyle, Arthur Conan/The Return of Sherlock Holmes"
-    }]
-}
-```
-
-Currently search is implemented only for folder names. Search term is split to words and each word is searched in full path (relative collection root - the path you see in folder listing).
-First path that includes all words in added to results (and it's subfolders are not searched further).
-
-**recent**
-Sample URL: https://your_server_name:3000/recent  
-Sample URL: https://your_server_name:3000/1/recent
-
-Lists top 64 most recent folders in the collection (based on folder modification time). Returns same json object as previous API endpoint `search`, but here subfolders are sorted by folder modification time descendently - e.g most recent is first.
-
-**audio**
-
-Sample URL: https://your_server_name:3000/audio/Doyle Arthur Conan/5 pomerancovych jaderek.mp3  
-Sample URL: https://your_server_name:3000/audio/Doyle Arthur Conan/5 pomerancovych jaderek.mp3?trans=m  
-Sample URL: https://your_server_name:3000/audio/Doyle Arthur Conan/5 pomerancovych jaderek.mp3?trans=m&seek=537.42  
-Sample URL: https://your_server_name:3000/2/audio/author_name/series_name/audiobook_name/chapter1.opus
-
-This endpoint allows to access audio file, either as it is stored audio file (in this case [http bytes range](https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests) is supported - but only one range per response)  
-or transcoded content of the file (in this case response content is [chunck encoded](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding) and its length is not known in advance). 
-It's responsibility of client to choose direct or transcoded content as needed. 
-
-Transcoding is triggered by query string paramater `trans`, which can have one of three possible values `l` (Low profile), 
-`m` (Medium profile) and `h` (High profile) - for meaning of transcoding profiles see above API endpoints `transcodings`.
-Typical usecase is that client loads transcoding parameters from `transcodings` endpoint and then for each audio file decides
-if transcoding is required or not based on `mime` and `bitrate` values available in folder listing.
-
-Transcoded files can be also seek for -  query string parameter `seek` can contain start of stream in seconds (related to 
-normal begining of file).  Plain, not transcoded files cannot be seeked in this way (they support byte ranges, which are 
-usually enough for a player to seek efficiently). So `seek` can be used only with `trans`.
-
-As already mentioned above, number of transcoding processing is limited, as it is lengthy and resources demanding (mainly CPU) 
-process. If maximum number of transcodings is already used, this endpoint will return HTTP response 503 Service Unavailable. It's client responsibility to handle such cases. 
-
-**cover**
-
-Sample URL: https://your_server_name:3000/cover/Doyle Arthur Conan/Arthur_Conany_Doyle_by_Walter_Benington,_1914.png  
-Sample URL: https://your_server_name:3000/2/cover/author_name/series_name/audiobook_name/cover.jpg  
-
-If cover exists in the folder, this enpoint enables to load the image.
-
-**desc**
-
-Sample URL: https://your_server_name:3000/desc/Doyle Arthur Conan/author.html  
-Sample URL: https://your_server_name:3000/2/desc/author_name/series_name/audiobook_name/info.txt  
-
-If text information in the folder, this endpoint can load the text.
-
-Recent playback position
-------------------------
+Websocket playback position API
+-------------------------------
 
 Clients can share and query recent playback positions. In order to determine, which clients share positions, there is a concept of clients group. Group is just arbitrary name and clients using same group name will share recent playback positions between them.
 
@@ -285,7 +82,7 @@ This longer form is useful, if connection is interrupt and client wants to repor
 
     480.383|group/0/Adams Douglas/Douglas Adams - Stoparuv pruvodce galaxii (2008)/01.kapitola.mp3|1614963001
 
-Such message can be send also in short form, without  `group_name/collection_number/audio_file_path`, if we are continuing to report position in same audio file. So next position update could be just:
+Such message can be send also in short form, without  `group_name/collection_number/audio_file_path`, if we are continuing to report position on same audio file. So next position update could be just:
 
     486.859|
 
