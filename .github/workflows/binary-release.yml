@@ -1,0 +1,15 @@
+name: Release Binary
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-static:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build static Binary
+        run: |
+          ./build_static.sh
+      - name: Publish static binary tar
+        run: echo TBD
