@@ -8,7 +8,13 @@ REST API
 --------
 Rest API for audioserve is defined in [OpenAPI 3 specification](audioserve-api-v1.yaml) **work in progress**
 
-You can also see [specification in Swagger UI](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/izderadicka/audioserve/master/docs/audioserve-api-v1.yaml)
+You can also see [specification in Swagger UI](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/izderadicka/audioserve/master/docs/audioserve-api-v1.yaml). You can use it also test API on demo instance of audioserve:
+- Choose "https://audioserve.zderadicka.eu" server
+- Expand Authentication POST endpoint, and click on "Try it out" button.
+- use sample secret provided and click big blue "Execute" button
+- you should get success 200 response with token in response body,  copy it
+- and client green "Authorize" button on top of the page,  paste token there and client "Auhorize" and then "Close" buttons
+- now you should be able to test other API endpoints, which require authorization
 
 Sections below is bit outdated and will be updated after OpenAPI definition is finished.
 
