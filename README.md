@@ -262,7 +262,8 @@ Android client code is [available on github](https://github.com/izderadicka/audi
 
 ## API
 
-audioserve server provides very simple API (see [api.md](./docs/api.md) for documentation), so it's easy to write your own clients.
+audioserve server provides very simple API, [defined in OAS 3](https://validator.swagger.io/?url=https://raw.githubusercontent.com/izderadicka/audioserve/master/docs/audioserve-api-v1.yaml)  (see also  [api.md](./docs/api.md) for details), 
+so it's easy to write your own clients.
 
 ## Installation
 
