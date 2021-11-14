@@ -145,7 +145,7 @@ fn serve_file_transcoded_checked(
             Ordering::SeqCst,
         ) {
             Ok(_) => {
-                running_transcodings = running_transcodings + 1;
+                running_transcodings += 1;
                 break;
             }
             Err(curr) => running_transcodings = curr,
@@ -494,11 +494,7 @@ pub fn collections_list() -> ResponseFuture {
     let collections = CollectionsInfo {
         version: env!("CARGO_PKG_VERSION"),
         folder_download: !get_config().disable_folder_download,
-        shared_positions: if cfg!(feature = "shared-positions") {
-            true
-        } else {
-            false
-        },
+        shared_positions: cfg!(feature = "shared-positions"),
         count: get_config().base_dirs.len() as u32,
         names: get_config()
             .base_dirs
@@ -521,14 +517,13 @@ pub fn insert_position(
 ) -> ResponseFuture {
     match serde_json::from_slice::<collection::Position>(&bytes) {
         Ok(pos) => {
-            let path = if pos.folder.len() > 0 {
+            let path = if !pos.folder.is_empty() {
                 pos.folder + "/" + &pos.file
             } else {
                 pos.file
             };
             Box::pin(
                 collections
-                    .clone()
                     .insert_position_if_newer_async(
                         pos.collection,
                         group,

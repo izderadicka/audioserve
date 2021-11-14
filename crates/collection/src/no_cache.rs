@@ -136,7 +136,7 @@ impl PartialOrd for DirEntry {
 }
 impl Ord for DirEntry {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(&other).unwrap()
+        self.partial_cmp(other).unwrap()
     }
 }
 
@@ -160,24 +160,22 @@ impl FoldersSearch {
             limit: usize,
         ) {
             if let Ok(dir_iter) = fs::read_dir(path) {
-                for item in dir_iter {
-                    if let Ok(f) = item {
-                        if let Ok(ft) = get_real_file_type(&f, path, allow_symlinks) {
-                            if ft.is_dir() {
-                                let p = f.path();
-                                search_recursive(base_path, &p, res, allow_symlinks, limit);
-                                if let Ok(meta) = p.metadata() {
-                                    let changed = meta.modified();
+                for f in dir_iter.flatten() {
+                    if let Ok(ft) = get_real_file_type(&f, path, allow_symlinks) {
+                        if ft.is_dir() {
+                            let p = f.path();
+                            search_recursive(base_path, &p, res, allow_symlinks, limit);
+                            if let Ok(meta) = p.metadata() {
+                                let changed = meta.modified();
 
-                                    if let Ok(changed) = changed {
-                                        if res.len() >= limit {
-                                            res.pop();
-                                        }
-                                        res.push(DirEntry {
-                                            path: p,
-                                            created: changed,
-                                        })
+                                if let Ok(changed) = changed {
+                                    if res.len() >= limit {
+                                        res.pop();
                                     }
+                                    res.push(DirEntry {
+                                        path: p,
+                                        created: changed,
+                                    })
                                 }
                             }
                         }
@@ -207,32 +205,22 @@ impl FoldersSearch {
             allow_symlinks: bool,
         ) {
             if let Ok(dir_iter) = fs::read_dir(path) {
-                for item in dir_iter {
-                    if let Ok(f) = item {
-                        if let Ok(ft) = get_real_file_type(&f, path, allow_symlinks) {
-                            if ft.is_dir() {
-                                let p = f.path();
-                                if let Some(s) =
-                                    p.strip_prefix(base_path).ok().and_then(Path::to_str)
-                                {
-                                    let lc_s = s.to_lowercase();
-                                    let m = tokens.iter().all(|token| lc_s.contains(token));
-                                    if m {
-                                        debug!("Found {:?} in {}", tokens, lc_s);
-                                        let folder =
-                                            AudioFolderShort::from_dir_entry(&f, s.into(), false);
-                                        if let Ok(folder) = folder {
-                                            results.push(folder)
-                                        }
-                                    } else {
-                                        search_recursive(
-                                            base_path,
-                                            &p,
-                                            results,
-                                            tokens,
-                                            allow_symlinks,
-                                        )
+                for f in dir_iter.flatten() {
+                    if let Ok(ft) = get_real_file_type(&f, path, allow_symlinks) {
+                        if ft.is_dir() {
+                            let p = f.path();
+                            if let Some(s) = p.strip_prefix(base_path).ok().and_then(Path::to_str) {
+                                let lc_s = s.to_lowercase();
+                                let m = tokens.iter().all(|token| lc_s.contains(token));
+                                if m {
+                                    debug!("Found {:?} in {}", tokens, lc_s);
+                                    let folder =
+                                        AudioFolderShort::from_dir_entry(&f, s.into(), false);
+                                    if let Ok(folder) = folder {
+                                        results.push(folder)
                                     }
+                                } else {
+                                    search_recursive(base_path, &p, results, tokens, allow_symlinks)
                                 }
                             }
                         }

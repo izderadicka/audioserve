@@ -94,24 +94,17 @@ impl Collections {
             .map(move |collection_path| {
                 if is_no_cache_collection(&collections_options, &collection_path) {
                     info!("Collection {:?} is not using cache", collection_path);
-                    Ok(CollectionDirect::new(
-                        collection_path.clone(),
-                        lister.clone(),
-                        allow_symlinks,
+                    Ok(
+                        CollectionDirect::new(collection_path, lister.clone(), allow_symlinks)
+                            .into(),
                     )
-                    .into())
                 } else {
-                    CollectionCache::new(
-                        collection_path.clone(),
-                        db_path,
-                        lister.clone(),
-                        force_update,
-                    )
-                    .map(|mut cache| {
-                        cache.run_update_loop();
-                        cache
-                    })
-                    .map(|c| Collection::from(c))
+                    CollectionCache::new(collection_path, db_path, lister.clone(), force_update)
+                        .map(|mut cache| {
+                            cache.run_update_loop();
+                            cache
+                        })
+                        .map(Collection::from)
                 }
             })
             .collect::<Result<Vec<_>>>()?;
@@ -123,7 +116,7 @@ impl Collections {
     fn get_cache(&self, collection: usize) -> Result<&Collection> {
         self.caches
             .get(collection)
-            .ok_or_else(|| Error::MissingCollectionCache(collection))
+            .ok_or(Error::MissingCollectionCache(collection))
     }
 
     pub fn list_dir<P: AsRef<Path>>(
@@ -253,13 +246,13 @@ impl Collections {
             write!(
                 f,
                 "\"{}\":",
-                c.base_dir().to_str().ok_or_else(|| Error::InvalidPath)?
+                c.base_dir().to_str().ok_or(Error::InvalidPath)?
             )?;
             c.write_json_positions(&mut f)?;
             if idx < self.caches.len() - 1 {
-                write!(f, ",\n")?;
+                writeln!(f, ",")?;
             } else {
-                write!(f, "\n")?;
+                writeln!(f)?;
             }
         }
         write!(f, "}}")?;
@@ -531,10 +524,12 @@ impl Collections {
                 MAX_POSITIONS,
                 filter.and_then(|f| f.into_option()),
             );
-            self.get_cache(collection)
+            if let Ok(c) = self
+                .get_cache(collection)
                 .map_err(|e| error!("Invalid collection used in get_position: {}", e))
-                .ok()
-                .map(|c| c.get_positions_recursive(group, folder, collection, &mut res));
+            {
+                c.get_positions_recursive(group, folder, collection, &mut res)
+            };
             res.into_vec()
         })
         .unwrap_or_else(|e| {

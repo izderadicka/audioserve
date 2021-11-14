@@ -201,7 +201,7 @@ impl AudioFolderShort {
     }
 }
 
-#[derive(PartialEq, Eq, Ord)]
+#[derive(PartialEq, Eq)]
 pub(crate) struct FolderByModification(AudioFolderShort);
 
 impl From<AudioFolderShort> for FolderByModification {
@@ -222,6 +222,12 @@ impl PartialOrd for FolderByModification {
             Some(Ordering::Equal) => self.0.partial_cmp(&other.0),
             other => other,
         }
+    }
+}
+
+impl Ord for FolderByModification {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap() // OK cause Option<Timestamp> has Ord
     }
 }
 

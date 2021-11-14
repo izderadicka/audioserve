@@ -173,7 +173,7 @@ fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> tokio:
                         use tokio_native_tls::TlsStream;
                         info!("Server listening on {}{} with TLS", &addr, get_url_path!());
                         let create_server = async move {
-                            let incoming = tls::tls_acceptor(&addr, &ssl)
+                            let incoming = tls::tls_acceptor(&addr, ssl)
                                 .await
                                 .context("TLS handshake")?;
                             let server = HttpServer::builder(incoming)

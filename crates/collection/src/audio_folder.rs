@@ -116,13 +116,13 @@ impl FolderLister {
             Ok(DirType::Dir)
         } else if meta.is_file() && is_audio(path) {
             let meta =
-                get_audio_properties(&path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+                get_audio_properties(path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
             match (meta.get_chapters(), meta.get_audio_info(&self.config.tags)) {
                 (Some(chapters), Some(audio_meta)) => Ok(DirType::File {
                     chapters,
                     audio_meta,
                 }),
-                (None, Some(audio_meta)) => match chapters_from_csv(&path)? {
+                (None, Some(audio_meta)) => match chapters_from_csv(path)? {
                     Some(chapters) => {
                         if chapters.len() > 1 {
                             Ok(DirType::File {
@@ -358,7 +358,7 @@ impl FolderLister {
 }
 
 fn extract_folder_tags(files: &mut Vec<AudioFile>) -> Option<HashMap<String, String>> {
-    let mut iter = (&files).iter();
+    let mut iter = (files).iter();
     let mut folder_tags = iter
         .next()?
         .meta

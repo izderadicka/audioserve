@@ -18,7 +18,7 @@ pub(crate) struct PositionItem {
 }
 
 impl PositionItem {
-    pub(crate) fn into_position<S: Into<String>>(&self, folder: S, collection: usize) -> Position {
+    pub(crate) fn to_position<S: Into<String>>(&self, folder: S, collection: usize) -> Position {
         Position {
             file: self.file.clone(),
             folder: folder.into(),
@@ -42,7 +42,8 @@ pub struct Position {
 }
 
 impl Eq for Position {}
-
+// TODO: Should I really need custom implementation of PartialOrd??
+#[allow(clippy::derive_ord_xor_partial_ord)] // Just WA for float ordering, which is not important here
 impl Ord for Position {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match self.partial_cmp(other) {
@@ -154,7 +155,7 @@ where
         Collector {
             heap: BinaryHeap::new(),
             max_size,
-            filter: filter,
+            filter,
         }
     }
 

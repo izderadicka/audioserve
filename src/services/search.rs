@@ -9,7 +9,7 @@ pub trait SearchTrait<S> {
 
 #[derive(Clone)]
 pub struct Search<S> {
-    inner: Arc<Box<dyn SearchTrait<S> + Send + Sync>>,
+    inner: Arc<dyn SearchTrait<S> + Send + Sync>,
 }
 
 impl<S: AsRef<str>> SearchTrait<S> for Search<S> {
@@ -24,9 +24,7 @@ impl<S: AsRef<str>> SearchTrait<S> for Search<S> {
 impl<S: AsRef<str>> Search<S> {
     pub fn new(collections: Option<Arc<collection::Collections>>) -> Self {
         Search {
-            inner: Arc::new(Box::new(col_db::CollectionsSearch::new(
-                collections.unwrap(),
-            ))),
+            inner: Arc::new(col_db::CollectionsSearch::new(collections.unwrap())),
         }
     }
 }

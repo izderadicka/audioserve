@@ -92,9 +92,9 @@ impl From<IpOrSocket> for NodeIdentifier {
 }
 
 impl IpOrSocket {
-    fn to_ip_only<'a>(self) -> Result<IpAddr, AddrError<'a>> {
+    fn to_ip_only<'a>(&self) -> Result<IpAddr, AddrError<'a>> {
         match self {
-            IpOrSocket::Ip(addr) => Ok(addr),
+            IpOrSocket::Ip(addr) => Ok(*addr),
             _ => Err(AddrError::SocketInsteadIp),
         }
     }
@@ -111,15 +111,15 @@ fn parse_ip(s: &str) -> Result<IpOrSocket, AddrError> {
             match s.parse::<SocketAddrV6>() {
                 Ok(a) => Ok(IpOrSocket::Socket(SocketAddr::V6(a))),
                 Err(_e) => {
-                    return Err(AddrError::InvalidAddress);
+                    Err(AddrError::InvalidAddress)
                     //TBD:  It can have obfuscated port
                 }
             }
         }
     } else {
         s.parse::<IpAddr>()
-            .map(|addr| IpOrSocket::Ip(addr))
-            .or_else(|_| s.parse::<SocketAddr>().map(|a| IpOrSocket::Socket(a)))
+            .map(IpOrSocket::Ip)
+            .or_else(|_| s.parse::<SocketAddr>().map(IpOrSocket::Socket))
             .map_err(AddrError::from)
     }
 }
@@ -367,8 +367,7 @@ pub struct XForwardedFor {
 
 impl XForwardedFor {
     pub fn client(&self) -> &IpAddr {
-        &self
-            .ips
+        self.ips
             .get(0)
             .expect("at least one record is alway present")
     }

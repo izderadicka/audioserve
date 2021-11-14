@@ -65,7 +65,13 @@ impl CollectionCache {
             thread_loop: None,
             watcher_sender: Arc::new(Mutex::new(None)),
             thread_updater: None,
-            cond: Arc::new((Condvar::new(), Mutex::new(false))),
+
+            cond: Arc::new((
+                Condvar::new(),
+                #[allow(clippy::mutex_atomic)]
+                // Not sure why clippy warns, as this is taken from example cor condition in std doc
+                Mutex::new(false),
+            )),
             update_sender,
             update_receiver: Some(update_receiver),
             force_update,
@@ -83,7 +89,7 @@ impl CollectionCache {
         let name = p
             .file_name()
             .map(|name| name.to_string_lossy() + "_" + name_prefix.as_ref())
-            .ok_or_else(|| Error::InvalidCollectionPath)?;
+            .ok_or(Error::InvalidCollectionPath)?;
         Ok(db_dir.as_ref().join(name.as_ref()))
     }
 
@@ -434,7 +440,7 @@ impl Iterator for Search {
     type Item = AudioFolderShort;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(item) = self.iter.next() {
+        for item in &mut self.iter {
             match item {
                 Ok((key, val)) => {
                     let path = std::str::from_utf8(key.as_ref()).unwrap(); // we can safely unwrap as we inserted string

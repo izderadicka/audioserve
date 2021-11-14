@@ -295,9 +295,9 @@ impl Token {
     }
 }
 
-impl Into<String> for Token {
-    fn into(self) -> String {
-        let data = [&self.random[..], &self.validity[..], &self.signature[..]].concat();
+impl From<Token> for String {
+    fn from(token: Token) -> String {
+        let data = [&token.random[..], &token.validity[..], &token.signature[..]].concat();
         BASE64.encode(&data)
     }
 }

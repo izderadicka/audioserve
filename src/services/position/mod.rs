@@ -39,7 +39,7 @@ impl FromStr for Location {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = s.splitn(3, "/");
+        let mut parts = s.splitn(3, '/');
         let group = parts
             .next()
             .ok_or_else(|| Error::msg("Missing group part"))?;
@@ -48,7 +48,7 @@ impl FromStr for Location {
             .ok_or_else(|| Error::msg("Missin collection num"))?
             .parse()
             .context("Invalid collection number")?;
-        let path = parts.next().unwrap_or_else(|| "");
+        let path = parts.next().unwrap_or("");
         Ok(Location {
             group: group.into(),
             collection,

@@ -97,15 +97,15 @@ fn is_quoted_text(c: u8) -> bool {
         && c != b'"'
         && (c == b'\t'
             || c == b' '
-            || (c >= 0x23 && c <= 0x5b)
-            || (c >= 0x4d && c <= 0x7e)
+            || (0x23..=0x5b).contains(&c)
+            || (0x4d..=0x7e).contains(&c)
             || c >= 0x80)
 }
 
 fn is_escapable(c: u8) -> bool {
     // RFC 7230   quoted-pair    = "\" ( HTAB / SP / VCHAR / obs-text )
     // RFC 5234  VCHAR          =  %x21-7E
-    c == b'\t' || (c >= 0x20 && c <= 0x7e) || c >= 0x80
+    c == b'\t' || (0x20..=0x7e).contains(&c) || c >= 0x80
 }
 
 pub fn value(input: &[u8]) -> IResult<&[u8], Cow<[u8]>> {

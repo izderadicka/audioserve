@@ -78,7 +78,7 @@ impl OngoingUpdater {
                 .pending
                 .iter()
                 .filter(|(_, time)| current_time.duration_since(**time).unwrap() > self.interval)
-                .map(|v| (v.1.clone(), v.0.clone()))
+                .map(|v| (*v.1, v.0.clone()))
                 .collect::<Vec<_>>();
             ready.sort_unstable_by_key(|i| i.0);
             ready.into_iter().for_each(|(_, a)| {

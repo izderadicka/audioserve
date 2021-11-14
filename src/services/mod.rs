@@ -123,7 +123,7 @@ impl RequestWrapper {
         };
         //Check for unwanted path segments - e.g. ., .., .anything - so we do not want special directories and hidden directories and files
         let mut segments = path.split('/');
-        if segments.any(|s| s.starts_with(".")) {
+        if segments.any(|s| s.starts_with('.')) {
             return Err(error::Error::msg(
                 "Illegal path, contains either special directories or hidden name",
             ));
@@ -170,8 +170,8 @@ impl RequestWrapper {
                 .request
                 .headers()
                 .typed_get::<proxy_headers::Forwarded>()
-                .and_then(|fwd| fwd.client().map(|c| c.clone()))
-                .map(|addr| RemoteIpAddr::Proxied(addr))
+                .and_then(|fwd| fwd.client().copied())
+                .map(RemoteIpAddr::Proxied)
                 .or_else(|| {
                     self.request
                         .headers()
@@ -206,7 +206,7 @@ impl RequestWrapper {
                 }
                 Ok(buf.into())
             }
-            Some(Err(e)) => return Err(e),
+            Some(Err(e)) => Err(e),
             None => Ok(Bytes::new()),
         }
     }
@@ -261,7 +261,7 @@ pub struct TranscodingDetails {
 }
 
 pub struct ServiceFactory<T> {
-    authenticator: Option<Arc<Box<dyn Authenticator<Credentials = T>>>>,
+    authenticator: Option<Arc<dyn Authenticator<Credentials = T>>>,
     rate_limitter: Option<Arc<Leaky>>,
     search: Search<String>,
     transcoding: TranscodingDetails,
@@ -280,8 +280,7 @@ impl<T> ServiceFactory<T> {
         A: Authenticator<Credentials = T> + 'static,
     {
         ServiceFactory {
-            authenticator: auth
-                .map(|a| Arc::new(Box::new(a) as Box<dyn Authenticator<Credentials = T>>)),
+            authenticator: auth.map(|a| Arc::new(a) as Arc<dyn Authenticator<Credentials = T>>),
             rate_limitter: rate_limit.map(|l| Arc::new(Leaky::new(l))),
             search,
             transcoding,
@@ -308,7 +307,7 @@ impl<T> ServiceFactory<T> {
 
 #[derive(Clone)]
 pub struct FileSendService<T> {
-    pub authenticator: Option<Arc<Box<dyn Authenticator<Credentials = T>>>>,
+    pub authenticator: Option<Arc<dyn Authenticator<Credentials = T>>>,
     pub rate_limitter: Option<Arc<Leaky>>,
     pub search: Search<String>,
     pub transcoding: TranscodingDetails,
@@ -388,7 +387,7 @@ impl<C: 'static> FileSendService<C> {
     fn process_request(&mut self, req: Request<Body>) -> ResponseFuture {
         //Limit rate of requests if configured
         if let Some(limiter) = self.rate_limitter.as_ref() {
-            if let Err(_) = limiter.start_one() {
+            if limiter.start_one().is_err() {
                 debug!("Rejecting request due to rate limit");
                 return resp::fut(resp::too_many_requests);
             }
@@ -540,18 +539,12 @@ impl<C: 'static> FileSendService<C> {
                         .map(|l| FoldersOrdering::from_letter(l))
                         .unwrap_or(FoldersOrdering::Alphabetical);
                     if path.starts_with("/audio/") {
-                        FileSendService::<C>::serve_audio(
-                            &req,
-                            base_dir,
-                            &path,
-                            transcoding,
-                            params,
-                        )
+                        FileSendService::<C>::serve_audio(&req, base_dir, path, transcoding, params)
                     } else if path.starts_with("/folder/") {
                         let group = params.get_string("group");
                         get_folder(
                             colllection_index,
-                            get_subpath(&path, "/folder/"),
+                            get_subpath(path, "/folder/"),
                             collections,
                             ord,
                             group,
@@ -564,11 +557,7 @@ impl<C: 'static> FileSendService<C> {
                                 .get("fmt")
                                 .and_then(|f| f.parse::<types::DownloadFormat>().ok())
                                 .unwrap_or_default();
-                            subs::download_folder(
-                                base_dir,
-                                get_subpath(&path, "/download/"),
-                                format,
-                            )
+                            subs::download_folder(base_dir, get_subpath(path, "/download/"), format)
                         }
                         #[cfg(not(feature = "folder-download"))]
                         {
@@ -587,13 +576,13 @@ impl<C: 'static> FileSendService<C> {
                     } else if path.starts_with("/cover/") {
                         send_file_simple(
                             base_dir,
-                            get_subpath(&path, "/cover"),
+                            get_subpath(path, "/cover"),
                             Some(FOLDER_INFO_FILES_CACHE_AGE),
                         )
                     } else if path.starts_with("/desc/") {
                         send_file_simple(
                             base_dir,
-                            get_subpath(&path, "/desc"),
+                            get_subpath(path, "/desc"),
                             Some(FOLDER_INFO_FILES_CACHE_AGE),
                         )
                     } else {
@@ -608,7 +597,7 @@ impl<C: 'static> FileSendService<C> {
                 if path.starts_with("/positions") {
                     match extract_group(path) {
                         PositionGroup::Group(group) => {
-                            if req
+                            let is_json = req
                                 .headers()
                                 .get("Content-Type")
                                 .and_then(|v| {
@@ -616,8 +605,8 @@ impl<C: 'static> FileSendService<C> {
                                         .ok()
                                         .map(|s| s.to_lowercase().eq("application/json"))
                                 })
-                                .unwrap_or(false)
-                            {
+                                .unwrap_or(false);
+                            if is_json {
                                 Box::pin(async move {
                                     match req.body_bytes().await {
                                         Ok(bytes) => {
@@ -684,7 +673,7 @@ impl<C: 'static> FileSendService<C> {
 
         send_file(
             base_dir,
-            get_subpath(&path, "/audio/"),
+            get_subpath(path, "/audio/"),
             bytes_range,
             seek,
             transcoding,
@@ -698,7 +687,7 @@ lazy_static! {
 }
 
 fn extract_collection_number(path: &str) -> Result<(&str, usize), ()> {
-    let matches = COLLECTION_NUMBER_RE.captures(&path);
+    let matches = COLLECTION_NUMBER_RE.captures(path);
     if let Some(matches) = matches {
         let cnum = matches.get(1).unwrap();
         // match gives us char position it's safe to slice

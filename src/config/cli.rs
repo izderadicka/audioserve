@@ -633,7 +633,7 @@ Preferred tags are:
 
 fn print_tags(list: &[&str]) {
     list.chunks(8).for_each(|c| {
-        let row = c.iter().map(|r| *r).collect::<Vec<_>>().join(", ");
+        let row = c.iter().copied().collect::<Vec<_>>().join(", ");
         println!("{},", row)
     })
 }

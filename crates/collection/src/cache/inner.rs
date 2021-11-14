@@ -138,10 +138,7 @@ impl CacheInner {
     }
 
     pub(crate) fn update<P: AsRef<Path>>(&self, dir: P, af: AudioFolder) -> Result<()> {
-        let dir = dir
-            .as_ref()
-            .to_str()
-            .ok_or_else(|| Error::InvalidCollectionPath)?;
+        let dir = dir.as_ref().to_str().ok_or(Error::InvalidCollectionPath)?;
         bincode::serialize(&af)
             .map_err(Error::from)
             .and_then(|data| self.db.insert(dir, data).map_err(Error::from))
@@ -190,11 +187,11 @@ impl CacheInner {
     }
 
     pub fn flush(&self) -> Result<()> {
-        let mut res = vec![];
-        res.push(self.db.flush());
-        res.push(self.pos_folder.flush());
-        res.push(self.pos_latest.flush());
-
+        let res = vec![
+            self.db.flush(),
+            self.pos_folder.flush(),
+            self.pos_latest.flush(),
+        ];
         res.into_iter()
             .find(|r| r.is_err())
             .unwrap_or(Ok(0))
@@ -282,14 +279,14 @@ impl CacheInner {
                     pos_latest.insert(group.as_ref(), path.as_bytes())?;
                     Ok(())
                 })
-                .map_err(|e| Error::from(e))
+                .map_err(Error::from)
         } else {
             // folder does not have playable file or does not exist in cache
             warn!(
                 "Trying to insert position for unknown or empty folder {}",
                 path
             );
-            return Err(Error::IgnoredPosition);
+            Err(Error::IgnoredPosition)
         }
     }
 
@@ -323,7 +320,7 @@ impl CacheInner {
                             .map_err(|e| error!("Error deserializing position record {}", e))
                             .ok()
                     })
-                    .and_then(|m| m.get(group.as_ref()).map(|p| p.into_position(fld, 0))))
+                    .and_then(|m| m.get(group.as_ref()).map(|p| p.to_position(fld, 0))))
             })
             .map_err(|e: TransactionError<Error>| error!("Db transaction error: {}", e))
             .ok()
@@ -399,7 +396,7 @@ impl CacheInner {
                         .ok()?;
                     let folder = String::from_utf8(folder.as_ref().into()).unwrap(); // known to be valid UTF8
                     rec.get(group.as_ref())
-                        .map(|p| p.into_position(folder, collection_no))
+                        .map(|p| p.to_position(folder, collection_no))
                 })
         })
         .for_each(|p| res.add(p))
@@ -419,7 +416,7 @@ impl CacheInner {
     fn remove_positions_batch<P: AsRef<Path>>(&self, path: P) -> Result<Batch> {
         let mut batch = Batch::default();
         self.pos_folder
-            .scan_prefix(path.as_ref().to_str().ok_or_else(|| Error::InvalidPath)?)
+            .scan_prefix(path.as_ref().to_str().ok_or(Error::InvalidPath)?)
             .filter_map(|r| {
                 r.map_err(|e| error!("Cannot read positions db: {}", e))
                     .ok()
@@ -443,7 +440,7 @@ impl CacheInner {
 
         let iter = self
             .pos_folder
-            .scan_prefix(from.to_str().ok_or_else(|| Error::InvalidPath)?)
+            .scan_prefix(from.to_str().ok_or(Error::InvalidPath)?)
             .filter_map(|r| {
                 r.map_err(|e| error!("Cannot read positions db: {}", e))
                     .ok()
@@ -517,9 +514,9 @@ impl CacheInner {
                     write!(file, "\"{}\":", folder)?;
                     serde_json::to_writer(&mut file, &res)?;
                     if idx < self.pos_folder.len() - 1 {
-                        write!(file, ",\n")?;
+                        writeln!(file, ",")?;
                     } else {
-                        write!(file, "\n")?;
+                        writeln!(file)?;
                     }
                 }
                 Err(e) => error!("Error when reading from position db: {}", e),
@@ -601,7 +598,7 @@ impl CacheInner {
             let mut folder_rec: AudioFolder = bincode::deserialize(&v)?;
             let p: &Path = Path::new(unsafe { std::str::from_utf8_unchecked(&k) }); // we insert only valid strings as keys
             let new_key = update_path(from, to, p)?;
-            let new_key = new_key.to_str().ok_or_else(|| Error::InvalidPath)?;
+            let new_key = new_key.to_str().ok_or(Error::InvalidPath)?;
             trace!(
                 "Processing path {} from key {} in to {:?}",
                 new_key,
@@ -707,10 +704,8 @@ impl CacheInner {
                 let col_path = self.strip_base(&p);
                 if self.is_dir(&p) {
                     snd(UpdateAction::RefreshFolderRecursive(col_path.into()));
-                    snd(UpdateAction::RefreshFolder(parent_path(col_path)));
-                } else {
-                    snd(UpdateAction::RefreshFolder(parent_path(col_path)));
                 }
+                snd(UpdateAction::RefreshFolder(parent_path(col_path)));
             }
             DebouncedEvent::Write(p) => {
                 let col_path = self.strip_base(&p);
@@ -744,7 +739,6 @@ impl CacheInner {
             }
             other => {
                 error!("This event {:?} should not get here", other);
-                return;
             }
         };
     }
