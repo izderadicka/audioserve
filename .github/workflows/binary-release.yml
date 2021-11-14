@@ -1,0 +1,33 @@
+name: Release version
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  audioserve-build:
+    runs-on: ubuntu-20.04
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build image
+      run: docker build --tag izderadicka/audioserve .
+    - name: Publish image
+      run: |
+        docker login -u ${{secrets.DOCKERHUB_USER}} -p ${{secrets.DOCKERHUB_PASSWORD}}
+        docker push izderadicka/audioserve
+  build-static:
+    runs-on: ubuntu-20.04
+    needs: audioserve-build
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build static Binary
+        run: |
+          ./build_static.sh
+      - name: Release static binary tar
+        uses: softprops/action-gh-release@v1
+        #if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: _static_build/audioserve_static.tar.gz

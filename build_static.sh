@@ -12,4 +12,4 @@ fi
 
 docker build --tag audioserve-builder -f Dockerfile.static .
 # if repeated build are done it can be made faster by mapping volumes to /.cargo and /.npm
-docker run -it --rm -v $(pwd):/src -u $(id -u) $OPTS_ARGS audioserve-builder
+docker run -i --rm -v $(pwd):/src -u $(id -u) $OPTS_ARGS audioserve-builder

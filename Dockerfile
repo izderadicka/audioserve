@@ -12,7 +12,7 @@ COPY . /audioserve
 WORKDIR /audioserve
 
 RUN cargo build --release ${CARGO_ARGS} &&\
-    cargo test --release ${CARGO_ARGS}
+    cargo test --release --all ${CARGO_ARGS}
 
 RUN mkdir /ssl &&\
     cd /ssl &&\
