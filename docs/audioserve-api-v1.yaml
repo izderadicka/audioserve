@@ -560,7 +560,7 @@ paths:
       tags:
         - "Collections"
       description: |
-        Lists top 64 most recent folders in the collection (based on folder modification time). 
+        Lists top 100 most recent folders in the collection (based on folder modification time). 
         Sorted by folder modification time descendently - e.g most recent is first.
       parameters:
         - $ref: "#/components/parameters/CollectionId"
