@@ -20,7 +20,7 @@ RUN mkdir /ssl &&\
         -subj "/C=CZ/ST=Prague/L=Prague/O=Ivan/CN=audioserve" &&\
     openssl pkcs12 -inkey key.pem -in certificate.pem -export  -passout pass:mypass -out audioserve.p12 
 
-FROM node:12-alpine as client
+FROM node:14-alpine as client
 
 COPY ./client /audioserve_client
 
