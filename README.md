@@ -185,7 +185,7 @@ Audioserve is handling this with with optional `--cors` argument, which will add
 
 CORS is relevant in several scenarios:
 - during web client development, when client is served from development server (for instance `webpack serve`) on one port, say 8080,  and API is served from audioserve listening on other port, say 3000  browser CORS policies will then prevent client from communicating with audioserve server API (as they are on different posts, thus different origins), unless CORS headers are included in server responses. 
-- If you are using third party client (like [audiosilo](https://github.com/KodeStar/audiosilo)), client may sit in one domain, say https://client.audiosilo.app/, abd audioserve in other domain, say https://audioserve.zderadicka.eu, so again here CORS headers are required (`--cors` argument when starting audioserve). Also in this case connection **must be secure** - https://.
+- If you are using third party client (like [audiosilo](https://github.com/KodeStar/audiosilo)), client may sit in one domain, say https://client.audiosilo.app/, and audioserve in other domain, say https://audioserve.zderadicka.eu, so again here CORS headers are required (`--cors` argument when starting audioserve). Also in this case connection **must be secure** - https://.
 - 
 Audioserve responses' CORS headers are  permissive, allowing access from all origins and with any additional headers enable any possible scenario of usage.
 
@@ -278,7 +278,7 @@ All audioserve parameters can be also provided in configuration file via `--conf
 ## Web client
 
 Web client is bundled with server. It provides simple interface (using bootstrap 4 CSS framework and JQuery JS library). Web client will remember your last playback position in a folder, so you can easily continue listening, even after page reload. Use three vertical dots in top right corner to choose required transcoding and subfolder items ordering.
-Otherwise it's rather minimalistic (following KISS principle).
+Otherwise it's rather minimalistic (following KISS principle). Also new, still very much in progress, but quite interesting [third party client](https://github.com/KodeStar/audiosilo) can be used with audioserve.
 
 It's tested on Firefox and Chrome (on Linux and Android, should work on Windows, on OSX too on these browsers).
 Also should work on on recent MS Edge browser(I'm not testing it on Edge, but seems to work and since it's now also based on Chromium should not be issue).

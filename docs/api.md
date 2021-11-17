@@ -37,6 +37,8 @@ API is described in [OAS3 yaml file](audioserve-api-v1.yaml).
 Some endpoints are specific for given collection - so their path starts with parameter `col_id`.  
 Actually for historical reasons this parameter is optional and collection 0 is then default, however it's now recommended to be explicit.
 
+If you tested API in swagger you probably noticed that `path` parameter is fully URL encoded - eg. path separator is encoded as %2F. It works, but actually it is not required, `path` can use it's separators directly, thus be a natural extension of URL path (but of course path segments must be URL friendly, so URL encoding is needed for these). Same holds for `path` parameter in Positions API.
+
 
 ### Note on chaptered audiofiles (.m4b and similar)
 
