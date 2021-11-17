@@ -9,7 +9,6 @@ on:
 jobs:
   audioserve-build:
     runs-on: ubuntu-20.04
-    if: ${{ needs.check_date.outputs.should_run != 'false' }}
     steps:
     - uses: actions/checkout@v2
     - name: Build image
