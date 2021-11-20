@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::audio_meta::*;
-use crate::util::{get_meta, get_modified, get_real_file_type, guess_mime_type};
 use crate::collator::Collate;
+use crate::util::{get_meta, get_modified, get_real_file_type, guess_mime_type};
 use lazy_static::lazy_static;
 use regex::Regex;
 

@@ -34,13 +34,13 @@ use crate::{
 pub mod audio_folder;
 pub mod audio_meta;
 mod cache;
+pub(crate) mod collator;
 pub mod common;
 pub mod error;
 mod legacy_pos;
 pub(crate) mod no_cache;
 pub mod position;
 pub mod util;
-pub(crate) mod collator;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const MAX_POSITIONS: usize = 1_000;
