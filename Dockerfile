@@ -6,7 +6,8 @@ ARG CARGO_ARGS
 
 RUN apk update &&\
     apk add git bash openssl openssl-dev curl yasm build-base \
-    wget libbz2 bzip2-dev  zlib zlib-dev rust cargo ffmpeg-dev ffmpeg
+    wget libbz2 bzip2-dev  zlib zlib-dev rust cargo ffmpeg-dev ffmpeg \
+    clang clang-dev gawk ctags llvm-dev icu icu-libs icu-dev
 
 COPY . /audioserve 
 WORKDIR /audioserve
@@ -38,7 +39,7 @@ COPY --from=build /ssl/audioserve.p12 /audioserve/ssl/audioserve.p12
 RUN adduser -D -u 1000 audioserve &&\
     chown -R audioserve:audioserve /audioserve &&\
     apk update &&\
-    apk add libssl1.1 taglib \
+    apk add libssl1.1 icu-libs \
     libbz2 zlib ffmpeg
 
 WORKDIR /audioserve

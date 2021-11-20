@@ -64,7 +64,7 @@ pub(crate) mod locale {
                 .or_else(|_| env::var("LANG"))
                 .unwrap_or("en_US".into());
 
-            debug!("Using locale {} for Collator", locale);
+            info!("Using locale {} for Collator", locale);
 
             let col = UCollator::try_from(locale.as_str()).expect("Cannot create UCollator");
             Collator(col)

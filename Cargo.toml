@@ -1,6 +1,6 @@
 [package]
 name = "audioserve"
-version = "0.16.4"
+version = "0.16.5"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2018"
 

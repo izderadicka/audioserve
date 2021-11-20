@@ -18,12 +18,14 @@ If you will install audioserve and make it available on Internet do not [underes
 Like audioserve and want to start quickly and easily and securely? Try [this simple guide](docs/deploy.md) to have audioserve up and running for free in no time.
 
 ## TOC
+
 - [Audioserve](#audioserve)
   - [TOC](#toc)
   - [Media Library](#media-library)
     - [Collections cache](#collections-cache)
     - [Single file audiobooks and their chapters](#single-file-audiobooks-and-their-chapters)
     - [Audio files metadata tags](#audio-files-metadata-tags)
+    - [Collation](#collation)
   - [Sharing playback positions between clients](#sharing-playback-positions-between-clients)
   - [Security](#security)
     - [TLS/SSL](#tlsssl)
@@ -74,7 +76,7 @@ By default symbolic(soft) links are not followed in the collections directory (b
 
 ### Collections cache
 
-Initially I though that everything can be just served from the file system.  However experience with the program and users feedback have revealed two major problems with this approach:
+Initially I though that everything can be just served from the file system. However experience with the program and users feedback have revealed two major problems with this approach:
 
 - for larger collections search was slow
 - for folder with many audiofiles (over couple hundred) was loading slowly (because we have to collect basic audio metadata - duration and bitrate for each file)
@@ -92,12 +94,13 @@ cat /proc/sys/fs/inotify/max_user_watches
 echo fs.inotify.max_user_watches=1048576 | sudo tee -a /etc/sysctl.conf
 sudo sysctl -p
 ```
+
 - cache is indeed binded with collection directory (hash of absolute normalized path is used as an identification for related cache) - so if you change collection directory path cache will also change (and old cache will still hang there - so some manual clean up might be needed).
-- if you do not want to cache particular collection you can add `:no-cache` option after collection directory argument. However then position sharing and metadata tags will also not work for that collection and search will be slow. 
+- if you do not want to cache particular collection you can add `:no-cache` option after collection directory argument. However then position sharing and metadata tags will also not work for that collection and search will be slow.
 
 ### Single file audiobooks and their chapters
 
-audioserve also supports single file audiobooks like  .m4b (one big file with chapters metadata) and similar (.mp3 can also contain chapters metadata). Such file is presented as a folder (with name of original file), which contains chapters as "virtual" files (chapters behaves like other audio files - can be transcoded to lower bitrates, seeked within etc.) (if you do not like this feature you can disable with `--ignore-chapters-meta` argument, I have seen some .mp3 files, which contained bad chapters metadata).
+audioserve also supports single file audiobooks like .m4b (one big file with chapters metadata) and similar (.mp3 can also contain chapters metadata). Such file is presented as a folder (with name of original file), which contains chapters as "virtual" files (chapters behaves like other audio files - can be transcoded to lower bitrates, seeked within etc.) (if you do not like this feature you can disable with `--ignore-chapters-meta` argument, I have seen some .mp3 files, which contained bad chapters metadata).
 
 Also long audiofile without chapters metadata, can be split into equaly sized parts/chapters (this has a slight disadvantage as split can be in middle of word). To enable this use `--chapters-from-duration` to set a limit, from which it should be used, and `chapters-duration` to set a duration of a part. Also for large files, which do not have chapters metadata, you can easily supply them in a separate file, with same name as the audio file but with additional extension `.chapters` - so it looks like `your_audiobook.mp3.chapters`. This file is simple CSV file (with header), where first column is chapter title, second is chapter start time, third (and last) is the chapter end time. Time is either in seconds (like `23.836`) or in `HH:MM:SS.mmm` format (like `02:35:23.386`).
 
@@ -107,7 +110,7 @@ Also note that web client will often load same part of chapter again if you're s
 
 ### Audio files metadata tags
 
-audioserve is using directory structure for navigation and searching. This is one of key design decisions and it will not change.  Main reason is because tags are just one big mess for audiobooks, everybody uses them in sligthly different way, so they are not reliable.  This was key reason why I started work on audioserve - to see my collection is the same way in which I stored it on disk. I do not want to bother with tags cleanup.
+audioserve is using directory structure for navigation and searching. This is one of key design decisions and it will not change. Main reason is because tags are just one big mess for audiobooks, everybody uses them in sligthly different way, so they are not reliable. This was key reason why I started work on audioserve - to see my collection is the same way in which I stored it on disk. I do not want to bother with tags cleanup.
 
 However with new collection cache there is possibility to scan tags and display them in web client (not yet in Android). Just for display purpose, no special functionality is related to tags.
 
@@ -115,9 +118,13 @@ It's optional you'll need to start audioserve with `--tags` or `--tags-custom` (
 
 This is the algorithm for scanning tags: tags are scanned for all files in the folder, if particular tag (like artist) is same for all files in the folder it is put on folder level, otherwise is stays with the file. For chapterized big audiofile its tags are put on folder level (virtual folder representing this file). Chapter tags are not collected (in all .m4b I saw only tag was title, which is anyhow used for chapter virtual file name).
 
+### Collation
+
+By default audioserve alphabetic order of audio files and subfolders is case insensitive "C like" collation, meaning national characters like "č" are sorted after all ASCII characters and not after "c". For more advanced collation respecting local collation additional unicode support is needed. Unfortunately Rust does not have native support for this and only working library is binding to ICU C libraries, which makes compilation bit complicated. So local/national collation audioserve has to be compiled with optional feature `collation`. Such version of audioserve will then use following env.variables to determine locale for collation (in order of precedence): `AUDIOSERVE_COLLATE`, `LC_ALL`, `LC_COLLATE`, `LANG`. If nothing is found it falls back to `en_US`, which still handles somehow national characters ("č" is equal to "c" in sorting).
+
 ## Sharing playback positions between clients
 
-Audioserve supports sharing playback positions between clients. This is basically used to continue listening on next client, from where you left audio file on previous one. It's supported in the included web client and in the recent Android client (from version 0.8). In order to enable position sharing you'll need to define 'device group' in the client (on login dialog in web client and in settings in Android client) - group is just an arbitrary name and devices within same group will share playback position. This is **not user**, as there is no such concept in audioserve,  it is just arbitrary identifier you set on several devices and they then share the playback position.
+Audioserve supports sharing playback positions between clients. This is basically used to continue listening on next client, from where you left audio file on previous one. It's supported in the included web client and in the recent Android client (from version 0.8). In order to enable position sharing you'll need to define 'device group' in the client (on login dialog in web client and in settings in Android client) - group is just an arbitrary name and devices within same group will share playback position. This is **not user**, as there is no such concept in audioserve, it is just arbitrary identifier you set on several devices and they then share the playback position.
 
 After you have several active devices with same group name, you'll be notified when you click play button and there is more recent playback position in the group and you can choose if to jump to this latest position or continue with current position. There is also option to check latest position directly (in web client it's icon in the folder header (shows something only if there if newer position then current), in Android client it's in options menu).
 
@@ -125,7 +132,7 @@ Proper functioning is (indeed) dependent on good connectivity - as position is s
 
 Position tracking is tightly connected with collection cache, so it'll not work for collection, which do not use caching (specified with `:no-cache` option). You can also backup positions to JSON file (highly recommended) for restoration in case of disk problems or for migration of audioserve - check `--positions-backup-file` and `--positions-backup-schedule` arguments of the program. Also if former argument is present you can force immediate backup by sending signal `sigusr2` to the program.
 
-Shared playback positions are behind default program feature `shared-positions`, so you can compile program without it. 
+Shared playback positions are behind default program feature `shared-positions`, so you can compile program without it.
 
 ## Security
 
@@ -133,10 +140,9 @@ Audioserve is not writing anything to your media library, so read only access is
 
 Read and **write** access is needed to data directory (`~/.audioserve` by default, but can be changed with `--data-dir` argument). This directory contains:
 
-- **server secret** - file were it keeps server secret key for authentication (by default `audioserve.secret`, but its locations can be changed by command line argument `--secret-file`) - this file should have exclusive rw access for user running audioserve (this is how file is created, so no special action is needed). 
-- **collections cache and playback positions** - are stored in key value database, separate database is created for each collection (by default in `col_db` subdirectory). Collection cache database name consists of last  segment of collection path and hash of absolute normalized collection path. 
--  **transcoding cache** - optionally, if feature `transcoding-cache` ([see below](#transcoding-cache)) is enabled (during compilation) cache directory (by default in `audioserve-cache`, can be changed by argument `--t-cache-dir`), where already transcoded audio files are stored for later reuse.
-
+- **server secret** - file were it keeps server secret key for authentication (by default `audioserve.secret`, but its locations can be changed by command line argument `--secret-file`) - this file should have exclusive rw access for user running audioserve (this is how file is created, so no special action is needed).
+- **collections cache and playback positions** - are stored in key value database, separate database is created for each collection (by default in `col_db` subdirectory). Collection cache database name consists of last segment of collection path and hash of absolute normalized collection path.
+- **transcoding cache** - optionally, if feature `transcoding-cache` ([see below](#transcoding-cache)) is enabled (during compilation) cache directory (by default in `audioserve-cache`, can be changed by argument `--t-cache-dir`), where already transcoded audio files are stored for later reuse.
 
 Authentication is done by shared secret phrase (supplied to server on command line or more securely via environment variable), which users must know. Audioserve does not have any notion of explicit named users, shared secret is all that is needed to access it (as explained above it's designed for hosting personal audio collection for one user, or group of users who trust each other fully).
 
@@ -184,17 +190,17 @@ When web client is served from different host (or port) then audioserve API then
 Audioserve is handling this with with optional `--cors` argument, which will add appropriate CORS headers to responses, thus enabling browser to accept responses from server.
 
 CORS is relevant in several scenarios:
-- during web client development, when client is served from development server (for instance `webpack serve`) on one port, say 8080,  and API is served from audioserve listening on other port, say 3000  browser CORS policies will then prevent client from communicating with audioserve server API (as they are on different posts, thus different origins), unless CORS headers are included in server responses. 
+
+- during web client development, when client is served from development server (for instance `webpack serve`) on one port, say 8080, and API is served from audioserve listening on other port, say 3000 browser CORS policies will then prevent client from communicating with audioserve server API (as they are on different posts, thus different origins), unless CORS headers are included in server responses.
 - If you are using third party client (like [audiosilo](https://github.com/KodeStar/audiosilo)), client may sit in one domain, say https://client.audiosilo.app/, and audioserve in other domain, say https://audioserve.zderadicka.eu, so again here CORS headers are required (`--cors` argument when starting audioserve). Also in this case connection **must be secure** - https://.
-- 
-Audioserve responses' CORS headers are  permissive, allowing access from all origins and with any additional headers enable any possible scenario of usage.
+- Audioserve responses' CORS headers are permissive, allowing access from all origins and with any additional headers enable any possible scenario of usage.
 
 It is important to understand that CORS is not security measure for server, but for browser only. No matter if `--cors` is added server will accept correct requests from any client.
 
 ### Security Best Practices
 
 - Always use SSL/TLS - ideally behind well proven reverse proxy (I'm using nginx) (audioserve has support for SSL/TLS, but reverse proxy is probably more solid, plus can provide additional safeguards)
-- Set solid shared secret 14+ characters   (to prevent guessing and brute force attacks), do not run on Internet with `no-authentication` - it's for testing only
+- Set solid shared secret 14+ characters (to prevent guessing and brute force attacks), do not run on Internet with `no-authentication` - it's for testing only
 - Never run audioserve as root
 - Keep audioserve updated - as I'm addressing found issues in new releases (definitely do not use versions older then v0.15.0, which addressed very important security fix)
 - in $HOME/.audoserve there are files, which are writable by server - so they should have proper permissions - especially `audioserve.secret` should be be limited to user (running audioserve) access only
@@ -209,9 +215,9 @@ It is important to understand that CORS is not security measure for server, but 
 
 Audioserve is intended to serve personal audio collections of moderate sizes. For sake of simplicity it does not provide any large scale performance optimizations. It's fine to serve couple of users from collections of couple of thousands audiobooks, if they are reasonably organized. That's it, if you're looking for solution for thousands or millions of users, look elsewhere. To compensate for this audioserve is very lightweight and by itself takes minimum of system resources.
 
-To compensate for some slow file system operations audioserve  by default is using collections cache system - see also [Collections Cache](#collections-cache) above.
+To compensate for some slow file system operations audioserve by default is using collections cache system - see also [Collections Cache](#collections-cache) above.
 
-If transcoding is used it is another significant limiting factor  - as it's quite CPU intensive. Normally you should run only a handful of transcodings in parallel, not much then 2x - 4x more then number of cores in the machine. For certain usage scenarios enabling of [transcoding cache](#transcoding-cache) can help a bit.
+If transcoding is used it is another significant limiting factor - as it's quite CPU intensive. Normally you should run only a handful of transcodings in parallel, not much then 2x - 4x more then number of cores in the machine. For certain usage scenarios enabling of [transcoding cache](#transcoding-cache) can help a bit.
 
 ### Transcoding Cache
 
@@ -287,13 +293,13 @@ On iOS default transcoding (opus+ogg) is not working - so switch transcoding off
 
 Web client is not working on MS IE (which will never be supported).
 
-## Android client        
+## Android client
 
 Android client code is [available on github](https://github.com/izderadicka/audioserve-android).
 
 ## API
 
-audioserve server provides very simple API, [defined in OAS 3](https://validator.swagger.io/?url=https://raw.githubusercontent.com/izderadicka/audioserve/master/docs/audioserve-api-v1.yaml)  (see also  [api.md](./docs/api.md) for details), 
+audioserve server provides very simple API, [defined in OAS 3](https://validator.swagger.io/?url=https://raw.githubusercontent.com/izderadicka/audioserve/master/docs/audioserve-api-v1.yaml) (see also [api.md](./docs/api.md) for details),
 so it's easy to write your own clients.
 
 ## Installation
@@ -324,31 +330,32 @@ A more realistic docker example (audioserve is an entry point to this container,
         izderadicka/audioserve \
         --tags \
         --behind-proxy \
-	    --transcoding-max-parallel-processes 24 \
+        --transcoding-max-parallel-processes 24 \
         --positions-backup-file /home/audioserve/positions-backup.json \
         --positions-backup-schedule "0 3 * * *" \
         /collection1 /collection2
 
 In the above example, we are adding two different collections of audiobooks (collection1 and collection2).
 Both are made available to the container via `-v` option and then passed to audioserve on command line.
-Also we have mapped with `-v` some folder to `/home/audioserve/.audioserve`, where runtime data of audioserve are stored (server secret, caches ...). For production it's **essential** to map this volume either to host directory or to named volume. 
+Also we have mapped with `-v` some folder to `/home/audioserve/.audioserve`, where runtime data of audioserve are stored (server secret, caches ...). For production it's **essential** to map this volume either to host directory or to named volume.
 
 We set the shared secret via `AUDIOSERVE_SHARED_SECRET` env.variable and also set couple of other arguments:
-- `--tags`  to scan and cache common metadata tags.
+
+- `--tags` to scan and cache common metadata tags.
 - `behind-proxy` just improves logging - logs real client IP address if audioserve is behind reverse proxy
-- `--transcoding-max-parallel-processes`  increases a bit number of parallel transcoding allowed
+- `--transcoding-max-parallel-processes` increases a bit number of parallel transcoding allowed
 - `--positions-backup-file` and `--positions-backup-schedule` backs up playback positions to open, transferrable JSON file
 
 #### Running audioserve in Docker as different user
 
-By default audioserve is running as user uid 1000,  which is fine in many use cases (uid 1000 is default primary user on Debian, Ubuntu, Alpine linux, but for instance not on CentOS or RHEL). 
+By default audioserve is running as user uid 1000, which is fine in many use cases (uid 1000 is default primary user on Debian, Ubuntu, Alpine linux, but for instance not on CentOS or RHEL).
 But sometimes you'd like to run audioserve as different user (say uid 1234), for this you must:
-- run docker with  `--user 1234`
+
+- run docker with `--user 1234`
 - assure that uid 1234 has read access to your collection folder (others have r access to files and rx to directories)
 - create directory with read and write access for uid 1234 (or optionally use named volume)
 - map that directory as volume to docker `-v /my/audioserve/data-dir:/audioserve-data`
-- and add this argument  to audioserve `--data-dir /audioserve-data`
-
+- and add this argument to audioserve `--data-dir /audioserve-data`
 
 #### Docker Compose Example
 
@@ -407,7 +414,7 @@ Build client in its directory (`cd client`):
 
 ### Other platforms
 
-Linux is the only officially supported platform.  It can theoretically work on other platforms (win, MacOS), but it might require some changes in build process and probably also small changes in code. A contributor tried [build for windows](docs/windows-build.md) with partial success, so you can checked that.
+Linux is the only officially supported platform. It can theoretically work on other platforms (win, MacOS), but it might require some changes in build process and probably also small changes in code. A contributor tried [build for windows](docs/windows-build.md) with partial success, so you can checked that.
 
 Any help in this area is welcomed.
 
@@ -424,11 +431,12 @@ To add non-default features (like `transcoding-cache`) compile with this option 
 | symlinks                    | Enables to use symbolic links in media folders                                                                                     |   Yes   | Use --allow-symlinks to follow symbolic links                                                                    |
 | folder-download             | Enables API endpoint to download content of a folder in tar archive                                                                |   Yes   | Can be disabled with argument --disable-folder-download                                                          |
 | shared-positions            | Clients can share recent playback positions via simple websocket API                                                               |   Yes   |
-| behind-proxy                | Enable logging of client address from proxy headers                                                                                |   yes    | Enables argument --behind-proxy which should be use to log client address from headers provided by reverse proxy |
+| behind-proxy                | Enable logging of client address from proxy headers                                                                                |   yes   | Enables argument --behind-proxy which should be use to log client address from headers provided by reverse proxy |
 | transcoding-cache           | Cache to save transcoded files for fast next use                                                                                   |   No    | Can be disabled by --t-cache-disable and modified by --t-cache-dir --t-cache-size --t-cache-max-files            |
 | static                      | Enables fully static build of audioserve. Check above notes for static build                                                       |   No    |
 | partially-static            | Statically links libavformat (and related).Enables to run audioserve on systems, which do not have required version of libavformat |   No    |
 | folder-download-default-tar | Default folder download format is tar (instead of zip)                                                                             |   No    |
+| collation                   | Supports locale collation                                                                                                          |   No    | Env. variables AUDIOSERVE_COLLATE, LC_ALL, LC_COLLATE, LANG determine locale used                                |
 
 ## License
 
