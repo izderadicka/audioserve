@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use super::audio_meta::*;
 use crate::util::{get_meta, get_modified, get_real_file_type, guess_mime_type};
+use crate::collator::Collate;
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -267,7 +268,7 @@ impl FolderLister {
                         }
                     }
                 } else {
-                    files.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+                    files.sort_unstable_by(|a, b| a.collate(b));
                     tags = extract_folder_tags(&mut files);
                     subfolders.sort_unstable_by(|a, b| a.compare_as(ordering, b));
                 }

@@ -76,7 +76,7 @@ dependencies = [
  "csv",
  "data-encoding",
  "dirs",
- "env_logger",
+ "env_logger 0.9.0",
  "escargot",
  "futures",
  "headers",
@@ -127,6 +127,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "bindgen"
+version = "0.53.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c72a978d268b1d70b0e963217e60fdabd9523a941457a6c42a7315d15c7e89e5"
+dependencies = [
+ "bitflags",
+ "cexpr",
+ "cfg-if 0.1.10",
+ "clang-sys",
+ "clap",
+ "env_logger 0.7.1",
+ "lazy_static",
+ "lazycell",
+ "log",
+ "peeking_take_while",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash",
+ "shlex",
+ "which",
 ]
 
 [[package]]
@@ -187,7 +211,7 @@ dependencies = [
  "bit-vec",
  "derive_builder",
  "ego-tree",
- "env_logger",
+ "env_logger 0.9.0",
  "log",
  "notify",
 ]
@@ -199,6 +223,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79c2681d6594606957bbb8631c4b90a7fcaaa72cdb714743a437b156d6a7eedd"
 dependencies = [
  "jobserver",
+]
+
+[[package]]
+name = "cexpr"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4aedb84272dbe89af497cf81375129abda4fc0a9e7c5d317498c15cc30c0d27"
+dependencies = [
+ "nom 5.1.2",
 ]
 
 [[package]]
@@ -227,6 +260,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "clang-sys"
+version = "0.29.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe6837df1d5cba2397b835c8530f51723267e16abbf83892e9e5af4f0e5dd10a"
+dependencies = [
+ "glob",
+ "libc",
+ "libloading",
+]
+
+[[package]]
 name = "clap"
 version = "2.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -250,7 +294,7 @@ dependencies = [
  "crossbeam-channel",
  "csv",
  "enum_dispatch",
- "env_logger",
+ "env_logger 0.9.0",
  "fs_extra",
  "lazy_static",
  "log",
@@ -259,6 +303,7 @@ dependencies = [
  "notify",
  "regex",
  "ring",
+ "rust_icu_ucol",
  "serde",
  "serde_derive",
  "serde_json",
@@ -506,12 +551,25 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44533bbbb3bb3c1fa17d9f2e4e38bbbaf8396ba82193c4cb1b6445d711445d36"
+dependencies = [
+ "atty",
+ "humantime 1.3.0",
+ "log",
+ "regex",
+ "termcolor",
+]
+
+[[package]]
+name = "env_logger"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b2cf0344971ee6c64c31be0d530793fba457d322dfec2810c453d0ef228f9c3"
 dependencies = [
  "atty",
- "humantime",
+ "humantime 2.1.0",
  "log",
  "regex",
  "termcolor",
@@ -754,6 +812,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "glob"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
+
+[[package]]
 name = "h2"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -845,6 +909,15 @@ name = "httpdate"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6456b8a6c8f33fee7d958fcd1b60d55b11940a79e63ae87013e6d22e26034440"
+
+[[package]]
+name = "humantime"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df004cfca50ef23c36850aaaa59ad52cc70d0e90243c3c7737a4dd32dc7a3c4f"
+dependencies = [
+ "quick-error",
+]
 
 [[package]]
 name = "humantime"
@@ -1010,7 +1083,7 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 name = "leaky-cauldron"
 version = "0.1.0"
 dependencies = [
- "env_logger",
+ "env_logger 0.9.0",
  "futures",
  "log",
  "tokio",
@@ -1021,6 +1094,16 @@ name = "libc"
 version = "0.2.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a60553f9a9e039a333b4e9b20573b9e9b9c0bb3a11e201ccc48ef4283456d673"
+
+[[package]]
+name = "libloading"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2b111a074963af1d37a139918ac6d49ad1d0d5e47f72fd55388619691a7d753"
+dependencies = [
+ "cc",
+ "winapi 0.3.9",
+]
 
 [[package]]
 name = "linked-hash-map"
@@ -1223,6 +1306,16 @@ dependencies = [
 
 [[package]]
 name = "nom"
+version = "5.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffb4262d26ed83a1c0a33a38fe2bb15797329c85770da05e6b828ddb782627af"
+dependencies = [
+ "memchr",
+ "version_check",
+]
+
+[[package]]
+name = "nom"
 version = "7.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b1d11e1ef389c76fe5b81bcaf2ea32cf88b62bc494e19f493d0b30e7a930109"
@@ -1359,6 +1452,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "paste"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0744126afe1a6dd7f394cb50a716dbe086cb06e255e53d8d0185d82828358fb5"
+
+[[package]]
+name = "peeking_take_while"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
+
+[[package]]
 name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1433,13 +1538,19 @@ dependencies = [
 name = "proxy-headers"
 version = "0.1.0"
 dependencies = [
- "env_logger",
+ "env_logger 0.9.0",
  "headers",
  "http",
  "lazy_static",
  "log",
  "nom 7.1.0",
 ]
+
+[[package]]
+name = "quick-error"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quote"
@@ -1629,6 +1740,74 @@ dependencies = [
 ]
 
 [[package]]
+name = "rust_icu_common"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68dc162ee5e465ecc6c076efa732a19f25226e024453adcf64bdc760cb2349c3"
+dependencies = [
+ "anyhow",
+ "rust_icu_sys",
+ "thiserror",
+]
+
+[[package]]
+name = "rust_icu_sys"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00b8180bf8c56d9c38ca852b0381d41c500605101f47afc1e36a2f9c8d0b902a"
+dependencies = [
+ "anyhow",
+ "bindgen",
+ "lazy_static",
+ "libc",
+ "paste",
+]
+
+[[package]]
+name = "rust_icu_ucol"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33f8533a071573d93b9763427c3aef2a84cd8f96986d334b76ab00a6cef7cfce"
+dependencies = [
+ "anyhow",
+ "log",
+ "paste",
+ "rust_icu_common",
+ "rust_icu_sys",
+ "rust_icu_uenum",
+ "rust_icu_ustring",
+]
+
+[[package]]
+name = "rust_icu_uenum"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2daf1c47fc9a001730fcf9e37a866ac293eb78db323cf83e12ade6526b3a502e"
+dependencies = [
+ "paste",
+ "rust_icu_common",
+ "rust_icu_sys",
+]
+
+[[package]]
+name = "rust_icu_ustring"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8512bba1446e148856207a5fe5bbab4fc75fa78b26f204ba9bf19892012a750a"
+dependencies = [
+ "log",
+ "paste",
+ "rust_icu_common",
+ "rust_icu_sys",
+]
+
+[[package]]
+name = "rustc-hash"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
+
+[[package]]
 name = "ryu"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1760,6 +1939,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "shlex"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fdf1b9db47230893d76faad238fd6097fd6d6a9245cd7a4d90dbd639536bbd2"
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1774,7 +1959,7 @@ version = "0.2.2"
 dependencies = [
  "byteorder",
  "data-encoding",
- "env_logger",
+ "env_logger 0.9.0",
  "linked-hash-map 0.5.4",
  "log",
  "rand 0.8.4",
@@ -2269,7 +2454,7 @@ dependencies = [
 name = "websock"
 version = "0.3.0"
 dependencies = [
- "env_logger",
+ "env_logger 0.9.0",
  "futures",
  "headers",
  "hyper",
@@ -2277,6 +2462,15 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-tungstenite",
+]
+
+[[package]]
+name = "which"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d011071ae14a2f6671d0b74080ae0cd8ebf3a6f8c9589a2cd45f23126fe29724"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

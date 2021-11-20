@@ -1,3 +1,4 @@
+use crate::collator::Collate;
 use crate::error::{Error, Result};
 use crate::position::PositionShort;
 use crate::util::{get_file_name, get_modified, guess_mime_type};
@@ -190,7 +191,7 @@ impl AudioFolderShort {
 
     pub fn compare_as(&self, ord: FoldersOrdering, other: &Self) -> Ordering {
         match ord {
-            FoldersOrdering::Alphabetical => self.name.cmp(&other.name),
+            FoldersOrdering::Alphabetical => self.collate(other),
             FoldersOrdering::RecentFirst => match (self.modified, other.modified) {
                 (Some(ref a), Some(ref b)) => b.cmp(a),
                 (Some(_), None) => Ordering::Less,

@@ -71,6 +71,7 @@ transcoding-cache=["simple-file-cache", "tokio-util"]
 # for static compilation only
 partially-static = ["collection/partially-static"]
 static = ["collection/static"]
+collation = ["collection/collation"]
 
 
 

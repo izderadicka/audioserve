@@ -40,6 +40,7 @@ mod legacy_pos;
 pub(crate) mod no_cache;
 pub mod position;
 pub mod util;
+pub(crate) mod collator;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const MAX_POSITIONS: usize = 1_000;
