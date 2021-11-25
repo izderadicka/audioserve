@@ -6,7 +6,8 @@ ENV FEATURES=""
 RUN apk update &&\
     apk upgrade &&\
     apk add git bash curl yasm build-base openssl-dev openssl-libs-static\
-    wget zlib-dev zlib-static bzip2-static bzip2-dev rustup npm &&\
+    wget zlib-dev zlib-static bzip2-static bzip2-dev rustup npm \
+    clang clang-dev gawk ctags llvm-dev icu icu-libs icu-dev icu-static clang-static &&\
     rustup-init -y &&\
     chmod -R 0777 /root &&\
     mkdir /src &&\

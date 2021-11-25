@@ -9,7 +9,6 @@ use error::{Error, Result};
 use legacy_pos::LegacyPositions;
 use no_cache::CollectionDirect;
 use serde_json::{Map, Value};
-#[cfg(feature = "async")]
 use std::sync::Arc;
 use std::{
     collections::HashMap,
