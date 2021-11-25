@@ -7,9 +7,9 @@
 
 **Version 0.16 brings a LOT of changes, so I recommend to read README even for existing users**
 
-Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalistic design.
+Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalist design.
 
-Server is written in Rust, default web client (HTML5 + Javascript) is intended for modern browsers (latest Firefox or Chrome) and is integrated with the server. There is also [Android client](https://github.com/izderadicka/audioserve-android) and API for custom clients.
+Server is written in Rust, default web client (HTML5 + Javascript) is intended for modern browsers (latest Firefox or Chrome) and is integrated with the server. There is also [Android client](https://github.com/izderadicka/audioserve-android) and [simple API](docs/api.md) for custom clients.
 
 For some background and video demo check this article(bit old but gives main motivation behind it) [Audioserve Audiobooks Server - Stupidly Simple or Simply Stupid?](http://zderadicka.eu/audioserve-audiobooks-server-stupidly-simple-or-simply-stupid)
 
@@ -436,7 +436,7 @@ To add non-default features (like `transcoding-cache`) compile with this option 
 | static                      | Enables fully static build of audioserve. Check above notes for static build                                                       |   No    |
 | partially-static            | Statically links libavformat (and related).Enables to run audioserve on systems, which do not have required version of libavformat |   No    |
 | folder-download-default-tar | Default folder download format is tar (instead of zip)                                                                             |   No    |
-| collation                   | Supports locale collation                                                                                                          |   No    | Env. variables AUDIOSERVE_COLLATE, LC_ALL, LC_COLLATE, LANG determine locale used                                |
+| collation                   | Supports locale collation (does not work with static build now)                                                                    |   No    | Env. variables AUDIOSERVE_COLLATE, LC_ALL, LC_COLLATE, LANG determine locale used                                |
 
 ## License
 

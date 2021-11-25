@@ -1,22 +1,20 @@
 audioserve API
 ==============
 
-audioserve API is simple HTTP REST like API with mostly JSON loads. 
-For updating/querying recent playback positions WebSocket connection is used with simple text based messages. Recently there is also REST API for playback positions.
+audioserve API is simple HTTP REST  API with (mostly) JSON loads. For efficient playback positions updates you can 
+use text based [web socket API](#websocket-playback-position-api), but there is also convenient [REST API for last positions update/query](#positions-api).
 
 REST API
 --------
-Rest API for audioserve is defined in [OpenAPI 3 specification](audioserve-api-v1.yaml) **work in progress**
+Rest API for audioserve is defined in [OpenAPI 3 Specification](audioserve-api-v1.yaml).
 
 You can also see [specification in Swagger UI](https://validator.swagger.io/?url=https://raw.githubusercontent.com/izderadicka/audioserve/master/docs/audioserve-api-v1.yaml). You can use it also test API on demo instance of audioserve:
 - Choose "https://audioserve.zderadicka.eu" server
 - Expand Authentication POST endpoint, and click on "Try it out" button.
 - use sample secret provided and click big blue "Execute" button
 - you should get success 200 response with token in response body,  copy it
-- and client green "Authorize" button on top of the page,  paste token there and client "Auhorize" and then "Close" buttons
+- and client green "Authorize" button on top of the page,  paste token there and client "Authorize" and then "Close" buttons
 - now you should be able to test other API endpoints, which require authorization
-
-Sections below is bit outdated and will be updated after OpenAPI definition is finished.
 
 
 Authentication API
@@ -33,7 +31,8 @@ Token is received from server when client proves knowledge of shared secret. For
 Collections API
 ----------------
 
-API is described in [OAS3 yaml file](audioserve-api-v1.yaml). 
+Here are some additional information, that cannot be included in [OAS3 Specification](audioserve-api-v1.yaml).
+
 Some endpoints are specific for given collection - so their path starts with parameter `col_id`.  
 Actually for historical reasons this parameter is optional and collection 0 is then default, however it's now recommended to be explicit.
 
@@ -59,7 +58,7 @@ There is also alternative form of path when containing directory is collapsed/sk
 Positions API
 -------------
 
-Positions API is also described in [OAS3 yaml file](audioserve-api-v1.yaml),  it's REST API, which enables to store last playback position per folder and per group (concept of sharing position with a group was explained in [main README](../README.md) or below).
+Positions API is also described in [OAS3 yaml file](audioserve-api-v1.yaml),  it's REST API, which enables to store and query last playback position per folder and per group (concept of sharing position with a group was explained in [main README](../README.md) or below).
 
 There is also alternative (older) API using websocket and combination of custom text messages and JSON.  Main advantage of old API is it's wire efficiency, only few bytes are transferred for each position update. This older API is used in current clients.
 
