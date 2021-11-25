@@ -20,12 +20,12 @@ You can also see [specification in Swagger UI](https://validator.swagger.io/?url
 Authentication API
 ------------------
 
-A token is used for authentication, the token can be used as cookie with key `audioserve_token` 
+A token is used for authentication, the token can be used as cookie with key `audioserve_token` name
 or as HTTP header `Authorization: Bearer token_value`.  Token is signed by server secret key and contains
-maximum validity time (token validity period can be set on the audioserve server) . If no or invalid token is provided
-API endpoints return `401 Unauthorised` HTTP response code.
+maximum validity time (token validity period can be set on the audioserve server). 
+If no or invalid token is provided API endpoints return `401 Unauthorised` HTTP response code.
 
-Token is received from server when client proves knowledge of shared secret. For this api endpoint `authenticate` is available.
+Token is received from server when client proves knowledge of shared secret. For this api endpoint `authenticate` is available. For details see also [OAS3 endpoint /authenticate](audioserve-api-v1.yaml).
 
 
 Collections API
