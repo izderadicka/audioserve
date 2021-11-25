@@ -235,7 +235,7 @@ impl Collections {
         res
     }
 
-    pub fn force_rescan(self: Arc<Self>) {
+    pub fn force_rescan(self: std::sync::Arc<Self>) {
         self.caches.iter().for_each(|c| c.signal_rescan())
     }
 
