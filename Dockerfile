@@ -1,3 +1,5 @@
+ARG CARGO_ARGS
+
 FROM alpine:3.14 AS build
 LABEL maintainer="Ivan <ivan@zderadicka.eu>"
 
@@ -31,6 +33,7 @@ RUN cd audioserve_client &&\
 
 FROM alpine:3.14
 
+ARG CARGO_ARGS
 VOLUME /audiobooks
 COPY --from=build /audioserve/target/release/audioserve /audioserve/audioserve
 COPY --from=client /audioserve_client/dist /audioserve/client/dist
@@ -38,9 +41,8 @@ COPY --from=build /ssl/audioserve.p12 /audioserve/ssl/audioserve.p12
 
 RUN adduser -D -u 1000 audioserve &&\
     chown -R audioserve:audioserve /audioserve &&\
-    apk update &&\
-    apk add libssl1.1 icu-libs \
-    libbz2 zlib ffmpeg
+    apk --no-cache add libssl1.1 libbz2 zlib ffmpeg && \
+    if [[ "$CARGO_ARGS" =~ "collation" ]]; then apk --no-cache add icu-libs; fi
 
 WORKDIR /audioserve
 USER audioserve
