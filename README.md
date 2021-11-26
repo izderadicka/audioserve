@@ -316,7 +316,7 @@ There is also `izderadicka/audioserve:unstable` image, which is automatically bu
 
     docker build --tag audioserve .
 
-When building docker image you can use `--build-arg CARGO_ARGS=` to modify cargo build command and to add/or remove features (see below for details). For instance this command will build audioserve with transcoding cache `docker build --tag audioserve --build-arg CARGO_ARGS="--features transcoding-cache" .`
+When building docker image you can use `--build-arg CARGO_ARGS=` to modify cargo build command and to add/or remove features (see below for details). For instance this command will build audioserve with transcoding cache `docker build --tag audioserve --build-arg CARGO_ARGS="--features transcoding-cache" .` If you want to build a debug version supply this build argument `--build-arg CARGO_RELEASE=""`.
 
 There is also one additional env. variable `PORT` - TCP port on which audioserve serves http(s) requests (defaults to: 3000) - this is useful for services like Heroku, where container must accept PORT variable from the service.
 

@@ -1,10 +1,11 @@
 ARG CARGO_ARGS
+ARG CARGO_RELEASE="release"
 
 FROM alpine:3.14 AS build
 LABEL maintainer="Ivan <ivan@zderadicka.eu>"
 
 ARG CARGO_ARGS
-
+ARG CARGO_RELEASE
 
 RUN apk update &&\
     apk add git bash openssl openssl-dev curl yasm build-base \
@@ -14,8 +15,10 @@ RUN apk update &&\
 COPY . /audioserve 
 WORKDIR /audioserve
 
-RUN cargo build --release ${CARGO_ARGS} &&\
-    cargo test --release --all ${CARGO_ARGS}
+RUN if [[ -n "$CARGO_RELEASE" ]]; then CARGO_RELEASE="--$CARGO_RELEASE"; fi && \
+    echo BUILDING: cargo build ${CARGO_RELEASE} ${CARGO_ARGS} && \
+    cargo build ${CARGO_RELEASE} ${CARGO_ARGS} &&\
+    cargo test ${CARGO_RELEASE} --all ${CARGO_ARGS}
 
 RUN mkdir /ssl &&\
     cd /ssl &&\
@@ -34,8 +37,10 @@ RUN cd audioserve_client &&\
 FROM alpine:3.14
 
 ARG CARGO_ARGS
+ARG CARGO_RELEASE
+
 VOLUME /audiobooks
-COPY --from=build /audioserve/target/release/audioserve /audioserve/audioserve
+COPY --from=build /audioserve/target/${CARGO_RELEASE:-debug}/audioserve /audioserve/audioserve
 COPY --from=client /audioserve_client/dist /audioserve/client/dist
 COPY --from=build /ssl/audioserve.p12 /audioserve/ssl/audioserve.p12
 
