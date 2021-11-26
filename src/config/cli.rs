@@ -4,13 +4,13 @@ use collection::tags::{ALLOWED_TAGS, BASIC_TAGS};
 
 use super::validators::*;
 use super::*;
-use clap::{crate_authors, crate_name, crate_version, App, Arg};
+use clap::{crate_authors, crate_name, App, Arg};
 
 type Parser<'a> = App<'a, 'a>;
 
 fn create_parser<'a>() -> Parser<'a> {
     let mut parser = App::new(crate_name!())
-        .version(crate_version!())
+        .version(LONG_VERSION)
         .author(crate_authors!())
         .arg(Arg::with_name("config")
             .short("g")
@@ -20,9 +20,13 @@ fn create_parser<'a>() -> Parser<'a> {
             .validator_os(is_existing_file)
             .help("Configuration file in YAML format")
             )
+        .arg(Arg::with_name("features")
+            .long("features")
+            .help("Prints features, with which program is compiled and exits")
+            )
         .arg(Arg::with_name("print-config")
             .long("print-config")
-            .help("Will print current config, with all other options to stdout, usefull for creating config file")
+            .help("Will print current config, with all other options to stdout, useful for creating config file")
             )
         .arg(Arg::with_name("data-dir")
             .long("data-dir")
@@ -345,6 +349,11 @@ where
 
     if args.is_present("help-tags") {
         print_tags_help();
+        exit(0);
+    }
+
+    if args.is_present("features") {
+        println!("{}", FEATURES);
         exit(0);
     }
 

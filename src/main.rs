@@ -295,7 +295,16 @@ fn main() -> anyhow::Result<()> {
         return Err(Error::msg(format!("Config/Arguments error: {}", e)));
     };
     env_logger::init();
-    debug!("Started with following config {:?}", get_config());
+    info!(
+        "Started audioserve {} with features {}",
+        config::LONG_VERSION,
+        config::FEATURES
+    );
+    if log_enabled!(log::Level::Debug) {
+        let mut cfg = get_config().clone();
+        cfg.shared_secret = cfg.shared_secret.map(|_| "******".to_string()); // Do not want to write secret to log!
+        debug!("Started with following config {:?}", cfg);
+    }
 
     collection::init_media_lib();
 

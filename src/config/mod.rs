@@ -17,6 +17,9 @@ mod error;
 
 static mut CONFIG: Option<Config> = None;
 
+pub const LONG_VERSION: &str = env!("AUDIOSERVE_LONG_VERSION");
+pub const FEATURES: &str = env!("AUDIOSERVE_FEATURES");
+
 // CONFIG is assured to be inited only once from main thread
 pub fn get_config() -> &'static Config {
     unsafe { CONFIG.as_ref().expect("Config is not initialized") }
