@@ -436,7 +436,7 @@ To add non-default features (like `transcoding-cache`) compile with this option 
 | static                      | Enables fully static build of audioserve. Check above notes for static build                                                       |   No    |
 | partially-static            | Statically links libavformat (and related).Enables to run audioserve on systems, which do not have required version of libavformat |   No    |
 | folder-download-default-tar | Default folder download format is tar (instead of zip)                                                                             |   No    |
-| collation                   | Supports locale collation (does not work with static build now)                                                                    |   No    | Env. variables AUDIOSERVE_COLLATE, LC_ALL, LC_COLLATE, LANG determine locale used                                |
+| collation or collation-static              | Supports locale collation (for static build second option must be used!)                                                                    |   No    | Env. variables AUDIOSERVE_COLLATE, LC_ALL, LC_COLLATE, LANG determine locale used                                |
 
 ## License
 

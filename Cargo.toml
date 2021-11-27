@@ -72,7 +72,7 @@ transcoding-cache=["simple-file-cache", "tokio-util"]
 partially-static = ["collection/partially-static"]
 static = ["collection/static"]
 collation = ["collection/collation"]
-
+collation-static = ["collection/collation-static"]
 
 
 

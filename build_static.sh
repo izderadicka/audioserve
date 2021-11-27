@@ -11,5 +11,6 @@ if [[ -n "$CARGO_ARGS" ]]; then
 fi
 
 docker build --tag audioserve-builder -f Dockerfile.static .
-# if repeated build are done it can be made faster by mapping volumes to /.cargo and /.npm
-docker run -i --rm -v $(pwd):/src -u $(id -u) $OPTS_ARGS audioserve-builder
+# if repeated build are done it can be made faster by mapping volumes to root/.cargo and root/.npm
+docker run -i --rm -v $(pwd):/src -u $(id -u) --mount type=volume,src=audioserve_static_build_cargo,dst=/root/.cargo \
+$OPTS_ARGS audioserve-builder
