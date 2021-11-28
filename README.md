@@ -5,7 +5,7 @@
 
 [ [**DEMO AVAILABLE** - shared secret: mypass] ](https://audioserve.zderadicka.eu)
 
-**Version 0.16 brings a LOT of changes, so I recommend to read README even for existing users**
+**Version 0.16 brings a LOT of changes, so I recommend to read README even for existing users, especially for Docker installation it is ESSENTIAL to map host_directory or named volume to audioserve --data_dir (defaults to /home/audioserve/.audioserve)**
 
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalist design.
 
@@ -79,9 +79,9 @@ By default symbolic(soft) links are not followed in the collections directory (b
 Initially I though that everything can be just served from the file system. However experience with the program and users feedback have revealed two major problems with this approach:
 
 - for larger collections search was slow
-- for folder with many audiofiles (over couple hundred) was loading slowly (because we have to collect basic audio metadata - duration and bitrate for each file)
+- a folder with many audiofiles (over couple hundred) was loading slowly (because we have to collect basic audio metadata - duration and bitrate for each file)
 
-So I implemented caching of collection data into embeded key-value database (using [sled](https://github.com/spacejam/sled)). I'm quite happy with it now, it really makes audioserve **superfast**.
+So I implemented caching of collection data into embedded key-value database (using [sled](https://github.com/spacejam/sled)). I'm quite happy with it now, it really makes audioserve **superfast**.
 
 However it brings bit more complexity into the program. Here are main things to consider:
 
@@ -95,7 +95,7 @@ echo fs.inotify.max_user_watches=1048576 | sudo tee -a /etc/sysctl.conf
 sudo sysctl -p
 ```
 
-- cache is indeed binded with collection directory (hash of absolute normalized path is used as an identification for related cache) - so if you change collection directory path cache will also change (and old cache will still hang there - so some manual clean up might be needed).
+- cache is indeed bound with collection directory (hash of absolute normalized path is used as an identification for related cache) - so if you change collection directory path cache will also change (and old cache will still hang there - so some manual clean up might be needed).
 - if you do not want to cache particular collection you can add `:no-cache` option after collection directory argument. However then position sharing and metadata tags will also not work for that collection and search will be slow.
 
 ### Single file audiobooks and their chapters
@@ -299,8 +299,7 @@ Android client code is [available on github](https://github.com/izderadicka/audi
 
 ## API
 
-audioserve server provides very simple API, [defined in OAS 3](https://validator.swagger.io/?url=https://raw.githubusercontent.com/izderadicka/audioserve/master/docs/audioserve-api-v1.yaml) (see also [api.md](./docs/api.md) for details),
-so it's easy to write your own clients.
+audioserve server provides very simple API, [defined in OAS 3](https://validator.swagger.io/?url=https://raw.githubusercontent.com/izderadicka/audioserve/master/docs/audioserve-api-v1.yaml) (see also [api.md](./docs/api.md) for details), so it's easy to write your own clients.
 
 ## Installation
 
@@ -310,17 +309,17 @@ Easiest way how to test audioserve (but do not use `--no-authentication` in prod
 
     docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve --no-authentication /audiobooks
 
-Then open <http://localhost:3000> - and browse your collection. This is indeed the very minimal configuration of audioserve and **should not be used in production**. For real deployment you'd like provide provide more command line arguments (or environment variables or your custom config file) - see more complex example below.
+Then open <http://localhost:3000> - and browse your collection. This is indeed the very minimal configuration of audioserve and **should not be used in production**. For real deployment you'd like provide provide more command line arguments (or environment variables or your custom config file) and it's **essential** to map persistent volume or bind writable host directory to audioserve data-dir (defaulted to /home/audioserve/.audioserve or can be set via `--data-dir` argument) - see more complex example below.
 
 There is also `izderadicka/audioserve:unstable` image, which is automatically built overnight from current master branch (so it contains latest features, but may have some issues). And of course you can build your own image very easily with provided `Dockerfile`, just run:
 
     docker build --tag audioserve .
 
-When building docker image you can use `--build-arg CARGO_ARGS=` to modify cargo build command and to add/or remove features (see below for details). For instance this command will build audioserve with transcoding cache `docker build --tag audioserve --build-arg CARGO_ARGS="--features transcoding-cache" .` If you want to build a debug version supply this build argument `--build-arg CARGO_RELEASE=""`.
+When building docker image you can use `--build-arg CARGO_ARGS=` to modify cargo build command and to add/or remove features (see [below](#compiling-without-default-features-or-with-non-default-features) for details). For instance this command will build audioserve with transcoding cache `docker build --tag audioserve --build-arg CARGO_ARGS="--features transcoding-cache" .` If you want to build a debug version supply this build argument `--build-arg CARGO_RELEASE=""`.
 
 There is also one additional env. variable `PORT` - TCP port on which audioserve serves http(s) requests (defaults to: 3000) - this is useful for services like Heroku, where container must accept PORT variable from the service.
 
-A more realistic docker example (audioserve is an entry point to this container, so you can use all command line arguments of the program, to get help for the program run this command `docker run -it --rm izderadicka/audioserve --help`):
+A more realistic docker example (audioserve executable is an entry point to this container, so you can use all command line arguments of the program, to get help for the program run this command `docker run -it --rm izderadicka/audioserve --help`):
 
     docker run -d --name audioserve -p 3000:3000 \
         -v /path/to/your/audiobooks1:/collection1 \
@@ -331,13 +330,13 @@ A more realistic docker example (audioserve is an entry point to this container,
         --tags \
         --behind-proxy \
         --transcoding-max-parallel-processes 24 \
-        --positions-backup-file /home/audioserve/positions-backup.json \
+        --positions-backup-file /home/audioserve/.audioserve/positions-backup.json \
         --positions-backup-schedule "0 3 * * *" \
         /collection1 /collection2
 
 In the above example, we are adding two different collections of audiobooks (collection1 and collection2).
 Both are made available to the container via `-v` option and then passed to audioserve on command line.
-Also we have mapped with `-v` some folder to `/home/audioserve/.audioserve`, where runtime data of audioserve are stored (server secret, caches ...). For production it's **essential** to map this volume either to host directory or to named volume.
+Also we have mapped with `-v` some folder to `/home/audioserve/.audioserve`, where runtime data of audioserve are stored (server secret, caches ...). For production it's **essential** to map this volume either to host directory (which must have read and write permissions for audioserve user, id 1000 by default) or to named volume.
 
 We set the shared secret via `AUDIOSERVE_SHARED_SECRET` env.variable and also set couple of other arguments:
 
@@ -391,9 +390,11 @@ Now audioserve depends on ffmpeg's libavformat 4.3 (and its dependent libavutil 
 
 Install required dependencies (some dependencies are optional, depending on features chosen in build):
 
-    # Ubuntu - for other distros look for equivalent packages
-    sudo apt-get install -y  openssl libssl-dev pkg-config\
-        ffmpeg yasm build-essential wget libbz2-dev zlib1g-dev libavformat-dev
+    # Ubuntu 20.04 - for other distros look for equivalent packages
+    sudo apt-get install -y  git openssl libssl-dev pkg-config \
+        ffmpeg yasm build-essential curl wget libbz2-dev zlib1g-dev libavformat-dev \
+        clang coreutils exuberant-ctags gawk  libclang-dev llvm-dev strace libicu-dev
+
 
 Clone repo with:
 
