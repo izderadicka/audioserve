@@ -5,7 +5,7 @@ use crate::util::ResponseBuilderExt;
 use data_encoding::BASE64;
 use futures::{future, prelude::*};
 use headers::authorization::Bearer;
-use headers::{Authorization, ContentLength, ContentType, Cookie, HeaderMapExt};
+use headers::{Authorization, ContentLength, ContentType, Cookie, HeaderMapExt, HeaderValue};
 use hyper::header::SET_COOKIE;
 use hyper::{Body, Method, Response};
 use ring::rand::{SecureRandom, SystemRandom};
@@ -64,13 +64,46 @@ impl SharedSecretAuthenticator {
 }
 
 const COOKIE_NAME: &str = "audioserve_token";
+const COOKIE_DURATION: u32 = 10 * 365 * 24 * 3600;
+const COOKIE_DELETE_DATE: &str = "Thu, 01 Jan 1970 00:00:00 GMT";
+
+fn deny(req: &RequestWrapper) -> Result<AuthResult<()>> {
+    let mut resp = resp::deny();
+
+    // delete cookie, if it was send in request
+
+    if req
+        .headers()
+        .typed_get::<Cookie>()
+        .map(|c| c.get(COOKIE_NAME).is_some())
+        .unwrap_or(false)
+    {
+        resp.headers_mut().append(
+            SET_COOKIE,
+            HeaderValue::from_str(&format!(
+                "{}=; Expires={}; {}",
+                COOKIE_NAME,
+                COOKIE_DELETE_DATE,
+                cookie_params(&req)
+            ))
+            .unwrap(),
+        ); // unwrap is safe as we control
+    }
+
+    Ok(AuthResult::Rejected(resp))
+}
+
+fn cookie_params(req: &RequestWrapper) -> &'static str {
+    if req.is_https() && get_config().cors {
+        "SameSite=None; Secure"
+    } else {
+        "SameSite=Lax"
+    }
+}
 
 impl Authenticator for SharedSecretAuthenticator {
     type Credentials = ();
     fn authenticate(&self, mut req: RequestWrapper) -> AuthFuture<()> {
-        fn deny() -> Result<AuthResult<()>> {
-            Ok(AuthResult::Rejected(resp::deny()))
-        }
         // this is part where client can authenticate itself and get token
         if req.method() == Method::POST && req.path() == "/authenticate" {
             debug!("Authentication request");
@@ -94,26 +127,22 @@ impl Authenticator for SharedSecretAuthenticator {
                                     Ok(m) => m,
                                     Err(e) => {
                                         error!("Invalid JSON: {}", e);
-                                        return deny();
+                                        return deny(&req);
                                     }
                                 }
                             } else {
                                 error!("Invalid content type {}", ct);
-                                return deny();
+                                return deny(&req);
                             }
                         } else {
                             error!("Content-Type header is missing");
-                            return deny();
+                            return deny(&req);
                         };
                         if let Some(secret) = params.get("secret") {
                             debug!("Authenticating user");
                             if auth.auth_token_ok(secret) {
                                 debug!("Authentication success");
-                                let cookie_params = if req.is_https() && get_config().cors {
-                                    "SameSite=None; Secure"
-                                } else {
-                                    "SameSite=Lax"
-                                };
+
                                 let token = auth.new_auth_token();
                                 let resp = Response::builder()
                                     .typed_header(ContentType::text())
@@ -124,8 +153,8 @@ impl Authenticator for SharedSecretAuthenticator {
                                             "{}={}; Max-Age={}; {}",
                                             COOKIE_NAME,
                                             token,
-                                            10 * 365 * 24 * 3600,
-                                            cookie_params
+                                            COOKIE_DURATION,
+                                            cookie_params(&req)
                                         )
                                         .as_str(),
                                     );
@@ -139,14 +168,14 @@ impl Authenticator for SharedSecretAuthenticator {
                                 // Let's not return failure immediately, because somebody is using wrong shared secret
                                 // Legitimate user can wait a bit, but for brute force attack it can be advantage not to reply quickly
                                 sleep(Duration::from_millis(500)).await;
-                                deny()
+                                deny(&req)
                             }
                         } else {
                             error!(
                                 "Invalid authentication: missing shared secret, client: {:?}",
                                 req.remote_addr()
                             );
-                            deny()
+                            deny(&req)
                         }
                     }
                 }
@@ -170,7 +199,7 @@ impl Authenticator for SharedSecretAuthenticator {
                     req.path(),
                     req.remote_addr()
                 );
-                return Box::pin(future::ready(deny()));
+                return Box::pin(future::ready(deny(&req)));
             }
             if !self.secrets.token_ok(&token.unwrap()) {
                 error!(
@@ -178,7 +207,7 @@ impl Authenticator for SharedSecretAuthenticator {
                     req.path(),
                     req.remote_addr()
                 );
-                return Box::pin(future::ready(deny()));
+                return Box::pin(future::ready(deny(&req)));
             }
         }
         // If everything is ok we return credentials (in this case they are just unit type) and we return back request
