@@ -64,7 +64,6 @@ impl SharedSecretAuthenticator {
 }
 
 const COOKIE_NAME: &str = "audioserve_token";
-const COOKIE_DURATION: u32 = 10 * 365 * 24 * 3600;
 const COOKIE_DELETE_DATE: &str = "Thu, 01 Jan 1970 00:00:00 GMT";
 
 fn deny(req: &RequestWrapper) -> Result<AuthResult<()>> {
@@ -153,7 +152,7 @@ impl Authenticator for SharedSecretAuthenticator {
                                             "{}={}; Max-Age={}; {}",
                                             COOKIE_NAME,
                                             token,
-                                            COOKIE_DURATION,
+                                            get_config().token_validity_hours * 3600,
                                             cookie_params(&req)
                                         )
                                         .as_str(),
