@@ -496,9 +496,11 @@ fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> io::Result<Path
         .map(|e| ".".to_owned() + e)
         .unwrap_or_else(|| "".to_owned());
 
+    // Must sanitize name, should not contain /
+    let pseudo_name = chap.title.replace('/', "-");
     let pseudo_file = format!(
         "{:03} - {}$${}-{}$${}",
-        chap.number, chap.title, chap.start, chap.end, ext
+        chap.number, pseudo_name, chap.start, chap.end, ext
     );
     let (base, file_name) = if collapse {
         let base = p.parent().ok_or_else(|| {
