@@ -42,6 +42,7 @@ pub mod util;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const MAX_POSITIONS: usize = 1_000;
+pub use common::MINIMUM_CHAPTER_DURATION;
 
 fn check_version<P: AsRef<Path>>(db_dir: P) -> Result<()> {
     let db_dir = db_dir.as_ref();

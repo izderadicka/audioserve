@@ -2,7 +2,7 @@ use crate::{
     audio_folder::FolderOptions,
     audio_meta::{AudioFolder, TimeStamp},
     cache::CollectionCache,
-    error::{invalid_option, Result},
+    error::{invalid_option, invalid_option_err, Result},
     no_cache::CollectionDirect,
     position::PositionsCollector,
     AudioFolderShort, FoldersOrdering, Position, VERSION,
@@ -14,6 +14,9 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
+
+/// Minimum chapter duration for splitting - in minutes
+pub const MINIMUM_CHAPTER_DURATION: u32 = 10;
 
 pub enum PositionsData {
     Legacy(()),
@@ -43,9 +46,56 @@ impl Default for CollectionOptions {
 
 impl CollectionOptions {
     pub fn update_from_str_options(&mut self, s: &str) -> Result<()> {
-        match s {
-            "nc" | "no-cache" => self.no_cache = true,
-            opt => invalid_option!("Unknown option: {}", opt),
+        let options = s.split(';');
+        for option in options {
+            let mut expr_iter = option.splitn(2, '=').map(|s| s.trim());
+            if let Some(tag) = expr_iter.next() {
+                let val = expr_iter.next();
+                let bool_val = || {
+                    val.map(|s| match s.to_ascii_lowercase().as_str() {
+                        "true" => Ok(true),
+                        "false" => Ok(false),
+                        _ => invalid_option!("Invalid value {} for option {}", s, tag),
+                    })
+                    .unwrap_or(Ok(true))
+                };
+
+                let u32_val = || {
+                    val.map(|s| {
+                        s.parse::<u32>().map_err(|e| {
+                            invalid_option_err!("NonInteger value {} for option {}", s, tag)
+                        })
+                    })
+                    .unwrap_or_else(|| invalid_option!("Value is required for option: {}", tag))
+                };
+                match tag {
+                    "nc" | "no-cache" => self.no_cache = bool_val()?,
+                    "force-cache-update" => self.force_cache_update_on_init = bool_val()?,
+                    "ignore-chapters-meta" => {
+                        self.folder_options.ignore_chapters_meta = bool_val()?
+                    }
+                    "allow-symlinks" => self.folder_options.allow_symlinks = bool_val()?,
+                    "no-dir-collaps" => self.folder_options.no_dir_collaps = bool_val()?,
+                    "chapters-duration" => {
+                        let val = u32_val()?;
+                        if val < MINIMUM_CHAPTER_DURATION {
+                            invalid_option!("Option {} has invalid value - value {} is below limit for reasonable chapter size", tag, val);
+                        }
+                        self.folder_options.chapters_duration = val;
+                    }
+                    "chapters_from_duration" => {
+                        let val = u32_val()?;
+                        if val > 0 && val < MINIMUM_CHAPTER_DURATION {
+                            invalid_option!("Option {} has invalid value - value {} is below limit for reasonable chapter size", tag, val);
+                        }
+                        self.folder_options.chapters_from_duration = val;
+                    }
+                    "tags" => todo!(),
+                    "default_tags" => todo!(),
+
+                    opt => invalid_option!("Unknown option: {}", opt),
+                }
+            }
         }
 
         Ok(())
@@ -155,4 +205,20 @@ pub(crate) trait CollectionTrait {
     fn signal_rescan(&self);
 
     fn base_dir(&self) -> &Path;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_col_options() {
+        let mut opt = CollectionOptions::default();
+        opt.update_from_str_options("no-cache;force-cache-update=true;ignore-chapters-meta=false;allow-symlinks;no-dir-collaps=TRUE");
+        assert!(opt.no_cache);
+        assert!(opt.force_cache_update_on_init);
+        assert!(!opt.folder_options.ignore_chapters_meta);
+        assert!(opt.folder_options.allow_symlinks);
+        assert!(opt.folder_options.no_dir_collaps);
+    }
 }

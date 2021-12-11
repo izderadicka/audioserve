@@ -1,3 +1,5 @@
+use collection::MINIMUM_CHAPTER_DURATION;
+
 pub use self::error::{Error, Result};
 use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
 use crate::util;
@@ -215,14 +217,14 @@ impl Default for ChaptersSize {
 
 impl ChaptersSize {
     pub fn check(&self) -> Result<()> {
-        if self.from_duration > 0 && self.from_duration < 10 {
+        if self.from_duration > 0 && self.from_duration < MINIMUM_CHAPTER_DURATION {
             return value_error!(
                 "from_duration",
                 "File shorter then 10 mins should not be split to chapters"
             );
         }
 
-        if self.duration < 10 {
+        if self.duration < MINIMUM_CHAPTER_DURATION {
             return value_error!("duration", "Minimal chapter duration is 10 minutes");
         }
 

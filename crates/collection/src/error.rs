@@ -58,13 +58,20 @@ pub enum Error {
     InvalidCollectionOption(String),
 }
 
+macro_rules! invalid_option_err {
+    ($fmt: literal, $($param: expr),*) => {
+       crate::error::Error::InvalidCollectionOption(format!($fmt, $($param),*))
+    };
+}
+
 macro_rules! invalid_option {
     ($fmt: literal, $($param: expr),*) => {
-        return Err(crate::error::Error::InvalidCollectionOption(format!($fmt, $($param),*)))
+        return Err(invalid_option_err!($fmt, $($param),*))
     };
 }
 
 pub(crate) use invalid_option;
+pub(crate) use invalid_option_err;
 
 impl From<TransactionError<Error>> for Error {
     fn from(e: TransactionError<Error>) -> Self {
