@@ -4,13 +4,13 @@ use std::ffi::OsStr;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use super::audio_meta::*;
 use crate::collator::Collate;
 use crate::util::{get_meta, get_modified, get_real_file_type, guess_mime_type};
 use lazy_static::lazy_static;
 use regex::Regex;
+use serde_derive::{Deserialize, Serialize};
 
 pub enum DirType {
     File {
@@ -21,15 +21,14 @@ pub enum DirType {
     Other,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FoldersOptions {
     pub chapters_duration: u32,
     pub chapters_from_duration: u32,
     pub ignore_chapters_meta: bool,
     pub allow_symlinks: bool,
     pub no_dir_collaps: bool,
-    pub tags: Arc<Option<HashSet<String>>>,
-    pub force_cache_update_on_init: bool,
+    pub tags: Option<HashSet<String>>,
 }
 
 impl Default for FoldersOptions {
@@ -40,8 +39,7 @@ impl Default for FoldersOptions {
             ignore_chapters_meta: false,
             allow_symlinks: false,
             no_dir_collaps: false,
-            tags: Arc::new(None),
-            force_cache_update_on_init: false,
+            tags: None,
         }
     }
 }

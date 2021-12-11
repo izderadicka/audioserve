@@ -5,7 +5,7 @@ use std::time::SystemTime;
 
 use crate::audio_folder::FolderLister;
 use crate::audio_meta::AudioFolder;
-use crate::common::{CollectionTrait, PositionsData, PositionsTrait};
+use crate::common::{CollectionOptions, CollectionTrait, PositionsData, PositionsTrait};
 use crate::error::{Error, Result};
 use crate::position::PositionsCollector;
 use crate::util::get_real_file_type;
@@ -18,11 +18,13 @@ pub(crate) struct CollectionDirect {
 }
 
 impl CollectionDirect {
-    pub(crate) fn new(base_dir: PathBuf, lister: FolderLister, allow_symlinks: bool) -> Self {
+    pub(crate) fn new(base_dir: PathBuf, opt: CollectionOptions) -> Self {
         CollectionDirect {
             base_dir,
-            lister,
-            searcher: FoldersSearch { allow_symlinks },
+            searcher: FoldersSearch {
+                allow_symlinks: opt.folder_options.allow_symlinks,
+            },
+            lister: FolderLister::new_with_options(opt.folder_options),
         }
     }
 }

@@ -7,7 +7,7 @@ use crate::{
     audio_folder::FolderLister,
     audio_meta::{AudioFolder, FolderByModification, TimeStamp},
     cache::update::{filter_event, FilteredEvent, RecursiveUpdater},
-    common::{CollectionTrait, PositionsData, PositionsTrait},
+    common::{CollectionOptions, CollectionTrait, PositionsData, PositionsTrait},
     error::{Error, Result},
     position::{Position, PositionShort, PositionsCollector},
     util::get_modified,
@@ -43,8 +43,7 @@ impl CollectionCache {
     pub fn new<P1: Into<PathBuf>, P2: AsRef<Path>>(
         path: P1,
         db_dir: P2,
-        lister: FolderLister,
-        force_update: bool,
+        opt: CollectionOptions,
     ) -> Result<CollectionCache> {
         let root_path = path.into();
         let db_path = CollectionCache::db_path(&root_path, &db_dir)?;
@@ -58,7 +57,7 @@ impl CollectionCache {
         Ok(CollectionCache {
             inner: Arc::new(CacheInner::new(
                 db,
-                lister,
+                FolderLister::new_with_options(opt.folder_options),
                 root_path,
                 update_sender.clone(),
             )?),
@@ -74,7 +73,7 @@ impl CollectionCache {
             )),
             update_sender,
             update_receiver: Some(update_receiver),
-            force_update,
+            force_update: opt.force_cache_update_on_init,
         })
     }
 
@@ -96,11 +95,11 @@ impl CollectionCache {
     pub(crate) fn restore_positions<P1: Into<PathBuf>, P2: AsRef<Path>>(
         path: P1,
         db_dir: P2,
-        lister: FolderLister,
-        force_update: bool,
+        opt: CollectionOptions,
         backup_data: PositionsData,
     ) -> Result<thread::JoinHandle<()>> {
-        let col = CollectionCache::new(path, db_dir, lister, force_update)?;
+        let force_update = opt.force_cache_update_on_init;
+        let col = CollectionCache::new(path, db_dir, opt)?;
         let inner = col.inner.clone();
         let thread = thread::spawn(move || {
             // clean up non-exitent directories
@@ -488,7 +487,7 @@ mod tests {
         let tmp_dir = TempDir::new("AS_CACHE_TEST").expect("Cannot create temp dir");
         let test_data_dir = Path::new("../../test_data");
         let db_path = tmp_dir.path().join("updater_db");
-        let mut col = CollectionCache::new(test_data_dir, db_path, FolderLister::new(), false)
+        let mut col = CollectionCache::new(test_data_dir, db_path, CollectionOptions::default())
             .expect("Cannot create CollectionCache");
         col.run_update_loop();
         col.wait_until_inital_scan_is_done();
@@ -521,7 +520,7 @@ mod tests {
         let info_file = test_data_dir.join("usak/kulisak/desc.txt");
         assert!(info_file.exists());
         let db_path = tmp_dir.path().join("updater_db");
-        let col = CollectionCache::new(&test_data_dir, db_path, FolderLister::new(), false)
+        let col = CollectionCache::new(&test_data_dir, db_path, CollectionOptions::default())
             .expect("Cannot create CollectionCache");
 
         col.force_update("usak/kulisak")?;

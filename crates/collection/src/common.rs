@@ -1,22 +1,68 @@
 use crate::{
+    audio_folder::FoldersOptions,
     audio_meta::{AudioFolder, TimeStamp},
     cache::CollectionCache,
     error::Result,
     no_cache::CollectionDirect,
     position::PositionsCollector,
-    AudioFolderShort, FoldersOrdering, Position,
+    AudioFolderShort, FoldersOrdering, Position, VERSION,
 };
 use enum_dispatch::enum_dispatch;
+use serde_derive::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::path::Path;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 pub enum PositionsData {
     Legacy(()),
     V1(Map<String, Value>),
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CollectionOptions {
     pub no_cache: bool,
+    pub folder_options: FoldersOptions,
+    pub col_version: &'static str,
+    pub pgm_version: &'static str,
+    pub force_cache_update_on_init: bool,
+}
+
+impl Default for CollectionOptions {
+    fn default() -> Self {
+        Self {
+            no_cache: false,
+            folder_options: Default::default(),
+            col_version: VERSION,
+            pgm_version: Default::default(),
+            force_cache_update_on_init: false,
+        }
+    }
+}
+
+pub struct CollectionOptionsMap {
+    cols: HashMap<PathBuf, CollectionOptions>,
+    default: CollectionOptions,
+}
+
+impl CollectionOptionsMap {
+    pub fn new(pgm_version: &'static str) -> Self {
+        let mut default = CollectionOptions::default();
+        default.pgm_version = pgm_version;
+        CollectionOptionsMap {
+            cols: HashMap::new(),
+            default,
+        }
+    }
+
+    pub fn add_col_options(&mut self, path: impl Into<PathBuf>, col_options: ()) {}
+
+    pub fn get_col_options(&mut self, path: impl AsRef<Path>) -> CollectionOptions {
+        self.cols
+            .remove(path.as_ref())
+            .unwrap_or_else(|| self.default.clone())
+    }
 }
 
 #[enum_dispatch(CollectionTrait, PositionsTrait)]

@@ -1,13 +1,17 @@
 #[macro_use]
 extern crate log;
 
-use audio_folder::{FolderLister, FoldersOptions};
+pub use audio_folder::{list_dir_files_only, parse_chapter_path, FoldersOptions};
+pub use audio_meta::{init_media_lib, AudioFile, AudioFolderShort, FoldersOrdering, TimeSpan};
 use audio_meta::{AudioFolder, TimeStamp};
 use cache::CollectionCache;
-use common::{Collection, CollectionOptions, CollectionTrait, PositionsTrait};
+pub use common::CollectionOptionsMap;
+use common::{Collection, CollectionTrait, PositionsTrait};
 use error::{Error, Result};
 use legacy_pos::LegacyPositions;
+pub use media_info::tags;
 use no_cache::CollectionDirect;
+pub use position::{Position, PositionFilter};
 use serde_json::{Map, Value};
 #[cfg(feature = "async")]
 use std::sync::Arc;
@@ -18,12 +22,6 @@ use std::{
     path::{Path, PathBuf},
     thread::JoinHandle,
 };
-use util::is_no_cache_collection;
-
-pub use audio_folder::{list_dir_files_only, parse_chapter_path};
-pub use audio_meta::{init_media_lib, AudioFile, AudioFolderShort, FoldersOrdering, TimeSpan};
-pub use media_info::tags;
-pub use position::{Position, PositionFilter};
 pub use util::guess_mime_type;
 
 use crate::{
@@ -76,9 +74,8 @@ pub struct Collections {
 impl Collections {
     pub fn new_with_detail<I, P1, P2>(
         collections_dirs: Vec<PathBuf>,
-        collections_options: HashMap<PathBuf, CollectionOptions>,
+        mut collections_options: CollectionOptionsMap,
         db_path: P2,
-        opt: FoldersOptions,
     ) -> Result<Self>
     where
         I: IntoIterator<Item = P1>,
@@ -87,20 +84,15 @@ impl Collections {
     {
         check_version(&db_path)?;
         let db_path = db_path.as_ref();
-        let allow_symlinks = opt.allow_symlinks;
-        let force_update = opt.force_cache_update_on_init;
-        let lister = FolderLister::new_with_options(opt);
         let caches = collections_dirs
             .into_iter()
             .map(move |collection_path| {
-                if is_no_cache_collection(&collections_options, &collection_path) {
+                let opt = collections_options.get_col_options(&collection_path);
+                if opt.no_cache {
                     info!("Collection {:?} is not using cache", collection_path);
-                    Ok(
-                        CollectionDirect::new(collection_path, lister.clone(), allow_symlinks)
-                            .into(),
-                    )
+                    Ok(CollectionDirect::new(collection_path, opt).into())
                 } else {
-                    CollectionCache::new(collection_path, db_path, lister.clone(), force_update)
+                    CollectionCache::new(collection_path, db_path, opt)
                         .map(|mut cache| {
                             cache.run_update_loop();
                             cache
@@ -262,9 +254,8 @@ impl Collections {
 
     pub fn restore_positions<P2, P3>(
         collections_dirs: Vec<PathBuf>,
-        collections_options: HashMap<PathBuf, CollectionOptions>,
+        collections_options: CollectionOptionsMap,
         db_path: P2,
-        opt: FoldersOptions,
         backup_file: BackupFile<P3>,
     ) -> Result<()>
     where
@@ -272,24 +263,17 @@ impl Collections {
         P3: AsRef<Path>,
     {
         check_version(&db_path)?;
-        let force_update = opt.force_cache_update_on_init;
-        let lister = FolderLister::new_with_options(opt);
-
         let threads = match backup_file {
             BackupFile::V1(backup_file) => Collections::restore_positions_v1(
                 collections_dirs,
                 collections_options,
                 db_path,
-                lister,
-                force_update,
                 backup_file,
             ),
             BackupFile::Legacy(backup_file) => Collections::restore_positions_legacy(
                 collections_dirs,
                 collections_options,
                 db_path,
-                lister,
-                force_update,
                 backup_file,
             ),
         }?;
@@ -305,10 +289,8 @@ impl Collections {
 
     fn restore_positions_v1<P2, P3>(
         collections_dirs: Vec<PathBuf>,
-        collections_options: HashMap<PathBuf, CollectionOptions>,
+        mut collections_options: CollectionOptionsMap,
         db_path: P2,
-        lister: FolderLister,
-        force_update: bool,
         backup_file: P3,
     ) -> Result<Vec<JoinHandle<()>>>
     where
@@ -322,7 +304,8 @@ impl Collections {
         let threads = collections_dirs
             .into_iter()
             .filter_map(move |collection_path| {
-                if !is_no_cache_collection(&collections_options, &collection_path) {
+                let opt = collections_options.get_col_options(&collection_path);
+                if !opt.no_cache {
                     collection_path
                         .to_str()
                         .and_then(|path| data.remove(path))
@@ -331,8 +314,7 @@ impl Collections {
                                 CollectionCache::restore_positions(
                                     collection_path.clone(),
                                     db_path,
-                                    lister.clone(),
-                                    force_update,
+                                    opt,
                                     PositionsData::V1(v),
                                 )
                                 .map_err(|e| {
@@ -354,10 +336,8 @@ impl Collections {
 
     fn restore_positions_legacy<P2, P3>(
         collections_dirs: Vec<PathBuf>,
-        collections_options: HashMap<PathBuf, CollectionOptions>,
+        mut collections_options: CollectionOptionsMap,
         db_path: P2,
-        lister: FolderLister,
-        force_update: bool,
         backup_file: P3,
     ) -> Result<Vec<JoinHandle<()>>>
     where
@@ -413,7 +393,8 @@ impl Collections {
             .into_iter()
             .enumerate()
             .filter_map(move |(col_no, collection_path)| {
-                if !is_no_cache_collection(&collections_options, &collection_path) {
+                let opt = collections_options.get_col_options(&collection_path);
+                if !opt.no_cache {
                     col_positions.remove(&col_no).and_then(|v| {
                         // HACK: This is just dirty trick to get same structure as for current positions JSON
                         //    but I hope it did not mind, because it's just migration function to be used once
@@ -425,8 +406,7 @@ impl Collections {
                         CollectionCache::restore_positions(
                             collection_path.clone(),
                             db_path,
-                            lister.clone(),
-                            force_update,
+                            opt,
                             PositionsData::V1(json),
                         )
                         .map_err(|e| error!("Failed to restore positions from backup: {}", e))
