@@ -6,9 +6,8 @@ extern crate serde_derive;
 extern crate lazy_static;
 
 use collection::audio_folder::FolderOptions;
-use collection::common::CollectionOptions;
-use collection::Collections;
-use config::{get_config, init_config};
+use collection::{CollectionOptionsMap, Collections};
+use config::{get_config, init_config, LONG_VERSION};
 use error::{bail, Context, Error};
 use futures::prelude::*;
 use hyper::{service::make_service_fn, Server as HttpServer};
@@ -16,7 +15,6 @@ use ring::rand::{SecureRandom, SystemRandom};
 use services::{
     auth::SharedSecretAuthenticator, search::Search, ServiceFactory, TranscodingDetails,
 };
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -82,40 +80,39 @@ macro_rules! get_url_path {
     };
 }
 
-fn create_folder_options() -> (FolderOptions, HashMap<PathBuf, CollectionOptions>) {
+fn create_collections_options() -> CollectionOptionsMap {
     let fo = FolderOptions {
         allow_symlinks: get_config().allow_symlinks,
         chapters_duration: get_config().chapters.duration,
         chapters_from_duration: get_config().chapters.from_duration,
         ignore_chapters_meta: get_config().ignore_chapters_meta,
         no_dir_collaps: get_config().no_dir_collaps,
-        tags: Arc::new(get_config().get_tags()),
-        force_cache_update_on_init: get_config().force_cache_update_on_init,
+        tags: get_config().get_tags(),
     };
-    let co: HashMap<_, _> = get_config()
-        .base_dirs_options
-        .iter()
-        .map(|(p, o)| {
-            (
-                p.clone(),
-                CollectionOptions {
-                    no_cache: o.no_cache,
-                },
-            )
-        })
-        .collect();
+    let co = CollectionOptionsMap::new(fo, LONG_VERSION);
+    // let co: HashMap<_, _> = get_config()
+    //     .base_dirs_options
+    //     .iter()
+    //     .map(|(p, o)| {
+    //         (
+    //             p.clone(),
+    //             CollectionOptions {
+    //                 no_cache: o.no_cache,
+    //             },
+    //         )
+    //     })
+    //     .collect();
 
-    (fo, co)
+    co
 }
 
 fn create_collections() -> Arc<Collections> {
-    let (fo, co) = create_folder_options();
+    let opt = create_collections_options();
     Arc::new(
         Collections::new_with_detail::<Vec<PathBuf>, _, _>(
             get_config().base_dirs.clone(),
-            co,
+            opt,
             get_config().collections_cache_dir.as_path(),
-            fo,
         )
         .expect("Unable to create collections cache"),
     )
@@ -123,12 +120,11 @@ fn create_collections() -> Arc<Collections> {
 
 #[cfg(feature = "shared-positions")]
 fn restore_positions<P: AsRef<Path>>(backup_file: collection::BackupFile<P>) -> anyhow::Result<()> {
-    let (fo, co) = create_folder_options();
+    let opt = create_collections_options();
     Collections::restore_positions(
         get_config().base_dirs.clone(),
-        co,
+        opt,
         get_config().collections_cache_dir.as_path(),
-        fo,
         backup_file,
     )
     .map_err(Error::new)

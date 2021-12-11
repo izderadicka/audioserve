@@ -47,8 +47,9 @@ pub struct CollectionOptionsMap {
 }
 
 impl CollectionOptionsMap {
-    pub fn new(pgm_version: &'static str) -> Self {
+    pub fn new(default_folder_options: FolderOptions, pgm_version: &'static str) -> Self {
         let mut default = CollectionOptions::default();
+        default.folder_options = default_folder_options;
         default.pgm_version = pgm_version;
         CollectionOptionsMap {
             cols: HashMap::new(),
