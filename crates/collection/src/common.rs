@@ -8,10 +8,11 @@ use crate::{
     AudioFolderShort, FoldersOrdering, Position, VERSION,
 };
 use enum_dispatch::enum_dispatch;
+use media_info::tags::{ALLOWED_TAGS, BASIC_TAGS};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -62,7 +63,7 @@ impl CollectionOptions {
 
                 let u32_val = || {
                     val.map(|s| {
-                        s.parse::<u32>().map_err(|e| {
+                        s.parse::<u32>().map_err(|_| {
                             invalid_option_err!("NonInteger value {} for option {}", s, tag)
                         })
                     })
@@ -83,15 +84,39 @@ impl CollectionOptions {
                         }
                         self.folder_options.chapters_duration = val;
                     }
-                    "chapters_from_duration" => {
+                    "chapters-from-duration" => {
                         let val = u32_val()?;
                         if val > 0 && val < MINIMUM_CHAPTER_DURATION {
                             invalid_option!("Option {} has invalid value - value {} is below limit for reasonable chapter size", tag, val);
                         }
                         self.folder_options.chapters_from_duration = val;
                     }
-                    "tags" => todo!(),
-                    "default_tags" => todo!(),
+                    "tags" => {
+                        if let Some(tags) = val {
+                            let tags = tags
+                                .split(',')
+                                .map(|s| s.trim().to_ascii_lowercase())
+                                .map(|s| {
+                                    if ALLOWED_TAGS.contains(&s.as_str()) {
+                                        Ok(s)
+                                    } else {
+                                        invalid_option!("This tag {} is not allowed", s);
+                                    }
+                                })
+                                .collect::<Result<HashSet<_>>>()?;
+                            self.folder_options.tags = Some(tags);
+                        } else {
+                            invalid_option!("Some tags are required for {}", tag);
+                        }
+                    }
+                    "default_tags" => {
+                        if bool_val()? {
+                            self.folder_options.tags =
+                                Some(BASIC_TAGS.iter().map(|i| i.to_string()).collect())
+                        } else {
+                            self.folder_options.tags = None
+                        }
+                    }
 
                     opt => invalid_option!("Unknown option: {}", opt),
                 }
@@ -214,11 +239,20 @@ mod tests {
     #[test]
     fn test_col_options() {
         let mut opt = CollectionOptions::default();
-        opt.update_from_str_options("no-cache;force-cache-update=true;ignore-chapters-meta=false;allow-symlinks;no-dir-collaps=TRUE");
+        opt.update_from_str_options("no-cache;force-cache-update=true;ignore-chapters-meta=false;allow-symlinks;no-dir-collaps=TRUE").expect("good options");
         assert!(opt.no_cache);
         assert!(opt.force_cache_update_on_init);
         assert!(!opt.folder_options.ignore_chapters_meta);
         assert!(opt.folder_options.allow_symlinks);
         assert!(opt.folder_options.no_dir_collaps);
+
+        opt.update_from_str_options("tags=title,album,composer")
+            .expect("valid tags");
+        assert_eq!(3, opt.folder_options.tags.as_ref().unwrap().len());
+
+        opt.update_from_str_options("chapters-duration=44;chapters-from-duration=200")
+            .expect("correct options");
+        assert_eq!(44, opt.folder_options.chapters_duration);
+        assert_eq!(200, opt.folder_options.chapters_from_duration);
     }
 }
