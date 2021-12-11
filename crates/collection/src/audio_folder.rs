@@ -22,7 +22,7 @@ pub enum DirType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FoldersOptions {
+pub struct FolderOptions {
     pub chapters_duration: u32,
     pub chapters_from_duration: u32,
     pub ignore_chapters_meta: bool,
@@ -31,7 +31,7 @@ pub struct FoldersOptions {
     pub tags: Option<HashSet<String>>,
 }
 
-impl Default for FoldersOptions {
+impl Default for FolderOptions {
     fn default() -> Self {
         Self {
             chapters_duration: 0,
@@ -46,17 +46,17 @@ impl Default for FoldersOptions {
 
 #[derive(Clone)]
 pub struct FolderLister {
-    config: FoldersOptions,
+    config: FolderOptions,
 }
 
 impl FolderLister {
     pub fn new() -> Self {
         FolderLister {
-            config: FoldersOptions::default(),
+            config: FolderOptions::default(),
         }
     }
 
-    pub fn new_with_options(config: FoldersOptions) -> Self {
+    pub fn new_with_options(config: FolderOptions) -> Self {
         FolderLister { config }
     }
 }

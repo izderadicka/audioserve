@@ -1,5 +1,5 @@
 use crate::{
-    audio_folder::FoldersOptions,
+    audio_folder::FolderOptions,
     audio_meta::{AudioFolder, TimeStamp},
     cache::CollectionCache,
     error::Result,
@@ -23,7 +23,7 @@ pub enum PositionsData {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CollectionOptions {
     pub no_cache: bool,
-    pub folder_options: FoldersOptions,
+    pub folder_options: FolderOptions,
     pub col_version: &'static str,
     pub pgm_version: &'static str,
     pub force_cache_update_on_init: bool,

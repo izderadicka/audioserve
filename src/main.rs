@@ -5,7 +5,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
 
-use collection::audio_folder::FoldersOptions;
+use collection::audio_folder::FolderOptions;
 use collection::common::CollectionOptions;
 use collection::Collections;
 use config::{get_config, init_config};
@@ -82,8 +82,8 @@ macro_rules! get_url_path {
     };
 }
 
-fn create_folder_options() -> (FoldersOptions, HashMap<PathBuf, CollectionOptions>) {
-    let fo = FoldersOptions {
+fn create_folder_options() -> (FolderOptions, HashMap<PathBuf, CollectionOptions>) {
+    let fo = FolderOptions {
         allow_symlinks: get_config().allow_symlinks,
         chapters_duration: get_config().chapters.duration,
         chapters_from_duration: get_config().chapters.from_duration,
