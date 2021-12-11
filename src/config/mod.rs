@@ -246,22 +246,6 @@ impl SslConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BaseDirOptions {
-    pub no_cache: bool,
-}
-
-impl FromStr for BaseDirOptions {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "nc" | "no-cache" => Ok(BaseDirOptions { no_cache: true }),
-            _ => return value_error!("base_dir", format!("invalid option {}", s)),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PositionsBackupFormat {
     None,
     Legacy,
@@ -327,7 +311,7 @@ pub struct Config {
     pub listen: SocketAddr,
     pub thread_pool: ThreadPoolConfig,
     pub base_dirs: Vec<PathBuf>,
-    pub base_dirs_options: HashMap<PathBuf, BaseDirOptions>,
+    pub base_dirs_options: HashMap<PathBuf, String>,
     pub url_path_prefix: Option<String>,
     pub shared_secret: Option<String>,
     pub limit_rate: Option<f32>,
@@ -371,8 +355,8 @@ impl Config {
         }
 
         if let Some(options) = parts.next() {
-            let options: BaseDirOptions = options.parse()?;
-            self.base_dirs_options.insert(base_dir.clone(), options);
+            self.base_dirs_options
+                .insert(base_dir.clone(), options.to_string());
         }
         self.base_dirs.push(base_dir);
         Ok(())

@@ -80,7 +80,7 @@ macro_rules! get_url_path {
     };
 }
 
-fn create_collections_options() -> CollectionOptionsMap {
+fn create_collections_options() -> anyhow::Result<CollectionOptionsMap> {
     let fo = FolderOptions {
         allow_symlinks: get_config().allow_symlinks,
         chapters_duration: get_config().chapters.duration,
@@ -89,38 +89,33 @@ fn create_collections_options() -> CollectionOptionsMap {
         no_dir_collaps: get_config().no_dir_collaps,
         tags: get_config().get_tags(),
     };
-    let co = CollectionOptionsMap::new(fo, get_config().force_cache_update_on_init, LONG_VERSION);
-    // let co: HashMap<_, _> = get_config()
-    //     .base_dirs_options
-    //     .iter()
-    //     .map(|(p, o)| {
-    //         (
-    //             p.clone(),
-    //             CollectionOptions {
-    //                 no_cache: o.no_cache,
-    //             },
-    //         )
-    //     })
-    //     .collect();
+    let mut co =
+        CollectionOptionsMap::new(fo, get_config().force_cache_update_on_init, LONG_VERSION);
+    for (p, o) in &get_config().base_dirs_options {
+        if let Err(e) = co.add_col_options(p, o) {
+            error!("Invalid option(s) for collection directory {:?}:{}", p, e);
+            bail!(e)
+        }
+    }
 
-    co
+    Ok(co)
 }
 
-fn create_collections() -> Arc<Collections> {
-    let opt = create_collections_options();
-    Arc::new(
+fn create_collections() -> anyhow::Result<Arc<Collections>> {
+    let opt = create_collections_options()?;
+    Ok(Arc::new(
         Collections::new_with_detail::<Vec<PathBuf>, _, _>(
             get_config().base_dirs.clone(),
             opt,
             get_config().collections_cache_dir.as_path(),
         )
         .expect("Unable to create collections cache"),
-    )
+    ))
 }
 
 #[cfg(feature = "shared-positions")]
 fn restore_positions<P: AsRef<Path>>(backup_file: collection::BackupFile<P>) -> anyhow::Result<()> {
-    let opt = create_collections_options();
+    let opt = create_collections_options()?;
     Collections::restore_positions(
         get_config().base_dirs.clone(),
         opt,
@@ -351,7 +346,7 @@ fn main() -> anyhow::Result<()> {
         Err(e) => return Err(Error::msg(format!("Error creating/reading secret: {}", e))),
     };
 
-    let collections = create_collections();
+    let collections = create_collections()?;
 
     let runtime = start_server(server_secret, collections.clone());
 

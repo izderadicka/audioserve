@@ -53,7 +53,18 @@ pub enum Error {
 
     #[error("JSON schema error: {0}")]
     JsonDataError(String),
+
+    #[error("Invalid collection option: {0}")]
+    InvalidCollectionOption(String),
 }
+
+macro_rules! invalid_option {
+    ($fmt: literal, $($param: expr),*) => {
+        return Err(crate::error::Error::InvalidCollectionOption(format!($fmt, $($param),*)))
+    };
+}
+
+pub(crate) use invalid_option;
 
 impl From<TransactionError<Error>> for Error {
     fn from(e: TransactionError<Error>) -> Self {

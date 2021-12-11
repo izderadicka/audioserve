@@ -2,7 +2,7 @@ use crate::{
     audio_folder::FolderOptions,
     audio_meta::{AudioFolder, TimeStamp},
     cache::CollectionCache,
-    error::Result,
+    error::{invalid_option, Result},
     no_cache::CollectionDirect,
     position::PositionsCollector,
     AudioFolderShort, FoldersOrdering, Position, VERSION,
@@ -41,6 +41,17 @@ impl Default for CollectionOptions {
     }
 }
 
+impl CollectionOptions {
+    pub fn update_from_str_options(&mut self, s: &str) -> Result<()> {
+        match s {
+            "nc" | "no-cache" => self.no_cache = true,
+            opt => invalid_option!("Unknown option: {}", opt),
+        }
+
+        Ok(())
+    }
+}
+
 pub struct CollectionOptionsMap {
     cols: HashMap<PathBuf, CollectionOptions>,
     default: CollectionOptions,
@@ -62,7 +73,12 @@ impl CollectionOptionsMap {
         }
     }
 
-    pub fn add_col_options(&mut self, path: impl Into<PathBuf>, col_options: ()) {}
+    pub fn add_col_options(&mut self, path: impl Into<PathBuf>, col_options: &str) -> Result<()> {
+        let mut col_opt = self.default.clone();
+        col_opt.update_from_str_options(col_options)?;
+        self.cols.insert(path.into(), col_opt);
+        Ok(())
+    }
 
     pub fn get_col_options(&mut self, path: impl AsRef<Path>) -> CollectionOptions {
         self.cols
