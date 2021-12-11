@@ -89,7 +89,7 @@ fn create_collections_options() -> CollectionOptionsMap {
         no_dir_collaps: get_config().no_dir_collaps,
         tags: get_config().get_tags(),
     };
-    let co = CollectionOptionsMap::new(fo, LONG_VERSION);
+    let co = CollectionOptionsMap::new(fo, get_config().force_cache_update_on_init, LONG_VERSION);
     // let co: HashMap<_, _> = get_config()
     //     .base_dirs_options
     //     .iter()

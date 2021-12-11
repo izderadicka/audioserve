@@ -47,8 +47,13 @@ pub struct CollectionOptionsMap {
 }
 
 impl CollectionOptionsMap {
-    pub fn new(default_folder_options: FolderOptions, pgm_version: &'static str) -> Self {
+    pub fn new(
+        default_folder_options: FolderOptions,
+        force_cache_update: bool,
+        pgm_version: &'static str,
+    ) -> Self {
         let mut default = CollectionOptions::default();
+        default.force_cache_update_on_init = force_cache_update;
         default.folder_options = default_folder_options;
         default.pgm_version = pgm_version;
         CollectionOptionsMap {
