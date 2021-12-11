@@ -47,7 +47,7 @@ impl Default for CollectionOptions {
 
 impl CollectionOptions {
     pub fn update_from_str_options(&mut self, s: &str) -> Result<()> {
-        let options = s.split(';');
+        let options = s.split(',');
         for option in options {
             let mut expr_iter = option.splitn(2, '=').map(|s| s.trim());
             if let Some(tag) = expr_iter.next() {
@@ -94,7 +94,7 @@ impl CollectionOptions {
                     "tags" => {
                         if let Some(tags) = val {
                             let tags = tags
-                                .split(',')
+                                .split('+')
                                 .map(|s| s.trim().to_ascii_lowercase())
                                 .map(|s| {
                                     if ALLOWED_TAGS.contains(&s.as_str()) {
@@ -239,18 +239,18 @@ mod tests {
     #[test]
     fn test_col_options() {
         let mut opt = CollectionOptions::default();
-        opt.update_from_str_options("no-cache;force-cache-update=true;ignore-chapters-meta=false;allow-symlinks;no-dir-collaps=TRUE").expect("good options");
+        opt.update_from_str_options("no-cache,force-cache-update=true,ignore-chapters-meta=false,allow-symlinks,no-dir-collaps=TRUE").expect("good options");
         assert!(opt.no_cache);
         assert!(opt.force_cache_update_on_init);
         assert!(!opt.folder_options.ignore_chapters_meta);
         assert!(opt.folder_options.allow_symlinks);
         assert!(opt.folder_options.no_dir_collaps);
 
-        opt.update_from_str_options("tags=title,album,composer")
+        opt.update_from_str_options("tags=title+album+composer")
             .expect("valid tags");
         assert_eq!(3, opt.folder_options.tags.as_ref().unwrap().len());
 
-        opt.update_from_str_options("chapters-duration=44;chapters-from-duration=200")
+        opt.update_from_str_options("chapters-duration=44,chapters-from-duration=200")
             .expect("correct options");
         assert_eq!(44, opt.folder_options.chapters_duration);
         assert_eq!(200, opt.folder_options.chapters_from_duration);
