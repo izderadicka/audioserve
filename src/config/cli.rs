@@ -610,13 +610,30 @@ where
 fn print_dir_options_help() {
     print!(
         "
-Options can be used to change behaviour of collection directories.
+Options can be used to change behavior of particular collection directory and override 
+some global arguments.
 Option is added after collection path argument separated with : and individual options
-are separated by ;. Example /my/audio:no-cache .
+are separated by , . 
+Options can have values - after =. For boolean options, value is optional and default is true.
+Examples: 
+/my/audio:no-cache
+/other/audio:ignore-chapters-meta=false,allow-symlinks,no-dir-collaps=true,tags=title+album+artist
 
 Available options:
-nc or no-cache      directory will not use cache (browsing and search will be slower for large 
-                    collection, playback position sharing and metadata tags will not work)
+nc or no-cache          <=true|false> directory will not use cache (browsing and search will be 
+                        slower for large collection, playback position sharing and metadata tags 
+                        will not work)
+force-cache-update      <=true|false> always do full cache update on start
+ignore-chapters-meta    <=true|false> ignore chapters metadata in audio files. Instead present as
+                        one big audio file
+allow-symlinks          <=true|false>  follow symbolic links
+no-dir-collaps          <=true|false> do not collaps directories with single chapterized audio file
+chapters-duration       =x  duration (mins) of chapter for cutting of large audio files
+chapters-from-duration  =x  min.duration (mins) of large audio file to be cut to chapters
+tags                    =tag1+tag2...  metadata tags to collect (supported tags names separated by +)
+default-tags            <=true|false>  collect default tags. Use --help-tags argument to get more 
+                        information about supported metadata tags 
+
 
 "
     )

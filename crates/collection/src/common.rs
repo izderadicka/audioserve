@@ -104,7 +104,7 @@ impl CollectionOptions {
                             invalid_option!("Some tags are required for {}", tag);
                         }
                     }
-                    "default_tags" => {
+                    "default-tags" => {
                         if bool_val()? {
                             self.folder_options.tags =
                                 Some(BASIC_TAGS.iter().map(|i| i.to_string()).collect())

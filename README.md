@@ -274,7 +274,7 @@ You can override one two or all three defaults, depending on what sections you h
 
 ## Command line
 
-Audioserve can take parameters from command line, environment variables and config file. For command line arguments check them with `audioserve -h`. Generally you need to provide shared secrect (or option `--no-authentication` for public access) and media collection directory (as noted above you can have severals collections).
+Audioserve can take parameters from command line, environment variables and config file. For command line arguments check them with `audioserve -h`. Generally you need to provide shared secrect (or option `--no-authentication` for public access) and media collection directory (as noted above you can have severals collections). You can also provide options specific for particular collection directory (add : and options directly after the collection path). For details use `help-dir-options` argument.
 
 `audioserve` is server executable and it also needs web client files , which are `index.html` and `bundle.js`, which are defaultly in `./client/dist`, but their location can by specified by argument `-c`.
 
