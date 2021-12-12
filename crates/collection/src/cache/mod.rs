@@ -49,7 +49,8 @@ impl CollectionCache {
     ) -> Result<CollectionCache> {
         let root_path = path.into();
         let db_path = CollectionCache::db_path(&root_path, &db_dir)?;
-        let options_file = db_path.join("folder_options.json");
+        let mut options_file = db_path.clone();
+        options_file.set_extension("options.json");
         let mut force_update = opt.force_cache_update_on_init;
         let save_options = || match File::create(&options_file) {
             Ok(f) => match serde_json::to_writer(f, &opt.folder_options) {
