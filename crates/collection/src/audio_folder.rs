@@ -21,7 +21,7 @@ pub enum DirType {
     Other,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FolderOptions {
     pub chapters_duration: u32,
     pub chapters_from_duration: u32,

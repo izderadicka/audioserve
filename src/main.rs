@@ -7,7 +7,7 @@ extern crate lazy_static;
 
 use collection::audio_folder::FolderOptions;
 use collection::{CollectionOptionsMap, Collections};
-use config::{get_config, init_config, LONG_VERSION};
+use config::{get_config, init_config};
 use error::{bail, Context, Error};
 use futures::prelude::*;
 use hyper::{service::make_service_fn, Server as HttpServer};
@@ -89,8 +89,7 @@ fn create_collections_options() -> anyhow::Result<CollectionOptionsMap> {
         no_dir_collaps: get_config().no_dir_collaps,
         tags: get_config().get_tags(),
     };
-    let mut co =
-        CollectionOptionsMap::new(fo, get_config().force_cache_update_on_init, LONG_VERSION);
+    let mut co = CollectionOptionsMap::new(fo, get_config().force_cache_update_on_init);
     for (p, o) in &get_config().base_dirs_options {
         if let Err(e) = co.add_col_options(p, o) {
             error!("Invalid option(s) for collection directory {:?}:{}", p, e);

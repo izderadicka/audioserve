@@ -11,13 +11,15 @@ use crate::{
     error::{Error, Result},
     position::{Position, PositionShort, PositionsCollector},
     util::get_modified,
-    AudioFolderShort, FoldersOrdering,
+    AudioFolderShort, FolderOptions, FoldersOrdering,
 };
 use crossbeam_channel::{unbounded as channel, Receiver, Sender};
 use notify::{watcher, DebouncedEvent, Watcher};
 use std::{
     collections::BinaryHeap,
     convert::TryInto,
+    fs::File,
+    io,
     path::{Path, PathBuf},
     sync::{Arc, Condvar, Mutex},
     thread,
@@ -47,6 +49,35 @@ impl CollectionCache {
     ) -> Result<CollectionCache> {
         let root_path = path.into();
         let db_path = CollectionCache::db_path(&root_path, &db_dir)?;
+        let options_file = db_path.join("folder_options.json");
+        let mut force_update = opt.force_cache_update_on_init;
+        let save_options = || match File::create(&options_file) {
+            Ok(f) => match serde_json::to_writer(f, &opt.folder_options) {
+                Ok(_) => debug!("Created options file {:?}", options_file),
+                Err(e) => error!("Cannot create {:?} : {}", options_file, e),
+            },
+            Err(e) => error!("Cannot create {:?} : {}", options_file, e),
+        };
+        match File::open(&options_file).and_then(|f| {
+            serde_json::from_reader::<_, FolderOptions>(f)
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        }) {
+            Ok(prev_options) => {
+                if prev_options != opt.folder_options {
+                    info!(
+                        "Previous folder options differ on {:?}, lets enforce full cache update",
+                        root_path
+                    );
+                    force_update = true;
+                    save_options();
+                }
+            }
+            Err(e) => {
+                warn!("Cannot read previous folder options on {:?} due to {}, will enforce full cache update", root_path, e);
+                force_update = true;
+                save_options();
+            }
+        }
         let db = sled::Config::default()
             .path(&db_path)
             .use_compression(true)
@@ -54,6 +85,7 @@ impl CollectionCache {
             .cache_capacity(100 * 1024 * 1024)
             .open()?;
         let (update_sender, update_receiver) = channel::<Option<UpdateAction>>();
+
         Ok(CollectionCache {
             inner: Arc::new(CacheInner::new(
                 db,
@@ -73,7 +105,7 @@ impl CollectionCache {
             )),
             update_sender,
             update_receiver: Some(update_receiver),
-            force_update: opt.force_cache_update_on_init,
+            force_update,
         })
     }
 
@@ -156,7 +188,7 @@ impl CollectionCache {
                 // clean up non-exitent directories
                 inner.clean_up_folders();
 
-                // inittial scan of directory
+                // initial scan of directory
                 let updater = RecursiveUpdater::new(&inner, None, force_update);
                 updater.process();
                 force_update = false;

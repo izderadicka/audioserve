@@ -5,11 +5,10 @@ use crate::{
     error::{invalid_option, invalid_option_err, Result},
     no_cache::CollectionDirect,
     position::PositionsCollector,
-    AudioFolderShort, FoldersOrdering, Position, VERSION,
+    AudioFolderShort, FoldersOrdering, Position,
 };
 use enum_dispatch::enum_dispatch;
 use media_info::tags::{ALLOWED_TAGS, BASIC_TAGS};
-use serde_derive::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{
     collections::{HashMap, HashSet},
@@ -24,12 +23,10 @@ pub enum PositionsData {
     V1(Map<String, Value>),
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone)]
 pub struct CollectionOptions {
     pub no_cache: bool,
     pub folder_options: FolderOptions,
-    pub col_version: &'static str,
-    pub pgm_version: &'static str,
     pub force_cache_update_on_init: bool,
 }
 
@@ -38,8 +35,6 @@ impl Default for CollectionOptions {
         Self {
             no_cache: false,
             folder_options: Default::default(),
-            col_version: VERSION,
-            pgm_version: Default::default(),
             force_cache_update_on_init: false,
         }
     }
@@ -133,15 +128,10 @@ pub struct CollectionOptionsMap {
 }
 
 impl CollectionOptionsMap {
-    pub fn new(
-        default_folder_options: FolderOptions,
-        force_cache_update: bool,
-        pgm_version: &'static str,
-    ) -> Self {
+    pub fn new(default_folder_options: FolderOptions, force_cache_update: bool) -> Self {
         let mut default = CollectionOptions::default();
         default.force_cache_update_on_init = force_cache_update;
         default.folder_options = default_folder_options;
-        default.pgm_version = pgm_version;
         CollectionOptionsMap {
             cols: HashMap::new(),
             default,
