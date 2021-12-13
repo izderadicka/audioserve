@@ -42,6 +42,7 @@ jobs:
         username: ${{ secrets.AUDIOSERVE_USERNAME }}
         key: ${{ secrets.AUDIOSERVE_KEY }}
         script: |
+          docker stop -t 30 audioserve || true
           docker rm -f audioserve || true
           docker pull izderadicka/audioserve:unstable
           ./run-audioserve.sh
