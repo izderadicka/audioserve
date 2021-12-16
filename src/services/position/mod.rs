@@ -125,114 +125,108 @@ impl FromStr for Msg {
 
 pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseFuture {
     debug!("We got these headers on websocket: {:?}", req.headers());
-    //let col = col.clone();
     let res = spawn_websocket_with_timeout::<Location, _>(
         req.into_request(),
-        move |m| {
+        move |m, ctx| {
             debug!("Got message {:?}", m);
             let message = m.to_str().map_err(Error::new).and_then(str::parse);
             let col = col.clone();
             match message {
-                Ok(message) => Box::pin(async move {
-                    Ok(match message {
-                        Msg::Position {
-                            position,
-                            file_path,
-                            timestamp,
-                        } => {
-                            match file_path {
-                                Some(file_loc) => {
-                                    {
-                                        let mut p = m.context_ref().write().await;
-                                        *p = file_loc.clone();
-                                    }
-                                    if let Some(ts) = timestamp {
-                                        col.insert_position_if_newer_async(
-                                            file_loc.collection,
-                                            file_loc.group,
-                                            file_loc.path,
-                                            position,
-                                            false,
-                                            ts.into(),
-                                        )
-                                        .await
-                                    } else {
-                                        col.insert_position_async(
-                                            file_loc.collection,
-                                            file_loc.group,
-                                            file_loc.path,
-                                            position,
-                                            false,
-                                        )
-                                        .await
-                                    }
-                                    .unwrap_or_else(|e| error!("Cannot insert position: {}", e))
-                                }
+                Ok(message) => match message {
+                    Msg::Position {
+                        position,
+                        file_path,
+                        timestamp,
+                    } => match file_path {
+                        Some(file_loc) => {
+                            *ctx = file_loc.clone();
 
-                                None => {
-                                    let prev = { m.context_ref().read().await.clone() };
-
-                                    if !prev.path.is_empty() {
-                                        col.insert_position_async(
-                                            prev.collection,
-                                            prev.group,
-                                            prev.path,
-                                            position,
-                                            false,
-                                        )
-                                        .await
-                                        .unwrap_or_else(|e| error!("Cannot insert position: {}", e))
-                                    } else {
-                                        error!(
-                                            "Client sent short position, but there is no context"
-                                        );
-                                    }
-                                }
-                            };
-
-                            None
-                        }
-                        Msg::GenericQuery { group } => {
-                            let last = col.clone().get_last_position_async(group).await;
-                            let res = Reply {
-                                folder: None,
-                                last: last.map(PositionCompatible::from),
-                            };
-
-                            Some(ws::Message::text(
-                                serde_json::to_string(&res).unwrap(),
-                                m.context(),
-                            ))
-                        }
-
-                        Msg::FolderQuery { folder_path } => {
-                            let last = col
-                                .clone()
-                                .get_last_position_async(folder_path.group.clone())
-                                .await;
-                            let folder = col
-                                .get_position_async(
-                                    folder_path.collection,
-                                    folder_path.group,
-                                    folder_path.path,
-                                )
-                                .await;
-                            let res = Reply {
-                                last: if last != folder {
-                                    last.map(PositionCompatible::from)
+                            Box::pin(async move {
+                                if let Some(ts) = timestamp {
+                                    col.insert_position_if_newer_async(
+                                        file_loc.collection,
+                                        file_loc.group,
+                                        file_loc.path,
+                                        position,
+                                        false,
+                                        ts.into(),
+                                    )
+                                    .await
                                 } else {
-                                    None
-                                },
-                                folder: folder.map(PositionCompatible::from),
-                            };
-
-                            Some(ws::Message::text(
-                                serde_json::to_string(&res).unwrap(),
-                                m.context(),
-                            ))
+                                    col.insert_position_async(
+                                        file_loc.collection,
+                                        file_loc.group,
+                                        file_loc.path,
+                                        position,
+                                        false,
+                                    )
+                                    .await
+                                }
+                                .unwrap_or_else(|e| error!("Cannot insert position: {}", e));
+                                Ok(None)
+                            })
                         }
-                    })
-                }),
+
+                        None => {
+                            let prev = ctx.clone();
+
+                            Box::pin(async move {
+                                if !prev.path.is_empty() {
+                                    col.insert_position_async(
+                                        prev.collection,
+                                        prev.group,
+                                        prev.path,
+                                        position,
+                                        false,
+                                    )
+                                    .await
+                                    .unwrap_or_else(|e| error!("Cannot insert position: {}", e))
+                                } else {
+                                    error!("Client sent short position, but there is no context");
+                                }
+
+                                Ok(None)
+                            })
+                        }
+                    },
+                    Msg::GenericQuery { group } => Box::pin(async move {
+                        let last = col.get_last_position_async(group).await;
+                        let res = Reply {
+                            folder: None,
+                            last: last.map(PositionCompatible::from),
+                        };
+
+                        Ok(Some(ws::Message::text(
+                            serde_json::to_string(&res).unwrap(),
+                        )))
+                    }),
+
+                    Msg::FolderQuery { folder_path } => Box::pin(async move {
+                        let last = col
+                            .clone()
+                            .get_last_position_async(folder_path.group.clone())
+                            .await;
+                        let folder = col
+                            .get_position_async(
+                                folder_path.collection,
+                                folder_path.group,
+                                folder_path.path,
+                            )
+                            .await;
+                        let res = Reply {
+                            last: if last != folder {
+                                last.map(PositionCompatible::from)
+                            } else {
+                                None
+                            },
+                            folder: folder.map(PositionCompatible::from),
+                        };
+
+                        Ok(Some(ws::Message::text(
+                            serde_json::to_string(&res).unwrap(),
+                        )))
+                    }),
+                },
                 Err(e) => {
                     error!("Position message error: {}", e);
                     Box::pin(future::ok(None))
