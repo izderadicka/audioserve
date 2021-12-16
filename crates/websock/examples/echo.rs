@@ -47,22 +47,13 @@ async fn route(req: Request<Body>) -> Result<Response<Body>, Infallible> {
 async fn server_upgrade(req: Request<Body>) -> Result<Response<Body>, io::Error> {
     debug!("We got these headers: {:?}", req.headers());
 
-    Ok(ws::spawn_websocket_with_timeout(
+    Ok(ws::spawn_websocket_with_timeout::<u32, _>(
         req,
-        |m| {
-            Box::pin(async move {
-                debug!("Got message {:?}", m);
-                let counter: u64 = {
-                    let mut c = m.context_ref().write().await;
-                    *c = *c + 1;
-                    *c
-                };
-
-                Ok(Some(ws::Message::text(
-                    format!("{}: {}", counter, m.to_str().unwrap()),
-                    m.context(),
-                )))
-            })
+        |m, ctx| {
+            debug!("Got message {:?}", m);
+            *ctx += 1;
+            let text = format!("{}: {}", ctx, m.to_str().expect("string message"));
+            Box::pin(async move { Ok(Some(ws::Message::text(text))) })
         },
         Duration::from_secs(5 * 60),
     ))

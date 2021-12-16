@@ -2,18 +2,15 @@
 extern crate log;
 
 use futures::prelude::*;
-use futures::ready;
 use headers::{self, HeaderMapExt};
 use hyper::header::{self, AsHeaderName, HeaderMap, HeaderValue};
 use hyper::upgrade;
 use hyper::{Body, Request, Response, StatusCode};
 use std::io;
 use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll};
 use std::{fmt, time::Duration};
 use thiserror::Error;
-use tokio::{self, sync::RwLock};
+use tokio;
 use tokio_tungstenite::{
     tungstenite::{self, protocol},
     WebSocketStream,
@@ -29,7 +26,12 @@ pub enum Error {
 
     #[error("Message is of incorrect type")]
     InvalidMessageType,
+
+    #[error("Application protocol error: {0}")]
+    ApplicationProtocol(String),
 }
+
+pub type MessageFuture = Pin<Box<dyn Future<Output = Result<Option<Message>, Error>> + Send>>;
 
 fn header_matches<S: AsHeaderName>(headers: &HeaderMap<HeaderValue>, name: S, value: &str) -> bool {
     headers
@@ -51,9 +53,7 @@ fn header_matches<S: AsHeaderName>(headers: &HeaderMap<HeaderValue>, name: S, va
 pub fn spawn_websocket<T, F>(req: Request<Body>, f: F) -> Response<Body>
 where
     T: Default + Send + Sync + 'static,
-    F: FnMut(Message<T>) -> Pin<Box<dyn Future<Output = Result<Option<Message<T>>, Error>> + Send>>
-        + Send
-        + 'static,
+    F: FnMut(Message, &mut T) -> MessageFuture + Send + 'static,
 {
     spawn_websocket_inner(req, f, None)
 }
@@ -65,9 +65,7 @@ pub fn spawn_websocket_with_timeout<T, F>(
 ) -> Response<Body>
 where
     T: Default + Send + Sync + 'static,
-    F: FnMut(Message<T>) -> Pin<Box<dyn Future<Output = Result<Option<Message<T>>, Error>> + Send>>
-        + Send
-        + 'static,
+    F: FnMut(Message, &mut T) -> MessageFuture + Send + 'static,
 {
     spawn_websocket_inner(req, f, Some(timeout))
 }
@@ -80,9 +78,7 @@ fn spawn_websocket_inner<T, F>(
 ) -> Response<Body>
 where
     T: Default + Send + Sync + 'static,
-    F: FnMut(Message<T>) -> Pin<Box<dyn Future<Output = Result<Option<Message<T>>, Error>> + Send>>
-        + Send
-        + 'static,
+    F: FnMut(Message, &mut T) -> MessageFuture + Send + 'static,
 {
     match upgrade_connection::<T>(req) {
         Err(r) => r,
@@ -90,13 +86,12 @@ where
             let ws_process = async move {
                 match ws_future.await {
                     Err(_) => error!("Failed upgrade to websocket"),
-                    Ok(ws) => {
-                        let (mut tx, mut rc) = ws.split();
+                    Ok(mut ws) => {
                         loop {
                             let next = async {
                                 match timeout {
-                                    None => Ok(rc.next().await),
-                                    Some(d) => tokio::time::timeout(d, rc.next()).await,
+                                    None => Ok(ws.next().await),
+                                    Some(d) => tokio::time::timeout(d, ws.next()).await,
                                 }
                             };
                             match next.await {
@@ -114,13 +109,12 @@ where
                                 Ok(Some(msg)) => {
                                     match msg {
                                         Ok(m) => {
-                                            let reply: Option<Message<_>> = match m.inner {
+                                            let reply: Option<Message> = match m.inner {
                                                 protocol::Message::Ping(p) => {
                                                     // Send Pong for Ping
                                                     debug!("Got ping {:?}", p);
                                                     Some(Message {
                                                         inner: protocol::Message::Pong(p),
-                                                        context: m.context,
                                                     })
                                                 }
                                                 protocol::Message::Close(_) => {
@@ -128,7 +122,7 @@ where
                                                     // TODO: According to RFC6455 we should reply to close message - is it done by library or do we need to do it here?
                                                     None
                                                 }
-                                                _ => match f(m).await {
+                                                _ => match f(m, &mut ws.context).await {
                                                     Ok(m) => m,
                                                     Err(e) => {
                                                         error!("error when processing message: {}; will close WS", e);
@@ -138,7 +132,7 @@ where
                                             };
 
                                             if let Some(m) = reply {
-                                                if let Err(e) = tx.send(m).await {
+                                                if let Err(e) = ws.send(m).await {
                                                     error!("error sending reply message: {}", e);
                                                 };
                                             }
@@ -230,7 +224,7 @@ pub fn upgrade_connection<T: Default>(
 /// This struct can hold a context for this particular connection
 pub struct WebSocket<T> {
     inner: WebSocketStream<::hyper::upgrade::Upgraded>,
-    context: Arc<RwLock<T>>,
+    context: T,
 }
 
 impl<T: Default> WebSocket<T> {
@@ -239,7 +233,7 @@ impl<T: Default> WebSocket<T> {
         let inner = WebSocketStream::from_raw_socket(upgraded, protocol::Role::Server, None).await;
         WebSocket {
             inner,
-            context: Arc::new(RwLock::new(T::default())),
+            context: T::default(),
         }
     }
 }
@@ -249,66 +243,18 @@ impl<T> WebSocket<T> {
     #[allow(dead_code)]
     pub(crate) async fn new_with_context(upgraded: hyper::upgrade::Upgraded, context: T) -> Self {
         let inner = WebSocketStream::from_raw_socket(upgraded, protocol::Role::Server, None).await;
-        WebSocket {
-            inner,
-            context: Arc::new(RwLock::new(context)),
-        }
-    }
-}
-
-impl<T> Stream for WebSocket<T> {
-    type Item = Result<Message<T>, crate::Error>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        match ready!(Pin::new(&mut self.inner).poll_next(cx)) {
-            Some(Ok(item)) => Poll::Ready(Some(Ok(Message {
-                inner: item,
-                context: self.context.clone(),
-            }))),
-            Some(Err(e)) => Poll::Ready(Some(Err(crate::Error::Ws(e)))),
-            None => {
-                log::trace!("websocket closed");
-                Poll::Ready(None)
-            }
-        }
-    }
-}
-
-impl<T> Sink<Message<T>> for WebSocket<T> {
-    type Error = crate::Error;
-
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match ready!(Pin::new(&mut self.inner).poll_ready(cx)) {
-            Ok(()) => Poll::Ready(Ok(())),
-            Err(e) => Poll::Ready(Err(crate::Error::Ws(e))),
-        }
+        WebSocket { inner, context }
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: Message<T>) -> Result<(), Self::Error> {
-        match Pin::new(&mut self.inner).start_send(item.inner) {
-            Ok(()) => Ok(()),
-            Err(e) => {
-                log::debug!("websocket start_send error: {}", e);
-                Err(crate::Error::Ws(e))
-            }
-        }
+    pub async fn next(&mut self) -> Option<Result<Message, Error>> {
+        self.inner.next().await.map(move |r| match r {
+            Ok(m) => Ok(Message { inner: m }),
+            Err(e) => Err(crate::Error::Ws(e)),
+        })
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        match ready!(Pin::new(&mut self.inner).poll_flush(cx)) {
-            Ok(()) => Poll::Ready(Ok(())),
-            Err(e) => Poll::Ready(Err(crate::Error::Ws(e))),
-        }
-    }
-
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        match ready!(Pin::new(&mut self.inner).poll_close(cx)) {
-            Ok(()) => Poll::Ready(Ok(())),
-            Err(err) => {
-                log::debug!("websocket close error: {}", err);
-                Poll::Ready(Err(crate::Error::Ws(err)))
-            }
-        }
+    pub async fn send(&mut self, m: Message) -> Result<(), Error> {
+        self.inner.send(m.inner).await.map_err(Error::from)
     }
 }
 
@@ -322,26 +268,23 @@ impl<T> fmt::Debug for WebSocket<T> {
 ///
 /// Only repesents Text and Binary messages.
 ///
-#[derive(Clone)]
-pub struct Message<T> {
+
+pub struct Message {
     inner: protocol::Message,
-    context: Arc<RwLock<T>>,
 }
 
-impl<T> Message<T> {
+impl Message {
     /// Constructs a new Text `Message`.
-    pub fn text<S: Into<String>>(s: S, context: Arc<RwLock<T>>) -> Self {
+    pub fn text<S: Into<String>>(s: S) -> Self {
         Message {
             inner: protocol::Message::text(s),
-            context,
         }
     }
 
     /// Constructs a new Binary `Message`.
-    pub fn binary<V: Into<Vec<u8>>>(v: V, context: Arc<RwLock<T>>) -> Self {
+    pub fn binary<V: Into<Vec<u8>>>(v: V) -> Self {
         Message {
             inner: protocol::Message::binary(v),
-            context,
         }
     }
 
@@ -376,19 +319,9 @@ impl<T> Message<T> {
             _ => unreachable!(),
         }
     }
-
-    /// Consumes this message and returns it's context
-    pub fn context(self) -> Arc<RwLock<T>> {
-        self.context
-    }
-
-    /// Returns reference to this message context
-    pub fn context_ref(&self) -> &Arc<RwLock<T>> {
-        &self.context
-    }
 }
 
-impl<T> fmt::Debug for Message<T> {
+impl fmt::Debug for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(&self.inner, f)
     }
