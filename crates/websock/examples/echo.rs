@@ -47,15 +47,17 @@ async fn route(req: Request<Body>) -> Result<Response<Body>, Infallible> {
 async fn server_upgrade(req: Request<Body>) -> Result<Response<Body>, io::Error> {
     debug!("We got these headers: {:?}", req.headers());
 
-    Ok(ws::spawn_websocket_with_timeout::<u32, _>(
+    Ok(ws::spawn_websocket::<u32, _>(
         req,
         |m, ctx| {
-            debug!("Got message {:?}", m);
-            *ctx += 1;
-            let text = format!("{}: {}", ctx, m.to_str().expect("string message"));
-            Box::pin(async move { Ok(Some(ws::Message::text(text))) })
+            Box::pin(async move {
+                debug!("Got message {:?}", m);
+                *ctx += 1;
+                let text = format!("{}: {}", ctx, m.to_str().expect("string message"));
+                Ok(Some(ws::Message::text(text)))
+            })
         },
-        Duration::from_secs(5 * 60),
+        Some(Duration::from_secs(5 * 60)),
     ))
 }
 #[tokio::main]

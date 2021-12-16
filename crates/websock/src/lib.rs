@@ -31,7 +31,8 @@ pub enum Error {
     ApplicationProtocol(String),
 }
 
-pub type MessageFuture = Pin<Box<dyn Future<Output = Result<Option<Message>, Error>> + Send>>;
+pub type MessageFuture<'a> =
+    Pin<Box<dyn Future<Output = Result<Option<Message>, Error>> + Send + 'a>>;
 
 fn header_matches<S: AsHeaderName>(headers: &HeaderMap<HeaderValue>, name: S, value: &str) -> bool {
     headers
@@ -43,42 +44,27 @@ fn header_matches<S: AsHeaderName>(headers: &HeaderMap<HeaderValue>, name: S, va
 
 /// This is a high level function that spawn a websocket handler from
 /// appropriate HTTP request (e.g. websocket upgrade request).
-/// Each incomming message can be then processed with function f,
+/// Each incoming message can be then processed with function f,
 /// which returns future with optional response to this message.
+/// Function f also receives mut reference to context, that is shared
+/// between all messages in same websocket connection.
+///
+/// Optionally timeout can be given, which closes websocket in no
+/// message arrives within given time
+///
 /// This function returns immediate HTTP response, which is either of status
 /// 101 Protocol upgrade, if websocket handshake is OK, or of status 400, if
 /// handshake was no successful.
 ///
-/// All messages in this websocket share (guarded by RwLock) context of type T
-pub fn spawn_websocket<T, F>(req: Request<Body>, f: F) -> Response<Body>
-where
-    T: Default + Send + Sync + 'static,
-    F: FnMut(Message, &mut T) -> MessageFuture + Send + 'static,
-{
-    spawn_websocket_inner(req, f, None)
-}
 
-pub fn spawn_websocket_with_timeout<T, F>(
-    req: Request<Body>,
-    f: F,
-    timeout: Duration,
-) -> Response<Body>
-where
-    T: Default + Send + Sync + 'static,
-    F: FnMut(Message, &mut T) -> MessageFuture + Send + 'static,
-{
-    spawn_websocket_inner(req, f, Some(timeout))
-}
-
-/// Implementation of spawn websocket
-fn spawn_websocket_inner<T, F>(
+pub fn spawn_websocket<T, F>(
     req: Request<Body>,
     mut f: F,
     timeout: Option<Duration>,
 ) -> Response<Body>
 where
     T: Default + Send + Sync + 'static,
-    F: FnMut(Message, &mut T) -> MessageFuture + Send + 'static,
+    F: for<'a> FnMut(Message, &'a mut T) -> MessageFuture<'a> + Send + 'static,
 {
     match upgrade_connection::<T>(req) {
         Err(r) => r,

@@ -6,7 +6,7 @@ use collection::{Collections, Position};
 use futures::future;
 use std::str::FromStr;
 use std::sync::Arc;
-use websock::{self as ws, spawn_websocket_with_timeout};
+use websock::{self as ws, spawn_websocket};
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 struct Location {
@@ -125,7 +125,7 @@ impl FromStr for Msg {
 
 pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseFuture {
     debug!("We got these headers on websocket: {:?}", req.headers());
-    let res = spawn_websocket_with_timeout::<Location, _>(
+    let res = spawn_websocket::<Location, _>(
         req.into_request(),
         move |m, ctx| {
             debug!("Got message {:?}", m);
@@ -233,7 +233,7 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseF
                 }
             }
         },
-        get_config().positions.ws_timeout,
+        Some(get_config().positions.ws_timeout),
     );
 
     Box::pin(future::ok(res))
