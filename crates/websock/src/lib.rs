@@ -7,7 +7,6 @@ use hyper::header::{self, AsHeaderName, HeaderMap, HeaderValue};
 use hyper::upgrade;
 use hyper::{Body, Request, Response, StatusCode};
 use std::io;
-use std::pin::Pin;
 use std::{fmt, time::Duration};
 use thiserror::Error;
 use tokio;
@@ -31,8 +30,24 @@ pub enum Error {
     ApplicationProtocol(String),
 }
 
-pub type MessageFuture<'a> =
-    Pin<Box<dyn Future<Output = Result<Option<Message>, Error>> + Send + 'a>>;
+pub type MessageResult = Result<Option<Message>, Error>;
+
+pub trait MessageProcessor<'a, T> {
+    type Fut: Future<Output = MessageResult> + Send + 'a;
+    fn process_message(&mut self, m: Message, ctx: &'a mut T) -> Self::Fut;
+}
+
+impl<'a, T, F, P> MessageProcessor<'a, T> for P
+where
+    P: FnMut(Message, &'a mut T) -> F,
+    F: Future<Output = MessageResult> + Send + 'a,
+    T: 'a,
+{
+    type Fut = F;
+    fn process_message(&mut self, m: Message, ctx: &'a mut T) -> Self::Fut {
+        self(m, ctx)
+    }
+}
 
 fn header_matches<S: AsHeaderName>(headers: &HeaderMap<HeaderValue>, name: S, value: &str) -> bool {
     headers
@@ -57,16 +72,17 @@ fn header_matches<S: AsHeaderName>(headers: &HeaderMap<HeaderValue>, name: S, va
 /// handshake was no successful.
 ///
 
-pub fn spawn_websocket<T, F>(
+pub fn spawn_websocket<T, P>(
     req: Request<Body>,
-    mut f: F,
+    mut f: P,
+    initial_context: T,
     timeout: Option<Duration>,
 ) -> Response<Body>
 where
-    T: Default + Send + Sync + 'static,
-    F: for<'a> FnMut(Message, &'a mut T) -> MessageFuture<'a> + Send + 'static,
+    T: Send + Sync + 'static,
+    P: for<'a> MessageProcessor<'a, T> + Send + 'static,
 {
-    match upgrade_connection::<T>(req) {
+    match upgrade_connection::<T>(req, initial_context) {
         Err(r) => r,
         Ok((r, ws_future)) => {
             let ws_process = async move {
@@ -108,7 +124,10 @@ where
                                                     // TODO: According to RFC6455 we should reply to close message - is it done by library or do we need to do it here?
                                                     None
                                                 }
-                                                _ => match f(m, &mut ws.context).await {
+                                                _ => match f
+                                                    .process_message(m, &mut ws.context)
+                                                    .await
+                                                {
                                                     Ok(m) => m,
                                                     Err(e) => {
                                                         error!("error when processing message: {}; will close WS", e);
@@ -145,8 +164,9 @@ where
 ///
 /// Websocket can have context of type T, which is then shared (guarded by RwLock) with all
 /// messages in this websocket.
-pub fn upgrade_connection<T: Default>(
+pub fn upgrade_connection<T: Send>(
     mut req: Request<Body>,
+    ctx: T,
 ) -> Result<
     (
         Response<Body>,
@@ -199,7 +219,7 @@ pub fn upgrade_connection<T: Default>(
         .map_err(|err| error!("Cannot create websocket: {} ", err))
         .and_then(|upgraded| async {
             debug!("Connection upgraded to websocket");
-            let r = WebSocket::new(upgraded).await;
+            let r = WebSocket::new_with_context(upgraded, ctx).await;
             Ok(r)
         });
 
@@ -215,6 +235,7 @@ pub struct WebSocket<T> {
 
 impl<T: Default> WebSocket<T> {
     /// Creates new WebSocket from an upgraded connection with default context
+    #[allow(dead_code)]
     pub(crate) async fn new(upgraded: hyper::upgrade::Upgraded) -> Self {
         let inner = WebSocketStream::from_raw_socket(upgraded, protocol::Role::Server, None).await;
         WebSocket {
@@ -226,7 +247,6 @@ impl<T: Default> WebSocket<T> {
 
 impl<T> WebSocket<T> {
     /// Creates new WebSocket from an upgraded connection with default context
-    #[allow(dead_code)]
     pub(crate) async fn new_with_context(upgraded: hyper::upgrade::Upgraded, context: T) -> Self {
         let inner = WebSocketStream::from_raw_socket(upgraded, protocol::Role::Server, None).await;
         WebSocket { inner, context }

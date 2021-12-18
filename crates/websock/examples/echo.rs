@@ -43,20 +43,21 @@ async fn route(req: Request<Body>) -> Result<Response<Body>, Infallible> {
     .or_else(|e| Ok(error_response(e.to_string())))
 }
 
+async fn process_message(m: ws::Message, ctx: &mut u32) -> ws::MessageResult {
+    debug!("Got message {:?}", m);
+    *ctx += 1;
+    let text = format!("{}: {}", ctx, m.to_str().expect("string message"));
+    Ok(Some(ws::Message::text(text)))
+}
+
 /// Our server HTTP handler to initiate HTTP upgrades.
 async fn server_upgrade(req: Request<Body>) -> Result<Response<Body>, io::Error> {
     debug!("We got these headers: {:?}", req.headers());
 
-    Ok(ws::spawn_websocket::<u32, _>(
+    Ok(ws::spawn_websocket(
         req,
-        |m, ctx| {
-            Box::pin(async move {
-                debug!("Got message {:?}", m);
-                *ctx += 1;
-                let text = format!("{}: {}", ctx, m.to_str().expect("string message"));
-                Ok(Some(ws::Message::text(text)))
-            })
-        },
+        process_message,
+        0,
         Some(Duration::from_secs(5 * 60)),
     ))
 }
