@@ -162,7 +162,7 @@ where
 /// future resolving to Websocket( struct implementing Stream and Sink of messages) or
 /// error response (status 400) if websocket handshake was not successful
 ///
-/// Websocket can have context of type T, which is then shared (guarded by RwLock) with all
+/// Websocket can have context of type T, which is then shared with all
 /// messages in this websocket.
 pub fn upgrade_connection<T: Send>(
     mut req: Request<Body>,
