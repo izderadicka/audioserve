@@ -394,7 +394,7 @@ impl<C: 'static> FileSendService<C> {
         }
 
         // handle OPTIONS method for CORS preflightAtomicUsize
-        if req.method() == Method::OPTIONS && get_config().cors {
+        if req.method() == Method::OPTIONS && get_config().is_cors_enabled(&req) {
             debug!(
                 "Got OPTIONS request in CORS mode : {} {:?}",
                 req.uri(),
@@ -435,7 +435,7 @@ impl<C: 'static> FileSendService<C> {
         // from here everything must be authenticated
         let searcher = self.search.clone();
         let transcoding = self.transcoding.clone();
-        let cors = get_config().cors;
+        let cors = get_config().is_cors_enabled(&req.request);
         let origin = req.headers().typed_get::<Origin>();
 
         let resp = match self.authenticator {

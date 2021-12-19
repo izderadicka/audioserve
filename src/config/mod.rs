@@ -1,4 +1,6 @@
 use collection::MINIMUM_CHAPTER_DURATION;
+use hyper::{Body, Request};
+use regex::Regex;
 
 pub use self::error::{Error, Result};
 use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
@@ -307,6 +309,37 @@ impl PositionsConfig {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum Cors {
+    Disable,
+    EnableAllOrigins,
+    EnableMatchingOrigins(Regex),
+}
+
+impl Default for Cors {
+    fn default() -> Self {
+        Cors::Disable
+    }
+}
+
+impl FromStr for Cors {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "" => Ok(Cors::Disable),
+            "*" => Ok(Cors::EnableAllOrigins),
+            re => {
+                let re = Regex::new(re).map_err(|e| Error::ConfigValue {
+                    name: "cors",
+                    message: format!("Invalid cors regex: {}", e).into(),
+                })?;
+                Ok(Cors::EnableMatchingOrigins(re))
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -321,7 +354,9 @@ pub struct Config {
     pub token_validity_hours: u32,
     pub secret_file: PathBuf,
     pub client_dir: PathBuf,
-    pub cors: bool,
+    pub cors: String,
+    #[serde(skip)]
+    cors_inner: Cors,
     pub ssl: Option<SslConfig>,
     pub allow_symlinks: bool,
     pub search_cache: bool,
@@ -468,6 +503,16 @@ impl Config {
             Some(self.tags.clone())
         }
     }
+
+    pub fn is_cors_enabled(&self, req: &Request<Body>) -> bool {
+        match self.cors_inner {
+            Cors::Disable => false,
+            Cors::EnableAllOrigins => true,
+            Cors::EnableMatchingOrigins(_) => {
+                todo!()
+            }
+        }
+    }
 }
 
 impl Default for Config {
@@ -485,7 +530,8 @@ impl Default for Config {
             token_validity_hours: 365 * 24,
             client_dir: "client/dist".into(),
             secret_file: data_base_dir.join("audioserve.secret"),
-            cors: false,
+            cors: "".to_string(),
+            cors_inner: Cors::default(),
             ssl: None,
             allow_symlinks: false,
             search_cache: false,
