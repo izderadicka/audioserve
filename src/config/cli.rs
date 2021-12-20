@@ -482,7 +482,7 @@ where
     }
 
     if is_present_or_env("cors", "AUDIOSERVE_CORS") {
-        config.cors = match args.value_of("cors-regexp") {
+        config.cors = match args.value_of("cors-regex") {
             Some(o) => Some(CorsConfig {
                 inner: o.parse()?,
                 regex: Some(o.to_string()),
@@ -721,6 +721,7 @@ mod test {
             "--chapters-duration",
             "99",
             "--cors",
+            "--cors-regex", "mameluci",
             "--url-path-prefix",
             "/user/audioserve",
             "test_data",
@@ -740,7 +741,7 @@ mod test {
         assert_eq!(PathBuf::from("test_data/some_secret"), c.secret_file);
         assert_eq!(99, c.chapters.from_duration);
         assert_eq!(99, c.chapters.duration);
-        assert!(matches!(c.cors.unwrap().inner, Cors::AllowAllOrigins));
+        assert!(matches!(c.cors.unwrap().inner, Cors::AllowMatchingOrigins(_)));
         assert_eq!("/user/audioserve", c.url_path_prefix.unwrap())
     }
 
