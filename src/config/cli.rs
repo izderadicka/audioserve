@@ -161,8 +161,14 @@ fn create_parser<'a>() -> Parser<'a> {
             )
         .arg(Arg::with_name("cors")
             .long("cors")
-            .help("Enable CORS - * enables any origin of requests or regular expression to match origin")
-            .env("AUDIOSERVE_CORS")
+            .help("Enable CORS for all origins")
+            .conflicts_with("cors-regexp")
+            )
+            .arg(Arg::with_name("cors-regex")
+            .long("cors-regex")
+            .help("Enable CORS only for origins that matches given regular expression")
+            .env("AUDIOSERVE_CORS_REGEX")
+            .conflicts_with("cors")
             .takes_value(true)
             )
         .arg(Arg::with_name("chapters-from-duration")
@@ -476,12 +482,24 @@ where
         config.secret_file = secret_file.into()
     }
 
-    if let Some(o) = args.value_of("cors") {
-        config.cors_inner = o.parse()?;
-        config.cors = o.into();
-    } else {
+    if is_present_or_env("cors", "AUDIOSERVE_CORS") {
+        config.cors = match args.value_of("cors-regexp") {
+            Some(o) => Some(CorsConfig {
+                inner: o.parse()?,
+                regex: Some(o.to_string()),
+            }),
+            None => Some(CorsConfig {
+                inner: Cors::AllowAllOrigins,
+                regex: None,
+            }),
+        }
+    } else if let Some(cc) = config.cors.as_mut() {
         // still need to parse from config
-        config.cors_inner = config.cors.parse()?;
+        if let Some(re) = cc.regex.as_ref() {
+            cc.inner = re.parse()?;
+        } else {
+            cc.inner = Cors::AllowAllOrigins
+        }
     }
 
     if is_present_or_env("force-cache-update", "AUDIOSERVE_FORCE_CACHE_UPDATE") {
@@ -704,7 +722,6 @@ mod test {
             "--chapters-duration",
             "99",
             "--cors",
-            "*",
             "--url-path-prefix",
             "/user/audioserve",
             "test_data",
@@ -724,8 +741,7 @@ mod test {
         assert_eq!(PathBuf::from("test_data/some_secret"), c.secret_file);
         assert_eq!(99, c.chapters.from_duration);
         assert_eq!(99, c.chapters.duration);
-        assert_eq!("*", c.cors);
-        assert!(matches!(c.cors_inner, Cors::EnableAllOrigins));
+        assert!(matches!(c.cors.unwrap().inner, Cors::AllowAllOrigins));
         assert_eq!("/user/audioserve", c.url_path_prefix.unwrap())
     }
 
@@ -795,5 +811,6 @@ mod test {
         assert_eq!("neco", c.ssl.as_ref().unwrap().key_password);
         assert_eq!(Some("asecret".into()), c.shared_secret);
         assert_eq!(Some("/user/audioserve".into()), c.url_path_prefix);
+        assert!(matches!(c.cors.unwrap().inner, Cors::AllowAllOrigins));
     }
 }

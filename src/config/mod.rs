@@ -309,16 +309,23 @@ impl PositionsConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CorsConfig {
+    #[serde(default)]
+    pub regex: Option<String>,
+    #[serde(skip)]
+    inner: Cors,
+}
+
 #[derive(Debug, Clone)]
 pub enum Cors {
-    Disable,
-    EnableAllOrigins,
-    EnableMatchingOrigins(Regex),
+    AllowAllOrigins,
+    AllowMatchingOrigins(Regex),
 }
 
 impl Default for Cors {
     fn default() -> Self {
-        Cors::Disable
+        Cors::AllowAllOrigins
     }
 }
 
@@ -326,17 +333,11 @@ impl FromStr for Cors {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "" => Ok(Cors::Disable),
-            "*" => Ok(Cors::EnableAllOrigins),
-            re => {
-                let re = Regex::new(re).map_err(|e| Error::ConfigValue {
-                    name: "cors",
-                    message: format!("Invalid cors regex: {}", e).into(),
-                })?;
-                Ok(Cors::EnableMatchingOrigins(re))
-            }
-        }
+        let re = Regex::new(s).map_err(|e| Error::ConfigValue {
+            name: "cors-regex",
+            message: format!("Invalid cors regex: {}", e).into(),
+        })?;
+        Ok(Cors::AllowMatchingOrigins(re))
     }
 }
 
@@ -354,9 +355,7 @@ pub struct Config {
     pub token_validity_hours: u32,
     pub secret_file: PathBuf,
     pub client_dir: PathBuf,
-    pub cors: String,
-    #[serde(skip)]
-    cors_inner: Cors,
+    pub cors: Option<CorsConfig>,
     pub ssl: Option<SslConfig>,
     pub allow_symlinks: bool,
     pub search_cache: bool,
@@ -505,12 +504,28 @@ impl Config {
     }
 
     pub fn is_cors_enabled(&self, req: &Request<Body>) -> bool {
-        match self.cors_inner {
-            Cors::Disable => false,
-            Cors::EnableAllOrigins => true,
-            Cors::EnableMatchingOrigins(_) => {
-                todo!()
+        if let Some(cors) = self.cors.as_ref() {
+            match &cors.inner {
+                Cors::AllowAllOrigins => true,
+                Cors::AllowMatchingOrigins(re) => req
+                    .headers()
+                    .get("origin")
+                    .and_then(|v| {
+                        v.to_str()
+                            .map_err(|e| error!("Invalid origin header: {}", e))
+                            .ok()
+                    })
+                    .map(|s| {
+                        if s.to_ascii_lowercase() == "null" {
+                            false
+                        } else {
+                            re.is_match(s)
+                        }
+                    })
+                    .unwrap_or(false),
             }
+        } else {
+            false
         }
     }
 }
@@ -530,8 +545,7 @@ impl Default for Config {
             token_validity_hours: 365 * 24,
             client_dir: "client/dist".into(),
             secret_file: data_base_dir.join("audioserve.secret"),
-            cors: "".to_string(),
-            cors_inner: Cors::default(),
+            cors: None,
             ssl: None,
             allow_symlinks: false,
             search_cache: false,
