@@ -721,7 +721,8 @@ mod test {
             "--chapters-duration",
             "99",
             "--cors",
-            "--cors-regex", "mameluci",
+            "--cors-regex",
+            "mameluci",
             "--url-path-prefix",
             "/user/audioserve",
             "test_data",
@@ -741,7 +742,10 @@ mod test {
         assert_eq!(PathBuf::from("test_data/some_secret"), c.secret_file);
         assert_eq!(99, c.chapters.from_duration);
         assert_eq!(99, c.chapters.duration);
-        assert!(matches!(c.cors.unwrap().inner, Cors::AllowMatchingOrigins(_)));
+        assert!(matches!(
+            c.cors.unwrap().inner,
+            Cors::AllowMatchingOrigins(_)
+        ));
         assert_eq!("/user/audioserve", c.url_path_prefix.unwrap())
     }
 
