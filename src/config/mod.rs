@@ -1,4 +1,6 @@
 use collection::MINIMUM_CHAPTER_DURATION;
+use hyper::{Body, Request};
+use regex::Regex;
 
 pub use self::error::{Error, Result};
 use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
@@ -308,6 +310,38 @@ impl PositionsConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CorsConfig {
+    #[serde(default)]
+    pub regex: Option<String>,
+    #[serde(skip)]
+    inner: Cors,
+}
+
+#[derive(Debug, Clone)]
+pub enum Cors {
+    AllowAllOrigins,
+    AllowMatchingOrigins(Regex),
+}
+
+impl Default for Cors {
+    fn default() -> Self {
+        Cors::AllowAllOrigins
+    }
+}
+
+impl FromStr for Cors {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let re = Regex::new(s).map_err(|e| Error::ConfigValue {
+            name: "cors-regex",
+            message: format!("Invalid cors regex: {}", e).into(),
+        })?;
+        Ok(Cors::AllowMatchingOrigins(re))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub listen: SocketAddr,
@@ -321,7 +355,7 @@ pub struct Config {
     pub token_validity_hours: u32,
     pub secret_file: PathBuf,
     pub client_dir: PathBuf,
-    pub cors: bool,
+    pub cors: Option<CorsConfig>,
     pub ssl: Option<SslConfig>,
     pub allow_symlinks: bool,
     pub search_cache: bool,
@@ -468,6 +502,32 @@ impl Config {
             Some(self.tags.clone())
         }
     }
+
+    pub fn is_cors_enabled(&self, req: &Request<Body>) -> bool {
+        if let Some(cors) = self.cors.as_ref() {
+            match &cors.inner {
+                Cors::AllowAllOrigins => true,
+                Cors::AllowMatchingOrigins(re) => req
+                    .headers()
+                    .get("origin")
+                    .and_then(|v| {
+                        v.to_str()
+                            .map_err(|e| error!("Invalid origin header: {}", e))
+                            .ok()
+                    })
+                    .map(|s| {
+                        if s.to_ascii_lowercase() == "null" {
+                            false
+                        } else {
+                            re.is_match(s)
+                        }
+                    })
+                    .unwrap_or(false),
+            }
+        } else {
+            false
+        }
+    }
 }
 
 impl Default for Config {
@@ -485,7 +545,7 @@ impl Default for Config {
             token_validity_hours: 365 * 24,
             client_dir: "client/dist".into(),
             secret_file: data_base_dir.join("audioserve.secret"),
-            cors: false,
+            cors: None,
             ssl: None,
             allow_symlinks: false,
             search_cache: false,

@@ -40,7 +40,7 @@ transcoding:
 token_validity_hours: 8760
 secret_file: test_data/.audioserve.secret
 client_dir: test_data
-cors: true
+cors: {}
 ssl:
   key_file: test_data/desc.txt
   key_password: neco

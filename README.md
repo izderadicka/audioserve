@@ -188,7 +188,7 @@ Number of parallel transcodings (transcodings are most resource intensive tasks)
 
 When web client is served from different host (or port) then audioserve API then browser enforces [Cross-Origin Resource Sharing (CORS) rules](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS). Basically it means that browser might refuse to connect to server, if server is not configured to send special HTTP headers.
 
-Audioserve is handling this with with optional `--cors` argument, which will add appropriate CORS headers to responses, thus enabling browser to accept responses from server.
+Audioserve is handling this with with optional `--cors` argument, which will add appropriate CORS headers to responses, thus enabling browser to accept responses from server.  If you want to limit origins for which audioserve sends CORS header you can use additional argument `--cors-regex`, which will first check `Origin` request header against given regular expresssion, if matches only then appropriate CORS responses are sent (but if you want it to use think carefully about regex - regex is not always giving what you wish for:-)  
 
 CORS is relevant in several scenarios:
 
