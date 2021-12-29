@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: audioserve API
   description: REST API for audioserve
-  version: 1.0.0
+  version: 1.0.1
 servers:
   - url: https://audioserve.zderadicka.eu
     description: Public demo server
@@ -82,28 +82,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  names:
-                    description: Names of available collections
-                    type: array
-                    maxItems: 100
-                    items:
-                      type: string
-                  count:
-                    type: integer
-                    minimum: 1
-                    maximum: 100
-                    description: Size of names array
-                  folder_download:
-                    type: boolean
-                    description: Is folder download endpoint enabled on server?
-                  shared_positions:
-                    type: boolean
-                    description: Is playback position API enabled on server?
-                  version:
-                    type: string
-                    description: Version of audioserve (and thus also version of API)
+                $ref: "#/components/schemas/CollectionsInfo"
               example:
                 {"version":"0.16.3","folder_download":true,"shared_positions":true,"count":1,"names":["audiobooks"]}
         "401":
@@ -127,19 +106,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  high:
-                    $ref:  "#/components/schemas/Transcoding"
-                  low:
-                    $ref:  "#/components/schemas/Transcoding"
-                  medium:
-                    $ref:  "#/components/schemas/Transcoding"
-                  max_transcodings:
-                    type: integer
-                    description: Maximum number of parallel transcodings allowed by server
-                    minimum: 2
-                    maximum: 100
+                $ref: "#/components/schemas/TranscodingsInfo"
               example:
                 {"max_transcodings":24,"low":{"bitrate":32,"name":"opus-in-ogg"},"medium":{"bitrate":48,"name":"opus-in-ogg"},"high":{"bitrate":64,"name":"opus-in-ogg"}}
         "401":
@@ -990,6 +957,44 @@ components:
           maxLength: 250
       required:
         - "secret"
+    CollectionsInfo:
+      type: object
+      properties:
+        names:
+          description: Names of available collections
+          type: array
+          maxItems: 100
+          items:
+            type: string
+        count:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Size of names array
+        folder_download:
+          type: boolean
+          description: Is folder download endpoint enabled on server?
+        shared_positions:
+          type: boolean
+          description: Is playback position API enabled on server?
+        version:
+          type: string
+          description: Version of audioserve (and thus also version of API)
+    TranscodingsInfo:
+      type: object
+      properties:
+        high:
+          $ref:  "#/components/schemas/Transcoding"
+        low:
+          $ref:  "#/components/schemas/Transcoding"
+        medium:
+          $ref:  "#/components/schemas/Transcoding"
+        max_transcodings:
+          type: integer
+          description: Maximum number of parallel transcodings allowed by server
+          minimum: 2
+          maximum: 100
+
   parameters:
     CollectionId:
       name: col_id
