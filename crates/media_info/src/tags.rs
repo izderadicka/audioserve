@@ -55,7 +55,7 @@ pub const TITLE: &str = "title";
 pub const TRACK: &str = "track";
 pub const VARIANT_BITRATE: &str = "variant_bitrate";
 pub const SERIES: &str = "series";
-pub const SERIES_SEQUENCE: &str = "track";
+pub const SERIES_SEQUENCE: &str = "series_sequence";
 
 pub const ALLOWED_TAGS: &[&str] = &[
     ALBUM,
