@@ -28,6 +28,8 @@ service_provider -- name of the service provider in broadcasting.
 title        -- name of the work.
 track        -- number of this work in the set, can be in form current/total.
 variant_bitrate -- the total bitrate of the bitrate variant that the current stream is part of
+series       -- name of the audiobook series
+series_sequence -- specifies the part of the series
 
  */
 
@@ -52,6 +54,8 @@ pub const SERVICE_PROVIDER: &str = "service_provider";
 pub const TITLE: &str = "title";
 pub const TRACK: &str = "track";
 pub const VARIANT_BITRATE: &str = "variant_bitrate";
+pub const SERIES: &str = "series";
+pub const SERIES_SEQUENCE: &str = "series_sequence";
 
 pub const ALLOWED_TAGS: &[&str] = &[
     ALBUM,
@@ -75,6 +79,8 @@ pub const ALLOWED_TAGS: &[&str] = &[
     TITLE,
     TRACK,
     VARIANT_BITRATE,
+    SERIES,
+    SERIES_SEQUENCE,
 ];
 
 pub const BASIC_TAGS: &[&str] = &[ALBUM, ARTIST, COMPOSER, DATE, GENRE, PERFORMER, TITLE];
