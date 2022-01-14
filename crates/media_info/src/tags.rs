@@ -28,6 +28,8 @@ service_provider -- name of the service provider in broadcasting.
 title        -- name of the work.
 track        -- number of this work in the set, can be in form current/total.
 variant_bitrate -- the total bitrate of the bitrate variant that the current stream is part of
+
+Following tags are not from ffmpeg documentation, but work for some formats mpeg4 aka .m4b
 series       -- name of the audiobook series
 series_sequence -- specifies the part of the series
 
