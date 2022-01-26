@@ -604,10 +604,11 @@ pub fn search(
     searcher: Search<String>,
     query: String,
     ordering: FoldersOrdering,
+    group: Option<String>,
 ) -> ResponseFuture {
     Box::pin(
         blocking(move || {
-            let res = searcher.search(collection, query, ordering);
+            let res = searcher.search(collection, query, ordering, group);
             json_response(&res)
         })
         .map_err(Error::new),

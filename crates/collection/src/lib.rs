@@ -137,8 +137,9 @@ impl Collections {
         collection: usize,
         q: S,
         ordering: FoldersOrdering,
+        group: Option<String>
     ) -> Result<Vec<AudioFolderShort>> {
-        let mut res = self.get_cache(collection)?.search(q);
+        let mut res = self.get_cache(collection)?.search(q, group);
 
         res.sort_unstable_by(|a, b| a.compare_as(ordering, b));
         Ok(res)

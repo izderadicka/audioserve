@@ -341,7 +341,7 @@ impl CollectionTrait for CollectionCache {
         self.inner.flush()
     }
 
-    fn search<S: AsRef<str>>(&self, q: S) -> Vec<AudioFolderShort> {
+    fn search<S: AsRef<str>>(&self, q: S, group: Option<String>) -> Vec<AudioFolderShort> {
         let tokens: Vec<String> = q
             .as_ref()
             .split_whitespace()
@@ -353,6 +353,7 @@ impl CollectionTrait for CollectionCache {
             tokens,
             iter,
             prev_match: None,
+            group,
         };
         search.collect()
     }
@@ -466,6 +467,7 @@ pub struct Search {
     tokens: Vec<String>,
     iter: sled::Iter,
     prev_match: Option<String>,
+    group: Option<String>
 }
 
 impl Iterator for Search {
@@ -639,7 +641,7 @@ mod tests {
     fn test_search() {
         env_logger::try_init().ok();
         let (col, _tmp_dir) = create_tmp_collection();
-        let res: Vec<_> = col.search("usak kulisak");
+        let res: Vec<_> = col.search("usak kulisak", None);
         assert_eq!(1, res.len());
         let af = &res[0];
         assert_eq!("kulisak", af.name.as_str());
@@ -648,7 +650,7 @@ mod tests {
         assert!(af.modified.is_some());
         assert!(!af.is_file);
 
-        let res: Vec<_> = col.search("neneneexistuje");
+        let res: Vec<_> = col.search("neneneexistuje", None);
         assert_eq!(0, res.len());
     }
 

@@ -3,7 +3,7 @@ use collection::FoldersOrdering;
 use std::sync::Arc;
 
 pub trait SearchTrait<S> {
-    fn search(&self, collection: usize, query: S, ordering: FoldersOrdering) -> SearchResult;
+    fn search(&self, collection: usize, query: S, ordering: FoldersOrdering, group: Option<String>) -> SearchResult;
     fn recent(&self, collection: usize) -> SearchResult;
 }
 
@@ -13,8 +13,8 @@ pub struct Search<S> {
 }
 
 impl<S: AsRef<str>> SearchTrait<S> for Search<S> {
-    fn search(&self, collection: usize, query: S, ordering: FoldersOrdering) -> SearchResult {
-        self.inner.search(collection, query, ordering)
+    fn search(&self, collection: usize, query: S, ordering: FoldersOrdering, group: Option<String>) -> SearchResult {
+        self.inner.search(collection, query, ordering, group)
     }
     fn recent(&self, collection: usize) -> SearchResult {
         self.inner.recent(collection)
@@ -45,12 +45,12 @@ mod col_db {
     }
 
     impl<T: AsRef<str>> SearchTrait<T> for CollectionsSearch {
-        fn search(&self, collection: usize, query: T, ordering: FoldersOrdering) -> SearchResult {
+        fn search(&self, collection: usize, query: T, ordering: FoldersOrdering, group: Option<String>) -> SearchResult {
             SearchResult {
                 files: vec![],
                 subfolders: self
                     .collections
-                    .search(collection, query, ordering)
+                    .search(collection, query, ordering, group)
                     .map_err(|e| error!("Error in collections search: {}", e))
                     .unwrap_or_else(|_| vec![]),
             }

@@ -213,7 +213,7 @@ pub(crate) trait CollectionTrait {
 
     fn flush(&self) -> Result<()>;
 
-    fn search<S: AsRef<str>>(&self, q: S) -> Vec<AudioFolderShort>;
+    fn search<S: AsRef<str>>(&self, q: S, group: Option<String>) -> Vec<AudioFolderShort>;
 
     fn recent(&self, limit: usize) -> Vec<AudioFolderShort>;
 

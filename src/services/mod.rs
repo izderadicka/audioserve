@@ -566,7 +566,8 @@ impl<C: 'static> FileSendService<C> {
                         }
                     } else if path == "/search" {
                         if let Some(search_string) = params.get_string("q") {
-                            search(colllection_index, searcher, search_string, ord)
+                            let group = params.get_string("group");
+                            search(colllection_index, searcher, search_string, ord, group)
                         } else {
                             error!("q parameter is missing in search");
                             resp::fut(resp::not_found)

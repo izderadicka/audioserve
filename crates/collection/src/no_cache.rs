@@ -48,7 +48,7 @@ impl CollectionTrait for CollectionDirect {
         Ok(())
     }
 
-    fn search<S: AsRef<str>>(&self, q: S) -> Vec<crate::AudioFolderShort> {
+    fn search<S: AsRef<str>>(&self, q: S, _group: Option<String>) -> Vec<crate::AudioFolderShort> {
         self.searcher.search_folder(&self.base_dir, q)
     }
 
