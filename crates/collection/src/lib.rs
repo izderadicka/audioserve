@@ -137,7 +137,7 @@ impl Collections {
         collection: usize,
         q: S,
         ordering: FoldersOrdering,
-        group: Option<String>
+        group: Option<String>,
     ) -> Result<Vec<AudioFolderShort>> {
         let mut res = self.get_cache(collection)?.search(q, group);
 
@@ -145,8 +145,14 @@ impl Collections {
         Ok(res)
     }
 
-    pub fn recent(&self, collection: usize, limit: usize) -> Result<Vec<AudioFolderShort>> {
-        self.get_cache(collection).map(|cache| cache.recent(limit))
+    pub fn recent(
+        &self,
+        collection: usize,
+        limit: usize,
+        group: Option<String>,
+    ) -> Result<Vec<AudioFolderShort>> {
+        self.get_cache(collection)
+            .map(|cache| cache.recent(limit, group))
     }
 }
 

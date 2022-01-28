@@ -366,10 +366,10 @@ impl CacheInner {
 
     pub(crate) fn update_subfolder<S: AsRef<str>>(&self, group: S, sf: &mut AudioFolderShort) {
         sf.finished = sf
-                .path
-                .to_str()
-                .map(|path| self.is_finished(&group, path))
-                .unwrap_or(false)
+            .path
+            .to_str()
+            .map(|path| self.is_finished(&group, path))
+            .unwrap_or(false)
     }
 
     pub(crate) fn update_subfolders<S: AsRef<str>>(
@@ -377,7 +377,9 @@ impl CacheInner {
         group: S,
         subfolders: &mut Vec<AudioFolderShort>,
     ) {
-        subfolders.iter_mut().for_each(|sf| self.update_subfolder(&group, sf))
+        subfolders
+            .iter_mut()
+            .for_each(|sf| self.update_subfolder(&group, sf))
     }
 
     fn positions_from_iter<I, S>(

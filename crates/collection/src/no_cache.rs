@@ -52,7 +52,7 @@ impl CollectionTrait for CollectionDirect {
         self.searcher.search_folder(&self.base_dir, q)
     }
 
-    fn recent(&self, limit: usize) -> Vec<crate::AudioFolderShort> {
+    fn recent(&self, limit: usize, _group: Option<String>) -> Vec<crate::AudioFolderShort> {
         self.searcher
             .search_folder_for_recent(&self.base_dir, limit)
     }

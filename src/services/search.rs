@@ -3,8 +3,14 @@ use collection::FoldersOrdering;
 use std::sync::Arc;
 
 pub trait SearchTrait<S> {
-    fn search(&self, collection: usize, query: S, ordering: FoldersOrdering, group: Option<String>) -> SearchResult;
-    fn recent(&self, collection: usize) -> SearchResult;
+    fn search(
+        &self,
+        collection: usize,
+        query: S,
+        ordering: FoldersOrdering,
+        group: Option<String>,
+    ) -> SearchResult;
+    fn recent(&self, collection: usize, group: Option<String>) -> SearchResult;
 }
 
 #[derive(Clone)]
@@ -13,11 +19,17 @@ pub struct Search<S> {
 }
 
 impl<S: AsRef<str>> SearchTrait<S> for Search<S> {
-    fn search(&self, collection: usize, query: S, ordering: FoldersOrdering, group: Option<String>) -> SearchResult {
+    fn search(
+        &self,
+        collection: usize,
+        query: S,
+        ordering: FoldersOrdering,
+        group: Option<String>,
+    ) -> SearchResult {
         self.inner.search(collection, query, ordering, group)
     }
-    fn recent(&self, collection: usize) -> SearchResult {
-        self.inner.recent(collection)
+    fn recent(&self, collection: usize, group: Option<String>) -> SearchResult {
+        self.inner.recent(collection, group)
     }
 }
 
@@ -45,7 +57,13 @@ mod col_db {
     }
 
     impl<T: AsRef<str>> SearchTrait<T> for CollectionsSearch {
-        fn search(&self, collection: usize, query: T, ordering: FoldersOrdering, group: Option<String>) -> SearchResult {
+        fn search(
+            &self,
+            collection: usize,
+            query: T,
+            ordering: FoldersOrdering,
+            group: Option<String>,
+        ) -> SearchResult {
             SearchResult {
                 files: vec![],
                 subfolders: self
@@ -56,10 +74,10 @@ mod col_db {
             }
         }
 
-        fn recent(&self, collection: usize) -> SearchResult {
+        fn recent(&self, collection: usize, group: Option<String>) -> SearchResult {
             let res = self
                 .collections
-                .recent(collection, 100)
+                .recent(collection, 100, group)
                 .map_err(|e| error!("Cannot get recents from coolection db: {}", e))
                 .unwrap_or_else(|_| vec![]);
             SearchResult {

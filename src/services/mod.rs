@@ -573,7 +573,8 @@ impl<C: 'static> FileSendService<C> {
                             resp::fut(resp::not_found)
                         }
                     } else if path.starts_with("/recent") {
-                        recent(colllection_index, searcher)
+                        let group = params.get_string("group");
+                        recent(colllection_index, searcher, group)
                     } else if path.starts_with("/cover/") {
                         send_file_simple(
                             base_dir,

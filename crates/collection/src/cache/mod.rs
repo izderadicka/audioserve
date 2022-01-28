@@ -359,7 +359,7 @@ impl CollectionTrait for CollectionCache {
         search.collect()
     }
 
-    fn recent(&self, limit: usize) -> Vec<AudioFolderShort> {
+    fn recent(&self, limit: usize, group: Option<String>) -> Vec<AudioFolderShort> {
         let mut heap = BinaryHeap::with_capacity(limit + 1);
 
         for (key, val) in self.inner.iter_folders().skip(1).filter_map(|r| r.ok()) {
@@ -369,10 +369,18 @@ impl CollectionTrait for CollectionCache {
                 heap.pop();
             }
         }
-        heap.into_sorted_vec()
+        let mut result: Vec<_> = heap
+            .into_sorted_vec()
             .into_iter()
             .map(|i| i.into())
-            .collect()
+            .collect();
+        if let Some(ref group) = group {
+            result
+                .iter_mut()
+                .for_each(|sf| self.inner.update_subfolder(&group, sf));
+        }
+
+        result
     }
 
     fn signal_rescan(&self) {
@@ -469,7 +477,7 @@ pub struct Search {
     iter: sled::Iter,
     prev_match: Option<String>,
     group: Option<String>,
-    inner: Arc<CacheInner>
+    inner: Arc<CacheInner>,
 }
 
 impl Iterator for Search {
@@ -494,7 +502,7 @@ impl Iterator for Search {
                     if is_match {
                         self.prev_match = Some(path.to_owned());
                         let mut sf = kv_to_audiofolder(path, val);
-                        if let Some(ref group)= self.group {
+                        if let Some(ref group) = self.group {
                             self.inner.update_subfolder(group, &mut sf);
                         }
                         return Some(sf);

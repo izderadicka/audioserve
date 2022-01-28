@@ -615,10 +615,14 @@ pub fn search(
     )
 }
 
-pub fn recent(collection: usize, searcher: Search<String>) -> ResponseFuture {
+pub fn recent(
+    collection: usize,
+    searcher: Search<String>,
+    group: Option<String>,
+) -> ResponseFuture {
     Box::pin(
         blocking(move || {
-            let res = searcher.recent(collection);
+            let res = searcher.recent(collection, group);
             json_response(&res)
         })
         .map_err(Error::new),
