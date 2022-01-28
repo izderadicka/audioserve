@@ -354,6 +354,7 @@ impl CollectionTrait for CollectionCache {
             iter,
             prev_match: None,
             group,
+            inner: self.inner.clone(),
         };
         search.collect()
     }
@@ -467,7 +468,8 @@ pub struct Search {
     tokens: Vec<String>,
     iter: sled::Iter,
     prev_match: Option<String>,
-    group: Option<String>
+    group: Option<String>,
+    inner: Arc<CacheInner>
 }
 
 impl Iterator for Search {
@@ -491,7 +493,11 @@ impl Iterator for Search {
                     let is_match = self.tokens.iter().all(|t| path_lower_case.contains(t));
                     if is_match {
                         self.prev_match = Some(path.to_owned());
-                        return Some(kv_to_audiofolder(path, val));
+                        let mut sf = kv_to_audiofolder(path, val);
+                        if let Some(ref group)= self.group {
+                            self.inner.update_subfolder(group, &mut sf);
+                        }
+                        return Some(sf);
                     }
                 }
                 Err(e) => error!("Error iterating collection db: {}", e),
