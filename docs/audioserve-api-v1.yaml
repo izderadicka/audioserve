@@ -502,6 +502,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Ordering"
+        - $ref: "#/components/parameters/Group"
         - name: q
           in: query
           required: true
@@ -531,6 +532,7 @@ paths:
         Sorted by folder modification time descendently - e.g most recent is first.
       parameters:
         - $ref: "#/components/parameters/CollectionId"
+        - $ref: "#/components/parameters/Group"
       responses:
         '200':
           description: Success -  most recent folders
