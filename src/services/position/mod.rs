@@ -149,7 +149,7 @@ async fn process_message(m: Message, ctx: &mut Ctx) -> MessageResult {
                             file_loc.path,
                             position,
                             false,
-                            ts.into(),
+                            (ts*1000).into(), // timestamp in WS message is in seconds!
                         )
                         .await
                     } else {

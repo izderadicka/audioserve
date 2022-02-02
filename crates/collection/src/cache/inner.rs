@@ -237,8 +237,10 @@ impl CacheInner {
                         if let Some(current_record) = folder_rec.get(group.as_ref()) {
                             if current_record.timestamp > ts {
                                 info!(
-                                    "Position not inserted for folder {} because it's outdated",
-                                    path
+                                    "Position not inserted for folder {} because it's outdated. It has timestamp {:?}, but we have ts {:?}",
+                                    path,
+                                    ts,
+                                    current_record.timestamp
                                 );
                                 return transaction::abort(Error::IgnoredPosition);
                             } else {
