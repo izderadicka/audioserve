@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: audioserve API
   description: REST API for audioserve
-  version: 1.0.1
+  version: 1.1.0
 servers:
   - url: https://audioserve.zderadicka.eu
     description: Public demo server
@@ -843,6 +843,8 @@ components:
           type: object
           nullable: true
           description: Metadata tags for this folders - map of name to value
+        position:
+          $ref: "#/components/schemas/PositionShort"
     AudioFile:
       type: object
       required:
@@ -903,6 +905,40 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Subfolder"
+    PositionShort:
+      type: object
+      description: |- 
+        Last shared playback position within a folder.
+        Only available if group parameter was used and there are some audiofiles in the folder.
+      nullable: true
+      properties:
+        timestamp:
+          type: integer
+          format: int64
+          description: |-
+            Position timestamp - unix time in ms
+            Timestamp is generated on server, so if you post new  position 
+            it is used to check, if there is not newer position, 
+            but actual value then is assigned by server
+        path: 
+          type: string
+          description: Audio file (or chapter)
+        position:
+          type: number 
+          format: float
+          description: Position in audiofile in seconds
+      required:
+        - timestamp
+        - path
+        - position
+      example:
+        {
+          "timestamp": 1636726423847,
+          "folder": "Wells H G/Invisible Man/invisibleman_09_wells_64kb.mp3",
+          "position": 1395.955
+        }
+      
+
     Position:
       type: object
       description: Playback position
