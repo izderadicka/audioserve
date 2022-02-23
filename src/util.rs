@@ -73,23 +73,6 @@ impl ResponseBuilderExt for Builder {
     }
 }
 
-/// Checks whether the pattern matches at the front of the haystack.
-#[inline]
-fn is_prefix_of(needle: &str, haystack: &str) -> bool {
-    haystack.as_bytes().starts_with(needle.as_bytes())
-}
-
-/// Removes the pattern from the front of haystack, if it matches.
-#[inline]
-pub fn strip_prefix_of<'a>(needle: &str, haystack: &'a str) -> Option<&'a str> {
-    if is_prefix_of(needle, haystack) {
-        // SAFETY: prefix was just verified to exist.
-        unsafe { Some(haystack.get_unchecked(needle.as_bytes().len()..)) }
-    } else {
-        None
-    }
-}
-
 #[cfg(feature = "shared-positions")]
 pub fn parse_cron<S: AsRef<str>>(exp: S) -> crate::error::Result<cron::Schedule> {
     let exp = format!("0 {} *", exp.as_ref());

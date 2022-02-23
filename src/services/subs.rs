@@ -279,12 +279,14 @@ async fn serve_opened_file(
     let last_modified = meta.modified().ok();
     let mut resp = HyperResponse::builder().typed_header(ContentType::from(mime));
     if let Some(age) = caching {
-        let cache = CacheControl::new()
-            .with_public()
-            .with_max_age(std::time::Duration::from_secs(u64::from(age)));
-        resp = resp.typed_header(cache);
-        if let Some(last_modified) = last_modified {
-            resp = resp.typed_header(LastModified::from(last_modified));
+        if age > 0 {
+            let cache = CacheControl::new()
+                .with_public()
+                .with_max_age(std::time::Duration::from_secs(u64::from(age)));
+            resp = resp.typed_header(cache);
+            if let Some(last_modified) = last_modified {
+                resp = resp.typed_header(LastModified::from(last_modified));
+            }
         }
     }
 

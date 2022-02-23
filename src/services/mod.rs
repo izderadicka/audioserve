@@ -130,8 +130,7 @@ impl RequestWrapper {
         }
 
         let path = match path_prefix {
-            Some(p) => match crate::util::strip_prefix_of(p, &path) {
-                //TODO: later replace with new std function strip_prefix
+            Some(p) => match path.strip_prefix(p) {
                 Some(s) => {
                     if s.is_empty() {
                         "/".to_string()
@@ -365,6 +364,19 @@ fn preflight_cors_response(req: &Request<Body>) -> Response<Body> {
     add_cors_headers(resp, origin, true)
 }
 
+const STATIC_FILE_NAMES: &[&str] = &[
+    "/bundle.js",
+    "/bundle.css",
+    "/global.css",
+    "/favicon.png",
+    "/app.webmanifest",
+    "service-worker.js",
+];
+
+fn is_static_file(path: &str) -> bool {
+    STATIC_FILE_NAMES.contains(&path)
+}
+
 #[allow(clippy::type_complexity)]
 impl<C: 'static> Service<Request<Body>> for FileSendService<C> {
     type Response = Response<Body>;
@@ -417,17 +429,16 @@ impl<C: 'static> FileSendService<C> {
         };
         //static files
         if req.method() == Method::GET {
-            if req.path() == "/" {
+            if req.path() == "/" || req.path() == "/index.html" {
                 return send_file_simple(
                     &get_config().client_dir,
                     "index.html",
                     Some(APP_STATIC_FILES_CACHE_AGE),
                 );
-            };
-            if req.path() == "/bundle.js" {
+            } else if is_static_file(req.path()) {
                 return send_file_simple(
                     &get_config().client_dir,
-                    "bundle.js",
+                    &req.path()[1..],
                     Some(APP_STATIC_FILES_CACHE_AGE),
                 );
             }
