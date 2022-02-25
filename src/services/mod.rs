@@ -370,7 +370,7 @@ const STATIC_FILE_NAMES: &[&str] = &[
     "/global.css",
     "/favicon.png",
     "/app.webmanifest",
-    "service-worker.js",
+    "/service-worker.js",
 ];
 
 fn is_static_file(path: &str) -> bool {
