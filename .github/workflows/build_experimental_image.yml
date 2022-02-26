@@ -1,0 +1,26 @@
+name: Build Experimental Image
+on:
+  workflow_dispatch:
+jobs:
+   audioserve-build:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build image
+      run: docker build --tag izderadicka/audioserve:experimental --build-arg NEW_CLIENT=1 --build-arg CARGO_ARGS="--features=collation" .
+    - name: Publish image
+      run: |
+        docker login -u ${{secrets.DOCKERHUB_USER}} -p ${{secrets.DOCKERHUB_PASSWORD}}
+        docker push izderadicka/audioserve:experimental
+    - name: ssh to VM and redeploy
+      uses: appleboy/ssh-action@master
+      with:
+        host: audioserve.zderadicka.eu
+        username: ${{ secrets.AUDIOSERVE_USERNAME }}
+        key: ${{ secrets.AUDIOSERVE_KEY }}
+        script: |
+          docker stop -t 30 audioserve-new || true
+          docker rm -f audioserve-new || true
+          docker pull izderadicka/audioserve:experimental
+          ./run-experimental.sh
+
