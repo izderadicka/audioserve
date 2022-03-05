@@ -47,9 +47,6 @@ mod subs;
 pub mod transcode;
 mod types;
 
-const APP_STATIC_FILES_CACHE_AGE: u32 = 30 * 24 * 3600;
-const FOLDER_INFO_FILES_CACHE_AGE: u32 = 24 * 3600;
-
 type Counter = Arc<AtomicUsize>;
 
 #[derive(Debug)]
@@ -433,13 +430,13 @@ impl<C: 'static> FileSendService<C> {
                 return send_file_simple(
                     &get_config().client_dir,
                     "index.html",
-                    Some(APP_STATIC_FILES_CACHE_AGE),
+                    get_config().static_resource_cache_age,
                 );
             } else if is_static_file(req.path()) {
                 return send_file_simple(
                     &get_config().client_dir,
                     &req.path()[1..],
-                    Some(APP_STATIC_FILES_CACHE_AGE),
+                    get_config().static_resource_cache_age,
                 );
             }
         }
@@ -590,13 +587,13 @@ impl<C: 'static> FileSendService<C> {
                         send_file_simple(
                             base_dir,
                             get_subpath(path, "/cover"),
-                            Some(FOLDER_INFO_FILES_CACHE_AGE),
+                            get_config().folder_file_cache_age,
                         )
                     } else if path.starts_with("/desc/") {
                         send_file_simple(
                             base_dir,
                             get_subpath(path, "/desc"),
-                            Some(FOLDER_INFO_FILES_CACHE_AGE),
+                            get_config().folder_file_cache_age,
                         )
                     } else {
                         error!("Invalid path requested {}", path);

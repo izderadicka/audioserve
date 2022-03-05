@@ -284,10 +284,12 @@ async fn serve_opened_file(
                 .with_public()
                 .with_max_age(std::time::Duration::from_secs(u64::from(age)));
             resp = resp.typed_header(cache);
-            if let Some(last_modified) = last_modified {
-                resp = resp.typed_header(LastModified::from(last_modified));
-            }
         }
+        if let Some(last_modified) = last_modified {
+            resp = resp.typed_header(LastModified::from(last_modified));
+        }
+    } else {
+        resp = resp.typed_header(CacheControl::new().with_no_store());
     }
 
     let (start, end) = match range {

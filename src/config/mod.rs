@@ -369,6 +369,8 @@ pub struct Config {
     pub collections_cache_dir: PathBuf,
     pub tags: HashSet<String>,
     pub force_cache_update_on_init: bool,
+    pub static_resource_cache_age: Option<u32>,
+    pub folder_file_cache_age: Option<u32>,
 }
 
 impl Config {
@@ -559,6 +561,8 @@ impl Default for Config {
             force_cache_update_on_init: false,
             #[cfg(feature = "shared-positions")]
             positions: Default::default(),
+            static_resource_cache_age: Some(30 * 24 * 3600),
+            folder_file_cache_age: Some(24 * 3600),
         }
     }
 }

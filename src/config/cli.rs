@@ -187,7 +187,6 @@ fn create_parser<'a>() -> Parser<'a> {
         .arg(Arg::with_name("no-dir-collaps")
             .long("no-dir-collaps")
             .help("Prevents automatic collaps/skip of directory with single chapterized audio file")
-
             )
         .arg(Arg::with_name("ignore-chapters-meta")
             .long("ignore-chapters-meta")
@@ -203,7 +202,19 @@ fn create_parser<'a>() -> Parser<'a> {
         .arg(Arg::with_name("force-cache-update")
             .long("force-cache-update")
             .help("Forces full reload of metadata cache on start")
-            );
+            )
+        .arg(Arg::with_name("static-resource-cache-age")
+            .long("static-resource-cache-age")
+            .env("AUDIOSERVE_STATIC_RESOURCE_CACHE_AGE")
+            .takes_value(true)
+            .help("Age for Cache-Control of static resource, 'no-store' or number of secs, 0 means Cache-Control is not sent [default 1 month]")
+        )
+        .arg(Arg::with_name("folder-file-cache-age")
+            .long("folder-file-cache-age")
+            .env("AUDIOSERVE_FOLDER_FILE_CACHE_AGE")
+            .takes_value(true)
+            .help("Age for Cache-Control of cover and text files in audio folders, 'no-store' or number of secs, 0 means Cache-Control is not sent [default 1 day]")
+        );
 
     if cfg!(feature = "behind-proxy") {
         parser = parser.arg(Arg::with_name("behind-proxy")
@@ -514,6 +525,24 @@ where
         }
     } else if is_present_or_env("tags", "AUDIOSERVE_TAGS") {
         config.tags.extend(BASIC_TAGS.iter().map(|i| i.to_string()));
+    }
+
+    let parse_cache_age = |age: &str| {
+        if age == "no-store" {
+            Ok(None)
+        } else {
+            age.parse::<u32>()
+                .or_else(|_| arg_error!("static-resource-cache-age", "Invalid value"))
+                .map(|n| Some(n))
+        }
+    };
+
+    if let Some(age) = args.value_of("static-resource-cache-age") {
+        config.static_resource_cache_age = parse_cache_age(age)?;
+    }
+
+    if let Some(age) = args.value_of("folder-file-cache-age") {
+        config.folder_file_cache_age = parse_cache_age(age)?;
     }
 
     if cfg!(feature = "symlinks")
