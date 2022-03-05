@@ -137,7 +137,7 @@ Shared playback positions are behind default program feature `shared-positions`,
 
 ## Security
 
-Audioserve is not writing anything to your media library, so read only access is enough. However you should assume that any file in published media directories can be accessible via audioserve API (names starting with . (hidden files/directories) are blocked in API) so basically to anybody who can obtain shared secret (or in case you use `--no-authentication` then to anybody).
+Audioserve is not writing anything to your media library, so read only access is enough. However you should assume that any file in published media directories can be accessible via audioserve API (names starting with . (hidden files/directories) are blocked in API) to anybody who can obtain shared secret (or in case you use `--no-authentication` then to anybody).
 
 Read and **write** access is needed to data directory (`~/.audioserve` by default, but can be changed with `--data-dir` argument). This directory contains:
 
@@ -284,15 +284,17 @@ All audioserve parameters can be also provided in configuration file via `--conf
 
 ## Web client
 
-Web client is bundled with server. It provides simple interface (using bootstrap 4 CSS framework and JQuery JS library). Web client will remember your last playback position in a folder, so you can easily continue listening, even after page reload. Use three vertical dots in top right corner to choose required transcoding and subfolder items ordering.
-Otherwise it's rather minimalistic (following KISS principle). Also new, still very much in progress, but quite interesting [third party client](https://github.com/KodeStar/audiosilo) can be used with audioserve.
+Web client is bundled with server. It provides simple interface (using bootstrap 4 CSS framework and JQuery JS library). Web client will remember your last playback position in a folder, so you can easily continue listening, even after page reload. Use three vertical dots in top right corner to choose required transcoding and subfolder items ordering. Otherwise it's rather minimalistic (following KISS principle).
 
 It's tested on Firefox and Chrome (on Linux and Android, should work on Windows, on OSX too on these browsers).
 Also should work on on recent MS Edge browser(I'm not testing it on Edge, but seems to work and since it's now also based on Chromium should not be issue).
 
+Current web client is quite conservative, if you want to experiment and try latest web technologies, you can try (still WIP) [new web client](https://github.com/izderadicka/audioserve-web).
+
+Also there is third party client, still very much in progress, but quite interesting [third party client](https://github.com/KodeStar/audiosilo) can be used with audioserve.
+
 On iOS default transcoding (opus+ogg) is not working - so switch transcoding off or try custom transcoding profile.
 
-Web client is not working on MS IE (which will never be supported).
 
 ## Android client
 
