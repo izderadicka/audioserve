@@ -5,7 +5,7 @@
 
 [ [**DEMO AVAILABLE** - shared secret: mypass] ](https://audioserve.zderadicka.eu)
 
-**Version 0.16 brings a LOT of changes, so I recommend to read README even for existing users, especially for Docker installation it is ESSENTIAL to map host_directory or named volume to audioserve --data_dir (defaults to /home/audioserve/.audioserve)**
+**New web client is at alpha stage - it's becoming to be usable - you can look at it [here](https://github.com/izderadicka/audioserve-web)**
 
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalist design.
 
