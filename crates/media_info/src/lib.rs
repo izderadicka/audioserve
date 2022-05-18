@@ -68,22 +68,22 @@ impl Dictionary {
         let mut map = HashMap::new();
         let mut prev = ptr::null();
         loop {
-            unsafe {
-                let current = ffi::av_dict_get(
+            
+                let current = unsafe { ffi::av_dict_get(
                     self.dic,
                     empty.as_ptr(),
                     prev,
                     ffi::AV_DICT_IGNORE_SUFFIX as i32,
-                );
+                ) };
                 if current.is_null() {
                     break;
                 } else {
-                    let key = string_from_ptr_lossy((*current).key);
-                    let value = string_from_ptr_lossy((*current).value);
+                    let key = unsafe { string_from_ptr_lossy((*current).key) };
+                    let value = unsafe { string_from_ptr_lossy((*current).value) };
                     map.insert(key, value);
                     prev = current;
                 }
-            }
+            
         }
 
         map
@@ -214,15 +214,15 @@ impl MediaFile {
             assert!(t >= 0);
             t as u64 * 1000 * time_base.num as u64 / time_base.den as u64
         }
-        unsafe {
-            let num_chapters = (*self.ctx).nb_chapters as usize;
+        
+            let num_chapters = unsafe { (*self.ctx).nb_chapters as usize };
             if num_chapters == 0 {
                 return None;
             }
             let mut c = Vec::new();
-            let chaps = slice::from_raw_parts((*self.ctx).chapters, num_chapters);
+            let chaps = unsafe { slice::from_raw_parts((*self.ctx).chapters, num_chapters) };
             for chap in chaps {
-                let chap = **chap;
+                let chap = unsafe { **chap };
                 let meta = Dictionary::new(chap.metadata);
                 let num = chap.id;
                 let title = meta
@@ -238,7 +238,7 @@ impl MediaFile {
                 });
             }
             Some(c)
-        }
+        
     }
 }
 

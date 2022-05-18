@@ -7885,10 +7885,10 @@ impl AVIndexEntry {
     }
     #[inline]
     pub fn set_flags(&mut self, val: ::std::os::raw::c_int) {
-        unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+        
+            let val: u32 = unsafe { ::std::mem::transmute(val) };
             self._bitfield_1.set(0usize, 2u8, val as u64)
-        }
+        
     }
     #[inline]
     pub fn size(&self) -> ::std::os::raw::c_int {
@@ -7896,10 +7896,10 @@ impl AVIndexEntry {
     }
     #[inline]
     pub fn set_size(&mut self, val: ::std::os::raw::c_int) {
-        unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+        
+            let val: u32 = unsafe { ::std::mem::transmute(val) };
             self._bitfield_1.set(2usize, 30u8, val as u64)
-        }
+        
     }
     #[inline]
     pub fn new_bitfield_1(
