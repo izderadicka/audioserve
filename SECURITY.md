@@ -10,7 +10,7 @@ For security considerations and recommendations please also check [Security sect
 ## Supported Versions
 
 **Definitelly do not use versions older that v15.0.0,  these had significant security vulnerability - confidentiality problem related to path relative traversal 
-[CWE-23](https://cwe.mitre.org/data/definitions/23.html) type of vulnerability.
+[CWE-23](https://cwe.mitre.org/data/definitions/23.html) type of vulnerability.**
 
 Considering my limited  capacity, I'm including security patches to `master` branch on best effort basis, and releasing new versions only for critical security fixes 
 (plus irregularly there are new releases with new functionality). 
