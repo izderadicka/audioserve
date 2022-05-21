@@ -255,7 +255,7 @@ impl CacheInner {
                         folder_finished: finished
                             || (file.eq(&last_file)
                                 && last_file_duration
-                                    .and_then(|d| d.checked_sub(position.round() as u32))
+                                    .map(|d| d.checked_sub(position.round() as u32).unwrap_or(0))
                                     .map(|dif| dif < CacheInner::EOB_LIMIT)
                                     .unwrap_or(false)),
                         file: file.into(),
