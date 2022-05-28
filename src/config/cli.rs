@@ -207,7 +207,7 @@ fn create_parser<'a>() -> Parser<'a> {
             .long("static-resource-cache-age")
             .env("AUDIOSERVE_STATIC_RESOURCE_CACHE_AGE")
             .takes_value(true)
-            .help("Age for Cache-Control of static resource, 'no-store' or number of secs, 0 means Cache-Control is not sent [default 1 month]")
+            .help("Age for Cache-Control of static resources, 'no-store' or number of secs, 0 means Cache-Control is not sent [default no-store]")
         )
         .arg(Arg::with_name("folder-file-cache-age")
             .long("folder-file-cache-age")
@@ -532,7 +532,7 @@ where
             Ok(None)
         } else {
             age.parse::<u32>()
-                .or_else(|_| arg_error!("static-resource-cache-age", "Invalid value"))
+                .or_else(|_| arg_error!("*-resource-cache-age", "Invalid value"))
                 .map(|n| Some(n))
         }
     };

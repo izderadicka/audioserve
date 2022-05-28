@@ -153,7 +153,7 @@ Token validity period is one year by default, but can be set via command line ar
 
 As the token can be used to steal the session, https is recommended (TLS support is build in, but reverse proxy is probably better solution). If you want to change shared secret also delete server secret (it will invalidate all issued tokens) - stop audioserve, delete `~/.audioserve/audioserve.secret` and restart audioserve with new shared secret.
 
-Authentication is used to access all URLs except web client static files (`/index.html` and `/bundle.js`).
+Authentication is used to access all URLs except web client static files (`/index.html`, `/bundle.js` and similar).
 
 ### TLS/SSL
 
