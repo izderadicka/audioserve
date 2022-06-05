@@ -4,6 +4,7 @@ use regex::Regex;
 
 pub use self::error::{Error, Result};
 use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
+use crate::services::transcode::codecs::{Opus, Bandwidth};
 use crate::util;
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -67,6 +68,11 @@ impl Default for TranscodingCacheConfig {
 
 #[cfg(feature = "transcoding-cache")]
 impl TranscodingCacheConfig {
+    pub fn new_for_name(name: impl AsRef<str>) -> Self {
+        let mut me = Self::default();
+        me.root_dir = me.root_dir.join(name.as_ref());
+        me
+    }
     pub fn check(&self) -> Result<()> {
         if !util::parent_dir_exists(&self.root_dir) {
             return value_error!(
@@ -104,6 +110,7 @@ pub struct TranscodingConfig {
     low: TranscodingFormat,
     medium: TranscodingFormat,
     high: TranscodingFormat,
+    alt_configs: HashMap<String, AltTranscodingConfig>
 }
 
 impl Default for TranscodingConfig {
@@ -113,9 +120,10 @@ impl Default for TranscodingConfig {
             max_runtime_hours: 24,
             #[cfg(feature = "transcoding-cache")]
             cache: TranscodingCacheConfig::default(),
-            low: TranscodingFormat::default_level(QualityLevel::Low),
-            medium: TranscodingFormat::default_level(QualityLevel::Medium),
-            high: TranscodingFormat::default_level(QualityLevel::High),
+            low: TranscodingFormat::OpusInOgg(Opus::new(32, 5, Bandwidth::SuperWideBand, true)),
+            medium: TranscodingFormat::OpusInOgg(Opus::new(48, 8, Bandwidth::SuperWideBand, false)),
+            high: TranscodingFormat::OpusInOgg(Opus::new(64, 10, Bandwidth::FullBand, false)),
+            alt_configs: HashMap::new(),
         }
     }
 }
@@ -149,6 +157,28 @@ impl TranscodingConfig {
         #[cfg(feature = "transcoding-cache")]
         self.cache.check()?;
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct AltTranscodingConfig {
+    #[cfg(feature = "transcoding-cache")]
+    pub cache: TranscodingCacheConfig,
+    low: TranscodingFormat,
+    medium: TranscodingFormat,
+    high: TranscodingFormat,
+}
+
+impl Default for AltTranscodingConfig {
+    fn default() -> Self {
+        Self {
+            #[cfg(feature = "transcoding-cache")]
+            cache: TranscodingCacheConfig::new_for_name("__alt__"),
+            low: TranscodingFormat::OpusInWebm(Opus::new(32, 5, Bandwidth::SuperWideBand, true)),
+            medium: TranscodingFormat::OpusInWebm(Opus::new(48, 8, Bandwidth::SuperWideBand, false)),
+            high: TranscodingFormat::OpusInWebm(Opus::new(64, 10, Bandwidth::FullBand, false)),
+        }
     }
 }
 

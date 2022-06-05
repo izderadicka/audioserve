@@ -105,23 +105,6 @@ impl TranscodingFormat {
     }
 }
 
-impl TranscodingFormat {
-    pub fn default_level(l: QualityLevel) -> Self {
-        match l {
-            QualityLevel::Low => {
-                TranscodingFormat::OpusInOgg(Opus::new(32, 5, Bandwidth::SuperWideBand, true))
-            }
-            QualityLevel::Medium => {
-                TranscodingFormat::OpusInOgg(Opus::new(48, 8, Bandwidth::SuperWideBand, false))
-            }
-            QualityLevel::High => {
-                TranscodingFormat::OpusInOgg(Opus::new(64, 10, Bandwidth::FullBand, false))
-            }
-            QualityLevel::Passthrough => TranscodingFormat::Remux,
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Copy)]
 pub enum QualityLevel {
     Low,
@@ -535,7 +518,12 @@ mod tests {
         span: Option<TimeSpan>,
     ) {
         env_logger::try_init().ok();
-        let t = Transcoder::new(TranscodingFormat::default_level(QualityLevel::Low));
+        let t = Transcoder::new(TranscodingFormat::OpusInOgg(Opus::new(
+            32,
+            5,
+            Bandwidth::SuperWideBand,
+            true,
+        )));
         let out_file = temp_dir().join(output_file);
         let mut cmd = match copy_file {
             None => t.build_command("./test_data/01-file.mp3", seek, span),
@@ -553,7 +541,7 @@ mod tests {
                 let mut out = child.stdout.take().unwrap();
                 tokio::io::copy(&mut out, &mut file)
                     .await
-                    .expect("file cope failed");
+                    .expect("file copy failed");
             }
             child.wait().await
         };
