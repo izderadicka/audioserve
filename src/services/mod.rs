@@ -15,7 +15,7 @@ use futures::{future, TryFutureExt};
 use headers::{
     AccessControlAllowCredentials, AccessControlAllowHeaders, AccessControlAllowMethods,
     AccessControlAllowOrigin, AccessControlMaxAge, AccessControlRequestHeaders, HeaderMapExt,
-    Origin, Range,
+    Origin, Range, UserAgent
 };
 use hyper::StatusCode;
 use hyper::{body::HttpBody, service::Service, Body, Method, Request, Response};
@@ -488,7 +488,8 @@ impl<C: 'static> FileSendService<C> {
                 if path.starts_with("/collections") {
                     collections_list()
                 } else if path.starts_with("/transcodings") {
-                    transcodings_list(params.get("User-Agent").map(|s| s.as_ref()))
+                    let user_agent = req.headers().typed_get::<UserAgent>();
+                    transcodings_list(user_agent.as_ref().map(|h| h.as_str()))
                 } else if cfg!(feature = "shared-positions") && path.starts_with("/positions") {
                     // positions API
                     #[cfg(feature = "shared-positions")]

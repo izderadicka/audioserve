@@ -110,7 +110,7 @@ pub struct TranscodingConfig {
     low: TranscodingFormat,
     medium: TranscodingFormat,
     high: TranscodingFormat,
-    alt_configs: Option<Vec<(String, AltTranscodingConfig)>>,
+    alt_configs: Option<HashMap<String, AltTranscodingConfig>>,
     #[serde(skip)]
     alt_configs_inner: Option<Vec<(regex::Regex, AltTranscodingConfig)>>,
 }
