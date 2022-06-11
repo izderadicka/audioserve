@@ -68,11 +68,13 @@ impl Default for TranscodingCacheConfig {
 
 #[cfg(feature = "transcoding-cache")]
 impl TranscodingCacheConfig {
-    pub fn new_for_name(name: impl AsRef<str>) -> Self {
-        let mut me = Self::default();
-        me.root_dir = me.root_dir.join(name.as_ref());
-        me
-    }
+    //TODO delete
+    // pub fn new_for_name(name: impl AsRef<str>) -> Self {
+    //     let mut me = Self::default();
+    //     me.root_dir = me.root_dir.join(name.as_ref());
+    //     me
+    // }
+    
     pub fn check(&self) -> Result<()> {
         if !util::parent_dir_exists(&self.root_dir) {
             return value_error!(
@@ -210,7 +212,6 @@ impl TranscodingConfig {
 #[serde(default)]
 pub struct AltTranscodingConfig {
     #[cfg(feature = "transcoding-cache")]
-    pub cache: TranscodingCacheConfig,
     low: TranscodingFormat,
     medium: TranscodingFormat,
     high: TranscodingFormat,
@@ -219,8 +220,6 @@ pub struct AltTranscodingConfig {
 impl Default for AltTranscodingConfig {
     fn default() -> Self {
         Self {
-            #[cfg(feature = "transcoding-cache")]
-            cache: TranscodingCacheConfig::new_for_name("__alt__"),
             low: TranscodingFormat::OpusInWebm(Opus::new(32, 5, Bandwidth::SuperWideBand, true)),
             medium: TranscodingFormat::OpusInWebm(Opus::new(
                 48,
