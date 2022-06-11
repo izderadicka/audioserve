@@ -488,7 +488,7 @@ impl<C: 'static> FileSendService<C> {
                 if path.starts_with("/collections") {
                     collections_list()
                 } else if path.starts_with("/transcodings") {
-                    transcodings_list()
+                    transcodings_list(params.get("User-Agent").map(|s| s.as_ref()))
                 } else if cfg!(feature = "shared-positions") && path.starts_with("/positions") {
                     // positions API
                     #[cfg(feature = "shared-positions")]

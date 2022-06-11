@@ -336,11 +336,11 @@ fn create_parser<'a>() -> Parser<'a> {
 
 macro_rules!  arg_error {
     ($arg:expr, $msg:expr) => {
-        Error::in_argument($arg, $msg)
+        Error::in_argument_result($arg, $msg)
     };
 
     ($arg:expr, $msg:expr, $($param:expr),+) => {
-        Error::in_argument($arg,
+        Error::in_argument_result($arg,
         format!($msg, $($param),+))
     };
 
@@ -651,6 +651,7 @@ where
     };
 
     config.check()?;
+    config.prepare()?;
     if args.is_present("print-config") {
         println!("{}", serde_yaml::to_string(&config).unwrap());
         exit(0);

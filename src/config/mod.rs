@@ -4,7 +4,7 @@ use regex::Regex;
 
 pub use self::error::{Error, Result};
 use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
-use crate::services::transcode::codecs::{Opus, Bandwidth};
+use crate::services::transcode::codecs::{Bandwidth, Opus};
 use crate::util;
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -110,7 +110,9 @@ pub struct TranscodingConfig {
     low: TranscodingFormat,
     medium: TranscodingFormat,
     high: TranscodingFormat,
-    alt_configs: HashMap<String, AltTranscodingConfig>
+    alt_configs: Option<Vec<(String, AltTranscodingConfig)>>,
+    #[serde(skip)]
+    alt_configs_inner: Option<Vec<(regex::Regex, AltTranscodingConfig)>>,
 }
 
 impl Default for TranscodingConfig {
@@ -123,21 +125,31 @@ impl Default for TranscodingConfig {
             low: TranscodingFormat::OpusInOgg(Opus::new(32, 5, Bandwidth::SuperWideBand, true)),
             medium: TranscodingFormat::OpusInOgg(Opus::new(48, 8, Bandwidth::SuperWideBand, false)),
             high: TranscodingFormat::OpusInOgg(Opus::new(64, 10, Bandwidth::FullBand, false)),
-            alt_configs: HashMap::new(),
+            alt_configs: None,
+            alt_configs_inner: None,
         }
     }
 }
 
-impl TranscodingConfig {
-    pub fn get(&self, quality: QualityLevel) -> TranscodingFormat {
-        match quality {
-            QualityLevel::Low => self.low.clone(),
-            QualityLevel::Medium => self.medium.clone(),
-            QualityLevel::High => self.high.clone(),
-            QualityLevel::Passthrough => TranscodingFormat::Remux,
+macro_rules! implement_get_transcoding {
+    ($($trans_config:ty),*) => {
+        $(
+        impl $trans_config {
+            pub fn get(&self, quality: QualityLevel) -> TranscodingFormat {
+                match quality {
+                    QualityLevel::Low => self.low.clone(),
+                    QualityLevel::Medium => self.medium.clone(),
+                    QualityLevel::High => self.high.clone(),
+                    QualityLevel::Passthrough => TranscodingFormat::Remux,
+                }
+            }
         }
-    }
+        )*
 
+    };
+}
+
+impl TranscodingConfig {
     pub fn check(&self) -> Result<()> {
         if self.max_parallel_processes < 2 {
             return value_error!(
@@ -154,9 +166,43 @@ impl TranscodingConfig {
         if self.max_runtime_hours < 1 {
             return value_error!("max_runtime_hours", "Minimum time is 1 hour");
         }
+
+        if let Some(alt_configs) = self.alt_configs.as_ref() {
+            for (re, _alt) in alt_configs {
+                regex::Regex::new(re)
+                    .map(|_re| ())
+                    .or_else(|e| value_error!("alt_encodings", "Invalid User Agent regex {}", e))?
+            }
+        }
         #[cfg(feature = "transcoding-cache")]
         self.cache.check()?;
         Ok(())
+    }
+
+    pub fn prepare(&mut self) -> Result<()> {
+        if let Some(alt_configs) = self.alt_configs.take() {
+            if alt_configs.len() > 0 {
+                self.alt_configs_inner = Some(
+                    alt_configs
+                        .into_iter()
+                        // I can unwrap because regex we checked by check fh
+                        .map(|(re, cfg)| (regex::Regex::new(&re), cfg))
+                        .map(|(res, cfg)| match res {
+                            Ok(re) => Ok((re, cfg)),
+                            Err(e) => Err(Error::in_value(
+                                "alt_configs",
+                                format!("Invalid regex {}", e),
+                            )),
+                        })
+                        .collect::<Result<Vec<_>>>()?,
+                )
+            }
+        }
+        Ok(())
+    }
+
+    pub fn alt_configs(&self) -> Option<&Vec<(regex::Regex, AltTranscodingConfig)>> {
+        self.alt_configs_inner.as_ref()
     }
 }
 
@@ -176,11 +222,18 @@ impl Default for AltTranscodingConfig {
             #[cfg(feature = "transcoding-cache")]
             cache: TranscodingCacheConfig::new_for_name("__alt__"),
             low: TranscodingFormat::OpusInWebm(Opus::new(32, 5, Bandwidth::SuperWideBand, true)),
-            medium: TranscodingFormat::OpusInWebm(Opus::new(48, 8, Bandwidth::SuperWideBand, false)),
+            medium: TranscodingFormat::OpusInWebm(Opus::new(
+                48,
+                8,
+                Bandwidth::SuperWideBand,
+                false,
+            )),
             high: TranscodingFormat::OpusInWebm(Opus::new(64, 10, Bandwidth::FullBand, false)),
         }
     }
 }
+
+implement_get_transcoding!(TranscodingConfig, AltTranscodingConfig);
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
@@ -293,10 +346,7 @@ impl FromStr for PositionsBackupFormat {
         match s {
             "legacy" => Ok(PositionsBackupFormat::Legacy),
             "v1" => Ok(PositionsBackupFormat::V1),
-            _ => Err(Error::ConfigValue {
-                name: "positions-restore",
-                message: "Invalid version".into(),
-            }),
+            _ => value_error!("positions-restore", "Invalid version"),
         }
     }
 }
@@ -363,10 +413,8 @@ impl FromStr for Cors {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        let re = Regex::new(s).map_err(|e| Error::ConfigValue {
-            name: "cors-regex",
-            message: format!("Invalid cors regex: {}", e).into(),
-        })?;
+        let re = Regex::new(s)
+            .map_err(|e| Error::in_value("cors-regex", format!("Invalid cors regex: {}", e)))?;
         Ok(Cors::AllowMatchingOrigins(re))
     }
 }
@@ -413,10 +461,7 @@ impl Config {
         let base_dir = parts
             .next()
             .map(PathBuf::from)
-            .ok_or_else(|| Error::ConfigValue {
-                name: "base_dir",
-                message: "Empty base_dir".into(),
-            })?;
+            .ok_or_else(|| Error::in_value("base_dir", "Empty base_dir, nothing before :"))?;
 
         if !base_dir.is_dir() {
             return value_error!("base_dir", "{:?} is not direcrory", base_dir);
@@ -456,7 +501,11 @@ impl Config {
             ),
         }
     }
-
+    /// Any runtime optimalizations, compilatipons of config
+    pub fn prepare(&mut self) -> Result<()> {
+        self.transcoding.prepare()?;
+        Ok(())
+    }
     pub fn check(&self) -> Result<()> {
         if self
             .shared_secret

@@ -35,6 +35,12 @@ pub struct Transcodings {
     pub high: TranscodingSummary,
 }
 
+impl Default for Transcodings {
+    fn default() -> Self {
+        Transcodings::new()
+    }
+}
+
 impl Transcodings {
     pub fn new() -> Self {
         let cfg = get_config();
@@ -44,6 +50,23 @@ impl Transcodings {
             medium: cfg.transcoding.get(QualityLevel::Medium).into(),
             high: cfg.transcoding.get(QualityLevel::High).into(),
         }
+    }
+
+    pub fn for_user_agent(user_agent: &str) -> Self {
+        let alt_configs = get_config().transcoding.alt_configs();
+        if let Some(alt_configs) = alt_configs {
+            for (re, cfg) in alt_configs {
+                if re.is_match(user_agent) {
+                    return Transcodings {
+                        max_transcodings: get_config().transcoding.max_parallel_processes,
+                        low: cfg.get(QualityLevel::Low).into(),
+                        medium: cfg.get(QualityLevel::Medium).into(),
+                        high: cfg.get(QualityLevel::High).into(),
+                    };
+                }
+            }
+        }
+        Transcodings::new()
     }
 }
 
