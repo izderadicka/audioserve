@@ -6,6 +6,7 @@ use self::subs::{
 };
 use self::transcode::QualityLevel;
 use crate::config::get_config;
+use crate::services::transcode::ChosenTranscoding;
 use crate::util::ResponseBuilderExt;
 use crate::{error, util::header2header};
 use bytes::{Bytes, BytesMut};
@@ -550,7 +551,15 @@ impl<C: 'static> FileSendService<C> {
                         .map(|l| FoldersOrdering::from_letter(l))
                         .unwrap_or(FoldersOrdering::Alphabetical);
                     if path.starts_with("/audio/") {
-                        FileSendService::<C>::serve_audio(&req, base_dir, path, transcoding, params)
+                        let user_agent = req.headers().typed_get::<UserAgent>();
+                        FileSendService::<C>::serve_audio(
+                            &req,
+                            base_dir,
+                            path,
+                            transcoding,
+                            params,
+                            user_agent.as_ref().map(|ua| ua.as_str()),
+                        )
                     } else if path.starts_with("/folder/") {
                         let group = params.get_string("group");
                         get_folder(
@@ -656,6 +665,7 @@ impl<C: 'static> FileSendService<C> {
         path: &str,
         transcoding: TranscodingDetails,
         params: QueryParams,
+        user_agent: Option<&str>,
     ) -> ResponseFuture {
         debug!(
             "Received request with following headers {:?}",
@@ -680,9 +690,10 @@ impl<C: 'static> FileSendService<C> {
             None => None,
         };
         let seek: Option<f32> = params.get("seek").and_then(|s| s.parse().ok());
-        let transcoding_quality: Option<QualityLevel> = params
+        let transcoding_quality: Option<ChosenTranscoding> = params
             .get("trans")
-            .and_then(|t| QualityLevel::from_letter(&t));
+            .and_then(|t| QualityLevel::from_letter(&t))
+            .map(|level| ChosenTranscoding::for_level_and_user_agent(level, user_agent));
 
         send_file(
             base_dir,

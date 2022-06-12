@@ -2,7 +2,7 @@
 use super::{
     resp,
     search::{Search, SearchTrait},
-    transcode::{guess_format, AudioFilePath, QualityLevel},
+    transcode::{guess_format, AudioFilePath, ChosenTranscoding, QualityLevel, Transcoder},
     types::*,
     Counter,
 };
@@ -41,7 +41,7 @@ fn serve_file_cached_or_transcoded(
     span: Option<TimeSpan>,
     _range: Option<ByteRange>,
     transcoding: super::TranscodingDetails,
-    transcoding_quality: QualityLevel,
+    transcoding_quality: ChosenTranscoding,
 ) -> ResponseFuture {
     serve_file_transcoded_checked(
         AudioFilePath::Original(full_path),
@@ -59,7 +59,7 @@ fn serve_file_cached_or_transcoded(
     span: Option<TimeSpan>,
     range: Option<ByteRange>,
     transcoding: super::TranscodingDetails,
-    transcoding_quality: QualityLevel,
+    transcoding_quality: ChosenTranscoding,
 ) -> ResponseFuture {
     if get_config().transcoding.cache.disabled {
         return serve_file_transcoded_checked(
@@ -73,7 +73,7 @@ fn serve_file_cached_or_transcoded(
 
     use super::transcode::cache::{cache_key, get_cache};
     let cache = get_cache();
-    let cache_key = cache_key(&full_path, transcoding_quality, span);
+    let cache_key = cache_key(&full_path, &transcoding_quality, span);
     let fut = cache
         .get2(cache_key)
         .then(|res| match res {
@@ -106,9 +106,7 @@ fn serve_file_cached_or_transcoded(
                     )
                 } else {
                     debug!("Sending file {:?} from transcoded cache", &full_path);
-                    let mime = get_config()
-                        .transcoder(transcoding_quality)
-                        .transcoded_mime();
+                    let mime = transcoding_quality.format.mime();
                     Box::pin(serve_opened_file(f, range, None, mime).map_err(|e| {
                         error!("Error sending cached file: {}", e);
                         Error::new(e).context("sending cached file")
@@ -125,7 +123,7 @@ fn serve_file_transcoded_checked(
     seek: Option<f32>,
     span: Option<TimeSpan>,
     transcoding: super::TranscodingDetails,
-    transcoding_quality: QualityLevel,
+    transcoding_quality: ChosenTranscoding,
 ) -> ResponseFuture {
     let counter = transcoding.transcodings;
     let mut running_transcodings = counter.load(Ordering::SeqCst);
@@ -171,16 +169,17 @@ async fn serve_file_transcoded(
     full_path: AudioFilePath<PathBuf>,
     seek: Option<f32>,
     span: Option<TimeSpan>,
-    transcoding_quality: QualityLevel,
+    transcoding_quality: ChosenTranscoding,
     counter: Counter,
 ) -> Result<Response> {
-    let transcoder = get_config().transcoder(transcoding_quality);
-    let params = transcoder.transcoding_params();
-    let mime = if let QualityLevel::Passthrough = transcoding_quality {
+    let mime = if let QualityLevel::Passthrough = transcoding_quality.level {
         guess_format(full_path.as_ref()).mime
     } else {
-        transcoder.transcoded_mime()
+        transcoding_quality.format.mime()
     };
+
+    let transcoder = Transcoder::new(transcoding_quality);
+    let params = transcoder.transcoding_params();
 
     // check if file exists
 
@@ -197,7 +196,7 @@ async fn serve_file_transcoded(
     }
 
     transcoder
-        .transcode(full_path, seek, span, counter.clone(), transcoding_quality)
+        .transcode(full_path, seek, span, counter.clone())
         .await
         .map(move |stream| {
             HyperResponse::builder()
@@ -360,14 +359,14 @@ pub fn send_file<P: AsRef<Path>>(
     range: Option<ByteRange>,
     seek: Option<f32>,
     transcoding: super::TranscodingDetails,
-    transcoding_quality: Option<QualityLevel>,
+    transcoding_quality: Option<ChosenTranscoding>,
 ) -> ResponseFuture {
     let (real_path, span) = parse_chapter_path(file_path.as_ref());
     let full_path = base_path.join(real_path);
     if let Some(transcoding_quality) = transcoding_quality {
         debug!(
             "Sending file transcoded in quality {:?}",
-            transcoding_quality
+            transcoding_quality.level
         );
         serve_file_cached_or_transcoded(
             full_path,
@@ -384,7 +383,7 @@ pub fn send_file<P: AsRef<Path>>(
             seek,
             span,
             transcoding,
-            QualityLevel::Passthrough,
+            ChosenTranscoding::passthough(),
         )
     } else {
         debug!("Sending file directly from fs");

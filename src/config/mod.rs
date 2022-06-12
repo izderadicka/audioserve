@@ -3,7 +3,7 @@ use hyper::{Body, Request};
 use regex::Regex;
 
 pub use self::error::{Error, Result};
-use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
+use super::services::transcode::{QualityLevel, TranscodingFormat};
 use crate::services::transcode::codecs::{Bandwidth, Opus};
 use crate::util;
 use std::collections::{HashMap, HashSet};
@@ -223,7 +223,7 @@ fn generate_tag(s: &str) -> String {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TranscodingDetails {
     #[serde(skip)]
-    tag: String,
+    pub tag: String,
     low: TranscodingFormat,
     medium: TranscodingFormat,
     high: TranscodingFormat,
@@ -448,10 +448,6 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn transcoder(&self, transcoding_quality: QualityLevel) -> Transcoder {
-        Transcoder::new(get_config().transcoding.get(transcoding_quality))
-    }
-
     pub fn add_base_dir<P: AsRef<str>>(&mut self, p: P) -> Result<()> {
         let mut parts = p.as_ref().splitn(2, ':');
         let base_dir = parts

@@ -104,6 +104,44 @@ impl TranscodingFormat {
         m.parse().unwrap()
     }
 }
+#[derive(Debug, Clone)]
+pub struct ChosenTranscoding {
+    pub format: TranscodingFormat,
+    pub level: QualityLevel,
+    pub tag: &'static str,
+}
+
+impl ChosenTranscoding {
+    pub fn passthough() -> Self {
+        Self {
+            format: TranscodingFormat::Remux,
+            level: QualityLevel::Passthrough,
+            tag: "",
+        }
+    }
+
+    pub fn for_level_and_user_agent(level: QualityLevel, user_agent: Option<&str>) -> Self {
+        let cfg = &get_config().transcoding;
+        if let Some(user_agent) = user_agent {
+            if let Some(alt_configs) = cfg.alt_configs() {
+                for (re, trans) in alt_configs {
+                    if re.is_match(user_agent) {
+                        return Self {
+                            format: trans.get(level),
+                            level,
+                            tag: trans.tag.as_str(),
+                        };
+                    }
+                }
+            }
+        }
+        Self {
+            format: cfg.get(level),
+            level,
+            tag: "",
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Copy)]
 pub enum QualityLevel {
@@ -156,7 +194,7 @@ impl<S> AsRef<S> for AudioFilePath<S> {
 
 #[derive(Clone, Debug)]
 pub struct Transcoder {
-    quality: TranscodingFormat,
+    quality: ChosenTranscoding,
 }
 
 #[cfg(feature = "transcoding-cache")]
@@ -166,7 +204,7 @@ type TranscodedStream =
 type TranscodedFuture = Pin<Box<dyn Future<Output = Result<TranscodedStream>> + Send>>;
 
 impl Transcoder {
-    pub fn new(quality: TranscodingFormat) -> Self {
+    pub fn new(quality: ChosenTranscoding) -> Self {
         Transcoder { quality }
     }
 
@@ -215,7 +253,7 @@ impl Transcoder {
         span: Option<TimeSpan>,
     ) -> Command {
         let mut cmd = self.base_ffmpeg(seek, span);
-        let targs = self.quality.args();
+        let targs = self.quality.format.args();
         self.input_file_args(&mut cmd, file);
         cmd.args(targs.codec_args)
             .args(targs.quality_args.iter().map(|i| i.as_ref()))
@@ -241,7 +279,7 @@ impl Transcoder {
         let fmt = if !use_transcoding_format {
             guess_format(file.as_ref()).ffmpeg
         } else {
-            self.quality.args().format
+            self.quality.format.args().format
         };
         self.input_file_args(&mut cmd, file);
         cmd.args(&["-acodec", "copy"])
@@ -257,13 +295,9 @@ impl Transcoder {
     pub fn transcoding_params(&self) -> String {
         format!(
             "codec={}; bitrate={}",
-            self.quality.format_name(),
-            self.quality.bitrate(),
+            self.quality.format.format_name(),
+            self.quality.format.bitrate(),
         )
-    }
-
-    pub fn transcoded_mime(&self) -> Mime {
-        self.quality.mime()
     }
 
     #[cfg(not(feature = "transcoding-cache"))]
@@ -273,7 +307,6 @@ impl Transcoder {
         seek: Option<f32>,
         span: Option<TimeSpan>,
         counter: super::Counter,
-        _quality: QualityLevel,
     ) -> impl Future<Output = Result<ChunkStream<ChildStdout>>> {
         future::ready(
             self.transcode_inner(file, seek, span, counter)
@@ -291,7 +324,6 @@ impl Transcoder {
         seek: Option<f32>,
         span: Option<TimeSpan>,
         counter: super::Counter,
-        quality: QualityLevel,
     ) -> TranscodedFuture {
         use self::cache::{cache_key, get_cache};
         use futures::channel::mpsc;
@@ -300,7 +332,7 @@ impl Transcoder {
         let is_transcoded = matches!(file, AudioFilePath::Transcoded(_));
         if is_transcoded
             || seek.is_some()
-            || quality == QualityLevel::Passthrough
+            || self.quality.level == QualityLevel::Passthrough
             || get_config().transcoding.cache.disabled
         {
             debug!("Shoud not add to cache as is already transcoded, seeking, remuxing or cache is disabled");
@@ -314,7 +346,7 @@ impl Transcoder {
         }
 
         //TODO: this is ugly -  unify either we will use Path or OsStr!
-        let key = cache_key(file.as_ref().as_ref(), quality, span);
+        let key = cache_key(file.as_ref().as_ref(), &self.quality, span);
         let fut = get_cache().add(key).then(move |res| match res {
             Err(e) => {
                 warn!("Cannot create cache entry: {}", e);
@@ -382,7 +414,7 @@ impl Transcoder {
         ChunkStream<ChildStdout>,
         impl Future<Output = Result<(), ()>>,
     )> {
-        let mut cmd = match (&file, &self.quality) {
+        let mut cmd = match (&file, &self.quality.format) {
             (_, TranscodingFormat::Remux) => {
                 self.build_remux_command(file.as_ref(), seek, span, false)
             }
@@ -518,12 +550,11 @@ mod tests {
         span: Option<TimeSpan>,
     ) {
         env_logger::try_init().ok();
-        let t = Transcoder::new(TranscodingFormat::OpusInOgg(Opus::new(
-            32,
-            5,
-            Bandwidth::SuperWideBand,
-            true,
-        )));
+        let t = Transcoder::new(ChosenTranscoding {
+            format: TranscodingFormat::OpusInOgg(Opus::new(32, 5, Bandwidth::SuperWideBand, true)),
+            level: QualityLevel::Medium,
+            tag: "test",
+        });
         let out_file = temp_dir().join(output_file);
         let mut cmd = match copy_file {
             None => t.build_command("./test_data/01-file.mp3", seek, span),

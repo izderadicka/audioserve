@@ -1,8 +1,10 @@
 use crate::config::get_config;
-use crate::services::transcode::{QualityLevel, TimeSpan};
+use crate::services::transcode::TimeSpan;
 use simple_file_cache::AsyncCache as Cache;
 use std::fs;
 use std::path::Path;
+
+use super::ChosenTranscoding;
 
 lazy_static! {
     pub static ref CACHE: Option<Cache> = {
@@ -27,8 +29,12 @@ lazy_static! {
 }
 
 //TODO: not ideal as potential collisions for non-unicode names
-pub fn cache_key<P: AsRef<Path>>(file: P, quality: QualityLevel, span: Option<TimeSpan>) -> String {
-    let mut key: String = quality.to_letter().into();
+pub fn cache_key<P: AsRef<Path>>(
+    file: P,
+    quality: &ChosenTranscoding,
+    span: Option<TimeSpan>,
+) -> String {
+    let mut key: String = quality.level.to_letter().into();
     key.push_str(&file.as_ref().to_string_lossy());
 
     if let Some(span) = span {
@@ -46,12 +52,17 @@ pub fn get_cache() -> &'static Cache {
 mod tests {
 
     use super::*;
+    use crate::services::transcode::{QualityLevel, TranscodingFormat};
 
     #[test]
     fn test_cache_key() {
         let key = cache_key(
             "/home/ivan/neco",
-            QualityLevel::Medium,
+            &ChosenTranscoding {
+                level: QualityLevel::Medium,
+                format: TranscodingFormat::Remux,
+                tag: "abcd",
+            },
             Some(TimeSpan {
                 start: 0,
                 duration: Some(5),
