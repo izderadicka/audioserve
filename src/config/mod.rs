@@ -7,6 +7,7 @@ use super::services::transcode::{QualityLevel, Transcoder, TranscodingFormat};
 use crate::services::transcode::codecs::{Bandwidth, Opus};
 use crate::util;
 use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
 use std::env;
 use std::fs::File;
 use std::io::Read;
@@ -188,7 +189,10 @@ impl TranscodingConfig {
                     alt_configs
                         .into_iter()
                         // I can unwrap because regex we checked by check fh
-                        .map(|(re, cfg)| (regex::Regex::new(&re), cfg))
+                        .map(|(re, mut cfg)| {
+                            cfg.tag = generate_tag(&re);
+                            (regex::Regex::new(&re), cfg)
+                        })
                         .map(|(res, cfg)| match res {
                             Ok(re) => Ok((re, cfg)),
                             Err(e) => Err(Error::in_value(
@@ -208,27 +212,21 @@ impl TranscodingConfig {
     }
 }
 
+fn generate_tag(s: &str) -> String {
+    let hash = ring::digest::digest(&ring::digest::SHA256, s.as_bytes());
+    return format!(
+        "{:016x}",
+        u64::from_be_bytes(hash.as_ref()[..8].try_into().expect("Invalid size"))
+    );
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(default)]
 pub struct TranscodingDetails {
+    #[serde(skip)]
+    tag: String,
     low: TranscodingFormat,
     medium: TranscodingFormat,
     high: TranscodingFormat,
-}
-
-impl Default for TranscodingDetails {
-    fn default() -> Self {
-        Self {
-            low: TranscodingFormat::OpusInWebm(Opus::new(32, 5, Bandwidth::SuperWideBand, true)),
-            medium: TranscodingFormat::OpusInWebm(Opus::new(
-                48,
-                8,
-                Bandwidth::SuperWideBand,
-                false,
-            )),
-            high: TranscodingFormat::OpusInWebm(Opus::new(64, 10, Bandwidth::FullBand, false)),
-        }
-    }
 }
 
 implement_get_transcoding!(TranscodingConfig, TranscodingDetails);
