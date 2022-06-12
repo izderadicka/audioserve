@@ -56,9 +56,11 @@ impl Transcodings {
         let alt_configs = get_config().transcoding.alt_configs();
         if let Some(alt_configs) = alt_configs {
             for (re, cfg) in alt_configs {
-                
                 if re.is_match(user_agent) {
-                    debug!("Using alternate transcoding {} config for User Agent {} ", re, user_agent);
+                    debug!(
+                        "Using alternate transcoding {} config for User Agent {} ",
+                        re, user_agent
+                    );
                     return Transcodings {
                         max_transcodings: get_config().transcoding.max_parallel_processes,
                         low: cfg.get(QualityLevel::Low).into(),

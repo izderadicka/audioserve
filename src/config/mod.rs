@@ -74,7 +74,7 @@ impl TranscodingCacheConfig {
     //     me.root_dir = me.root_dir.join(name.as_ref());
     //     me
     // }
-    
+
     pub fn check(&self) -> Result<()> {
         if !util::parent_dir_exists(&self.root_dir) {
             return value_error!(
@@ -112,9 +112,9 @@ pub struct TranscodingConfig {
     low: TranscodingFormat,
     medium: TranscodingFormat,
     high: TranscodingFormat,
-    alt_configs: Option<HashMap<String, AltTranscodingConfig>>,
+    alt_configs: Option<HashMap<String, TranscodingDetails>>,
     #[serde(skip)]
-    alt_configs_inner: Option<Vec<(regex::Regex, AltTranscodingConfig)>>,
+    alt_configs_inner: Option<Vec<(regex::Regex, TranscodingDetails)>>,
 }
 
 impl Default for TranscodingConfig {
@@ -203,21 +203,20 @@ impl TranscodingConfig {
         Ok(())
     }
 
-    pub fn alt_configs(&self) -> Option<&Vec<(regex::Regex, AltTranscodingConfig)>> {
+    pub fn alt_configs(&self) -> Option<&Vec<(regex::Regex, TranscodingDetails)>> {
         self.alt_configs_inner.as_ref()
     }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
-pub struct AltTranscodingConfig {
-    #[cfg(feature = "transcoding-cache")]
+pub struct TranscodingDetails {
     low: TranscodingFormat,
     medium: TranscodingFormat,
     high: TranscodingFormat,
 }
 
-impl Default for AltTranscodingConfig {
+impl Default for TranscodingDetails {
     fn default() -> Self {
         Self {
             low: TranscodingFormat::OpusInWebm(Opus::new(32, 5, Bandwidth::SuperWideBand, true)),
@@ -232,7 +231,7 @@ impl Default for AltTranscodingConfig {
     }
 }
 
-implement_get_transcoding!(TranscodingConfig, AltTranscodingConfig);
+implement_get_transcoding!(TranscodingConfig, TranscodingDetails);
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]

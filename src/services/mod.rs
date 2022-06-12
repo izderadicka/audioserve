@@ -15,7 +15,7 @@ use futures::{future, TryFutureExt};
 use headers::{
     AccessControlAllowCredentials, AccessControlAllowHeaders, AccessControlAllowMethods,
     AccessControlAllowOrigin, AccessControlMaxAge, AccessControlRequestHeaders, HeaderMapExt,
-    Origin, Range, UserAgent
+    Origin, Range, UserAgent,
 };
 use hyper::StatusCode;
 use hyper::{body::HttpBody, service::Service, Body, Method, Request, Response};
