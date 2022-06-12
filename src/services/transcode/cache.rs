@@ -35,6 +35,9 @@ pub fn cache_key<P: AsRef<Path>>(
     span: Option<TimeSpan>,
 ) -> String {
     let mut key: String = quality.level.to_letter().into();
+    if !quality.tag.is_empty() {
+        key.push_str(&quality.tag);
+    }
     key.push_str(&file.as_ref().to_string_lossy());
 
     if let Some(span) = span {
@@ -68,6 +71,6 @@ mod tests {
                 duration: Some(5),
             }),
         );
-        assert_eq!("m/home/ivan/neco/0-5", key);
+        assert_eq!("mabcd/home/ivan/neco/0-5", key);
     }
 }
