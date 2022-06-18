@@ -36,6 +36,7 @@ Like audioserve and want to start quickly and easily and securely? Try [this sim
   - [Performance](#performance)
     - [Transcoding Cache](#transcoding-cache)
   - [Transcoding](#transcoding)
+    - [Alternative transcodings and transcoding configuration for Apple users](#alternative-transcodings-and-transcoding-configuration-for-apple-users)
   - [Command line](#command-line)
   - [Web client](#web-client)
   - [Android client](#android-client)
@@ -271,6 +272,11 @@ All encodings have optional parameter `mono`, if set to `true` audio will be dow
 Overall `opus-in-ogg` provides best results from both quality and functionality perspective, so I'd highly recommend to stick to it, unless you have some problem with it.
 
 You can override one two or all three defaults, depending on what sections you have in this config file.
+
+### Alternative transcodings and transcoding configuration for Apple users
+
+I'm quite fond of opus codec, but Apple is not. I'm not using nor testing on Apple products.
+
 
 ## Command line
 
