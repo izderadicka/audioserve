@@ -55,7 +55,7 @@ Like audioserve and want to start quickly and easily and securely? Try [this sim
 
 ## Media Library
 
-Audioserve is intended to serve files from directory in exactly same structure (with support for .m4b and similar single file audiobooks, where chapters are presented as virtual files), audio tags are not used for browsing, only optionally they can be displayed. Recommended directory structure of collections is:
+Audioserve is intended to serve files from directories in exactly same structure (with support for .m4b and similar single file audiobooks, where chapters are presented as virtual files), audio tags are not used for browsing, only optionally they can be displayed. Recommended directory structure of collections is:
 
     Author Last Name, First Name/Audio Book Name
     Author Last Name, First Name/Series Name/Audio Book Name
@@ -67,7 +67,7 @@ Files should be named so they are in right alphabetical order - ideally prefixed
 
 But this structure is not mandatory - you will just see whatever directories and files you have, so use anything that will suite you.
 
-The characters `$$` and `|` are used for internal usage of audioserve, so you should not use then in file names.
+The characters `$$` and `|` are used for internal usage of audioserve, so you should not use them in file names.
 
 In folders you can have additional metadata files - first available image (jpeg or png) is taken as a cover picture and first text file (html, txt, md) is taken as description of the folder.
 
@@ -82,7 +82,7 @@ By default symbolic(soft) links are not followed in the collections directory (b
 Initially I though that everything can be just served from the file system. However experience with the program and users feedback have revealed two major problems with this approach:
 
 - for larger collections search was slow
-- a folder with many audiofiles (over couple hundred) was loading slowly (because we have to collect basic audio metadata - duration and bitrate for each file)
+- a folder with many audiofiles (over couple hundreds) was loading slowly (because we have to collect basic audio metadata - duration and bitrate for each file)
 
 So I implemented caching of collection data into embedded key-value database (using [sled](https://github.com/spacejam/sled)). I'm quite happy with it now, it really makes audioserve **superfast**.
 
@@ -124,7 +124,7 @@ This is the algorithm for scanning tags: tags are scanned for all files in the f
 
 ### Collation
 
-By default audioserve alphabetic order of audio files and subfolders is case insensitive "C like" collation, meaning national characters like "č" are sorted after all ASCII characters and not after "c". For more advanced collation respecting local collation additional unicode support is needed. Unfortunately Rust does not have native support for this and only working library is binding to ICU C libraries, which makes compilation bit complicated. So local/national collation audioserve has to be compiled with optional feature `collation`. Such version of audioserve will then use following env.variables to determine locale for collation (in order of precedence): `AUDIOSERVE_COLLATE`, `LC_ALL`, `LC_COLLATE`, `LANG`. If nothing is found it falls back to `en_US`, which still handles somehow national characters ("č" is equal to "c" in sorting).
+By default audioserve alphabetic order of audio files and subfolders is case insensitive "C like" collation, meaning national characters like "č" are sorted after all ASCII characters and not after "c". For more advanced collation respecting local collation additional unicode support is needed. Unfortunately Rust does not have native support for this and only working library is binding to ICU C libraries, which makes compilation bit complicated. To support local/national collation audioserve has to be compiled with optional feature `collation`. Such version of audioserve will then use following env.variables to determine locale for collation (in order of precedence): `AUDIOSERVE_COLLATE`, `LC_ALL`, `LC_COLLATE`, `LANG`. If nothing is found it falls back to `en_US`, which still handles somehow national characters ("č" is equal to "c" in sorting).
 
 ## Sharing playback positions between clients
 
@@ -171,7 +171,7 @@ You can also run audioserve behind reverse proxy like nginx or ha-proxy and term
 
 #### Reverse proxy
 
-Often best way how to deploy audioserve is behind reverse proxy, which terminates TLS/SSL and connects to backend audioserve. Reverse proxy can serve also other backend servers on same domain, in this case audioserve server could be determined either by subdomain ( https://audioserve.yourdomain.com), which assumes that you can modify DNS records, or by URL path prefix - external address is like https://yourdomain.com/audioserve and it's map to http://local_name_or_ip:3000 backend host. Decent proxy can do such mapping using URL rewriting (removing path prefix), but in some setups (shared seedbox), when it is not possible and URL path prefix is automatically forwarded to backend. For that case audioserve has argument `--url-path-prefix`, which can contain path prefix (without final slash) and audioserve accepts this prefix as root path.
+Often best way how to deploy audioserve is behind reverse proxy, which terminates TLS/SSL and connects to backend audioserve. Reverse proxy can serve also other backend servers on same domain, in this case audioserve server could be determined either by subdomain ( https://audioserve.yourdomain.com), which assumes that you can modify DNS records, or by URL path prefix - external address is like https://yourdomain.com/audioserve and it's map to http://local_name_or_ip:3000 backend host. Decent proxy can do such mapping using URL rewriting (removing path prefix), but in some setups (shared seedbox), it is not possible and URL path prefix is automatically forwarded to backend. For that case audioserve has argument `--url-path-prefix`, which can contain path prefix (without final slash) and audioserve accepts this prefix as root path.
 
 Another gotcha for reverse proxy might be usage of last [playback position](#sharing-playback-positions-between-clients) feature, which requires websocket connection and some special configuration for that might be needed in reverse proxy.
 
@@ -197,9 +197,9 @@ CORS is relevant in several scenarios:
 
 - during web client development, when client is served from development server (for instance `webpack serve`) on one port, say 8080, and API is served from audioserve listening on other port, say 3000 browser CORS policies will then prevent client from communicating with audioserve server API (as they are on different posts, thus different origins), unless CORS headers are included in server responses.
 - If you are using third party client (like [audiosilo](https://github.com/KodeStar/audiosilo)), client may sit in one domain, say https://client.audiosilo.app/, and audioserve in other domain, say https://audioserve.zderadicka.eu, so again here CORS headers are required (`--cors` argument when starting audioserve). Also in this case connection **must be secure** - https://.
-- Audioserve responses' CORS headers are permissive, allowing access from all origins and with any additional headers enable any possible scenario of usage.
+- Audioserve responses' CORS headers are permissive by default, allowing access from all origins and with any additional headers enable any possible scenario of usage. You can limit CORS origins by regular expression by using `--cors-regex` argument instead - it will allow only origins matching given regular expression.
 
-It is important to understand that CORS is not security measure for server, but for browser only. No matter if `--cors` is added server will accept correct requests from any client.
+It is important to understand that CORS is not security measure for server, but for browser only. No matter if `--cors` is added or not server will accept correct (properly formatted and with valid token) requests from any client.
 
 ### Security Best Practices
 
@@ -236,7 +236,7 @@ Transcoding is provided in three variants and client can choose between them (us
 - medium - (default 48 kbps opus with 12kHz cutoff)
 - high - (default 64 kbps opus with 20kHz cutoff)
 
-As already noted audioserve is intended primarily for audiobooks and believe me opus codec is excellent there even in quite low bitrates. However if you want to change parameters of these three transcodings you can easily do so by providing yaml confing file to argument `--config`. Here is example of transcoding section in config file:
+As already noted audioserve is intended primarily for audiobooks and believe me opus codec is excellent choice there even in quite low bitrates. However if you want to change parameters of these three transcodings you can easily do so by providing yaml confing file to argument `--config`. Here is example of transcoding section in config file:
 
 ```yaml
 transcoding:
