@@ -15,6 +15,8 @@ For some background and video demo check this article(bit old but gives main mot
 
 If you will install audioserve and make it available on Internet do not [underestimate security](#security-best-practices).
 
+**Apple** users need to add additional configuration - [read this](#alternative-transcodings-and-transcoding-configuration-for-apple-users).
+
 Like audioserve and want to start quickly and easily and securely? Try [this simple guide](docs/deploy.md) to have audioserve up and running for free in no time.
 
 ## TOC
@@ -269,14 +271,40 @@ For mp3 transcoding there are also 3 parameters: `bitrate` (in kbps), `compressi
 
 All encodings have optional parameter `mono`, if set to `true` audio will be down-mixed to mono.
 
-Overall `opus-in-ogg` provides best results from both quality and functionality perspective, so I'd highly recommend to stick to it, unless you have some problem with it.
+You can override one two or all three defaults, depending on what sections you have in this config file. You can also provide complete alternative transcoding configuration for particular clients ([see below](#alternative-transcodings-and-transcoding-configuration-for-apple-users))
 
-You can override one two or all three defaults, depending on what sections you have in this config file.
+Overall `opus-in-ogg` provides best results from both quality and functionality perspective, so I'd highly recommend to stick to it, unless you have some problem with it, which might be case on Apple platforms ([see below](#alternative-transcodings-and-transcoding-configuration-for-apple-users)).
+
 
 ### Alternative transcodings and transcoding configuration for Apple users
 
-I'm quite fond of opus codec, but Apple is not. I'm not using nor testing on Apple products.
+Default transcoding for audioserve is opus codec in ogg container, which is not supported on Apple platforms. Recently audioserve also supports alternative transcoding configurations based on matching User-Agent string in request header. You can create any number of alternative transcoding configurations, each identified by a regular expression. First matching configuration is then used.
 
+So if you create this configuration file:
+
+```
+---
+transcoding:
+  alt_configs:
+    "iPhone|IPad|Mac OS":
+      low:
+        aac-in-adts:
+          bitrate: 32
+          sr: "24kHz"
+          mono: true
+      medium:
+        aac-in-adts:
+          bitrate: 48
+          mono: false
+      high:
+        aac-in-adts:
+          bitrate: 64
+          mono: false
+
+```
+
+and use it with audioserve through argument `--config` or short version `-g`. 
+It will then use aac transcoding for browsers on Apple platforms.
 
 ## Command line
 
