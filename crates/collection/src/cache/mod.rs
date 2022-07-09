@@ -4,7 +4,7 @@ use self::{
     util::kv_to_audiofolder,
 };
 use crate::{
-    audio_folder::{FolderLister, FolderOptions},
+    audio_folder::FolderLister,
     audio_meta::{AudioFolder, FolderByModification, TimeStamp},
     cache::update::{filter_event, FilteredEvent, RecursiveUpdater},
     common::{CollectionOptions, CollectionTrait, PositionsData, PositionsTrait},
@@ -53,20 +53,19 @@ impl CollectionCache {
         options_file.set_extension("options.json");
         let mut force_update = opt.force_cache_update_on_init;
 
-        /* //TODO fix later
         let save_options = || match File::create(&options_file) {
-            Ok(f) => match serde_json::to_writer(f, &opt.folder_options) {
+            Ok(f) => match serde_json::to_writer(f, &opt) {
                 Ok(_) => debug!("Created options file {:?}", options_file),
                 Err(e) => error!("Cannot create {:?} : {}", options_file, e),
             },
             Err(e) => error!("Cannot create {:?} : {}", options_file, e),
         };
         match File::open(&options_file).and_then(|f| {
-            serde_json::from_reader::<_, FolderOptions>(f)
+            serde_json::from_reader::<_, CollectionOptions>(f)
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
         }) {
             Ok(prev_options) => {
-                if prev_options != opt.folder_options {
+                if prev_options != opt {
                     info!(
                         "Previous folder options differ on {:?}, lets enforce full cache update",
                         root_path
@@ -81,7 +80,7 @@ impl CollectionCache {
                 save_options();
             }
         }
-        */
+
         let db = sled::Config::default()
             .path(&db_path)
             .use_compression(true)

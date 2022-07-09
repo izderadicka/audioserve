@@ -9,6 +9,7 @@ use crate::{
 use enum_dispatch::enum_dispatch;
 use media_info::tags::{ALLOWED_TAGS, BASIC_TAGS};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{
     collections::{HashMap, HashSet},
@@ -23,8 +24,9 @@ pub enum PositionsData {
     V1(Map<String, Value>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CollectionOptions {
+    #[serde(skip)]
     pub no_cache: bool,
     pub chapters_duration: u32,
     pub chapters_from_duration: u32,
@@ -33,9 +35,22 @@ pub struct CollectionOptions {
     pub no_dir_collaps: bool,
     pub tags: Option<HashSet<String>>,
     pub cd_folder_regex_str: Option<String>,
-    //pub folder_options: FolderOptions,
+    #[serde(skip)]
     pub force_cache_update_on_init: bool,
+    #[serde(skip)]
     pub(crate) cd_folder_regex: Option<Regex>,
+}
+
+impl PartialEq for CollectionOptions {
+    fn eq(&self, other: &Self) -> bool {
+        self.chapters_duration == other.chapters_duration
+            && self.chapters_from_duration == other.chapters_from_duration
+            && self.ignore_chapters_meta == other.ignore_chapters_meta
+            && self.allow_symlinks == other.allow_symlinks
+            && self.no_dir_collaps == other.no_dir_collaps
+            && self.tags == other.tags
+            && self.cd_folder_regex_str == other.cd_folder_regex_str
+    }
 }
 
 impl Default for CollectionOptions {
