@@ -1,5 +1,4 @@
 use crate::{
-    audio_folder::FolderOptions,
     audio_meta::{AudioFolder, TimeStamp},
     cache::CollectionCache,
     error::{invalid_option, invalid_option_err, Error, Result},
@@ -27,17 +26,30 @@ pub enum PositionsData {
 #[derive(Clone, Debug)]
 pub struct CollectionOptions {
     pub no_cache: bool,
-    pub folder_options: FolderOptions,
+    pub chapters_duration: u32,
+    pub chapters_from_duration: u32,
+    pub ignore_chapters_meta: bool,
+    pub allow_symlinks: bool,
+    pub no_dir_collaps: bool,
+    pub tags: Option<HashSet<String>>,
+    pub cd_folder_regex_str: Option<String>,
+    //pub folder_options: FolderOptions,
     pub force_cache_update_on_init: bool,
-    pub cd_folder_regex: Option<Regex>,
+    pub(crate) cd_folder_regex: Option<Regex>,
 }
 
 impl Default for CollectionOptions {
     fn default() -> Self {
         Self {
             no_cache: false,
-            folder_options: Default::default(),
             force_cache_update_on_init: false,
+            chapters_duration: 0,
+            chapters_from_duration: 30,
+            ignore_chapters_meta: false,
+            allow_symlinks: false,
+            no_dir_collaps: false,
+            tags: None,
+            cd_folder_regex_str: None,
             cd_folder_regex: None,
         }
     }
@@ -70,24 +82,22 @@ impl CollectionOptions {
                 match tag {
                     "nc" | "no-cache" => self.no_cache = bool_val()?,
                     "force-cache-update" => self.force_cache_update_on_init = bool_val()?,
-                    "ignore-chapters-meta" => {
-                        self.folder_options.ignore_chapters_meta = bool_val()?
-                    }
-                    "allow-symlinks" => self.folder_options.allow_symlinks = bool_val()?,
-                    "no-dir-collaps" => self.folder_options.no_dir_collaps = bool_val()?,
+                    "ignore-chapters-meta" => self.ignore_chapters_meta = bool_val()?,
+                    "allow-symlinks" => self.allow_symlinks = bool_val()?,
+                    "no-dir-collaps" => self.no_dir_collaps = bool_val()?,
                     "chapters-duration" => {
                         let val = u32_val()?;
                         if val < MINIMUM_CHAPTER_DURATION {
                             invalid_option!("Option {} has invalid value - value {} is below limit for reasonable chapter size", tag, val);
                         }
-                        self.folder_options.chapters_duration = val;
+                        self.chapters_duration = val;
                     }
                     "chapters-from-duration" => {
                         let val = u32_val()?;
                         if val > 0 && val < MINIMUM_CHAPTER_DURATION {
                             invalid_option!("Option {} has invalid value - value {} is below limit for reasonable chapter size", tag, val);
                         }
-                        self.folder_options.chapters_from_duration = val;
+                        self.chapters_from_duration = val;
                     }
                     "tags" => {
                         if let Some(tags) = val {
@@ -102,17 +112,16 @@ impl CollectionOptions {
                                     }
                                 })
                                 .collect::<Result<HashSet<_>>>()?;
-                            self.folder_options.tags = Some(tags);
+                            self.tags = Some(tags);
                         } else {
                             invalid_option!("Some tags are required for {}", tag);
                         }
                     }
                     "default-tags" => {
                         if bool_val()? {
-                            self.folder_options.tags =
-                                Some(BASIC_TAGS.iter().map(|i| i.to_string()).collect())
+                            self.tags = Some(BASIC_TAGS.iter().map(|i| i.to_string()).collect())
                         } else {
-                            self.folder_options.tags = None
+                            self.tags = None
                         }
                     }
 
@@ -131,11 +140,8 @@ pub struct CollectionOptionsMap {
 }
 
 impl CollectionOptionsMap {
-    pub fn new(default_folder_options: FolderOptions, force_cache_update: bool) -> Result<Self> {
-        let mut default = CollectionOptions::default();
-        default.force_cache_update_on_init = force_cache_update;
-        default.folder_options = default_folder_options;
-        if let Some(ref re) = default.folder_options.cd_folder_regex {
+    pub fn new(mut default: CollectionOptions) -> Result<Self> {
+        if let Some(ref re) = default.cd_folder_regex_str {
             default.cd_folder_regex =
                 Some(Regex::new(re).map_err(|e| (Error::InvalidCDFolderRegex(re.into(), e)))?);
         }
@@ -239,17 +245,17 @@ mod tests {
         opt.update_from_str_options("no-cache,force-cache-update=true,ignore-chapters-meta=false,allow-symlinks,no-dir-collaps=TRUE").expect("good options");
         assert!(opt.no_cache);
         assert!(opt.force_cache_update_on_init);
-        assert!(!opt.folder_options.ignore_chapters_meta);
-        assert!(opt.folder_options.allow_symlinks);
-        assert!(opt.folder_options.no_dir_collaps);
+        assert!(!opt.ignore_chapters_meta);
+        assert!(opt.allow_symlinks);
+        assert!(opt.no_dir_collaps);
 
         opt.update_from_str_options("tags=title+album+composer")
             .expect("valid tags");
-        assert_eq!(3, opt.folder_options.tags.as_ref().unwrap().len());
+        assert_eq!(3, opt.tags.as_ref().unwrap().len());
 
         opt.update_from_str_options("chapters-duration=44,chapters-from-duration=200")
             .expect("correct options");
-        assert_eq!(44, opt.folder_options.chapters_duration);
-        assert_eq!(200, opt.folder_options.chapters_from_duration);
+        assert_eq!(44, opt.chapters_duration);
+        assert_eq!(200, opt.chapters_from_duration);
     }
 }

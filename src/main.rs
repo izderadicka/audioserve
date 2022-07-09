@@ -5,8 +5,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
 
-use collection::audio_folder::FolderOptions;
-use collection::{CollectionOptionsMap, Collections};
+use collection::{CollectionOptions, CollectionOptionsMap, Collections};
 use config::{get_config, init_config};
 use error::{bail, Context, Error};
 use futures::prelude::*;
@@ -81,19 +80,19 @@ macro_rules! get_url_path {
 }
 
 fn create_collections_options() -> anyhow::Result<CollectionOptionsMap> {
-    let fo = FolderOptions {
-        allow_symlinks: get_config().allow_symlinks,
-        chapters_duration: get_config().chapters.duration,
-        chapters_from_duration: get_config().chapters.from_duration,
-        ignore_chapters_meta: get_config().ignore_chapters_meta,
-        no_dir_collaps: get_config().no_dir_collaps,
-        tags: get_config().get_tags(),
-        cd_folder_regex: get_config()
-            .collapse_cd_folders
-            .as_ref()
-            .and_then(|x| x.regex.clone()),
-    };
-    let mut co = CollectionOptionsMap::new(fo, get_config().force_cache_update_on_init)?;
+    let c = get_config();
+    let mut fo = CollectionOptions::default();
+
+    fo.allow_symlinks = c.allow_symlinks;
+    fo.chapters_duration = c.chapters.duration;
+    fo.chapters_from_duration = c.chapters.from_duration;
+    fo.ignore_chapters_meta = c.ignore_chapters_meta;
+    fo.no_dir_collaps = c.no_dir_collaps;
+    fo.tags = c.get_tags();
+    fo.cd_folder_regex_str = c.collapse_cd_folders.as_ref().and_then(|x| x.regex.clone());
+    fo.force_cache_update_on_init = c.force_cache_update_on_init;
+
+    let mut co = CollectionOptionsMap::new(fo)?;
     for (p, o) in &get_config().base_dirs_options {
         if let Err(e) = co.add_col_options(p, o) {
             error!("Invalid option(s) for collection directory {:?}:{}", p, e);

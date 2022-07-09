@@ -7,10 +7,10 @@ use std::path::{Path, PathBuf};
 
 use super::audio_meta::*;
 use crate::collator::Collate;
+use crate::common::CollectionOptions;
 use crate::util::{get_meta, get_modified, get_real_file_type, guess_mime_type};
 use lazy_static::lazy_static;
 use regex::Regex;
-use serde_derive::{Deserialize, Serialize};
 
 pub enum DirType {
     File {
@@ -21,44 +21,38 @@ pub enum DirType {
     Other,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct FolderOptions {
+#[derive(Debug, Clone)]
+pub(crate) struct FolderOptions {
     pub chapters_duration: u32,
     pub chapters_from_duration: u32,
     pub ignore_chapters_meta: bool,
     pub allow_symlinks: bool,
     pub no_dir_collaps: bool,
     pub tags: Option<HashSet<String>>,
-    pub cd_folder_regex: Option<String>,
+    pub cd_folder_regex: Option<Regex>,
 }
 
-impl Default for FolderOptions {
-    fn default() -> Self {
+impl From<CollectionOptions> for FolderOptions {
+    fn from(o: CollectionOptions) -> Self {
         Self {
-            chapters_duration: 0,
-            chapters_from_duration: 30,
-            ignore_chapters_meta: false,
-            allow_symlinks: false,
-            no_dir_collaps: false,
-            tags: None,
-            cd_folder_regex: None,
+            chapters_duration: o.chapters_duration,
+            chapters_from_duration: o.chapters_from_duration,
+            ignore_chapters_meta: o.ignore_chapters_meta,
+            allow_symlinks: o.allow_symlinks,
+            no_dir_collaps: o.no_dir_collaps,
+            tags: o.tags,
+            cd_folder_regex: o.cd_folder_regex,
         }
     }
 }
 
 #[derive(Clone)]
-pub struct FolderLister {
+pub(crate) struct FolderLister {
     config: FolderOptions,
 }
 
 impl FolderLister {
-    pub fn new() -> Self {
-        FolderLister {
-            config: FolderOptions::default(),
-        }
-    }
-
-    pub fn new_with_options(config: FolderOptions) -> Self {
+    pub(crate) fn new_with_options(config: FolderOptions) -> Self {
         FolderLister { config }
     }
 }
@@ -640,7 +634,7 @@ mod tests {
     #[test]
     fn test_list_dir() {
         media_info::init();
-        let lister = FolderLister::new();
+        let lister = FolderLister::new_with_options(CollectionOptions::default().into());
         let res = lister.list_dir("/non-existent", "folder", FoldersOrdering::Alphabetical);
         assert!(res.is_err());
         let res = lister.list_dir(TEST_DATA_BASE, "test_data/", FoldersOrdering::Alphabetical);
@@ -666,7 +660,7 @@ mod tests {
 
     #[test]
     fn test_json() {
-        let lister = FolderLister::new();
+        let lister = FolderLister::new_with_options(CollectionOptions::default().into());
         let folder = lister
             .list_dir(TEST_DATA_BASE, "test_data/", FoldersOrdering::Alphabetical)
             .unwrap();

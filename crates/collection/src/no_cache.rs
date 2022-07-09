@@ -22,9 +22,9 @@ impl CollectionDirect {
         CollectionDirect {
             base_dir,
             searcher: FoldersSearch {
-                allow_symlinks: opt.folder_options.allow_symlinks,
+                allow_symlinks: opt.allow_symlinks,
             },
-            lister: FolderLister::new_with_options(opt.folder_options),
+            lister: FolderLister::new_with_options(opt.into()),
         }
     }
 }

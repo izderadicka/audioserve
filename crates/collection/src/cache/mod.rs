@@ -4,14 +4,14 @@ use self::{
     util::kv_to_audiofolder,
 };
 use crate::{
-    audio_folder::FolderLister,
+    audio_folder::{FolderLister, FolderOptions},
     audio_meta::{AudioFolder, FolderByModification, TimeStamp},
     cache::update::{filter_event, FilteredEvent, RecursiveUpdater},
     common::{CollectionOptions, CollectionTrait, PositionsData, PositionsTrait},
     error::{Error, Result},
     position::{Position, PositionShort, PositionsCollector},
     util::get_modified,
-    AudioFolderShort, FolderOptions, FoldersOrdering,
+    AudioFolderShort, FoldersOrdering,
 };
 use crossbeam_channel::{unbounded as channel, Receiver, Sender};
 use notify::{watcher, DebouncedEvent, Watcher};
@@ -52,6 +52,8 @@ impl CollectionCache {
         let mut options_file = db_path.clone();
         options_file.set_extension("options.json");
         let mut force_update = opt.force_cache_update_on_init;
+
+        /* //TODO fix later
         let save_options = || match File::create(&options_file) {
             Ok(f) => match serde_json::to_writer(f, &opt.folder_options) {
                 Ok(_) => debug!("Created options file {:?}", options_file),
@@ -79,6 +81,7 @@ impl CollectionCache {
                 save_options();
             }
         }
+        */
         let db = sled::Config::default()
             .path(&db_path)
             .use_compression(true)
@@ -90,7 +93,7 @@ impl CollectionCache {
         Ok(CollectionCache {
             inner: Arc::new(CacheInner::new(
                 db,
-                FolderLister::new_with_options(opt.folder_options),
+                FolderLister::new_with_options(opt.into()),
                 root_path,
                 update_sender.clone(),
             )?),

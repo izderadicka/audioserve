@@ -1,12 +1,12 @@
 #[macro_use]
 extern crate log;
 
-pub use audio_folder::{list_dir_files_only, parse_chapter_path, FolderOptions};
+pub use audio_folder::{list_dir_files_only, parse_chapter_path};
 pub use audio_meta::{init_media_lib, AudioFile, AudioFolderShort, FoldersOrdering, TimeSpan};
 use audio_meta::{AudioFolder, TimeStamp};
 use cache::CollectionCache;
-pub use common::CollectionOptionsMap;
 use common::{Collection, CollectionTrait, PositionsTrait};
+pub use common::{CollectionOptions, CollectionOptionsMap};
 use error::{Error, Result};
 use legacy_pos::LegacyPositions;
 pub use media_info::tags;
