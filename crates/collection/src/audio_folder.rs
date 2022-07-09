@@ -1,9 +1,9 @@
 use std::borrow::{self, Cow};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
-use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::{fs, mem};
 
 use super::audio_meta::*;
 use crate::collator::Collate;
@@ -262,6 +262,51 @@ impl FolderLister {
                         }
                     }
                 } else {
+                    if !subfolders.is_empty() && files.is_empty() {
+                        if let Some(ref re) = self.config.cd_folder_regex {
+                            let can_collapse = subfolders
+                                .iter()
+                                .all(|f| !f.is_file && re.is_match(&f.name));
+                            if can_collapse {
+                                debug!("Can collapse CD subfolders on path {:?}", full_path);
+                                let folders = mem::replace(&mut subfolders, vec![]);
+                                for fld in folders {
+                                    let prefix: String = fld.name.into();
+                                    let subdir_path = base_dir.as_ref().join(&fld.path);
+                                    let subdir_name = fld.path.file_name();
+                                    let subdir = self.list_dir_dir(
+                                        base_dir.as_ref(),
+                                        subdir_path,
+                                        FoldersOrdering::Alphabetical,
+                                    )?;
+                                    if !subdir.subfolders.is_empty() {
+                                        warn!("CD folder contains subfolders, these will not be visible");
+                                    }
+                                    for mut f in subdir.files {
+                                        if let (Some(file_name), Some(subdir_name)) =
+                                            (f.path.file_name(), subdir_name)
+                                        {
+                                            f.name = (prefix.clone() + " " + &f.name).into();
+                                            let mut new_file_name = subdir_name.to_owned();
+                                            new_file_name.push("$$");
+                                            new_file_name.push(file_name);
+                                            let mut new_path = fld.path.clone();
+                                            new_path.set_file_name(new_file_name);
+                                            f.path = new_path;
+                                            // TODO: update path - join last two segments by $$
+                                            files.push(f);
+                                        } else {
+                                            warn!(
+                                                "CD subfolder in wrong position: ${:?}",
+                                                fld.path
+                                            );
+                                        }
+                                    }
+                                    // TODO: update tags, cover, description if possible
+                                }
+                            }
+                        }
+                    }
                     files.sort_unstable_by(|a, b| a.collate(b));
                     tags = extract_folder_tags(&mut files);
                     subfolders.sort_unstable_by(|a, b| a.compare_as(ordering, b));
@@ -534,28 +579,59 @@ fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> io::Result<Path
 }
 
 lazy_static! {
-    static ref CHAPTER_PSEUDO_RE: Regex = Regex::new(r"\$\$(\d+)-(\d+)\$\$").unwrap();
+    static ref CHAPTER_SPAN_RE: Regex = Regex::new(r"(\d+)-(\d+)").unwrap();
+}
+
+fn parse_span(s: &str) -> Option<TimeSpan> {
+    if let Some(cap) = CHAPTER_SPAN_RE.captures(s) {
+        // can unwrap because of regex
+        let start: u64 = cap.get(1).unwrap().as_str().parse().unwrap();
+        let end: Option<u64> = cap.get(2).and_then(|g| g.as_str().parse().ok());
+        let duration = end.map(|end| end - start);
+
+        Some(TimeSpan { start, duration })
+    } else {
+        None
+    }
 }
 
 pub fn parse_chapter_path(p: &Path) -> (Cow<Path>, Option<TimeSpan>) {
     let fname = p.file_name().and_then(OsStr::to_str);
     if let Some(fname) = fname {
-        if let Some(cap) = CHAPTER_PSEUDO_RE.captures(fname) {
-            let start_index = cap.get(0).unwrap().start();
-            let start: u64 = cap.get(1).unwrap().as_str().parse().unwrap();
-            let end: Option<u64> = cap.get(2).and_then(|g| g.as_str().parse().ok());
-            let duration = end.map(|end| end - start);
-            let parent = p.parent().unwrap_or_else(|| Path::new(""));
-            let path = match fname.find("$$") {
-                Some(pos) if pos < start_index => Cow::Owned(parent.join(&fname[..pos])),
-                _ => Cow::Borrowed(parent),
-            };
-
-            return (path, Some(TimeSpan { start, duration }));
+        let parts: Vec<_> = fname.split("$$").collect();
+        let sz = parts.len();
+        match sz {
+            1 => (Cow::Borrowed(p), None),
+            2 | 3 | 4 => {
+                let parent = p.parent().unwrap_or_else(|| Path::new(""));
+                if sz == 2 {
+                    (Cow::Owned(parent.join(parts[0]).join(parts[1])), None)
+                } else {
+                    let span = parse_span(parts[sz - 2]);
+                    if let Some(span) = span {
+                        if sz == 3 {
+                            (Cow::Borrowed(parent), Some(span))
+                        } else {
+                            let p = parent.join(parts[0]);
+                            (Cow::Owned(p), Some(span))
+                        }
+                    } else {
+                        warn!(
+                            "Invalid file name - this {} should be time chappter time span",
+                            parts[sz - 2]
+                        );
+                        (Cow::Borrowed(p), None)
+                    }
+                }
+            }
+            _ => {
+                warn!("Unsupported file name - $$  separators : {}", fname);
+                (Cow::Borrowed(p), None)
+            }
         }
-    };
-
-    (Cow::Borrowed(p), None)
+    } else {
+        (Cow::Borrowed(p), None)
+    }
 }
 
 pub fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
@@ -755,11 +831,36 @@ mod tests {
         assert_eq!(span.start, 1000);
         assert_eq!(span.duration.unwrap(), 1000);
 
+        let f = "stoker/dracula/dracula.m4b/001 - Chapter1$$1000-2000$$";
+        let (p, span) = parse_chapter_path(Path::new(f));
+        let span = span.unwrap();
+        assert_eq!(p.to_str().unwrap(), "stoker/dracula/dracula.m4b");
+        assert_eq!(span.start, 1000);
+        assert_eq!(span.duration.unwrap(), 1000);
+
         let f = "stoker/dracula/dracula.m4b$$001 - Chapter1$$1000-2000$$.m4b";
         let (p, span) = parse_chapter_path(Path::new(f));
         let span = span.unwrap();
         assert_eq!(p.to_str().unwrap(), "stoker/dracula/dracula.m4b");
         assert_eq!(span.start, 1000);
         assert_eq!(span.duration.unwrap(), 1000);
+
+        let f = "stoker/dracula/dracula.m4b$$001 - Chapter1$$1000-2000$$";
+        let (p, span) = parse_chapter_path(Path::new(f));
+        let span = span.unwrap();
+        assert_eq!(p.to_str().unwrap(), "stoker/dracula/dracula.m4b");
+        assert_eq!(span.start, 1000);
+        assert_eq!(span.duration.unwrap(), 1000);
+    }
+
+    #[test]
+    fn test_pseudo_file3() {
+        let f = "Follet Ken/Srsen leta v noci/CD1$$01 Srsen leta v noci.opus";
+        let (p, span) = parse_chapter_path(Path::new(f));
+        assert!(span.is_none());
+        assert_eq!(
+            p.to_str().unwrap(),
+            "Follet Ken/Srsen leta v noci/CD1/01 Srsen leta v noci.opus"
+        );
     }
 }
