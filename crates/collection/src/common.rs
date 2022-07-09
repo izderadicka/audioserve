@@ -2,13 +2,14 @@ use crate::{
     audio_folder::FolderOptions,
     audio_meta::{AudioFolder, TimeStamp},
     cache::CollectionCache,
-    error::{invalid_option, invalid_option_err, Result},
+    error::{invalid_option, invalid_option_err, Error, Result},
     no_cache::CollectionDirect,
     position::PositionsCollector,
     AudioFolderShort, FoldersOrdering, Position,
 };
 use enum_dispatch::enum_dispatch;
 use media_info::tags::{ALLOWED_TAGS, BASIC_TAGS};
+use regex::Regex;
 use serde_json::{Map, Value};
 use std::{
     collections::{HashMap, HashSet},
@@ -23,11 +24,12 @@ pub enum PositionsData {
     V1(Map<String, Value>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CollectionOptions {
     pub no_cache: bool,
     pub folder_options: FolderOptions,
     pub force_cache_update_on_init: bool,
+    pub cd_folder_regex: Option<Regex>,
 }
 
 impl Default for CollectionOptions {
@@ -36,6 +38,7 @@ impl Default for CollectionOptions {
             no_cache: false,
             folder_options: Default::default(),
             force_cache_update_on_init: false,
+            cd_folder_regex: None,
         }
     }
 }
@@ -128,14 +131,18 @@ pub struct CollectionOptionsMap {
 }
 
 impl CollectionOptionsMap {
-    pub fn new(default_folder_options: FolderOptions, force_cache_update: bool) -> Self {
+    pub fn new(default_folder_options: FolderOptions, force_cache_update: bool) -> Result<Self> {
         let mut default = CollectionOptions::default();
         default.force_cache_update_on_init = force_cache_update;
         default.folder_options = default_folder_options;
-        CollectionOptionsMap {
+        if let Some(ref re) = default.folder_options.cd_folder_regex {
+            default.cd_folder_regex =
+                Some(Regex::new(re).map_err(|e| (Error::InvalidCDFolderRegex(re.into(), e)))?);
+        }
+        Ok(CollectionOptionsMap {
             cols: HashMap::new(),
             default,
-        }
+        })
     }
 
     pub fn add_col_options(&mut self, path: impl Into<PathBuf>, col_options: &str) -> Result<()> {

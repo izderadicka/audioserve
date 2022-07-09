@@ -214,6 +214,19 @@ fn create_parser<'a>() -> Parser<'a> {
             .env("AUDIOSERVE_FOLDER_FILE_CACHE_AGE")
             .takes_value(true)
             .help("Age for Cache-Control of cover and text files in audio folders, 'no-store' or number of secs, 0 means Cache-Control is not sent [default 1 day]")
+        )
+        .arg(
+            Arg::with_name("collapse-cd-folders")
+            .long("collapse-cd-folders")
+            .help("Collapses multi CD folders into one root folder, CD subfolders are recognized by regular expression")
+        )
+        .arg(
+            Arg::with_name("cd-folder-regex")
+            .long("cd-folder-regex")
+            .takes_value(true)
+            .requires("collapse-cd-folders")
+            .env("AUDIOSERVE_CD_FOLDER_REGEX")
+            .help("Regular expression to recognize CD subfolder, if want to use other then default")
         );
 
     if cfg!(feature = "behind-proxy") {
@@ -495,20 +508,19 @@ where
     if is_present_or_env("cors", "AUDIOSERVE_CORS") {
         config.cors = match args.value_of("cors-regex") {
             Some(o) => Some(CorsConfig {
-                inner: o.parse()?,
+                inner: Cors::default(),
                 regex: Some(o.to_string()),
             }),
-            None => Some(CorsConfig {
-                inner: Cors::AllowAllOrigins,
-                regex: None,
-            }),
+            None => Some(CorsConfig::default()),
         }
-    } else if let Some(cc) = config.cors.as_mut() {
-        // still need to parse from config
-        if let Some(re) = cc.regex.as_ref() {
-            cc.inner = re.parse()?;
-        } else {
-            cc.inner = Cors::AllowAllOrigins
+    }
+
+    if is_present_or_env("collapse-cd-folders", "AUDIOSERVE_COLLAPSE_CD_FOLDERS") {
+        config.collapse_cd_folders = match args.value_of("cd-folder-regex") {
+            Some(re) => Some(CollapseCDFolderConfig {
+                regex: Some(re.into()),
+            }),
+            None => Some(CollapseCDFolderConfig::default()),
         }
     }
 

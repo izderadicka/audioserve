@@ -25,6 +25,7 @@ static mut CONFIG: Option<Config> = None;
 
 pub const LONG_VERSION: &str = env!("AUDIOSERVE_LONG_VERSION");
 pub const FEATURES: &str = env!("AUDIOSERVE_FEATURES");
+const CD_FOLDER_RE: &str = r"^CD[ -_]?\s*\d+\s*$";
 
 // CONFIG is assured to be inited only once from main thread
 pub fn get_config() -> &'static Config {
@@ -385,13 +386,21 @@ impl PositionsConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct CorsConfig {
     #[serde(default)]
     pub regex: Option<String>,
     #[serde(skip)]
     inner: Cors,
 }
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct CollapseCDFolderConfig {
+    #[serde(default)]
+    pub regex: Option<String>,
+}
+
+impl CollapseCDFolderConfig {}
 
 #[derive(Debug, Clone)]
 pub enum Cors {
@@ -445,6 +454,7 @@ pub struct Config {
     pub force_cache_update_on_init: bool,
     pub static_resource_cache_age: Option<u32>,
     pub folder_file_cache_age: Option<u32>,
+    pub collapse_cd_folders: Option<CollapseCDFolderConfig>,
 }
 
 impl Config {
@@ -496,8 +506,21 @@ impl Config {
     /// Any runtime optimalizations, compilatipons of config
     pub fn prepare(&mut self) -> Result<()> {
         self.transcoding.prepare()?;
+
+        if let Some(ref mut cors) = self.cors {
+            if let Some(ref re) = cors.regex {
+                cors.inner = re.parse()?;
+            }
+        }
+
+        if let Some(ref mut collapse) = self.collapse_cd_folders {
+            if collapse.regex.is_none() {
+                collapse.regex = Some(CD_FOLDER_RE.into());
+            }
+        }
         Ok(())
     }
+
     pub fn check(&self) -> Result<()> {
         if self
             .shared_secret
@@ -562,6 +585,13 @@ impl Config {
         if let Some(url) = &self.url_path_prefix {
             if let Err(e) = validators::is_valid_url_path_prefix(url.clone()) {
                 return value_error!("url_path_prefix", e);
+            }
+        }
+
+        if let Some(ref c) = self.collapse_cd_folders {
+            if let Some(ref re) = c.regex {
+                Regex::new(re)
+                    .or_else(|e| value_error!("cd-folder-regex", "Invalid regex: {}", e))?;
             }
         }
 
@@ -634,6 +664,7 @@ impl Default for Config {
             positions: Default::default(),
             static_resource_cache_age: None,
             folder_file_cache_age: Some(24 * 3600),
+            collapse_cd_folders: None,
         }
     }
 }

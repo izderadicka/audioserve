@@ -56,6 +56,9 @@ pub enum Error {
 
     #[error("Invalid collection option: {0}")]
     InvalidCollectionOption(String),
+
+    #[error("Invalid regex for CD folder: {0} {1}")]
+    InvalidCDFolderRegex(String, regex::Error),
 }
 
 macro_rules! invalid_option_err {

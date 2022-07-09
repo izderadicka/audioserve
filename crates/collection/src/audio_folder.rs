@@ -29,6 +29,7 @@ pub struct FolderOptions {
     pub allow_symlinks: bool,
     pub no_dir_collaps: bool,
     pub tags: Option<HashSet<String>>,
+    pub cd_folder_regex: Option<String>,
 }
 
 impl Default for FolderOptions {
@@ -40,6 +41,7 @@ impl Default for FolderOptions {
             allow_symlinks: false,
             no_dir_collaps: false,
             tags: None,
+            cd_folder_regex: None,
         }
     }
 }
