@@ -19,9 +19,9 @@ const MIN_VERSION: u16 = 20;
 const FLAGS: u16 = 0b0000_1000_0000_1000;
 const COMPRESS_STORE: u16 = 0;
 
-pub fn calc_size<P, I>(sizes: I) -> Result<u64>
+pub fn calc_size<'a, P, I>(sizes: I) -> Result<u64>
 where
-    I: IntoIterator<Item = (P, u64)>,
+    I: IntoIterator<Item = (P, &'a String, u64)>,
     P: AsRef<Path>,
 {
     // let mut size: u64 = DIRECTORY_END_SIZE as u64;
@@ -31,10 +31,10 @@ where
     // Ok(size)
     sizes
         .into_iter()
-        .try_fold(DIRECTORY_END_SIZE as u64, |total, (path, sz)| {
+        .try_fold(DIRECTORY_END_SIZE as u64, |total, (_path, name, sz)| {
             Ok(total
                 + FILE_HEADER_SIZE as u64
-                + 2 * path_to_file_name(&path)?.len() as u64
+                + 2 * name.len() as u64
                 + sz
                 + DATA_DESCRIPTOR_SIZE as u64
                 + DIRECTORY_ENTRY_SIZE as u64)

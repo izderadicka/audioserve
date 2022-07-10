@@ -640,12 +640,35 @@ pub fn parse_chapter_path(p: &Path) -> (Cow<Path>, Option<TimeSpan>) {
     }
 }
 
-pub fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
-    base_dir: P,
-    dir_path: P2,
+pub fn list_dir_files_only(
+    base_dir: impl AsRef<Path>,
+    dir_path: impl AsRef<Path>,
     allow_symlinks: bool,
-    include_subdirs: Option<Regex>
-) -> Result<Vec<(PathBuf, u64)>, io::Error> {
+) -> Result<Vec<(PathBuf, String, u64)>, io::Error> {
+    list_dir_files_ext(
+        base_dir,
+        dir_path,
+        allow_symlinks,
+        None,
+        |p| -> Result<String, io::Error> {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_string())
+                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Invalid file name"))
+        },
+    )
+}
+
+pub fn list_dir_files_ext<F>(
+    base_dir: impl AsRef<Path>,
+    dir_path: impl AsRef<Path>,
+    allow_symlinks: bool,
+    include_subdirs: Option<Regex>,
+    name_fn: F,
+) -> Result<Vec<(PathBuf, String, u64)>, io::Error>
+where
+    F: Fn(&Path) -> Result<String, io::Error>,
+{
     let full_path = base_dir.as_ref().join(&dir_path);
     match fs::read_dir(&full_path) {
         Ok(dir_iter) => {
@@ -654,10 +677,11 @@ pub fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
             let mut description = None;
             let allow_symlinks = allow_symlinks;
 
-            fn get_size(p: PathBuf) -> Result<(PathBuf, u64), io::Error> {
+            let get_size_and_name = |p: PathBuf| -> Result<(PathBuf, String, u64), io::Error> {
                 let meta = get_meta(&p)?;
-                Ok((p, meta.len()))
-            }
+                let name = name_fn(&p)?;
+                Ok((p, name, meta.len()))
+            };
 
             for item in dir_iter {
                 match item {
@@ -666,13 +690,13 @@ pub fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
                             let path = f.path();
                             if ft.is_file() {
                                 if is_audio(&path) {
-                                    files.push(get_size(path)?)
+                                    files.push(get_size_and_name(path)?)
                                 } else if cover.is_none() && is_cover(&path) {
-                                    cover = Some(get_size(path)?)
+                                    cover = Some(get_size_and_name(path)?)
                                 } else if description.is_none() && is_description(&path) {
-                                    description = Some(get_size(path)?)
+                                    description = Some(get_size_and_name(path)?)
                                 }
-                            } else if ft.is_dir(){
+                            } else if ft.is_dir() {
                                 if let Some(ref re) = include_subdirs {
                                     if let Some(name) = f.file_name().to_str() {
                                         if re.is_match(name) {
@@ -681,10 +705,17 @@ pub fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
                                                 for item in di {
                                                     if let Ok(f) = item {
                                                         debug!("SUBDIR ITEM {:?}", f);
-                                                        if let Ok(ft) = get_real_file_type(&f, &subdir, allow_symlinks) {
+                                                        if let Ok(ft) = get_real_file_type(
+                                                            &f,
+                                                            &subdir,
+                                                            allow_symlinks,
+                                                        ) {
                                                             let file_path = f.path();
-                                                            if ft.is_file() && is_audio(&file_path){
-                                                                files.push(get_size(file_path)?)
+                                                            if ft.is_file() && is_audio(&file_path)
+                                                            {
+                                                                files.push(get_size_and_name(
+                                                                    file_path,
+                                                                )?)
                                                             }
                                                         }
                                                     }
@@ -692,7 +723,6 @@ pub fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
                                             }
                                         }
                                     }
-                                    
                                 }
                             }
                         }
@@ -755,9 +785,9 @@ mod tests {
 
     #[test]
     fn test_list_dir_files_only() {
-        let res = list_dir_files_only("/non-existent", "folder", false, None);
+        let res = list_dir_files_only("/non-existent", "folder", false);
         assert!(res.is_err());
-        let res = list_dir_files_only(TEST_DATA_BASE, "test_data/", false, None);
+        let res = list_dir_files_only(TEST_DATA_BASE, "test_data/", false);
         assert!(res.is_ok());
         let folder = res.unwrap();
         assert_eq!(folder.len(), 5);

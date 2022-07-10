@@ -89,7 +89,6 @@ pub struct AudioFile {
     pub section: Option<FileSection>,
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AudioFolder {
     pub is_file: bool,

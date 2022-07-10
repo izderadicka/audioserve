@@ -34,7 +34,7 @@ where
         }
     }
 
-    pub fn from_iter_with_naming<I,F>(files: I, name_fn: F) -> Self
+    pub fn from_iter_with_naming<I, F>(files: I, name_fn: F) -> Self
     where
         I: Iterator<Item = P> + Send + 'static,
         F: Fn(&Path) -> String + Send + 'static,
@@ -44,7 +44,6 @@ where
             name_fn: Some(Box::new(name_fn)),
         }
     }
-
 
     async fn main_loop(
         files: Box<dyn Iterator<Item = P> + Send>,
@@ -199,7 +198,11 @@ mod tests {
             .filter_map(|e| {
                 e.ok().and_then(|e| {
                     if e.file_type().unwrap().is_file() {
-                        Some((e.path(), e.metadata().unwrap().len()))
+                        Some((
+                            e.path(),
+                            e.file_name().to_str().map(|n| n.to_string()).unwrap(),
+                            e.metadata().unwrap().len(),
+                        ))
                     } else {
                         None
                     }
@@ -207,8 +210,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
         assert_eq!(files.len(), 4);
-        let expected_size = calc_size(files.iter().map(|&(ref p, s)| (p, s)))?;
-        let zipper = Zipper::from_iter(files.into_iter().map(|(p, _)| p));
+        let expected_size = calc_size(files.iter().map(|&(ref p, ref n, s)| (p, n, s)))?;
+        let zipper = Zipper::from_iter(files.into_iter().map(|(p, _, _)| p));
         let mut stream = zipper.zipped_stream();
         let mut f = Cursor::new(Vec::<u8>::new());
         while let Some(chunk) = stream.next().await {

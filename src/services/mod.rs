@@ -573,16 +573,21 @@ impl<C: 'static> FileSendService<C> {
                     {
                         #[cfg(feature = "folder-download")]
                         {
-                            
                             let format = params
                                 .get("fmt")
                                 .and_then(|f| f.parse::<types::DownloadFormat>().ok())
                                 .unwrap_or_default();
-                            let recursive = params.get("collapsed")
-                            .and_then(|_| get_config().collapse_cd_folders.as_ref())
-                            .and_then(|c| c.regex.as_ref())
-                            .and_then(|re| Regex::new(re).ok());
-                            subs::download_folder(base_dir, get_subpath(path, "/download/"), format, recursive)
+                            let recursive = params
+                                .get("collapsed")
+                                .and_then(|_| get_config().collapse_cd_folders.as_ref())
+                                .and_then(|c| c.regex.as_ref())
+                                .and_then(|re| Regex::new(re).ok());
+                            subs::download_folder(
+                                base_dir,
+                                get_subpath(path, "/download/"),
+                                format,
+                                recursive,
+                            )
                         }
                         #[cfg(not(feature = "folder-download"))]
                         {

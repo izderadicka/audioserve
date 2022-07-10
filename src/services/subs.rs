@@ -439,7 +439,6 @@ pub fn download_folder(
                     &base_path,
                     &folder_path,
                     get_config().allow_symlinks,
-                    include_subfolders,
                 )
             })
             .await
@@ -450,11 +449,13 @@ pub fn download_folder(
                     } else {
                         Some(match format {
                             DownloadFormat::Tar => {
-                                let lens_iter = folder.iter().map(|i| i.1);
+                                let lens_iter = folder.iter().map(|i| i.2);
                                 async_tar::calc_size(lens_iter)
                             }
                             DownloadFormat::Zip => {
-                                let iter = folder.iter().map(|&(ref path, len)| (path, len));
+                                let iter = folder
+                                    .iter()
+                                    .map(|&(ref path, ref name, len)| (path, name, len));
                                 async_zip::calc_size(iter).context("calc zip size")?
                             }
                         })
@@ -489,14 +490,12 @@ pub fn download_folder(
 
                     let disposition = format!("attachment; filename=\"{}\"", download_name);
                     let mut builder = HyperResponse::builder()
-                    .typed_header(ContentType::from(format.mime()))
-                    .header(CONTENT_DISPOSITION, disposition.as_bytes());
+                        .typed_header(ContentType::from(format.mime()))
+                        .header(CONTENT_DISPOSITION, disposition.as_bytes());
                     if let Some(content_len) = total_len {
                         builder = builder.typed_header(ContentLength(content_len));
                     }
-                    Ok(builder
-                        .body(Body::wrap_stream(stream))
-                        .unwrap())
+                    Ok(builder.body(Body::wrap_stream(stream)).unwrap())
                 }
                 Ok(Err(e)) => Err(Error::new(e).context("listing directory")),
                 Err(e) => Err(Error::new(e).context("spawn blocking directory")),
