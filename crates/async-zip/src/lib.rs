@@ -17,6 +17,7 @@ pub mod error;
 mod zip;
 pub struct Zipper<P> {
     files: Box<dyn Iterator<Item = P> + Send>,
+    name_fn: Option<Box<dyn Fn(&Path) -> String + Send>>,
 }
 
 impl<P> Zipper<P>
@@ -29,11 +30,25 @@ where
     {
         Zipper {
             files: Box::new(files),
+            name_fn: None,
         }
     }
 
+    pub fn from_iter_with_naming<I,F>(files: I, name_fn: F) -> Self
+    where
+        I: Iterator<Item = P> + Send + 'static,
+        F: Fn(&Path) -> String + Send + 'static,
+    {
+        Zipper {
+            files: Box::new(files),
+            name_fn: Some(Box::new(name_fn)),
+        }
+    }
+
+
     async fn main_loop(
         files: Box<dyn Iterator<Item = P> + Send>,
+        name_fn: Option<Box<dyn Fn(&Path) -> String + Send>>,
         mut sender: Sender<std::result::Result<Vec<u8>, io::Error>>,
     ) -> Result<()> {
         let mut pos: u64 = 0;
@@ -50,7 +65,13 @@ where
             let mut f = fs::File::open(&path).await?;
             let meta = f.metadata().await?;
             // send header
-            let file_header = FileHeader::new(path, meta.modified()?)?;
+            let file_header = if let Some(ref name_fn) = name_fn {
+                let file_name = name_fn(path.as_ref());
+                FileHeader::new_from_name(file_name, meta.modified()?)
+            } else {
+                FileHeader::new_from_path(path, meta.modified()?)?
+            };
+
             let file_header_bytes = file_header.to_bytes()?;
             let file_header_offset = pos;
             send!(file_header_bytes);
@@ -88,7 +109,7 @@ where
 
         tokio::spawn(async move {
             let sender = s.clone();
-            let res = Zipper::main_loop(self.files, sender).await;
+            let res = Zipper::main_loop(self.files, self.name_fn, sender).await;
             if let Err(e) = res {
                 s.send(Err(e.into())).await.ok();
             }

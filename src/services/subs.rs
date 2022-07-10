@@ -413,11 +413,12 @@ pub fn download_folder(
     base_path: &'static Path,
     folder_path: PathBuf,
     format: DownloadFormat,
-    include_subfolders: Option<regex::Regex>
+    include_subfolders: Option<regex::Regex>,
 ) -> ResponseFuture {
     use anyhow::Context;
     use hyper::header::CONTENT_DISPOSITION;
     let full_path = base_path.join(&folder_path);
+    let is_resursive = include_subfolders.is_some();
     let f = async move {
         let meta = tokio::fs::metadata(&full_path)
             .await
@@ -444,33 +445,56 @@ pub fn download_folder(
             .await
             {
                 Ok(Ok(folder)) => {
-                    let total_len: u64 = match format {
-                        DownloadFormat::Tar => {
-                            let lens_iter = folder.iter().map(|i| i.1);
-                            async_tar::calc_size(lens_iter)
-                        }
-                        DownloadFormat::Zip => {
-                            let iter = folder.iter().map(|&(ref path, len)| (path, len));
-                            async_zip::calc_size(iter).context("calc zip size")?
-                        }
+                    let total_len: Option<u64> = if is_resursive {
+                        None
+                    } else {
+                        Some(match format {
+                            DownloadFormat::Tar => {
+                                let lens_iter = folder.iter().map(|i| i.1);
+                                async_tar::calc_size(lens_iter)
+                            }
+                            DownloadFormat::Zip => {
+                                let iter = folder.iter().map(|&(ref path, len)| (path, len));
+                                async_zip::calc_size(iter).context("calc zip size")?
+                            }
+                        })
                     };
 
-                    debug!("Total len of folder is {}", total_len);
+                    debug!("Total len of folder is {:?}", total_len);
                     let files = folder.into_iter().map(|i| i.0);
 
                     let stream: Box<dyn Stream<Item = _> + Unpin + Send> = match format {
                         DownloadFormat::Tar => Box::new(async_tar::TarStream::tar_iter(files)),
                         DownloadFormat::Zip => {
-                            let zipper = async_zip::Zipper::from_iter(files);
+                            let zipper = if !is_resursive {
+                                async_zip::Zipper::from_iter(files)
+                            } else {
+                                async_zip::Zipper::from_iter_with_naming(files, |p| {
+                                    let name = p
+                                        .file_name()
+                                        .and_then(|n| n.to_str())
+                                        .unwrap_or("invalid_file_name");
+                                    let folder = p
+                                        .parent()
+                                        .and_then(|p| p.file_name())
+                                        .and_then(|f| f.to_str())
+                                        .unwrap_or("invalid_folder_name");
+
+                                    return folder.to_string() + " " + name;
+                                })
+                            };
                             Box::new(zipper.zipped_stream())
                         }
                     };
 
                     let disposition = format!("attachment; filename=\"{}\"", download_name);
-                    Ok(HyperResponse::builder()
-                        .typed_header(ContentType::from(format.mime()))
-                        .typed_header(ContentLength(total_len))
-                        .header(CONTENT_DISPOSITION, disposition.as_bytes())
+                    let mut builder = HyperResponse::builder()
+                    .typed_header(ContentType::from(format.mime()))
+                    .header(CONTENT_DISPOSITION, disposition.as_bytes());
+                    if let Some(content_len) = total_len {
+                        builder = builder.typed_header(ContentLength(content_len));
+                    }
+                    Ok(builder
                         .body(Body::wrap_stream(stream))
                         .unwrap())
                 }

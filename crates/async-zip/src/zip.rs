@@ -58,12 +58,19 @@ pub struct FileHeader {
 }
 
 impl FileHeader {
-    pub fn new(path: impl AsRef<Path>, modified: impl Into<Timestamp>) -> Result<Self> {
+    pub fn new_from_path(path: impl AsRef<Path>, modified: impl Into<Timestamp>) -> Result<Self> {
         let file_name = path_to_file_name(&path)?.to_string();
         Ok(FileHeader {
             file_name,
             modified: modified.into(),
         })
+    }
+
+    pub fn new_from_name(file_name: String, modified: impl Into<Timestamp>) -> Self {
+        FileHeader {
+            file_name,
+            modified: modified.into(),
+        }
     }
 }
 
