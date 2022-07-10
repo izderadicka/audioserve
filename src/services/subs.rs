@@ -413,6 +413,7 @@ pub fn download_folder(
     base_path: &'static Path,
     folder_path: PathBuf,
     format: DownloadFormat,
+    include_subfolders: Option<regex::Regex>
 ) -> ResponseFuture {
     use anyhow::Context;
     use hyper::header::CONTENT_DISPOSITION;
@@ -437,6 +438,7 @@ pub fn download_folder(
                     &base_path,
                     &folder_path,
                     get_config().allow_symlinks,
+                    include_subfolders,
                 )
             })
             .await

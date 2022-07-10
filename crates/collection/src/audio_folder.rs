@@ -644,6 +644,7 @@ pub fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
     base_dir: P,
     dir_path: P2,
     allow_symlinks: bool,
+    include_subdirs: Option<Regex>
 ) -> Result<Vec<(PathBuf, u64)>, io::Error> {
     let full_path = base_dir.as_ref().join(&dir_path);
     match fs::read_dir(&full_path) {
@@ -670,6 +671,28 @@ pub fn list_dir_files_only<P: AsRef<Path>, P2: AsRef<Path>>(
                                     cover = Some(get_size(path)?)
                                 } else if description.is_none() && is_description(&path) {
                                     description = Some(get_size(path)?)
+                                }
+                            } else if ft.is_dir(){
+                                if let Some(ref re) = include_subdirs {
+                                    if let Some(name) = f.file_name().to_str() {
+                                        if re.is_match(name) {
+                                            let subdir = f.path();
+                                            if let Ok(di) = fs::read_dir(&subdir) {
+                                                for item in di {
+                                                    if let Ok(f) = item {
+                                                        debug!("SUBDIR ITEM {:?}", f);
+                                                        if let Ok(ft) = get_real_file_type(&f, &subdir, allow_symlinks) {
+                                                            let file_path = f.path();
+                                                            if ft.is_file() && is_audio(&file_path){
+                                                                files.push(get_size(file_path)?)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
                                 }
                             }
                         }
@@ -732,9 +755,9 @@ mod tests {
 
     #[test]
     fn test_list_dir_files_only() {
-        let res = list_dir_files_only("/non-existent", "folder", false);
+        let res = list_dir_files_only("/non-existent", "folder", false, None);
         assert!(res.is_err());
-        let res = list_dir_files_only(TEST_DATA_BASE, "test_data/", false);
+        let res = list_dir_files_only(TEST_DATA_BASE, "test_data/", false, None);
         assert!(res.is_ok());
         let folder = res.unwrap();
         assert_eq!(folder.len(), 5);
