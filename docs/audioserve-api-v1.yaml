@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: audioserve API
   description: REST API for audioserve
-  version: 1.1.0
+  version: 1.2.0
 servers:
   - url: https://audioserve.zderadicka.eu
     description: Public demo server
@@ -181,6 +181,7 @@ paths:
               example:
                 {
                   "is_file": false,
+                  "is_collapsed": false,
                   "modified": 1613948393506,
                   "total_time": 0,
                   "files": [],
@@ -251,6 +252,7 @@ paths:
                   value:
                       {
                         "is_file": false,
+                        "is_collapsed": false,
                         "modified": 1613902871789,
                         "total_time": 0,
                         "files": [],
@@ -820,6 +822,9 @@ components:
         is_file:
           type: boolean
           description: Is virtual folder - e.g. representing big chapterized file (.m4b etc.)
+        is_collapsed:
+          type: boolean
+          description: Folder contains files from CD subfolders, structure is collapsed
         modified:
           type: number
           description: last modification timestamp (unix time in miliseconds)

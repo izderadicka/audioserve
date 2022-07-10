@@ -89,9 +89,12 @@ pub struct AudioFile {
     pub section: Option<FileSection>,
 }
 
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AudioFolder {
     pub is_file: bool,
+    #[serde(default)]
+    pub is_collapsed: bool,
     pub modified: Option<TimeStamp>, // last modification time of this folder
     pub total_time: Option<u32>,     // total playback time of contained audio files
     pub files: Vec<AudioFile>,

@@ -170,6 +170,7 @@ impl FolderLister {
                 let mut description = None;
                 let tags;
                 let mut is_file = false;
+                let mut is_collapsed = false;
                 let allow_symlinks = self.config.allow_symlinks;
 
                 for item in dir_iter {
@@ -253,6 +254,8 @@ impl FolderLister {
                             files = f.files;
                             tags = f.tags;
                             is_file = true;
+                            // TODO: Should this be also collapsed?
+                            //is_collapsed = true;
                         }
                         _ => {
                             return Err(io::Error::new(
@@ -268,6 +271,7 @@ impl FolderLister {
                                 .iter()
                                 .all(|f| !f.is_file && re.is_match(&f.name));
                             if can_collapse {
+                                is_collapsed = true;
                                 debug!("Can collapse CD subfolders on path {:?}", full_path);
                                 let folders = mem::replace(&mut subfolders, vec![]);
                                 for fld in folders {
@@ -316,6 +320,7 @@ impl FolderLister {
                     &full_path,
                     AudioFolder {
                         is_file,
+                        is_collapsed,
                         modified: None,
                         total_time: None,
                         files,
@@ -384,6 +389,7 @@ impl FolderLister {
             &full_path,
             AudioFolder {
                 is_file: true,
+                is_collapsed: false,
                 modified: None,
                 total_time: None,
                 files,
