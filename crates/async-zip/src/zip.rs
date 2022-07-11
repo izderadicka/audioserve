@@ -21,7 +21,7 @@ const COMPRESS_STORE: u16 = 0;
 
 pub fn calc_size<'a, P, I>(sizes: I) -> Result<u64>
 where
-    I: IntoIterator<Item = (P, &'a String, u64)>,
+    I: IntoIterator<Item = (P, &'a str, u64)>,
     P: AsRef<Path>,
 {
     // let mut size: u64 = DIRECTORY_END_SIZE as u64;
@@ -58,6 +58,7 @@ pub struct FileHeader {
 }
 
 impl FileHeader {
+    #[allow(dead_code)]
     pub fn new_from_path(path: impl AsRef<Path>, modified: impl Into<Timestamp>) -> Result<Self> {
         let file_name = path_to_file_name(&path)?.to_string();
         Ok(FileHeader {

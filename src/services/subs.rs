@@ -418,7 +418,6 @@ pub fn download_folder(
     use anyhow::Context;
     use hyper::header::CONTENT_DISPOSITION;
     let full_path = base_path.join(&folder_path);
-    let is_resursive = include_subfolders.is_some();
     let f = async move {
         let meta = tokio::fs::metadata(&full_path)
             .await
@@ -435,66 +434,66 @@ pub fn download_folder(
             download_name.push_str(format.extension());
 
             match blocking(move || {
-                collection::list_dir_files_only(
-                    &base_path,
-                    &folder_path,
-                    get_config().allow_symlinks,
-                )
+                let allow_symlinks = get_config().allow_symlinks;
+                if let Some(folder_re) = include_subfolders {
+                    collection::list_dir_files_ext(
+                        &base_path,
+                        &folder_path,
+                        allow_symlinks,
+                        Some(folder_re),
+                        |p| {
+                            let name = p
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or("invalid_file_name");
+                            let folder = p
+                                .parent()
+                                .and_then(|p| p.file_name())
+                                .and_then(|f| f.to_str())
+                                .unwrap_or("invalid_folder_name");
+
+                            return Ok(folder.to_string() + " " + name);
+                        },
+                    )
+                } else {
+                    collection::list_dir_files_only(&base_path, &folder_path, allow_symlinks)
+                }
             })
             .await
             {
                 Ok(Ok(folder)) => {
-                    let total_len: Option<u64> = if is_resursive {
-                        None
-                    } else {
-                        Some(match format {
-                            DownloadFormat::Tar => {
-                                let lens_iter = folder.iter().map(|i| i.2);
-                                async_tar::calc_size(lens_iter)
-                            }
-                            DownloadFormat::Zip => {
-                                let iter = folder
-                                    .iter()
-                                    .map(|&(ref path, ref name, len)| (path, name, len));
-                                async_zip::calc_size(iter).context("calc zip size")?
-                            }
-                        })
+                    let total_len: u64 = match format {
+                        DownloadFormat::Tar => {
+                            let lens_iter = folder.iter().map(|i| i.2);
+                            async_tar::calc_size(lens_iter)
+                        }
+                        DownloadFormat::Zip => {
+                            let iter = folder
+                                .iter()
+                                .map(|&(ref path, ref name, len)| (path, name.as_str(), len));
+                            async_zip::calc_size(iter).context("calc zip size")?
+                        }
                     };
 
                     debug!("Total len of folder is {:?}", total_len);
-                    let files = folder.into_iter().map(|i| i.0);
 
                     let stream: Box<dyn Stream<Item = _> + Unpin + Send> = match format {
-                        DownloadFormat::Tar => Box::new(async_tar::TarStream::tar_iter(files)),
+                        DownloadFormat::Tar => {
+                            let files = folder.into_iter().map(|i| i.0);
+                            Box::new(async_tar::TarStream::tar_iter(files))
+                        }
                         DownloadFormat::Zip => {
-                            let zipper = if !is_resursive {
-                                async_zip::Zipper::from_iter(files)
-                            } else {
-                                async_zip::Zipper::from_iter_with_naming(files, |p| {
-                                    let name = p
-                                        .file_name()
-                                        .and_then(|n| n.to_str())
-                                        .unwrap_or("invalid_file_name");
-                                    let folder = p
-                                        .parent()
-                                        .and_then(|p| p.file_name())
-                                        .and_then(|f| f.to_str())
-                                        .unwrap_or("invalid_folder_name");
-
-                                    return folder.to_string() + " " + name;
-                                })
-                            };
+                            let files = folder.into_iter().map(|i| (i.0, i.1));
+                            let zipper = async_zip::Zipper::from_iter(files);
                             Box::new(zipper.zipped_stream())
                         }
                     };
 
                     let disposition = format!("attachment; filename=\"{}\"", download_name);
-                    let mut builder = HyperResponse::builder()
+                    let builder = HyperResponse::builder()
                         .typed_header(ContentType::from(format.mime()))
-                        .header(CONTENT_DISPOSITION, disposition.as_bytes());
-                    if let Some(content_len) = total_len {
-                        builder = builder.typed_header(ContentLength(content_len));
-                    }
+                        .header(CONTENT_DISPOSITION, disposition.as_bytes())
+                        .typed_header(ContentLength(total_len));
                     Ok(builder.body(Body::wrap_stream(stream)).unwrap())
                 }
                 Ok(Err(e)) => Err(Error::new(e).context("listing directory")),

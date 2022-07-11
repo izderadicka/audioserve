@@ -16,8 +16,7 @@ mod date;
 pub mod error;
 mod zip;
 pub struct Zipper<P> {
-    files: Box<dyn Iterator<Item = P> + Send>,
-    name_fn: Option<Box<dyn Fn(&Path) -> String + Send>>,
+    files: Box<dyn Iterator<Item = (P, String)> + Send>,
 }
 
 impl<P> Zipper<P>
@@ -26,28 +25,15 @@ where
 {
     pub fn from_iter<I>(files: I) -> Self
     where
-        I: Iterator<Item = P> + Send + 'static,
+        I: Iterator<Item = (P, String)> + Send + 'static,
     {
         Zipper {
             files: Box::new(files),
-            name_fn: None,
-        }
-    }
-
-    pub fn from_iter_with_naming<I, F>(files: I, name_fn: F) -> Self
-    where
-        I: Iterator<Item = P> + Send + 'static,
-        F: Fn(&Path) -> String + Send + 'static,
-    {
-        Zipper {
-            files: Box::new(files),
-            name_fn: Some(Box::new(name_fn)),
         }
     }
 
     async fn main_loop(
-        files: Box<dyn Iterator<Item = P> + Send>,
-        name_fn: Option<Box<dyn Fn(&Path) -> String + Send>>,
+        files: Box<dyn Iterator<Item = (P, String)> + Send>,
         mut sender: Sender<std::result::Result<Vec<u8>, io::Error>>,
     ) -> Result<()> {
         let mut pos: u64 = 0;
@@ -60,16 +46,11 @@ where
             }};
         }
 
-        for path in files {
+        for (path, name) in files {
             let mut f = fs::File::open(&path).await?;
             let meta = f.metadata().await?;
             // send header
-            let file_header = if let Some(ref name_fn) = name_fn {
-                let file_name = name_fn(path.as_ref());
-                FileHeader::new_from_name(file_name, meta.modified()?)
-            } else {
-                FileHeader::new_from_path(path, meta.modified()?)?
-            };
+            let file_header = FileHeader::new_from_name(name, meta.modified()?);
 
             let file_header_bytes = file_header.to_bytes()?;
             let file_header_offset = pos;
@@ -108,7 +89,7 @@ where
 
         tokio::spawn(async move {
             let sender = s.clone();
-            let res = Zipper::main_loop(self.files, self.name_fn, sender).await;
+            let res = Zipper::main_loop(self.files, sender).await;
             if let Err(e) = res {
                 s.send(Err(e.into())).await.ok();
             }
@@ -125,7 +106,10 @@ impl Zipper<PathBuf> {
         let mut dir_listing = fs::read_dir(path).await?;
         while let Some(entry) = dir_listing.next_entry().await? {
             if entry.file_type().await?.is_file() {
-                files.push(entry.path())
+                files.push((
+                    entry.path(),
+                    entry.file_name().to_string_lossy().into_owned(),
+                ))
             }
         }
 
@@ -210,8 +194,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
         assert_eq!(files.len(), 4);
-        let expected_size = calc_size(files.iter().map(|&(ref p, ref n, s)| (p, n, s)))?;
-        let zipper = Zipper::from_iter(files.into_iter().map(|(p, _, _)| p));
+        let expected_size = calc_size(files.iter().map(|&(ref p, ref n, s)| (p, n.as_str(), s)))?;
+        let zipper = Zipper::from_iter(files.into_iter().map(|(p, n, _)| (p, n)));
         let mut stream = zipper.zipped_stream();
         let mut f = Cursor::new(Vec::<u8>::new());
         while let Some(chunk) = stream.next().await {
