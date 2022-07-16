@@ -66,7 +66,7 @@ impl FolderLister {
     ) -> Result<AudioFolder, io::Error> {
         let full_path = base_dir.as_ref().join(&dir_path);
         match self.get_dir_type(&full_path)? {
-            DirType::Dir => self.list_dir_dir(base_dir, full_path, ordering),
+            DirType::Dir => self.list_dir_dir(base_dir, full_path, ordering, true),
             DirType::File {
                 chapters,
                 audio_meta,
@@ -161,6 +161,7 @@ impl FolderLister {
         base_dir: P,
         full_path: PathBuf,
         ordering: FoldersOrdering,
+        extract_tags: bool,
     ) -> Result<AudioFolder, io::Error> {
         match fs::read_dir(&full_path) {
             Ok(dir_iter) => {
@@ -282,6 +283,7 @@ impl FolderLister {
                                         base_dir.as_ref(),
                                         subdir_path,
                                         FoldersOrdering::Alphabetical,
+                                        false,
                                     )?;
                                     if !subdir.subfolders.is_empty() {
                                         warn!("CD folder contains subfolders, these will not be visible");
@@ -312,7 +314,11 @@ impl FolderLister {
                         }
                     }
                     files.sort_unstable_by(|a, b| a.collate(b));
-                    tags = extract_folder_tags(&mut files);
+                    tags = if extract_tags {
+                        extract_folder_tags(&mut files)
+                    } else {
+                        None
+                    };
                     subfolders.sort_unstable_by(|a, b| a.compare_as(ordering, b));
                 }
 
