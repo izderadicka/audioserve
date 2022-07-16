@@ -23,7 +23,7 @@ use crate::{
     common::PositionsData,
     error::{Error, Result},
     position::{PositionItem, PositionRecord, PositionsCollector, MAX_GROUPS},
-    util::{get_file_name, get_meta, get_modified},
+    util::{get_file_name, get_modified},
     AudioFolderShort, FoldersOrdering, Position,
 };
 
@@ -110,6 +110,13 @@ impl CacheInner {
                     .flatten()
             })
             .and_then(deser_audiofolder)
+    }
+
+    pub(crate) fn has_key<P: AsRef<Path>>(&self, dir: P) -> bool {
+        dir.as_ref()
+            .to_str()
+            .and_then(|p| self.db.contains_key(p.as_bytes()).ok())
+            .unwrap_or(false)
     }
 
     pub(crate) fn get_if_actual<P: AsRef<Path>>(
@@ -708,7 +715,7 @@ impl CacheInner {
         match evt {
             DebouncedEvent::Create(p) => {
                 let col_path = self.strip_base(&p);
-                if self.is_dir(&p) {
+                if self.is_dir(&p).is_dir() {
                     snd(UpdateAction::RefreshFolderRecursive(col_path.into()));
                 }
                 snd(UpdateAction::RefreshFolder(parent_path(col_path)));
@@ -716,7 +723,7 @@ impl CacheInner {
             DebouncedEvent::Write(p) => {
                 let col_path = self.strip_base(&p);
                 // TODO - check can get Write on directory?
-                if self.is_dir(&p) {
+                if self.is_dir(&p).is_dir() {
                     // should be single file folder
                     snd(UpdateAction::RefreshFolder(col_path.into()));
                 } else {
@@ -725,7 +732,7 @@ impl CacheInner {
             }
             DebouncedEvent::Remove(p) => {
                 let col_path = self.strip_base(&p);
-                if self.is_dir(&p) {
+                if self.is_dir(&p).is_dir() {
                     snd(UpdateAction::RemoveFolder(col_path.into()));
                 } else {
                     snd(UpdateAction::RefreshFolder(parent_path(col_path)))
@@ -733,7 +740,7 @@ impl CacheInner {
             }
             DebouncedEvent::Rename(p1, p2) => {
                 let col_path = self.strip_base(&p1);
-                match (p2.starts_with(&self.base_dir), self.is_dir(&p1)) {
+                match (p2.starts_with(&self.base_dir), self.is_dir(&p1).is_dir()) {
                     (true, true) => snd(UpdateAction::RenameFolder {
                         from: col_path.into(),
                         to: self.strip_base(&p2).into(),
@@ -758,36 +765,62 @@ impl CacheInner {
     }
 
     /// only for absolute paths
-    fn is_dir<P: AsRef<Path>>(&self, full_path: P) -> bool {
+    fn is_dir<P: AsRef<Path>>(&self, full_path: P) -> FolderType {
         let full_path: &Path = full_path.as_ref();
         assert!(full_path.is_absolute());
         let col_path = self.strip_base(&full_path);
-        if col_path
-            .to_str()
-            .and_then(|p| self.db.contains_key(p.as_bytes()).ok())
-            .unwrap_or(false)
-        {
-            // it has been identified as directory before
-            // TODO: but it can change - for instance if chapter metadata are removed from file
-            return true;
-        }
-        let meta = if let Ok(meta) = get_meta(full_path) {
-            meta
-        } else {
-            return false;
-        };
-        if meta.is_dir() {
-            true
-        } else {
-            match self.lister.get_dir_type(full_path) {
-                Ok(DirType::Dir) => true,
-                Ok(DirType::File { .. }) => false,
-                Ok(DirType::Other) => false,
-                Err(e) => {
-                    error!("Error id determining dir type: {}", e);
-                    false
+        match self.lister.get_dir_type(full_path) {
+            Ok(DirType::Dir) => {
+                if self.has_key(col_path) {
+                    FolderType::RegularDir
+                } else {
+                    if col_path
+                        .parent()
+                        .and_then(|p| self.get(p))
+                        .map(|af| af.is_collapsed)
+                        .unwrap_or(false)
+                    {
+                        return FolderType::CollapsedDir;
+                    } else {
+                        return FolderType::NewDir;
+                    }
                 }
             }
+            Ok(DirType::File { .. }) => {
+                if self.has_key(col_path) {
+                    FolderType::FileDir
+                } else {
+                    FolderType::NewFileDir
+                }
+            }
+            Ok(DirType::Other) => FolderType::RegularFile,
+            Err(e) => {
+                if ! matches!(e.kind(), std::io::ErrorKind::NotFound ) {
+                    error!("Error determining dir type: {}", e);
+                }
+                
+                FolderType::Unknown
+            }
+        }
+    }
+}
+
+enum FolderType {
+    RegularDir,
+    FileDir,
+    RegularFile,
+    CollapsedDir,
+    NewDir,
+    NewFileDir,
+    Unknown,
+}
+
+impl FolderType {
+    fn is_dir(&self) -> bool {
+        use FolderType::*;
+        match self {
+            RegularFile | Unknown => false,
+            _ => true,
         }
     }
 }
