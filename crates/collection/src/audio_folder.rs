@@ -704,28 +704,20 @@ where
                                 }
                             } else if ft.is_dir() {
                                 if let Some(ref re) = include_subdirs {
-                                    if let Some(name) = f.file_name().to_str() {
-                                        if re.is_match(name) {
-                                            let subdir = f.path();
-                                            if let Ok(di) = fs::read_dir(&subdir) {
-                                                for item in di {
-                                                    if let Ok(f) = item {
-                                                        debug!("SUBDIR ITEM {:?}", f);
-                                                        if let Ok(ft) = get_real_file_type(
-                                                            &f,
-                                                            &subdir,
-                                                            allow_symlinks,
-                                                        ) {
-                                                            let file_path = f.path();
-                                                            if ft.is_file() && is_audio(&file_path)
-                                                            {
-                                                                files.push(get_size_and_name(
-                                                                    file_path,
-                                                                )?)
-                                                            }
-                                                        }
-                                                    }
-                                                }
+                                    let name = f.file_name();
+                                    let name = name.to_str().ok_or_else(|| {
+                                        io::Error::new(io::ErrorKind::Other, "Non UTF-8 name")
+                                    })?;
+                                    if re.is_match(name) {
+                                        let subdir = f.path();
+                                        let di = fs::read_dir(&subdir)?;
+                                        for item in di {
+                                            let f = item?;
+                                            let ft =
+                                                get_real_file_type(&f, &subdir, allow_symlinks)?;
+                                            let file_path = f.path();
+                                            if ft.is_file() && is_audio(&file_path) {
+                                                files.push(get_size_and_name(file_path)?)
                                             }
                                         }
                                     }
