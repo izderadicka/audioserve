@@ -26,6 +26,7 @@ Like audioserve and want to start quickly and easily and securely? Try [this sim
   - [Media Library](#media-library)
     - [Collections cache](#collections-cache)
     - [Single file audiobooks and their chapters](#single-file-audiobooks-and-their-chapters)
+    - [Merge/collapsing of CD subfolders](#mergecollapsing-of-cd-subfolders)
     - [Audio files metadata tags](#audio-files-metadata-tags)
     - [Collation](#collation)
   - [Sharing playback positions between clients](#sharing-playback-positions-between-clients)
@@ -66,6 +67,8 @@ Files should be named so they are in right alphabetical order - ideally prefixed
     002 - Second Chapter Name.opus
 
 But this structure is not mandatory - you will just see whatever directories and files you have, so use anything that will suite you.
+
+Audioserve assumes that file and folder names are in UTF-8 encoding (or compatible), for other encodings it may not work correctly.
 
 The characters `$$` and `|` are used for internal usage of audioserve, so you should not use them in file names.
 
@@ -111,6 +114,15 @@ Also long audiofile without chapters metadata, can be split into equaly sized pa
 If chaptered file is a single file in a directory (and there are no other subdirectories), then chapters are presented within this directory, as if they were files in this directory and cover and description is shown from this directory. If you do not like this feature you can disable by `--no-dir-collaps` option.
 
 Also note that web client will often load same part of chapter again if you're seeking within it (especially Firefox with m4b), so it's definitely not bandwidth optimal (similar issue appears when often seeking in transcoded file).
+
+### Merge/collapsing of CD subfolders
+
+Sometimes (mainly for historical reasons) content of audiobook is divided in CD subfolders, reflecting how it was originally distributed on physical media. In audioserve you have option to collapse all these CD subfolders into main root folder and thus see whole audiobook at once. File names then will be prefixed with CD subfolder name.
+This is an optional feature and could be enabled by argument `--collapse-cd-folders` (will require full reload of collection cache) and will collapse CD subfolders if:
+
+a) Folder does not contain any audiofiles directly, only subfolders
+
+b) All subfolders match regular expression `r"^CD[ -_]?\s*\d+\s*$"` or custom regular expression provided by argument `--cd-folder-regexp`. 
 
 ### Audio files metadata tags
 
