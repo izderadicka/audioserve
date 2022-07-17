@@ -90,7 +90,7 @@ impl CacheInner {
                 if !full_path.exists() {
                     debug!("Removing {:?} from collection cache db", full_path);
                     self.remove(rel_path)
-                        .map_err(|e| error!("cannot remove revord from db: {}", e))
+                        .map_err(|e| error!("cannot remove record from db: {}", e))
                         .ok();
                 }
             }
@@ -679,7 +679,7 @@ impl CacheInner {
             }
             UpdateAction::RenameFolder { from, to } => {
                 if let Err(e) = self.update_recursive_after_rename(&from, &to) {
-                    error!("Faild to do recusrsive rename, error: {}, we will have to do rescan of {:?}", e, &to);
+                    error!("Failed to do recursive rename, error: {}, we will have to do rescan of {:?}", e, &to);
                     self.remove_tree(&from)
                         .map_err(|e| warn!("Error removing folder from cache: {}", e))
                         .ok();
@@ -795,11 +795,16 @@ impl CacheInner {
             }
             Ok(DirType::Other) => FolderType::RegularFile,
             Err(e) => {
-                if ! matches!(e.kind(), std::io::ErrorKind::NotFound ) {
+                if !matches!(e.kind(), std::io::ErrorKind::NotFound) {
                     error!("Error determining dir type: {}", e);
+                    FolderType::Unknown
+                } else {
+                    if self.has_key(col_path) {
+                        FolderType::DeletedDir
+                    } else {
+                        FolderType::Unknown
+                    }
                 }
-                
-                FolderType::Unknown
             }
         }
     }
@@ -807,6 +812,7 @@ impl CacheInner {
 
 enum FolderType {
     RegularDir,
+    DeletedDir,
     FileDir,
     RegularFile,
     CollapsedDir,

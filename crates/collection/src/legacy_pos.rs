@@ -25,6 +25,7 @@ pub(super) struct LegacyPosition {
 }
 
 #[derive(Clone, Deserialize)]
+#[allow(dead_code)]
 pub(super) struct LegacyPositions {
     pub table: HashMap<String, HashMap<String, LegacyPosition>>,
     pub max_size: usize,
