@@ -712,22 +712,35 @@ impl CacheInner {
                 .ok()
                 .unwrap_or(())
         };
+
+
         match evt {
             DebouncedEvent::Create(p) => {
                 let col_path = self.strip_base(&p);
                 if self.is_dir(&p).is_dir() {
                     snd(UpdateAction::RefreshFolderRecursive(col_path.into()));
                 }
-                snd(UpdateAction::RefreshFolder(parent_path(col_path)));
+                let parent = parent_path(&p);
+
+                match self.is_dir(&parent) {
+                        
+                    FolderType::CollapsedDir => snd(UpdateAction::RefreshFolder(parent_path(parent))),
+                    _ => snd(UpdateAction::RefreshFolder(parent))
+                }
             }
             DebouncedEvent::Write(p) => {
                 let col_path = self.strip_base(&p);
-                // TODO - check can get Write on directory?
+                // AFAIK you cannot get write on directory
                 if self.is_dir(&p).is_dir() {
                     // should be single file folder
                     snd(UpdateAction::RefreshFolder(col_path.into()));
                 } else {
-                    snd(UpdateAction::RefreshFolder(parent_path(col_path)));
+                    let parent = parent_path(&p);
+                    match self.is_dir(&parent) {
+                        
+                        FolderType::CollapsedDir => snd(UpdateAction::RefreshFolder(parent_path(parent))),
+                        _ => snd(UpdateAction::RefreshFolder(parent))
+                    }
                 }
             }
             DebouncedEvent::Remove(p) => {
@@ -774,7 +787,7 @@ impl CacheInner {
                 if self.has_key(col_path) {
                     FolderType::RegularDir
                 } else {
-                    if col_path
+                    if self.lister.collapse_cd_enabled() && col_path
                         .parent()
                         .and_then(|p| self.get(p))
                         .map(|af| af.is_collapsed)

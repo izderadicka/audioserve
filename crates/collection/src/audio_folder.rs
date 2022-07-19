@@ -78,6 +78,10 @@ impl FolderLister {
         }
     }
 
+    pub(crate) fn collapse_cd_enabled(&self) -> bool {
+        self.config.cd_folder_regex.is_some()
+    }
+
     fn split_chapters(&self, dur: u32) -> Vec<Chapter> {
         let chap_length = u64::from(self.config.chapters_duration) * 60 * 1000;
         let mut count = 0;
