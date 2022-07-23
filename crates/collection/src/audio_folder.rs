@@ -671,7 +671,48 @@ pub fn list_dir_files_only(
     )
 }
 
-pub fn list_dir_files_ext<F>(
+pub fn list_dir_files_with_subdirs(
+    base_dir: impl AsRef<Path>,
+    dir_path: impl AsRef<Path>,
+    allow_symlinks: bool,
+    include_subdirs: Regex,
+) -> Result<Vec<(PathBuf, String, u64)>, io::Error> {
+    let full_path = base_dir.as_ref().join(&dir_path);
+    list_dir_files_ext(
+        base_dir,
+        dir_path,
+        allow_symlinks,
+        Some(include_subdirs),
+        |p| {
+            let subdir = p
+                .strip_prefix(&full_path)
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Invalid path {}", e)))?
+                .parent();
+
+            let name = p.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+                io::Error::new(io::ErrorKind::Other, "Invalid file name - not UTF8")
+            })?;
+            if !subdir
+                .and_then(|p| p.file_name().map(|n| n.is_empty()))
+                .unwrap_or(true)
+            {
+                let folder = p
+                    .parent()
+                    .and_then(|p| p.file_name())
+                    .and_then(|f| f.to_str())
+                    .ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::Other, "Invalid folder name - not UTF8")
+                    })?;
+
+                return Ok(folder.to_string() + " " + name);
+            } else {
+                return Ok(name.into());
+            }
+        },
+    )
+}
+
+fn list_dir_files_ext<F>(
     base_dir: impl AsRef<Path>,
     dir_path: impl AsRef<Path>,
     allow_symlinks: bool,

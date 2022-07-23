@@ -436,24 +436,11 @@ pub fn download_folder(
             match blocking(move || {
                 let allow_symlinks = get_config().allow_symlinks;
                 if let Some(folder_re) = include_subfolders {
-                    collection::list_dir_files_ext(
+                    collection::list_dir_files_with_subdirs(
                         &base_path,
                         &folder_path,
                         allow_symlinks,
-                        Some(folder_re),
-                        |p| {
-                            let name = p
-                                .file_name()
-                                .and_then(|n| n.to_str())
-                                .unwrap_or("invalid_file_name");
-                            let folder = p
-                                .parent()
-                                .and_then(|p| p.file_name())
-                                .and_then(|f| f.to_str())
-                                .unwrap_or("invalid_folder_name");
-
-                            return Ok(folder.to_string() + " " + name);
-                        },
+                        folder_re,
                     )
                 } else {
                     collection::list_dir_files_only(&base_path, &folder_path, allow_symlinks)

@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate log;
 
-pub use audio_folder::{list_dir_files_ext, list_dir_files_only, parse_chapter_path};
+pub use audio_folder::{list_dir_files_only, list_dir_files_with_subdirs, parse_chapter_path};
 pub use audio_meta::{init_media_lib, AudioFile, AudioFolderShort, FoldersOrdering, TimeSpan};
 use audio_meta::{AudioFolder, TimeStamp};
 use cache::CollectionCache;

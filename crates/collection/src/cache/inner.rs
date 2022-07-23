@@ -713,7 +713,6 @@ impl CacheInner {
                 .unwrap_or(())
         };
 
-
         match evt {
             DebouncedEvent::Create(p) => {
                 let col_path = self.strip_base(&p);
@@ -723,9 +722,10 @@ impl CacheInner {
                 let parent = parent_path(&p);
 
                 match self.is_dir(&parent) {
-                        
-                    FolderType::CollapsedDir => snd(UpdateAction::RefreshFolder(parent_path(parent))),
-                    _ => snd(UpdateAction::RefreshFolder(parent))
+                    FolderType::CollapsedDir => {
+                        snd(UpdateAction::RefreshFolder(parent_path(parent)))
+                    }
+                    _ => snd(UpdateAction::RefreshFolder(parent)),
                 }
             }
             DebouncedEvent::Write(p) => {
@@ -737,9 +737,10 @@ impl CacheInner {
                 } else {
                     let parent = parent_path(&p);
                     match self.is_dir(&parent) {
-                        
-                        FolderType::CollapsedDir => snd(UpdateAction::RefreshFolder(parent_path(parent))),
-                        _ => snd(UpdateAction::RefreshFolder(parent))
+                        FolderType::CollapsedDir => {
+                            snd(UpdateAction::RefreshFolder(parent_path(parent)))
+                        }
+                        _ => snd(UpdateAction::RefreshFolder(parent)),
                     }
                 }
             }
@@ -787,11 +788,12 @@ impl CacheInner {
                 if self.has_key(col_path) {
                     FolderType::RegularDir
                 } else {
-                    if self.lister.collapse_cd_enabled() && col_path
-                        .parent()
-                        .and_then(|p| self.get(p))
-                        .map(|af| af.is_collapsed)
-                        .unwrap_or(false)
+                    if self.lister.collapse_cd_enabled()
+                        && col_path
+                            .parent()
+                            .and_then(|p| self.get(p))
+                            .map(|af| af.is_collapsed)
+                            .unwrap_or(false)
                     {
                         return FolderType::CollapsedDir;
                     } else {
