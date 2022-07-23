@@ -270,49 +270,51 @@ impl FolderLister {
                         }
                     }
                 } else {
-                    if !subfolders.is_empty() && files.is_empty() {
+                    if !subfolders.is_empty() {
                         if let Some(ref re) = self.config.cd_folder_regex {
-                            let can_collapse = subfolders
-                                .iter()
-                                .all(|f| !f.is_file && re.is_match(&f.name));
-                            if can_collapse {
+                            let can_collapse =
+                                |f: &AudioFolderShort| !f.is_file && re.is_match(&f.name);
+                            let will_collapse = subfolders.iter().any(can_collapse);
+                            if will_collapse {
                                 is_collapsed = true;
                                 debug!("Can collapse CD subfolders on path {:?}", full_path);
                                 let folders = mem::replace(&mut subfolders, vec![]);
                                 for fld in folders {
-                                    let prefix: String = fld.name.into();
-                                    let subdir_path = base_dir.as_ref().join(&fld.path);
-                                    let subdir_name = fld.path.file_name();
-                                    let subdir = self.list_dir_dir(
-                                        base_dir.as_ref(),
-                                        subdir_path,
-                                        FoldersOrdering::Alphabetical,
-                                        false,
-                                    )?;
-                                    if !subdir.subfolders.is_empty() {
-                                        warn!("CD folder contains subfolders, these will not be visible");
-                                    }
-                                    for mut f in subdir.files {
-                                        if let (Some(file_name), Some(subdir_name)) =
-                                            (f.path.file_name(), subdir_name)
-                                        {
-                                            f.name = (prefix.clone() + " " + &f.name).into();
-                                            let mut new_file_name = subdir_name.to_owned();
-                                            new_file_name.push("$$");
-                                            new_file_name.push(file_name);
-                                            let mut new_path = fld.path.clone();
-                                            new_path.set_file_name(new_file_name);
-                                            f.path = new_path;
-                                            // TODO: update path - join last two segments by $$
-                                            files.push(f);
-                                        } else {
-                                            warn!(
-                                                "CD subfolder in wrong position: ${:?}",
-                                                fld.path
-                                            );
+                                    if can_collapse(&fld) {
+                                        let prefix: String = fld.name.into();
+                                        let subdir_path = base_dir.as_ref().join(&fld.path);
+                                        let subdir_name = fld.path.file_name();
+                                        let subdir = self.list_dir_dir(
+                                            base_dir.as_ref(),
+                                            subdir_path,
+                                            FoldersOrdering::Alphabetical,
+                                            false,
+                                        )?;
+                                        if !subdir.subfolders.is_empty() {
+                                            warn!("CD folder contains subfolders, these will not be visible");
                                         }
+                                        for mut f in subdir.files {
+                                            if let (Some(file_name), Some(subdir_name)) =
+                                                (f.path.file_name(), subdir_name)
+                                            {
+                                                f.name = (prefix.clone() + " " + &f.name).into();
+                                                let mut new_file_name = subdir_name.to_owned();
+                                                new_file_name.push("$$");
+                                                new_file_name.push(file_name);
+                                                let mut new_path = fld.path.clone();
+                                                new_path.set_file_name(new_file_name);
+                                                f.path = new_path;
+                                                files.push(f);
+                                            } else {
+                                                warn!(
+                                                    "CD subfolder in wrong position: ${:?}",
+                                                    fld.path
+                                                );
+                                            }
+                                        }
+                                    } else {
+                                        subfolders.push(fld);
                                     }
-                                    // TODO: update tags, cover, description if possible
                                 }
                             }
                         }
