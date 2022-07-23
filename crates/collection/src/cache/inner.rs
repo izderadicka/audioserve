@@ -719,14 +719,7 @@ impl CacheInner {
                 if self.is_dir(&p).is_dir() {
                     snd(UpdateAction::RefreshFolderRecursive(col_path.into()));
                 }
-                let parent = parent_path(&p);
-
-                match self.is_dir(&parent) {
-                    FolderType::CollapsedDir => {
-                        snd(UpdateAction::RefreshFolder(parent_path(parent)))
-                    }
-                    _ => snd(UpdateAction::RefreshFolder(parent)),
-                }
+                snd(UpdateAction::RefreshFolder(self.get_true_parent(col_path, &p)));
             }
             DebouncedEvent::Write(p) => {
                 let col_path = self.strip_base(&p);
@@ -735,13 +728,7 @@ impl CacheInner {
                     // should be single file folder
                     snd(UpdateAction::RefreshFolder(col_path.into()));
                 } else {
-                    let parent = parent_path(&p);
-                    match self.is_dir(&parent) {
-                        FolderType::CollapsedDir => {
-                            snd(UpdateAction::RefreshFolder(parent_path(parent)))
-                        }
-                        _ => snd(UpdateAction::RefreshFolder(parent)),
-                    }
+                    snd(UpdateAction::RefreshFolder(self.get_true_parent(col_path, &p)));
                 }
             }
             DebouncedEvent::Remove(p) => {
@@ -749,7 +736,7 @@ impl CacheInner {
                 if self.is_dir(&p).is_dir() {
                     snd(UpdateAction::RemoveFolder(col_path.into()));
                 } else {
-                    snd(UpdateAction::RefreshFolder(parent_path(col_path)))
+                    snd(UpdateAction::RefreshFolder(self.get_true_parent(col_path, &p)))
                 }
             }
             DebouncedEvent::Rename(p1, p2) => {
@@ -759,15 +746,32 @@ impl CacheInner {
                         from: col_path.into(),
                         to: self.strip_base(&p2).into(),
                     }),
-                    (true, false) => snd(UpdateAction::RefreshFolder(parent_path(col_path))),
+                    (true, false) => {
+                        snd(UpdateAction::RefreshFolder(self.get_true_parent(col_path, &p1)))
+                    }
                     (false, true) => snd(UpdateAction::RemoveFolder(col_path.into())),
-                    (false, false) => snd(UpdateAction::RefreshFolder(parent_path(col_path))),
+                    (false, false) => {
+                        snd(UpdateAction::RefreshFolder(self.get_true_parent(col_path, &p1)))
+                    }
                 }
             }
             other => {
                 error!("This event {:?} should not get here", other);
             }
         };
+    }
+
+    fn get_true_parent(&self, rel_path: &Path, full_path: &Path) -> PathBuf {
+        let parent = parent_path(rel_path);
+        if self.lister.collapse_cd_enabled()
+            && full_path.parent()
+                .map(|p| self.is_dir(&p).is_collapsed())
+                .unwrap_or(false)
+        {
+            parent_path(parent)
+        } else {
+            parent
+        }
     }
 
     /// must be used only on paths with this collection
@@ -781,20 +785,14 @@ impl CacheInner {
     /// only for absolute paths
     fn is_dir<P: AsRef<Path>>(&self, full_path: P) -> FolderType {
         let full_path: &Path = full_path.as_ref();
-        assert!(full_path.is_absolute());
+        assert!(full_path.is_absolute(), "path {:?}", full_path);
         let col_path = self.strip_base(&full_path);
         match self.lister.get_dir_type(full_path) {
             Ok(DirType::Dir) => {
                 if self.has_key(col_path) {
                     FolderType::RegularDir
                 } else {
-                    if self.lister.collapse_cd_enabled()
-                        && col_path
-                            .parent()
-                            .and_then(|p| self.get(p))
-                            .map(|af| af.is_collapsed)
-                            .unwrap_or(false)
-                    {
+                    if self.lister.is_collapsable_folder(col_path) {
                         return FolderType::CollapsedDir;
                     } else {
                         return FolderType::NewDir;
@@ -840,9 +838,13 @@ impl FolderType {
     fn is_dir(&self) -> bool {
         use FolderType::*;
         match self {
-            RegularFile | Unknown => false,
+            RegularFile | Unknown | CollapsedDir => false,
             _ => true,
         }
+    }
+
+    fn is_collapsed(&self) -> bool {
+        matches!(self, FolderType::CollapsedDir)
     }
 }
 

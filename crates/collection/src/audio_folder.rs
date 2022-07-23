@@ -82,6 +82,17 @@ impl FolderLister {
         self.config.cd_folder_regex.is_some()
     }
 
+    pub(crate) fn is_collapsable_folder(&self, p: impl AsRef<Path>) -> bool {
+        self.config
+            .cd_folder_regex
+            .as_ref()
+            .and_then(|re| {
+                let name = p.as_ref().file_name()?.to_str()?;
+                Some(re.is_match(name))
+            })
+            .unwrap_or(false)
+    }
+
     fn split_chapters(&self, dur: u32) -> Vec<Chapter> {
         let chap_length = u64::from(self.config.chapters_duration) * 60 * 1000;
         let mut count = 0;
