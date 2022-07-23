@@ -719,7 +719,9 @@ impl CacheInner {
                 if self.is_dir(&p).is_dir() {
                     snd(UpdateAction::RefreshFolderRecursive(col_path.into()));
                 }
-                snd(UpdateAction::RefreshFolder(self.get_true_parent(col_path, &p)));
+                snd(UpdateAction::RefreshFolder(
+                    self.get_true_parent(col_path, &p),
+                ));
             }
             DebouncedEvent::Write(p) => {
                 let col_path = self.strip_base(&p);
@@ -728,7 +730,9 @@ impl CacheInner {
                     // should be single file folder
                     snd(UpdateAction::RefreshFolder(col_path.into()));
                 } else {
-                    snd(UpdateAction::RefreshFolder(self.get_true_parent(col_path, &p)));
+                    snd(UpdateAction::RefreshFolder(
+                        self.get_true_parent(col_path, &p),
+                    ));
                 }
             }
             DebouncedEvent::Remove(p) => {
@@ -736,7 +740,9 @@ impl CacheInner {
                 if self.is_dir(&p).is_dir() {
                     snd(UpdateAction::RemoveFolder(col_path.into()));
                 } else {
-                    snd(UpdateAction::RefreshFolder(self.get_true_parent(col_path, &p)))
+                    snd(UpdateAction::RefreshFolder(
+                        self.get_true_parent(col_path, &p),
+                    ))
                 }
             }
             DebouncedEvent::Rename(p1, p2) => {
@@ -746,13 +752,13 @@ impl CacheInner {
                         from: col_path.into(),
                         to: self.strip_base(&p2).into(),
                     }),
-                    (true, false) => {
-                        snd(UpdateAction::RefreshFolder(self.get_true_parent(col_path, &p1)))
-                    }
+                    (true, false) => snd(UpdateAction::RefreshFolder(
+                        self.get_true_parent(col_path, &p1),
+                    )),
                     (false, true) => snd(UpdateAction::RemoveFolder(col_path.into())),
-                    (false, false) => {
-                        snd(UpdateAction::RefreshFolder(self.get_true_parent(col_path, &p1)))
-                    }
+                    (false, false) => snd(UpdateAction::RefreshFolder(
+                        self.get_true_parent(col_path, &p1),
+                    )),
                 }
             }
             other => {
@@ -764,7 +770,8 @@ impl CacheInner {
     fn get_true_parent(&self, rel_path: &Path, full_path: &Path) -> PathBuf {
         let parent = parent_path(rel_path);
         if self.lister.collapse_cd_enabled()
-            && full_path.parent()
+            && full_path
+                .parent()
                 .map(|p| self.is_dir(&p).is_collapsed())
                 .unwrap_or(false)
         {
