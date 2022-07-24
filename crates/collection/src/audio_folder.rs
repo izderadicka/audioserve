@@ -66,7 +66,18 @@ impl FolderLister {
     ) -> Result<AudioFolder, io::Error> {
         let full_path = base_dir.as_ref().join(&dir_path);
         match self.get_dir_type(&full_path)? {
-            DirType::Dir => self.list_dir_dir(base_dir, full_path, ordering, true),
+            DirType::Dir => {
+                if self.is_collapsable_folder(&full_path) {
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!(
+                            "Directory {:?} is collapsed, should not be scanned directly",
+                            full_path
+                        ),
+                    ));
+                }
+                self.list_dir_dir(base_dir, full_path, ordering, true)
+            }
             DirType::File {
                 chapters,
                 audio_meta,
