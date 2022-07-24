@@ -712,7 +712,6 @@ impl CacheInner {
                 .ok()
                 .unwrap_or(())
         };
-
         match evt {
             DebouncedEvent::Create(p) => {
                 let col_path = self.strip_base(&p);

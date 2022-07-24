@@ -20,6 +20,43 @@ pub(crate) enum UpdateAction {
     RenameFolder { from: PathBuf, to: PathBuf },
 }
 
+impl UpdateAction {
+    fn is_covered_by(&self, other: &UpdateAction) -> bool {
+        match self {
+            UpdateAction::RefreshFolder(my_path) => match other {
+                UpdateAction::RefreshFolder(other_path) => my_path == other_path,
+                UpdateAction::RefreshFolderRecursive(other_path) => my_path.starts_with(other_path),
+                UpdateAction::RemoveFolder(other_path) => my_path.starts_with(other_path),
+                UpdateAction::RenameFolder { .. } => false,
+            },
+            UpdateAction::RefreshFolderRecursive(my_path) => match other {
+                UpdateAction::RefreshFolder(_) => false,
+                UpdateAction::RefreshFolderRecursive(other_path) => my_path.starts_with(other_path),
+                UpdateAction::RemoveFolder(other_path) => my_path.starts_with(other_path),
+                UpdateAction::RenameFolder { .. } => false,
+            },
+            UpdateAction::RemoveFolder(my_path) => match other {
+                UpdateAction::RefreshFolder(_) => false,
+                UpdateAction::RefreshFolderRecursive(_) => false,
+                UpdateAction::RemoveFolder(other_path) => my_path.starts_with(other_path),
+                UpdateAction::RenameFolder { .. } => false,
+            },
+            UpdateAction::RenameFolder {
+                from: my_from,
+                to: my_to,
+            } => match other {
+                UpdateAction::RefreshFolder(_) => false,
+                UpdateAction::RefreshFolderRecursive(_) => false,
+                UpdateAction::RemoveFolder(_) => false,
+                UpdateAction::RenameFolder {
+                    from: other_from,
+                    to: other_to,
+                } => my_from == other_from && my_to == other_to,
+            },
+        }
+    }
+}
+
 impl AsRef<Path> for UpdateAction {
     fn as_ref(&self) -> &Path {
         match self {
@@ -81,10 +118,18 @@ impl OngoingUpdater {
                 .map(|v| (*v.1, v.0.clone()))
                 .collect::<Vec<_>>();
             ready.sort_unstable_by_key(|i| i.0);
-            ready.into_iter().for_each(|(_, a)| {
+            for (n, (_, a)) in ready.iter().enumerate() {
                 self.pending.remove(&a);
-                self.inner.proceed_update(a)
-            })
+                // if some later action will have same effect we do not need this action
+                if !ready
+                    .iter()
+                    .skip(n + 1)
+                    .take(100)
+                    .any(|(_, other)| a.is_covered_by(other))
+                {
+                    self.inner.proceed_update(a.clone())
+                }
+            }
         }
     }
 }
