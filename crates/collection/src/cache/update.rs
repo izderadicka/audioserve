@@ -85,11 +85,23 @@ impl OngoingUpdater {
         }
     }
 
-    fn finish(self) {
-        let inner = self.inner;
-        self.pending
-            .into_iter()
-            .for_each(|(a, _)| inner.proceed_update(a))
+    fn send_actions(&mut self) {
+        if self.pending.len() > 0 {
+            // TODO: Would replacing map with empty be more efficient then iterating?
+            let done = std::mem::replace(&mut self.pending, HashMap::new());
+            let mut ready = done.into_iter().collect::<Vec<_>>();
+            ready.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+
+            while let Some((a, _)) = ready.pop() {
+                if !ready
+                    .iter()
+                    .skip(ready.len().saturating_sub(100)) // This is speculative optimalization, not be O(n^2) for large sets, but work for decent changes
+                    .any(|(other, _)| a.is_covered_by(other))
+                {
+                    self.inner.proceed_update(a.clone())
+                }
+            }
+        }
     }
 
     pub(super) fn run(mut self) {
@@ -97,37 +109,23 @@ impl OngoingUpdater {
             match self.queue.recv_timeout(self.interval) {
                 Ok(Some(action)) => {
                     self.pending.insert(action, SystemTime::now());
+                    if self.pending.len() >= 10_000 {
+                        // should not grow too big
+                        self.send_actions();
+                    }
                 }
                 Ok(None) => {
-                    self.finish();
+                    self.send_actions();
                     return;
                 }
                 Err(RecvTimeoutError::Disconnected) => {
                     error!("OngoingUpdater channel disconnected preliminary");
-                    self.finish();
+                    self.send_actions();
                     return;
                 }
-                Err(RecvTimeoutError::Timeout) => (), // just give chance to send pending actions
-            }
-            let current_time = SystemTime::now();
-            // TODO replace with drain_filter when becomes stable
-            let mut ready = self
-                .pending
-                .iter()
-                .filter(|(_, time)| current_time.duration_since(**time).unwrap() > self.interval)
-                .map(|v| (*v.1, v.0.clone()))
-                .collect::<Vec<_>>();
-            ready.sort_unstable_by_key(|i| i.0);
-            for (n, (_, a)) in ready.iter().enumerate() {
-                self.pending.remove(&a);
-                // if some later action will have same effect we do not need this action
-                if !ready
-                    .iter()
-                    .skip(n + 1)
-                    .take(100)
-                    .any(|(_, other)| a.is_covered_by(other))
-                {
-                    self.inner.proceed_update(a.clone())
+                Err(RecvTimeoutError::Timeout) => {
+                    //every pending action is older then limit
+                    self.send_actions();
                 }
             }
         }
