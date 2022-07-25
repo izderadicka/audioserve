@@ -675,7 +675,6 @@ impl CacheInner {
                 self.remove_tree(&folder)
                     .map_err(|e| warn!("Error removing folder from cache: {}", e))
                     .ok();
-                self.force_update(parent_path(&folder), false).ok();
             }
             UpdateAction::RenameFolder { from, to } => {
                 if let Err(e) = self.update_recursive_after_rename(&from, &to) {
@@ -693,12 +692,6 @@ impl CacheInner {
                     self.remove_positions(&from)
                         .map_err(|e| error!("Even deleting positions failed: {}", e))
                         .ok();
-                }
-                let orig_parent = parent_path(&from);
-                let new_parent = parent_path(&to);
-                self.force_update(&orig_parent, false).ok();
-                if new_parent != orig_parent {
-                    self.force_update(&new_parent, false).ok();
                 }
             }
         }
@@ -738,6 +731,7 @@ impl CacheInner {
                 let col_path = self.strip_base(&p);
                 if self.is_dir(&p).is_dir() {
                     snd(UpdateAction::RemoveFolder(col_path.into()));
+                    snd(UpdateAction::RefreshFolder(parent_path(col_path)));
                 } else {
                     snd(UpdateAction::RefreshFolder(
                         self.get_true_parent(col_path, &p),
@@ -747,14 +741,26 @@ impl CacheInner {
             DebouncedEvent::Rename(p1, p2) => {
                 let col_path = self.strip_base(&p1);
                 match (p2.starts_with(&self.base_dir), self.is_dir(&p1).is_dir()) {
-                    (true, true) => snd(UpdateAction::RenameFolder {
-                        from: col_path.into(),
-                        to: self.strip_base(&p2).into(),
-                    }),
+                    (true, true) => {
+                        snd(UpdateAction::RenameFolder {
+                            from: col_path.into(),
+                            to: self.strip_base(&p2).into(),
+                        });
+                        let orig_parent = parent_path(col_path);
+                        let new_parent = parent_path(self.strip_base(&p2));
+                        let diff = new_parent != orig_parent;
+                        snd(UpdateAction::RefreshFolder(orig_parent));
+                        if diff {
+                            snd(UpdateAction::RefreshFolder(new_parent));
+                        }
+                    }
                     (true, false) => snd(UpdateAction::RefreshFolder(
                         self.get_true_parent(col_path, &p1),
                     )),
-                    (false, true) => snd(UpdateAction::RemoveFolder(col_path.into())),
+                    (false, true) => {
+                        snd(UpdateAction::RemoveFolder(col_path.into()));
+                        snd(UpdateAction::RefreshFolder(parent_path(col_path)));
+                    }
                     (false, false) => snd(UpdateAction::RefreshFolder(
                         self.get_true_parent(col_path, &p1),
                     )),
