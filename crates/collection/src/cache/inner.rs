@@ -87,7 +87,7 @@ impl CacheInner {
         for key in self.iter_folders().filter_map(|e| e.ok()).map(|(k, _)| k) {
             if let Ok(rel_path) = std::str::from_utf8(&key) {
                 let full_path = self.base_dir.join(rel_path);
-                if !full_path.exists() {
+                if !full_path.exists() || self.lister.is_collapsable_folder(&full_path) {
                     debug!("Removing {:?} from collection cache db", full_path);
                     self.remove(rel_path)
                         .map_err(|e| error!("cannot remove record from db: {}", e))
@@ -742,10 +742,15 @@ impl CacheInner {
                 let col_path = self.strip_base(&p1);
                 match (p2.starts_with(&self.base_dir), self.is_dir(&p1).is_dir()) {
                     (true, true) => {
-                        snd(UpdateAction::RenameFolder {
-                            from: col_path.into(),
-                            to: self.strip_base(&p2).into(),
-                        });
+                        if self.lister.is_collapsable_folder(&p2) {
+                            snd(UpdateAction::RemoveFolder(col_path.into()));
+                        } else {
+                            let dest_path = self.strip_base(&p2).into();
+                            snd(UpdateAction::RenameFolder {
+                                from: col_path.into(),
+                                to: dest_path,
+                            });
+                        }
                         let orig_parent = parent_path(col_path);
                         let new_parent = parent_path(self.strip_base(&p2));
                         let diff = new_parent != orig_parent;
@@ -754,9 +759,20 @@ impl CacheInner {
                             snd(UpdateAction::RefreshFolder(new_parent));
                         }
                     }
-                    (true, false) => snd(UpdateAction::RefreshFolder(
-                        self.get_true_parent(col_path, &p1),
-                    )),
+                    (true, false) => {
+                        snd(UpdateAction::RefreshFolder(
+                            self.get_true_parent(col_path, &p1),
+                        ));
+                        let dest_path = self.strip_base(&p2);
+                        if self.is_dir(&p2).is_dir() {
+                            snd(UpdateAction::RefreshFolder(parent_path(dest_path)));
+                            snd(UpdateAction::RefreshFolderRecursive(dest_path.into()))
+                        } else {
+                            snd(UpdateAction::RefreshFolder(
+                                self.get_true_parent(dest_path, &p2),
+                            ))
+                        }
+                    }
                     (false, true) => {
                         snd(UpdateAction::RemoveFolder(col_path.into()));
                         snd(UpdateAction::RefreshFolder(parent_path(col_path)));
