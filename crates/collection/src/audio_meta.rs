@@ -337,7 +337,10 @@ mod libavformat {
         pub fn from_file(path: &Path) -> Result<Info> {
             match path.as_os_str().to_str() {
                 Some(fname) => Ok(Info {
-                    media_file: media_info::MediaFile::open(fname)?,
+                    media_file: media_info::MediaFile::open_with_encoding(
+                        fname,
+                        Some("windows-1250"),
+                    )?,
                 }),
                 None => {
                     error!("Invalid file name {:?}, not utf-8", path);

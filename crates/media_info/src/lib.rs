@@ -1,3 +1,5 @@
+use encoding::label::encoding_from_whatwg_label;
+use encoding::{DecoderTrap, EncodingRef};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -22,6 +24,9 @@ pub enum Error {
 
     #[error("UTF8 error: {0}")]
     InvalidString(#[from] std::str::Utf8Error),
+
+    #[error("Invalid encoding name {0}")]
+    InvalidEncoding(String),
 }
 
 // fn string_from_ptr(ptr: *const c_char) -> Result<Option<String>> {
@@ -32,21 +37,43 @@ pub enum Error {
 //     }
 // }
 
-fn string_from_ptr_lossy(ptr: *const c_char) -> String {
+fn string_from_ptr_lossy(ptr: *const c_char, alternate_encoding: Option<EncodingRef>) -> String {
     if ptr.is_null() {
         "".into()
     } else {
-        unsafe { CStr::from_ptr(ptr).to_string_lossy().into() }
+        let data = unsafe { CStr::from_ptr(ptr) }.to_bytes();
+        std::str::from_utf8(data)
+            .ok()
+            .map(|s| s.to_string())
+            .or_else(|| alternate_encoding.and_then(|e| e.decode(data, DecoderTrap::Strict).ok()))
+            .unwrap_or_else(|| String::from_utf8_lossy(data).into())
     }
 }
 
 struct Dictionary {
     pub dic: *mut ffi::AVDictionary,
+    pub alternate_encoding: Option<EncodingRef>,
 }
 
 impl Dictionary {
     fn new(dic: *mut ffi::AVDictionary) -> Self {
-        Dictionary { dic }
+        Dictionary {
+            dic,
+            alternate_encoding: None,
+        }
+    }
+
+    fn new_with_encoding(
+        dic: *mut ffi::AVDictionary,
+        encoding_name: impl AsRef<str>,
+    ) -> Result<Self> {
+        let encoding = encoding_from_whatwg_label(encoding_name.as_ref())
+            .ok_or_else(|| Error::InvalidEncoding(encoding_name.as_ref().to_string()))?;
+
+        Ok(Dictionary {
+            dic,
+            alternate_encoding: Some(encoding),
+        })
     }
 
     fn get<S: AsRef<str>>(&self, key: S) -> Option<String> {
@@ -59,7 +86,7 @@ impl Dictionary {
             if res.is_null() {
                 return None;
             }
-            Some(string_from_ptr_lossy((*res).value))
+            Some(string_from_ptr_lossy((*res).value, self.alternate_encoding))
         }
     }
 
@@ -78,8 +105,8 @@ impl Dictionary {
                 if current.is_null() {
                     break;
                 } else {
-                    let key = string_from_ptr_lossy((*current).key);
-                    let value = string_from_ptr_lossy((*current).value);
+                    let key = string_from_ptr_lossy((*current).key, self.alternate_encoding);
+                    let value = string_from_ptr_lossy((*current).value, self.alternate_encoding);
                     map.insert(key, value);
                     prev = current;
                 }
@@ -136,6 +163,12 @@ macro_rules! meta_methods {
 
 impl MediaFile {
     pub fn open<S: AsRef<str>>(fname: S) -> Result<Self> {
+        MediaFile::open_with_encoding(fname, None as Option<&str>)
+    }
+    pub fn open_with_encoding<S: AsRef<str>>(
+        fname: S,
+        alternate_encoding: Option<impl AsRef<str>>,
+    ) -> Result<Self> {
         unsafe {
             let mut ctx = ffi::avformat_alloc_context();
             assert!(ctx as usize > 0);
@@ -166,11 +199,13 @@ impl MediaFile {
                 }
             }
 
+            let meta = match alternate_encoding {
+                Some(enc) => Dictionary::new_with_encoding(m, enc)?,
+                None => Dictionary::new(m),
+            };
+
             // --------------------------------------------------------
-            Ok(MediaFile {
-                ctx,
-                meta: Dictionary::new(m),
-            })
+            Ok(MediaFile { ctx, meta: meta })
         }
     }
 
