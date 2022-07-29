@@ -7,10 +7,11 @@ build = "build.rs"
 
 [dependencies]
 thiserror = "1.0"
-encoding = "0.2"
+encoding = {version="0.2", optional=true}
 
 
 [features]
 static=[]
 partially-static=[]
+alternate-encoding=["encoding"]
 
