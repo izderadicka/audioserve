@@ -124,7 +124,7 @@ Only folders matching regular expression `r"^CD[ -_]?\s*\d+\s*$"` (case insensit
 
 ### Audio files metadata tags
 
-audioserve is using directory structure for navigation and searching. This is one of key design decisions and it will not change. Main reason is because tags are just one big mess for audiobooks, everybody uses them in sligthly different way, so they are not reliable. This was key reason why I started work on audioserve - to see my collection is the same way in which I stored it on disk. I do not want to bother with tags cleanup.
+audioserve is using directory structure for navigation and searching. This is one of key design decisions and it will not change. Main reason is because tags are just one big mess for audiobooks, everybody uses them in slightly different way, so they are not reliable. This was key reason why I started work on audioserve - to see my collection is the same way in which I stored it on disk. I do not want to bother with tags cleanup.
 
 However with new collection cache there is possibility to scan tags and display them in web client (not yet in Android). Just for display purpose, no special functionality is related to tags.
 
