@@ -298,6 +298,7 @@ impl MediaFile {
             let chaps = slice::from_raw_parts((*self.ctx).chapters, num_chapters);
             for chap in chaps {
                 let chap = **chap;
+                // TODO: May need alternate encoding also for chapter names
                 let meta = Dictionary::new(chap.metadata);
                 let num = chap.id;
                 let title = meta

@@ -147,6 +147,14 @@ impl CollectionOptions {
                             self.tags = None
                         }
                     }
+                    #[cfg(feature = "tags-encoding")]
+                    tag @ "tags-encoding" => {
+                        if let Some(v) = val {
+                            self.tags_encoding = Some(v.into())
+                        } else {
+                            invalid_option!("Encoding name is required for {}", tag);
+                        }
+                    }
 
                     opt => invalid_option!("Unknown option: {}", opt),
                 }

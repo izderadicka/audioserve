@@ -305,6 +305,18 @@ fn create_parser<'a>() -> Parser<'a> {
         );
     }
 
+    if cfg!(feature = "tags-encoding") {
+        parser = parser.arg(
+            Arg::with_name("tags-encoding")
+                .takes_value(true)
+                .long("tags-encoding")
+                .env("AUDIOSERVE_TAGS_ENCODING")
+                .help(
+                    "Alternate character encoding for audio tags metadata, if UTF8 decoding fails",
+                ),
+        )
+    }
+
     parser = parser.arg(Arg::with_name("search-cache").long("search-cache").help(
         "Deprecated: does nothing. For caching config use :<options> on individual collections dirs params",
     ));
@@ -645,6 +657,13 @@ where
 
         if let Some(positions_backup_schedule) = args.value_of("positions-backup-schedule") {
             config.positions.backup_schedule = Some(positions_backup_schedule.into());
+        }
+    }
+
+    #[cfg(feature = "tags-encoding")]
+    {
+        if let Some(enc) = args.value_of("tags-encoding") {
+            config.tags_encoding = Some(enc.into())
         }
     }
 

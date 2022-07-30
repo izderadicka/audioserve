@@ -92,6 +92,11 @@ fn create_collections_options() -> anyhow::Result<CollectionOptionsMap> {
     fo.cd_folder_regex_str = c.collapse_cd_folders.as_ref().and_then(|x| x.regex.clone());
     fo.force_cache_update_on_init = c.force_cache_update_on_init;
 
+    #[cfg(feature = "tags-encoding")]
+    {
+        fo.tags_encoding = c.tags_encoding.clone();
+    }
+
     let mut co = CollectionOptionsMap::new(fo)?;
     for (p, o) in &get_config().base_dirs_options {
         if let Err(e) = co.add_col_options(p, o) {

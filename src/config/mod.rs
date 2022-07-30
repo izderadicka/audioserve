@@ -455,6 +455,8 @@ pub struct Config {
     pub static_resource_cache_age: Option<u32>,
     pub folder_file_cache_age: Option<u32>,
     pub collapse_cd_folders: Option<CollapseCDFolderConfig>,
+    #[cfg(feature = "tags-encoding")]
+    pub tags_encoding: Option<String>,
 }
 
 impl Config {
@@ -665,6 +667,8 @@ impl Default for Config {
             static_resource_cache_age: None,
             folder_file_cache_age: Some(24 * 3600),
             collapse_cd_folders: None,
+            #[cfg(feature = "tags-encoding")]
+            tags_encoding: None,
         }
     }
 }
