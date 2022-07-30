@@ -8,7 +8,7 @@ use crate::{
 };
 use enum_dispatch::enum_dispatch;
 use media_info::tags::{ALLOWED_TAGS, BASIC_TAGS};
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{
@@ -173,8 +173,12 @@ pub struct CollectionOptionsMap {
 impl CollectionOptionsMap {
     pub fn new(mut default: CollectionOptions) -> Result<Self> {
         if let Some(ref re) = default.cd_folder_regex_str {
-            default.cd_folder_regex =
-                Some(Regex::new(re).map_err(|e| (Error::InvalidCDFolderRegex(re.into(), e)))?);
+            default.cd_folder_regex = Some(
+                RegexBuilder::new(re)
+                    .case_insensitive(true)
+                    .build()
+                    .map_err(|e| (Error::InvalidCDFolderRegex(re.into(), e)))?,
+            );
         }
         Ok(CollectionOptionsMap {
             cols: HashMap::new(),

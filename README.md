@@ -120,7 +120,7 @@ Also note that web client will often load same part of chapter again if you're s
 Sometimes (mainly for historical reasons) content of audiobook is divided in CD subfolders, reflecting how it was originally distributed on physical media. In audioserve you have option to collapse all these CD subfolders into main root folder and thus see whole audiobook at once. File names then will be prefixed with CD subfolder name.
 This is an optional feature and could be enabled by argument `--collapse-cd-folders` (will require full reload of collection cache) and will collapse CD subfolders if:
 
-Only folders matching regular expression `r"^CD[ -_]?\s*\d+\s*$"` are collapsed into parent folder. Custom regular expression can be provided by argument `--cd-folder-regexp`. 
+Only folders matching regular expression `r"^CD[ -_]?\s*\d+\s*$"` (case insensitive) are collapsed into parent folder. Custom regular expression can be provided by argument `--cd-folder-regexp`. 
 
 ### Audio files metadata tags
 
