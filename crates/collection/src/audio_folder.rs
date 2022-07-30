@@ -30,6 +30,8 @@ pub(crate) struct FolderOptions {
     pub no_dir_collaps: bool,
     pub tags: Option<HashSet<String>>,
     pub cd_folder_regex: Option<Regex>,
+    #[cfg(feature = "tags-encoding")]
+    pub tags_encoding: Option<String>,
 }
 
 impl From<CollectionOptions> for FolderOptions {
@@ -42,6 +44,8 @@ impl From<CollectionOptions> for FolderOptions {
             no_dir_collaps: o.no_dir_collaps,
             tags: o.tags,
             cd_folder_regex: o.cd_folder_regex,
+            #[cfg(feature = "tags-encoding")]
+            tags_encoding: o.tags_encoding,
         }
     }
 }
@@ -136,8 +140,11 @@ impl FolderLister {
         if meta.is_dir() {
             Ok(DirType::Dir)
         } else if meta.is_file() && is_audio(path) {
-            let meta =
-                get_audio_properties(path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            #[cfg(feature = "tags-encoding")]
+            let audio_info = get_audio_properties(path, self.config.tags_encoding.as_ref());
+            #[cfg(not(feature = "tags-encoding"))]
+            let audio_info = get_audio_properties(path);
+            let meta = audio_info.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
             match (meta.get_chapters(), meta.get_audio_info(&self.config.tags)) {
                 (Some(chapters), Some(audio_meta)) => Ok(DirType::File {
                     chapters,
@@ -212,7 +219,14 @@ impl FolderLister {
                                     if is_audio(&path) {
                                         let mime = guess_mime_type(&path);
                                         let audio_file_path = base_dir.as_ref().join(&path);
-                                        let meta = match get_audio_properties(&audio_file_path) {
+                                        #[cfg(feature = "tags-encoding")]
+                                        let audio_info = get_audio_properties(
+                                            &audio_file_path,
+                                            self.config.tags_encoding.as_ref(),
+                                        );
+                                        #[cfg(not(feature = "tags-encoding"))]
+                                        let audio_info = get_audio_properties(&audio_file_path);
+                                        let meta = match audio_info {
                                             Ok(meta) => meta,
                                             Err(e) => {
                                                 error!("Cannot add file {:?} because error in extraction audio meta: {}",path, e);
@@ -390,7 +404,11 @@ impl FolderLister {
         let mime = guess_mime_type(&path);
         let mut tags = None;
         if self.config.tags.is_some() {
-            let meta = get_audio_properties(&full_path)
+            #[cfg(feature = "tags-encoding")]
+            let audio_info = get_audio_properties(&full_path, self.config.tags_encoding.as_ref());
+            #[cfg(not(feature = "tags-encoding"))]
+            let audio_info = get_audio_properties(&full_path);
+            let meta = audio_info
                 .map_err(|e| warn!("Error extracting meta from {:?}: {}", full_path, e))
                 .ok()
                 .and_then(|m| m.get_audio_info(&self.config.tags));
@@ -874,6 +892,9 @@ mod tests {
     fn test_meta() {
         media_info::init();
         let path = Path::new(TEST_DATA_BASE).join(Path::new("test_data/01-file.mp3"));
+        #[cfg(feature = "tags-encoding")]
+        let res = get_audio_properties(&path, None as Option<String>);
+        #[cfg(not(feature = "tags-encoding"))]
         let res = get_audio_properties(&path);
         assert!(res.is_ok());
         let media_info = res.unwrap();

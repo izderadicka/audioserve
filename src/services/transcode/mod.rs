@@ -582,7 +582,11 @@ mod tests {
         assert!(out_file.exists());
 
         //TODO: for some reasons sometimes cannot get meta - but file is OK
-        let meta = get_audio_properties(&out_file).expect("Cannot get audio file meta");
+        #[cfg(feature = "tags-encoding")]
+        let meta = get_audio_properties(&out_file, None as Option<String>);
+        #[cfg(not(feature = "tags-encoding"))]
+        let meta = get_audio_properties(&out_file);
+        let meta = meta.expect("Cannot get audio file meta");
         let audio_len = if copy_file.is_some() { 1 } else { 2 };
         let dur = audio_len - seek.map(|s| s.round() as u32).unwrap_or(0);
 

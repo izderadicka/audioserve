@@ -334,12 +334,15 @@ mod libavformat {
             })
         }
 
-        pub fn from_file(path: &Path) -> Result<Info> {
+        pub fn from_file(
+            path: &Path,
+            #[cfg(feature = "tags-encoding")] alternate_encoding: Option<impl AsRef<str>>,
+        ) -> Result<Info> {
             match path.as_os_str().to_str() {
                 Some(fname) => {
                     #[cfg(feature = "tags-encoding")]
                     let media_file =
-                        media_info::MediaFile::open_with_encoding(fname, Some("windows-1250"))?;
+                        media_info::MediaFile::open_with_encoding(fname, alternate_encoding)?;
 
                     #[cfg(not(feature = "tags-encoding"))]
                     let media_file = media_info::MediaFile::open(fname)?;
@@ -355,8 +358,17 @@ mod libavformat {
     }
 }
 
+#[cfg(not(feature = "tags-encoding"))]
 pub fn get_audio_properties(audio_file_path: &Path) -> Result<impl MediaInfo> {
     libavformat::Info::from_file(audio_file_path)
+}
+
+#[cfg(feature = "tags-encoding")]
+pub fn get_audio_properties(
+    audio_file_path: &Path,
+    alternate_encoding: Option<impl AsRef<str>>,
+) -> Result<impl MediaInfo> {
+    libavformat::Info::from_file(audio_file_path, alternate_encoding)
 }
 
 pub fn init_media_lib() {

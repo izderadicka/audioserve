@@ -34,6 +34,8 @@ pub struct CollectionOptions {
     pub allow_symlinks: bool,
     pub no_dir_collaps: bool,
     pub tags: Option<HashSet<String>>,
+    #[cfg(feature = "tags-encoding")]
+    pub tags_encoding: Option<String>,
     pub cd_folder_regex_str: Option<String>,
     #[serde(skip)]
     pub force_cache_update_on_init: bool,
@@ -43,13 +45,17 @@ pub struct CollectionOptions {
 
 impl PartialEq for CollectionOptions {
     fn eq(&self, other: &Self) -> bool {
-        self.chapters_duration == other.chapters_duration
+        let res = self.chapters_duration == other.chapters_duration
             && self.chapters_from_duration == other.chapters_from_duration
             && self.ignore_chapters_meta == other.ignore_chapters_meta
             && self.allow_symlinks == other.allow_symlinks
             && self.no_dir_collaps == other.no_dir_collaps
             && self.tags == other.tags
-            && self.cd_folder_regex_str == other.cd_folder_regex_str
+            && self.cd_folder_regex_str == other.cd_folder_regex_str;
+
+        #[cfg(feature = "tags-encoding")]
+        let res = res && self.tags_encoding == other.tags_encoding;
+        res
     }
 }
 
@@ -64,6 +70,8 @@ impl Default for CollectionOptions {
             allow_symlinks: false,
             no_dir_collaps: false,
             tags: None,
+            #[cfg(feature = "tags-encoding")]
+            tags_encoding: None,
             cd_folder_regex_str: None,
             cd_folder_regex: None,
         }

@@ -65,10 +65,12 @@ struct Dictionary {
 impl Dictionary {
     fn new(dic: *mut ffi::AVDictionary) -> Self {
         #[cfg(feature = "alternate-encoding")]
-        return Dictionary { dic, alternate_encoding: None };
+        return Dictionary {
+            dic,
+            alternate_encoding: None,
+        };
         #[cfg(not(feature = "alternate-encoding"))]
         return Dictionary { dic };
-
     }
 
     #[cfg(feature = "alternate-encoding")]
@@ -97,7 +99,10 @@ impl Dictionary {
 
         #[cfg(feature = "alternate-encoding")]
         {
-            Some(string_from_ptr_lossy((unsafe {*res}).value, self.alternate_encoding))
+            Some(string_from_ptr_lossy(
+                (unsafe { *res }).value,
+                self.alternate_encoding,
+            ))
         }
         #[cfg(not(feature = "alternate-encoding"))]
         {
@@ -230,22 +235,18 @@ impl MediaFile {
         }
     }
 
-
-    #[cfg(feature="alternate-encoding")]
+    #[cfg(feature = "alternate-encoding")]
     pub fn open_with_encoding<S: AsRef<str>>(
         fname: S,
         alternate_encoding: Option<impl AsRef<str>>,
     ) -> Result<Self> {
-        MediaFile::prepare_open(fname)
-        .and_then(|(ctx, m)| {
+        MediaFile::prepare_open(fname).and_then(|(ctx, m)| {
             let meta = match alternate_encoding {
                 Some(e) => Dictionary::new_with_encoding(m, e)?,
-                None => Dictionary::new(m)
+                None => Dictionary::new(m),
             };
-            Ok(MediaFile{ ctx, meta})
-        }
-        )
-        
+            Ok(MediaFile { ctx, meta })
+        })
     }
 
     /// Duration in ms
