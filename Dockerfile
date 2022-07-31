@@ -19,7 +19,7 @@ WORKDIR /audioserve
 ENV PATH=/root/.cargo/bin:$PATH
 RUN if [[ -n "$CARGO_RELEASE" ]]; then CARGO_RELEASE="--$CARGO_RELEASE"; fi && \
     echo BUILDING: cargo build ${CARGO_RELEASE} ${CARGO_ARGS} && \
-    cargo build ${CARGO_RELEASE} ${CARGO_ARGS} && \
+    cargo build ${CARGO_RELEASE} ${CARGO_ARGS} 
     # cargo test ${CARGO_RELEASE} --all ${CARGO_ARGS}
 
 RUN mkdir /ssl &&\
