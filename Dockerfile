@@ -10,16 +10,17 @@ ARG CARGO_RELEASE
 
 RUN apk update &&\
     apk add git bash openssl openssl-dev curl yasm build-base \
-    wget libbz2 bzip2-dev  zlib zlib-dev rust cargo ffmpeg-dev ffmpeg \
-    clang clang-dev gawk ctags llvm-dev icu icu-libs icu-dev
+    wget libbz2 bzip2-dev  zlib zlib-dev rustup ffmpeg-dev ffmpeg \
+    clang clang-dev gawk ctags llvm-dev icu icu-libs icu-dev &&\
+    rustup-init -y
 
 COPY . /audioserve 
 WORKDIR /audioserve
-
+ENV PATH=/root/.cargo/bin:$PATH
 RUN if [[ -n "$CARGO_RELEASE" ]]; then CARGO_RELEASE="--$CARGO_RELEASE"; fi && \
     echo BUILDING: cargo build ${CARGO_RELEASE} ${CARGO_ARGS} && \
-    cargo build ${CARGO_RELEASE} ${CARGO_ARGS} &&\
-    cargo test ${CARGO_RELEASE} --all ${CARGO_ARGS}
+    cargo build ${CARGO_RELEASE} ${CARGO_ARGS} && \
+    # cargo test ${CARGO_RELEASE} --all ${CARGO_ARGS}
 
 RUN mkdir /ssl &&\
     cd /ssl &&\
