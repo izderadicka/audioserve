@@ -2,7 +2,7 @@ ARG CARGO_ARGS
 ARG CARGO_RELEASE="release"
 ARG OLD_CLIENT
 
-FROM alpine:3.14 AS build
+FROM alpine:3.15 AS build
 LABEL maintainer="Ivan <ivan@zderadicka.eu>"
 
 ARG CARGO_ARGS
@@ -28,7 +28,7 @@ RUN mkdir /ssl &&\
     openssl pkcs12 -inkey key.pem -in certificate.pem -export  -passout pass:mypass -out audioserve.p12 
 
 
-FROM node:14-alpine as client
+FROM node:16-alpine as client
 
 ARG OLD_CLIENT
 
@@ -51,7 +51,7 @@ RUN if [[ -n "$OLD_CLIENT" ]]; then \
     mv public dist ;\
     fi
 
-FROM alpine:3.14
+FROM alpine:3.15
 
 ARG CARGO_ARGS
 ARG CARGO_RELEASE
