@@ -82,6 +82,7 @@ pub struct SearchResult {
 
 #[cfg(feature = "folder-download")]
 pub use download_format::DownloadFormat;
+use serde::Serialize;
 
 #[cfg(feature = "folder-download")]
 mod download_format {

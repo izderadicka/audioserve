@@ -319,6 +319,7 @@ impl<P: AsRef<Path> + Send> Stream for TarStream<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::Bytes;
     use futures::sink::SinkExt;
     use futures::stream::{StreamExt, TryStreamExt};
     use io::Result;
@@ -340,7 +341,7 @@ mod tests {
         let codec = tokio_util::codec::BytesCodec::new();
         let mut file_sink = codec.framed(tar_file);
         file_sink
-            .send_all(&mut tar_stream.map(|v| v.map(|x| x.into())))
+            .send_all(&mut tar_stream.map(|v| v.map(Bytes::from)))
             .await?;
 
         let archive_len = tar_file_name2.metadata().unwrap().len();
@@ -364,7 +365,7 @@ mod tests {
         let tar_file = tokio_fs::File::create(tar_file_name).await?;
         let codec = tokio_util::codec::BytesCodec::new();
         let mut file_sink = codec.framed(tar_file);
-        file_sink.send_all(&mut tar.map_ok(|v| v.into())).await?;
+        file_sink.send_all(&mut tar.map_ok(Bytes::from)).await?;
 
         check_archive(tar_file_name2, 2);
         temp_dir.close().unwrap();

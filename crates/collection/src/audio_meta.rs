@@ -3,7 +3,7 @@ use crate::error::{Error, Result};
 use crate::position::PositionShort;
 use crate::util::{get_file_name, get_modified, guess_mime_type};
 use mime_guess::Mime;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::{
     cmp::Ordering,

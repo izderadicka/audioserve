@@ -1,6 +1,6 @@
 [package]
 name = "async-zip"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2021"
 
@@ -8,11 +8,11 @@ edition = "2021"
 
 [dependencies]
 futures = "0.3"
-tokio = {version="1.2", features=["full"]}
-bytes = "1.0"
+tokio = {version="1.20", features=["full"]}
+bytes = "1.2"
 chrono = "0.4"
 thiserror = "1.0"
-crc32fast = "1.2"
+crc32fast = "1.3"
 
 [dev-dependencies]
-zip = {version="0.5", default-features=false}
+zip = {version="0.6", default-features=false}

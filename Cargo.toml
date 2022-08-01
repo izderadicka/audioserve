@@ -2,14 +2,15 @@
 name = "audioserve"
 version = "0.21.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
-edition = "2018"
+edition = "2021"
+rust-version = "1.56.1"
 
 [workspace]
 members = ["crates/*"]
 
 [dependencies]
 
-bytes = "1.0"
+bytes = "1.2"
 env_logger = "0.9"
 log = {version="0.4", features = ["release_max_level_info", "max_level_trace"]}
 hyper = {version="0.14", features = ["full"]}
@@ -29,11 +30,10 @@ num_cpus = "1.13"
 ring = "0.16"
 data-encoding = "2.3"
 regex = "1.4"
-tokio = {version="1.2", features=["full"]}
+tokio = {version="1.20", features=["full"]}
 
 dirs = "4.0"
 csv = "1.1"
-linked-hash-map = {git="https://github.com/izderadicka/linked-hash-map.git", version="0.5.3", features=["serde_impl"]}
 
 image="0.24"
 
@@ -44,8 +44,8 @@ futures-util = { version = "0.3", default-features = false, optional=true }
 rustls-pemfile = { version = "1", optional=true}
 
 leaky-cauldron = {path="crates/leaky-cauldron"}
-tokio-util = {version="0.6", optional=true, features=["codec"]}
-cron = {version="0.9", optional=true}
+tokio-util = {version="0.7", optional=true, features=["codec"]}
+cron = {version="0.11", optional=true}
 chrono = {version="0.4", optional=true}
 
 
@@ -58,7 +58,7 @@ async-zip = {path="crates/async-zip", optional=true}
 websock = {path="crates/websock", optional = true}
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.23"
+nix = "0.24"
 
 [features]
 default = ["tls", "symlinks", "folder-download", "shared-positions", "behind-proxy"]

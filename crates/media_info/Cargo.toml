@@ -2,7 +2,7 @@
 name = "media_info"
 version = "0.2.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
-edition = "2018"
+edition = "2021"
 build = "build.rs"
 
 [dependencies]

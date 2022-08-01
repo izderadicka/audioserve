@@ -1,6 +1,7 @@
 use collection::MINIMUM_CHAPTER_DURATION;
 use hyper::{Body, Request};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 pub use self::error::{Error, Result};
 use super::services::transcode::{QualityLevel, TranscodingFormat};

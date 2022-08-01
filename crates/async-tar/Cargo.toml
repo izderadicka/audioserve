@@ -1,8 +1,8 @@
 [package]
 name = "async-tar"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 tar="0.4"
@@ -11,6 +11,7 @@ tokio={version="1.2", features=["fs"]}
 
 [dev-dependencies]
 tempfile="3.2"
-tokio-util = {version="0.6", features=["codec"]}
-tokio={version="1.2", features=["macros", "rt"]}
+bytes = "1.2"
+tokio-util = {version="0.7", features=["codec"]}
+tokio={version="1.20", features=["macros", "rt"]}
 

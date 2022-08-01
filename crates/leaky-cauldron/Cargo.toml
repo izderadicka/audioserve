@@ -2,15 +2,15 @@
 name = "leaky-cauldron"
 version = "0.1.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio={version="1.2", features=["rt-multi-thread", "time", "sync"]}
+tokio={version="1.20", features=["rt-multi-thread", "time", "sync"]}
 futures="0.3"
 log="0.4"
 
 [dev-dependencies]
-tokio={version="1.2", features=["macros", "test-util"]}
+tokio={version="1.20", features=["macros", "test-util"]}
 env_logger = "0.9"
