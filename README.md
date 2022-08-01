@@ -5,13 +5,13 @@
 
 [ [**DEMO AVAILABLE** - shared secret: mypass] ](https://audioserve.zderadicka.eu)
 
-**New web client is at alpha stage - it's becoming to be usable - you can look at it [here](https://github.com/izderadicka/audioserve-web)**
+**New web client is coming - it'll be now default for master branch and soon it'll be also in stable image release. New client is in  [separate project](https://github.com/izderadicka/audioserve-web)**
 
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalist design.
 
-Server is written in Rust, default web client (HTML5 + Javascript) is intended for modern browsers (latest Firefox or Chrome) and is integrated with the server. There is also [Android client](https://github.com/izderadicka/audioserve-android) and [simple API](docs/api.md) for custom clients.
+Server is written in Rust, new web PWA client (Typescript and Svelte) is focused on modern browsers and is using rather recent functionality (Service Worker), older, less demanding web client is still around - check [Web client chapter](#web-client) for details. There is also [Android client](https://github.com/izderadicka/audioserve-android) and [simple API](docs/api.md) for custom clients.
 
-For some background and video demo check this article(bit old but gives main motivation behind it) [Audioserve Audiobooks Server - Stupidly Simple or Simply Stupid?](http://zderadicka.eu/audioserve-audiobooks-server-stupidly-simple-or-simply-stupid)
+For some (now bit outdated) background and video demo check this article(bit old but gives main motivation behind it) [Audioserve Audiobooks Server - Stupidly Simple or Simply Stupid?](http://zderadicka.eu/audioserve-audiobooks-server-stupidly-simple-or-simply-stupid)
 
 If you will install audioserve and make it available on Internet do not [underestimate security](#security-best-practices).
 
@@ -330,16 +330,13 @@ All audioserve parameters can be also provided in configuration file via `--conf
 
 ## Web client
 
-Web client is bundled with server. It provides simple interface (using bootstrap 4 CSS framework and JQuery JS library). Web client will remember your last playback position in a folder, so you can easily continue listening, even after page reload. Use three vertical dots in top right corner to choose required transcoding and subfolder items ordering. Otherwise it's rather minimalistic (following KISS principle).
+Finally I think **new web client**  is ready for prime time, so I'll become default - it resides in it's [own project](https://github.com/izderadicka/audioserve-web) and it's integrated into Docker image build, so it's part of the image (TBD for stable image and static release). New web client uses latest and greatest web technologies and it's intended to replace Android client (can be installed as PWA app). However if you do not like new client for any reason (please let me know what's wrong with new client), you can still use old client (residing in this repo, it's just HTML5 and javascript, so less demanding, but also code is bit clumsy), which will be around for some time. You can easily enable in Docker build with `OLD_CLIENT` build argument, or just build separately with npm and direct do resulting `dist` directory with `--client-dir` argument.
 
-It's tested on Firefox and Chrome (on Linux and Android, should work on Windows, on OSX too on these browsers).
-Also should work on on recent MS Edge browser(I'm not testing it on Edge, but seems to work and since it's now also based on Chromium should not be issue).
 
-Current web client is quite conservative, if you want to experiment and try latest web technologies, you can try (still WIP) [new web client](https://github.com/izderadicka/audioserve-web).
+I'm testing web clients on recent Firefox and Chrome/Chromium (on Linux and Android platforms, occasionally on Win and Edge, assuming that Edge is now basically Chrome, so it should work). For Apple platforms, new client should work for Safari after some additional configuration - check [this chapter](#alternative-transcodings-and-transcoding-configuration-for-apple-users).
 
-Also there is third party client, still very much in progress, but quite interesting [third party client](https://github.com/KodeStar/audiosilo) can be used with audioserve.
 
-On iOS default transcoding (opus+ogg) is not working - so switch transcoding off or try custom transcoding profile.
+Also there is third party client, still very much in progress (and not much progressing lately), but quite interesting [third party client](https://github.com/KodeStar/audiosilo).
 
 
 ## Android client
@@ -435,7 +432,7 @@ You can also create your own static build with script `build_static.sh` (Docker 
 
 ### Local build (Linux)
 
-Now audioserve depends on ffmpeg's libavformat 4.3 (and its dependent libavutil and libavcodec libs), which is a complex beast. If you are building locally you need this dependence (plus couple of others). If you have available right version on your system you can dynamically link against it (remember it has to be correct version). Other option is to use feature `partially-static`, which will download right version of ffmpeg, compile it and statically link it into audioserve (but then binary will be indeed bigger).
+Now audioserve depends on ffmpeg's libavformat 4.3/4.4 (and its dependent libavutil and libavcodec libs), which is a complex beast. If you are building locally you need this dependence (plus couple of others). If you have available right version on your system you can dynamically link against it (remember it has to be correct version, if you have wrong wersion you'll probably see Segmentation Faults when running the program). Other option is to use feature `partially-static`, which will download right version of ffmpeg, compile it and statically link it into audioserve (but then binary will be indeed bigger).
 
 Install required dependencies (some dependencies are optional, depending on features chosen in build):
 
@@ -457,7 +454,17 @@ Compile Rust code (it has optional system dependencies to openssl,zlib, bz2lib, 
 
 Optionally you can compile with/without other features ([see below](#compiling-without-default-features-or-with-non-default-features) for details).
 
-Build client in its directory (`cd client`):
+Build new client:
+```
+git clone https://github.com/izderadicka/audioserve-web.git /audioserve_client &&\
+    cd /audioserve_client &&\
+    npm install &&\
+    npm run build &&\
+    npm run build-sw &&\
+    mv public dist  # The directory that audioserve will recognize as --client-dir
+```
+
+Optionally you can build old client (in its directory `cd client`):
 
     npm install
     npm run build
