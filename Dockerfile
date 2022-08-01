@@ -1,6 +1,6 @@
 ARG CARGO_ARGS
 ARG CARGO_RELEASE="release"
-ARG NEW_CLIENT
+ARG OLD_CLIENT
 
 FROM alpine:3.14 AS build
 LABEL maintainer="Ivan <ivan@zderadicka.eu>"
@@ -30,11 +30,16 @@ RUN mkdir /ssl &&\
 
 FROM node:14-alpine as client
 
-ARG NEW_CLIENT
+ARG OLD_CLIENT
 
 COPY ./client /audioserve_client
 
-RUN if [[ -n "$NEW_CLIENT" ]]; then \
+RUN if [[ -n "$OLD_CLIENT" ]]; then \
+    echo "Old client" &&\
+    cd audioserve_client &&\
+    npm install &&\
+    npm run build ;\
+    else \
     echo "New client $NEW_CLIENT" && \
     rm -r  /audioserve_client/* &&\
     apk add git &&\
@@ -44,11 +49,6 @@ RUN if [[ -n "$NEW_CLIENT" ]]; then \
     npm run build &&\
     npm run build-sw &&\
     mv public dist ;\
-    else \
-    echo "Old client" &&\
-    cd audioserve_client &&\
-    npm install &&\
-    npm run build ;\
     fi
 
 FROM alpine:3.14
