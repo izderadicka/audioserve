@@ -172,12 +172,11 @@ Authentication is used to access all URLs except web client static files (`/inde
 
 ### TLS/SSL
 
-Audioserve supports TLS/SSL - to enable it you need to provide your private server key as PKCS#12 file (in `--ssl-key` argument). Here is quick tip how to create private key with self-signed certificate (for testing purposed only):
+Audioserve supports TLS/SSL - to enable it you need to provide your private server key and it's corresponding certificates chain both in PEM format (this changed recently in version 0.20 as `rustls` is now  used, previously key and certificate were in single PKCS#12 file, I think PEM is more supported and easier to handle - it's similar how apache, nginx, etc. work, also with this change private key is no longer encrypted. Key and certificate are provided  in `--ssl-key` and `ssl-cert` arguments respectively. Here is quick tip how to create private key with self-signed certificate (for testing purposed only):
 
     openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out certificate.pem \
         -subj "/C=CZ/ST=Prague/L=Prague/O=Ivan/CN=audioserve"
-    openssl pkcs12 -inkey key.pem -in certificate.pem -export  -passout pass:mypass -out audioserve.p12
-    rm key.pem certificate.pem
+
 
 You can also run audioserve behind reverse proxy like nginx or ha-proxy and terminate SSL there (in that case you can compile audioserve without TLS support see compilation without default features below)
 

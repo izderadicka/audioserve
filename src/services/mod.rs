@@ -96,7 +96,7 @@ impl<'a> QueryParams<'a> {
 pub struct RequestWrapper {
     request: Request<Body>,
     path: String,
-    remote_addr: Option<IpAddr>,
+    remote_addr: IpAddr,
     #[allow(dead_code)]
     is_ssl: bool,
     #[allow(dead_code)]
@@ -107,7 +107,7 @@ impl RequestWrapper {
     pub fn new(
         request: Request<Body>,
         path_prefix: Option<&str>,
-        remote_addr: Option<IpAddr>,
+        remote_addr: IpAddr,
         is_ssl: bool,
     ) -> error::Result<Self> {
         let path = match percent_decode(request.uri().path().as_bytes()).decode_utf8() {
@@ -176,7 +176,7 @@ impl RequestWrapper {
                         .map(|xfwd| RemoteIpAddr::Proxied(*xfwd.client()))
                 });
         }
-        self.remote_addr.map(RemoteIpAddr::Direct)
+        Some(RemoteIpAddr::Direct(self.remote_addr))
     }
 
     pub fn headers(&self) -> &hyper::HeaderMap {
@@ -287,7 +287,7 @@ impl<T> ServiceFactory<T> {
 
     pub fn create(
         &self,
-        remote_addr: Option<SocketAddr>,
+        remote_addr: SocketAddr,
         is_ssl: bool,
     ) -> impl Future<Output = Result<FileSendService<T>, Infallible>> {
         future::ok(FileSendService {
@@ -309,7 +309,7 @@ pub struct FileSendService<T> {
     pub search: Search<String>,
     pub transcoding: TranscodingDetails,
     pub collections: Arc<Collections>,
-    pub remote_addr: Option<SocketAddr>,
+    pub remote_addr: SocketAddr,
     pub is_ssl: bool,
 }
 
@@ -418,7 +418,7 @@ impl<C: 'static> FileSendService<C> {
         let req = match RequestWrapper::new(
             req,
             get_config().url_path_prefix.as_deref(),
-            self.remote_addr.map(|a| a.ip()),
+            self.remote_addr.ip(),
             self.is_ssl,
         ) {
             Ok(r) => r,

@@ -24,6 +24,8 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+use crate::tls::TlsStream;
+
 mod config;
 mod error;
 mod services;
@@ -158,7 +160,7 @@ fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> tokio:
                     let server = HttpServer::bind(&addr).serve(make_service_fn(
                         move |conn: &hyper::server::conn::AddrStream| {
                             let remote_addr = conn.remote_addr();
-                            svc_factory.create(Some(remote_addr), false)
+                            svc_factory.create(remote_addr, false)
                         },
                     ));
                     info!("Server listening on {}{}", &addr, get_url_path!());
@@ -167,17 +169,12 @@ fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> tokio:
                 Some(ssl) => {
                     #[cfg(feature = "tls")]
                     {
-                        use tokio::net::TcpStream;
-                        use tokio_native_tls::TlsStream;
                         info!("Server listening on {}{} with TLS", &addr, get_url_path!());
                         let create_server = async move {
-                            let incoming = tls::tls_acceptor(&addr, ssl)
-                                .await
-                                .context("TLS handshake")?;
+                            let incoming = tls::tls_acceptor(addr, ssl)?;
                             let server = HttpServer::builder(incoming)
-                                .serve(make_service_fn(move |conn: &TlsStream<TcpStream>| {
-                                    let remote_addr =
-                                        conn.get_ref().get_ref().get_ref().peer_addr().ok();
+                                .serve(make_service_fn(move |conn: &TlsStream| {
+                                    let remote_addr = conn.remote_addr();
                                     svc_factory.create(remote_addr, true)
                                 }))
                                 .await;

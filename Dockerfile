@@ -24,9 +24,7 @@ RUN if [[ -n "$CARGO_RELEASE" ]]; then CARGO_RELEASE="--$CARGO_RELEASE"; fi && \
 RUN mkdir /ssl &&\
     cd /ssl &&\
     openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out certificate.pem \
-        -subj "/C=CZ/ST=Prague/L=Prague/O=Ivan/CN=audioserve" &&\
-    openssl pkcs12 -inkey key.pem -in certificate.pem -export  -passout pass:mypass -out audioserve.p12 
-
+        -subj "/C=CZ/ST=Prague/L=Prague/O=Ivan/CN=audioserve"
 
 FROM node:16-alpine as client
 
@@ -59,7 +57,7 @@ ARG CARGO_RELEASE
 VOLUME /audiobooks
 COPY --from=build /audioserve/target/${CARGO_RELEASE:-debug}/audioserve /audioserve/audioserve
 COPY --from=client /audioserve_client/dist /audioserve/client/dist
-COPY --from=build /ssl/audioserve.p12 /audioserve/ssl/audioserve.p12
+COPY --from=build /ssl /audioserve/ssl
 
 RUN adduser -D -u 1000 audioserve &&\
     chown -R audioserve:audioserve /audioserve &&\

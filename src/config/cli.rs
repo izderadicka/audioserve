@@ -248,17 +248,22 @@ fn create_parser<'a>() -> Parser<'a> {
         parser = parser.arg(Arg::with_name("ssl-key")
             .long("ssl-key")
             .takes_value(true)
-            .requires("ssl-key-password")
+            .requires("ssl-cert")
             .validator_os(is_existing_file)
             .env("AUDIOSERVE_SSL_KEY")
-            .help("TLS/SSL private key and certificate in form of PKCS#12 key file, if provided, https is used")
+            .help("TLS/SSL private key in PEM format, https is used")
+            )
+            .arg(Arg::with_name("ssl-cert")
+            .long("ssl-cert")
+            .requires("ssl-key")
+            .validator_os(is_existing_file)
+            .env("AUDIOSERVE_SSL_CERT")
             )
             .arg(Arg::with_name("ssl-key-password")
                 .long("ssl-key-password")
                 .takes_value(true)
-                .requires("ssl-key")
                 .env("AUDIOSERVE_SSL_KEY_PASSWORD")
-                .help("Password for TLS/SSL private key")
+                .help("Deprecated - for PEM key password is not needed, so it should not be encrypted - default from rustls")
             );
     }
 
@@ -579,10 +584,11 @@ where
     {
         if let Some(key) = args.value_of("ssl-key") {
             let key_file = key.into();
-            let key_password = args.value_of("ssl-key-password").unwrap().into();
+            let cert_file = args.value_of("ssl-cert").unwrap().into();
             config.ssl = Some(SslConfig {
                 key_file,
-                key_password,
+                cert_file,
+                key_password: "".into(),
             });
         }
     }

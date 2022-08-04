@@ -317,7 +317,8 @@ impl ChaptersSize {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SslConfig {
     pub key_file: PathBuf,
-    pub key_password: String,
+    pub cert_file: PathBuf,
+    pub key_password: String, // TODO: kept for now for config arguments compatibility
 }
 
 impl SslConfig {

@@ -400,7 +400,7 @@ mod tests {
             .body(b)
             .unwrap();
 
-        RequestWrapper::new(req, None, None, false).unwrap()
+        RequestWrapper::new(req, None,[192,168,1,2].into(), false).unwrap()
     }
 
     fn build_authenticated_request(token: &str) -> RequestWrapper {
@@ -411,7 +411,7 @@ mod tests {
             .body(Body::from("Hey"))
             .unwrap();
 
-        RequestWrapper::new(req, None, None, false).unwrap()
+        RequestWrapper::new(req, None, [192,168,1,2].into(), false).unwrap()
     }
 
     fn shared_secret(sec: &str) -> String {

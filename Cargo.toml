@@ -1,6 +1,6 @@
 [package]
 name = "audioserve"
-version = "0.19.0"
+version = "0.20.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2018"
 
@@ -37,8 +37,10 @@ csv = "1.1"
 linked-hash-map = {git="https://github.com/izderadicka/linked-hash-map.git", version="0.5.3", features=["serde_impl"]}
 
 # for tls
-tokio-native-tls = {version="0.3", optional=true}
-native-tls = {version="0.2", optional=true}
+rustls ={version="0.20", optional=true}
+tokio-rustls = { version="0.23", optional=true, default-features = false}
+futures-util = { version = "0.3", default-features = false, optional=true }
+rustls-pemfile = { version = "1", optional=true}
 
 leaky-cauldron = {path="crates/leaky-cauldron"}
 tokio-util = {version="0.6", optional=true, features=["codec"]}
@@ -60,7 +62,7 @@ nix = "0.23"
 [features]
 default = ["tls", "symlinks", "folder-download", "shared-positions", "behind-proxy"]
 # default
-tls=["tokio-native-tls", "native-tls"]
+tls=["rustls", "tokio-rustls", "futures-util", "rustls-pemfile"]
 symlinks=["collection/symlinks"]
 
 folder-download = ["async-tar", "async-zip"]

@@ -1,112 +1,176 @@
-use crate::error::{Context, Error};
-use futures::{channel::mpsc, SinkExt};
-use hyper::server::accept::{from_stream, Accept};
-use native_tls::Identity;
-use std::io;
+use anyhow::Context as _;
+use core::task::{Context, Poll};
+use futures_util::ready;
+use hyper::server::accept::Accept;
+use hyper::server::conn::{AddrIncoming, AddrStream};
+use std::future::Future;
+use std::net::SocketAddr;
 use std::path::Path;
-use tokio::{
-    fs::File,
-    io::AsyncReadExt,
-    net::{TcpListener, TcpStream},
-};
-use tokio_native_tls::{TlsAcceptor, TlsStream};
+use std::pin::Pin;
+use std::sync::Arc;
+use std::vec::Vec;
+use std::{fs, io, sync};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio_rustls::rustls::ServerConfig;
 
-async fn load_private_key<P>(file: P, pass: &str) -> Result<Identity, Error>
-where
-    P: AsRef<Path>,
-{
-    let mut bytes = vec![];
-    let mut f = File::open(&file)
-        .await
-        .with_context(|| format!("cannot open private key file {:?}", file.as_ref()))?;
-    f.read_to_end(&mut bytes)
-        .await
-        .context("cannot read private key file")?;
-    let key = Identity::from_pkcs12(&bytes, pass).context("invalid private key")?;
-    Ok(key)
+use crate::config::SslConfig;
+
+pub fn tls_acceptor(addr: SocketAddr, ssl_config: &SslConfig) -> anyhow::Result<TlsAcceptor> {
+    // Build TLS configuration.
+    let tls_cfg = {
+        // Load public certificate.
+        let certs = load_certs("examples/sample.pem")?;
+        // Load private key.
+        let key = load_private_key(&ssl_config.key_file)?;
+        // Do not use client certificate authentication.
+        let mut cfg = rustls::ServerConfig::builder()
+            .with_safe_defaults()
+            .with_no_client_auth()
+            .with_single_cert(certs, key)?;
+        // Configure ALPN to accept HTTP/2, HTTP/1.1 in that order.
+        cfg.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
+        sync::Arc::new(cfg)
+    };
+
+    // Create a TCP listener via tokio.
+    let incoming = AddrIncoming::bind(&addr)?;
+    Ok(TlsAcceptor::new(tls_cfg, incoming))
 }
 
-pub(crate) async fn tls_acceptor(
-    addr: &std::net::SocketAddr,
-    ssl: &crate::config::SslConfig,
-) -> Result<impl Accept<Conn = TlsStream<TcpStream>, Error = io::Error>, Error> {
-    let private_key = load_private_key(&ssl.key_file, &ssl.key_password).await?;
-    let tls_cx = native_tls::TlsAcceptor::builder(private_key)
-        .build()
-        .context("cannot build native TLS acceptor")?;
-    let tls_cx = TlsAcceptor::from(tls_cx);
-    let listener = TcpListener::bind(addr)
-        .await
-        .with_context(|| format!("cannot bind address {}", addr))?;
+enum State {
+    Handshaking(tokio_rustls::Accept<AddrStream>),
+    Streaming(tokio_rustls::server::TlsStream<AddrStream>),
+}
 
-    let (sender, stream) = mpsc::channel(32);
+// tokio_rustls::server::TlsStream doesn't expose constructor methods,
+// so we have to TlsAcceptor::accept and handshake to have access to it
+// TlsStream implements AsyncRead/AsyncWrite handshaking tokio_rustls::Accept first
+pub struct TlsStream {
+    state: State,
+    remote_addr: SocketAddr,
+}
 
-    tokio::spawn(async move {
-        loop {
-            let s = listener.accept().await;
-            match s {
-                Ok((s, addr)) => {
-                    debug!("Accepted connection from {}", addr);
-                    let acceptor = tls_cx.clone();
-                    let mut res_sender = sender.clone();
-                    tokio::spawn(async move {
-                        let conn = acceptor.accept(s).await;
-                        match conn {
-                            Ok(conn) => {
-                                if let Err(e) = res_sender.send(Ok(conn)).await {
-                                    error!("internal channel send error: {}", e)
-                                };
-                            }
-                            Err(e) => {
-                                error!("Error when accepting TLS connection {}", e);
-                            }
-                        }
-                    });
-                }
-                Err(e) => {
-                    error!("Error accepting connection: {}", e);
-                }
-            }
+impl TlsStream {
+    fn new(stream: AddrStream, config: Arc<ServerConfig>) -> TlsStream {
+        let remote_addr = stream.remote_addr();
+        let accept = tokio_rustls::TlsAcceptor::from(config).accept(stream);
+        TlsStream {
+            state: State::Handshaking(accept),
+            remote_addr,
         }
-    });
-    Ok(from_stream(stream))
+    }
+
+    pub fn remote_addr(&self) -> SocketAddr {
+        self.remote_addr
+    }
 }
 
-// pub(crate) struct IncommingAcceptor {
-//     acceptor: TlsAcceptor,
-//     listener: TcpListener,
-//     handshake_pending: Vec<>,
-//     connected: Vec<TlsStream<TcpStream>>
-// }
+impl AsyncRead for TlsStream {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context,
+        buf: &mut ReadBuf,
+    ) -> Poll<io::Result<()>> {
+        let pin = self.get_mut();
+        match pin.state {
+            State::Handshaking(ref mut accept) => match ready!(Pin::new(accept).poll(cx)) {
+                Ok(mut stream) => {
+                    let result = Pin::new(&mut stream).poll_read(cx, buf);
+                    pin.state = State::Streaming(stream);
+                    result
+                }
+                Err(err) => Poll::Ready(Err(err)),
+            },
+            State::Streaming(ref mut stream) => Pin::new(stream).poll_read(cx, buf),
+        }
+    }
+}
 
-// impl IncommingAcceptor {
-//     pub(crate) async fn new(addr: &std::net::SocketAddr, ssl: &crate::config::SslConfig) -> Result<IncommingAcceptor, Error> {
-//         let private_key = load_private_key(&ssl.key_file, &ssl.key_password)?;
-//     let tls_cx = native_tls::TlsAcceptor::builder(private_key)
-//         .build()
-//         .context("cannot build native TLS acceptor")?;
-//     let tls_cx = TlsAcceptor::from(tls_cx);
-//     let listener = TcpListener::bind(addr)
-//         .await
-//         .with_context(|| format!("cannot bind address {}", addr))?;
+impl AsyncWrite for TlsStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let pin = self.get_mut();
+        match pin.state {
+            State::Handshaking(ref mut accept) => match ready!(Pin::new(accept).poll(cx)) {
+                Ok(mut stream) => {
+                    let result = Pin::new(&mut stream).poll_write(cx, buf);
+                    pin.state = State::Streaming(stream);
+                    result
+                }
+                Err(err) => Poll::Ready(Err(err)),
+            },
+            State::Streaming(ref mut stream) => Pin::new(stream).poll_write(cx, buf),
+        }
+    }
 
-//     }
-// }
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.state {
+            State::Handshaking(_) => Poll::Ready(Ok(())),
+            State::Streaming(ref mut stream) => Pin::new(stream).poll_flush(cx),
+        }
+    }
 
-// impl  Accept for IncommingAcceptor {
-//     type Conn = TlsStream<TcpStream>;
-//     type Error = io::Error;
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.state {
+            State::Handshaking(_) => Poll::Ready(Ok(())),
+            State::Streaming(ref mut stream) => Pin::new(stream).poll_shutdown(cx),
+        }
+    }
+}
 
-//     fn poll_accept(
-//         self: Pin<&mut Self>,
-//         cx: &mut Context<'_>,
-//     ) -> Poll<Option<Result<Self::Conn, Self::Error>>> {
-//         let pin = self.get_mut();
-//         match ready!(Pin::new(&mut pin.incoming).poll_accept(cx)) {
-//             Some(Ok(sock)) => {
-//                 unimplemented!()}//Poll::Ready(Some(Ok(TlsStream::new(sock, pin.config.clone())))),
-//             Some(Err(e)) => Poll::Ready(Some(Err(e))),
-//             None => Poll::Ready(None),
-//         }
-//     }
-// }
+pub struct TlsAcceptor {
+    config: Arc<ServerConfig>,
+    incoming: AddrIncoming,
+}
+
+impl TlsAcceptor {
+    pub fn new(config: Arc<ServerConfig>, incoming: AddrIncoming) -> TlsAcceptor {
+        TlsAcceptor { config, incoming }
+    }
+}
+
+impl Accept for TlsAcceptor {
+    type Conn = TlsStream;
+    type Error = io::Error;
+
+    fn poll_accept(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Self::Conn, Self::Error>>> {
+        let pin = self.get_mut();
+        match ready!(Pin::new(&mut pin.incoming).poll_accept(cx)) {
+            Some(Ok(sock)) => Poll::Ready(Some(Ok(TlsStream::new(sock, pin.config.clone())))),
+            Some(Err(e)) => Poll::Ready(Some(Err(e))),
+            None => Poll::Ready(None),
+        }
+    }
+}
+
+// Load public certificate from file.
+fn load_certs(filename: impl AsRef<Path>) -> anyhow::Result<Vec<rustls::Certificate>> {
+    // Open certificate file.
+    let certfile = fs::File::open(filename).context("open certificate file")?;
+    let mut reader = io::BufReader::new(certfile);
+
+    // Load and return certificate.
+    let certs = rustls_pemfile::certs(&mut reader).context("read certificates")?;
+    Ok(certs.into_iter().map(rustls::Certificate).collect())
+}
+
+// Load private key from file.
+fn load_private_key(filename: impl AsRef<Path>) -> anyhow::Result<rustls::PrivateKey> {
+    // Open keyfile.
+    let keyfile = fs::File::open(filename).context("open private key file")?;
+    let mut reader = io::BufReader::new(keyfile);
+
+    // Load and return a single private key.
+    let keys = rustls_pemfile::rsa_private_keys(&mut reader).context("read private keys")?;
+    if keys.len() != 1 {
+        anyhow::bail!("more then one pripave keys in file")
+    }
+
+    Ok(rustls::PrivateKey(keys[0].clone()))
+}
