@@ -19,7 +19,7 @@ pub fn tls_acceptor(addr: SocketAddr, ssl_config: &SslConfig) -> anyhow::Result<
     // Build TLS configuration.
     let tls_cfg = {
         // Load public certificate.
-        let certs = load_certs("examples/sample.pem")?;
+        let certs = load_certs(&ssl_config.cert_file)?;
         // Load private key.
         let key = load_private_key(&ssl_config.key_file)?;
         // Do not use client certificate authentication.
@@ -157,6 +157,10 @@ fn load_certs(filename: impl AsRef<Path>) -> anyhow::Result<Vec<rustls::Certific
 
     // Load and return certificate.
     let certs = rustls_pemfile::certs(&mut reader).context("read certificates")?;
+    assert!(
+        !certs.is_empty(),
+        "there must be at least 1 certificate in file"
+    );
     Ok(certs.into_iter().map(rustls::Certificate).collect())
 }
 
@@ -167,10 +171,16 @@ fn load_private_key(filename: impl AsRef<Path>) -> anyhow::Result<rustls::Privat
     let mut reader = io::BufReader::new(keyfile);
 
     // Load and return a single private key.
-    let keys = rustls_pemfile::rsa_private_keys(&mut reader).context("read private keys")?;
-    if keys.len() != 1 {
-        anyhow::bail!("more then one pripave keys in file")
+    match rustls_pemfile::read_one(&mut reader).context("read private keys")? {
+        Some(r) => match r {
+            rustls_pemfile::Item::X509Certificate(_) => {
+                anyhow::bail!("looks like file contains certificates")
+            }
+            rustls_pemfile::Item::RSAKey(data) => Ok(rustls::PrivateKey(data)),
+            rustls_pemfile::Item::PKCS8Key(data) => Ok(rustls::PrivateKey(data)),
+            rustls_pemfile::Item::ECKey(_) => anyhow::bail!("EC keys are not supported"),
+            _ => anyhow::bail!("unknown PEM item"),
+        },
+        None => anyhow::bail!("there is no private key in file"),
     }
-
-    Ok(rustls::PrivateKey(keys[0].clone()))
 }

@@ -850,8 +850,8 @@ mod test {
             "--no-authentication",
             "--ssl-key",
             "test_data/desc.txt",
-            "--ssl-key-password",
-            "neco",
+            "--ssl-cert",
+            "test_data/desc.txt",
             "test_data",
         ])
         .unwrap();
@@ -859,7 +859,7 @@ mod test {
         assert!(c.ssl.is_some());
         let ssl = c.ssl.unwrap();
         assert_eq!(PathBuf::from("test_data/desc.txt"), ssl.key_file);
-        assert_eq!("neco", ssl.key_password);
+        assert_eq!(PathBuf::from("test_data/desc.txt"), ssl.cert_file);
     }
 
     #[test]
@@ -879,7 +879,10 @@ mod test {
         let c =
             parse_args_from(&["audioserve", "--config", "test_data/sample-config.yaml"]).unwrap();
 
-        assert_eq!("neco", c.ssl.as_ref().unwrap().key_password);
+        assert_eq!(
+            Path::new("test_data/desc.txt"),
+            c.ssl.as_ref().unwrap().key_file
+        );
         assert_eq!(Some("asecret".into()), c.shared_secret);
         assert_eq!(Some("/user/audioserve".into()), c.url_path_prefix);
         assert!(matches!(c.cors.unwrap().inner, Cors::AllowAllOrigins));

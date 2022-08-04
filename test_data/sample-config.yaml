@@ -43,7 +43,7 @@ client_dir: test_data
 cors: {}
 ssl:
   key_file: test_data/desc.txt
-  key_password: neco
+  cert_file: test_data/desc.txt
 allow_symlinks: true
 search_cache: true
 disable_folder_download: false

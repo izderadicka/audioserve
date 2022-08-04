@@ -318,6 +318,7 @@ impl ChaptersSize {
 pub struct SslConfig {
     pub key_file: PathBuf,
     pub cert_file: PathBuf,
+    #[serde(default)]
     pub key_password: String, // TODO: kept for now for config arguments compatibility
 }
 
