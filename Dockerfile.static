@@ -1,4 +1,4 @@
-FROM alpine:3.14 AS build
+FROM alpine:3.15 AS build
 MAINTAINER Ivan <ivan@zderadicka.eu>
 ENV CARGO_ARGS=""
 ENV FEATURES=""
