@@ -9,8 +9,8 @@ ARG CARGO_ARGS
 ARG CARGO_RELEASE
 
 RUN apk update &&\
-    apk add git bash openssl openssl-dev curl yasm build-base \
-    wget libbz2 bzip2-dev  zlib zlib-dev rust cargo ffmpeg-dev ffmpeg \
+    apk add git bash curl yasm build-base \
+    wget libbz2 bzip2-dev zlib zlib-dev rust cargo ffmpeg-dev ffmpeg \
     clang clang-dev gawk ctags llvm-dev icu icu-libs icu-dev
 
 COPY . /audioserve 
@@ -20,11 +20,6 @@ RUN if [[ -n "$CARGO_RELEASE" ]]; then CARGO_RELEASE="--$CARGO_RELEASE"; fi && \
     echo BUILDING: cargo build ${CARGO_RELEASE} ${CARGO_ARGS} && \
     cargo build ${CARGO_RELEASE} ${CARGO_ARGS} &&\
     cargo test ${CARGO_RELEASE} --all ${CARGO_ARGS}
-
-RUN mkdir /ssl &&\
-    cd /ssl &&\
-    openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out certificate.pem \
-        -subj "/C=CZ/ST=Prague/L=Prague/O=Ivan/CN=audioserve"
 
 FROM node:16-alpine as client
 
@@ -61,7 +56,7 @@ COPY --from=build /ssl /audioserve/ssl
 
 RUN adduser -D -u 1000 audioserve &&\
     chown -R audioserve:audioserve /audioserve &&\
-    apk --no-cache add libssl1.1 libbz2 zlib ffmpeg && \
+    apk --no-cache add libbz2 zlib ffmpeg && \
     if [[ "$CARGO_ARGS" =~ "collation" ]]; then apk --no-cache add icu-libs; fi
 
 WORKDIR /audioserve

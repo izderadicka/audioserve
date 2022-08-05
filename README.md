@@ -436,7 +436,7 @@ Now audioserve depends on ffmpeg's libavformat 4.3/4.4 (and its dependent libavu
 Install required dependencies (some dependencies are optional, depending on features chosen in build):
 
     # Ubuntu 20.04 - for other distros look for equivalent packages
-    sudo apt-get install -y  git openssl libssl-dev pkg-config \
+    sudo apt-get install -y  git pkg-config \
         ffmpeg yasm build-essential curl wget libbz2-dev zlib1g-dev libavformat-dev \
         clang coreutils exuberant-ctags gawk  libclang-dev llvm-dev strace libicu-dev
 
@@ -447,7 +447,7 @@ Clone repo with:
 
 To install locally you need recent [Rust](https://www.rust-lang.org/en-US/install.html) and [NodeJS](https://nodejs.org/en/download/package-manager/) installed.
 
-Compile Rust code (it has optional system dependencies to openssl,zlib, bz2lib, and libavformat, as might not have exactly correct version of libavformat around, it's better to build required version statically into binary with `partially-static` feature, because otherwise you might see problems like segfaults):
+Compile Rust code (it has optional system dependencies to zlib, bz2lib, and libavformat, as might not have exactly correct version of libavformat around, it's better to build required version statically into binary with `partially-static` feature, because otherwise you might see problems like segfaults):
 
     cargo build --release --features partially-static
 
@@ -483,7 +483,7 @@ To add non-default features (like `transcoding-cache`) compile with this option 
 
 | Feature                       | Description                                                                                                                        | Default | Program options                                                                                                  |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | :-----: | ---------------------------------------------------------------------------------------------------------------- |
-| tls                           | Enables TLS support (e.g https) (requires openssl and libssl-dev)                                                                  |   Yes   | --ssl-key --ssl-key-password to define server key                                                                |
+| tls                           | Enables TLS support (e.g https)                                                                                                    |   Yes   | --ssl-key --ssl-cert to define server key and certificate                                                        |
 | symlinks                      | Enables to use symbolic links in media folders                                                                                     |   Yes   | Use --allow-symlinks to follow symbolic links                                                                    |
 | folder-download               | Enables API endpoint to download content of a folder in tar archive                                                                |   Yes   | Can be disabled with argument --disable-folder-download                                                          |
 | shared-positions              | Clients can share recent playback positions via simple websocket API                                                               |   Yes   |
