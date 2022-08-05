@@ -329,7 +329,7 @@ All audioserve parameters can be also provided in configuration file via `--conf
 
 ## Web client
 
-Finally I think **new web client**  is ready for prime time, so I'll become default - it resides in it's [own project](https://github.com/izderadicka/audioserve-web) and it's integrated into Docker image build, so it's part of the image (TBD for stable image and static release). New web client uses latest and greatest web technologies and it's intended to replace Android client (can be installed as PWA app). However if you do not like new client for any reason (please let me know what's wrong with new client), you can still use old client (residing in this repo, it's just HTML5 and javascript, so less demanding, but also code is bit clumsy), which will be around for some time. You can easily enable in Docker build with `OLD_CLIENT` build argument, or just build separately with npm and direct do resulting `dist` directory with `--client-dir` argument.
+Finally I think **new web client**  is ready for prime time, so I'll become default - it resides in it's [own project](https://github.com/izderadicka/audioserve-web) and it's integrated into Docker image build, so it's part of the image (TBD for stable image). New web client uses latest and greatest web technologies and it's intended to replace Android client (can be installed as PWA app). However if you do not like new client for any reason (please let me know what's wrong with new client), you can still use old client (residing in this repo, it's just HTML5 and javascript, so less demanding, but also code is bit clumsy), which will be around for some time. You can easily enable in Docker build with `OLD_CLIENT` build argument, or just build separately with npm and direct do resulting `dist` directory with `--client-dir` argument.
 
 
 I'm testing web clients on recent Firefox and Chrome/Chromium (on Linux and Android platforms, occasionally on Win and Edge, assuming that Edge is now basically Chrome, so it should work). For Apple platforms, new client should work for Safari after some additional configuration - check [this chapter](#alternative-transcodings-and-transcoding-configuration-for-apple-users).
@@ -426,7 +426,8 @@ services:
 
 ### Static build (Linux)
 
-Static build of audioserve is available (for recent releases) at [github releases page](https://github.com/izderadicka/audioserve/releases). You can can just download and extract it locally and run on any modern x86_64 linux.
+Static build of audioserve is available (for recent releases) at [github releases page](https://github.com/izderadicka/audioserve/releases). You can can just download and extract it locally and run on any modern x86_64 linux, but it does not contain the web client - you need to get [latest release](https://github.com/izderadicka/audioserve-web/releases/latest).
+
 You can also create your own static build with script `build_static.sh` (Docker is required for this)
 
 ### Local build (Linux)
