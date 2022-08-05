@@ -1,12 +1,7 @@
 use std::{env, process::Command};
 
 fn main() {
-    #[cfg(feature = "static")]
-    {
-        println!("cargo:rustc-link-lib=static=ssl");
-        println!("cargo:rustc-link-lib=static=crypto");
-    }
-
+    
     println!(
         "cargo:rustc-env=AUDIOSERVE_LONG_VERSION={}",
         get_long_version()
