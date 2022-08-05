@@ -1,7 +1,6 @@
 use std::{env, process::Command};
 
 fn main() {
-    
     println!(
         "cargo:rustc-env=AUDIOSERVE_LONG_VERSION={}",
         get_long_version()
