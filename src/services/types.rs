@@ -1,7 +1,7 @@
 use super::transcode::{QualityLevel, TranscodingFormat};
 use crate::config::get_config;
-
 use collection::{AudioFile, AudioFolderShort};
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct CollectionsInfo {

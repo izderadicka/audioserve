@@ -4,6 +4,7 @@ use crate::error::{bail, Context, Error};
 use collection::audio_meta::TimeStamp;
 use collection::{Collections, Position};
 use futures::future;
+use serde::Serialize;
 use std::str::FromStr;
 use std::sync::Arc;
 use websock::{self as ws, spawn_websocket};

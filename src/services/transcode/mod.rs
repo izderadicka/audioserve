@@ -5,6 +5,7 @@ use crate::error::{bail, Result};
 use collection::TimeSpan;
 use futures::prelude::*;
 use mime::Mime;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fmt::Debug;

@@ -1,10 +1,9 @@
 use std::process::exit;
 
-use collection::tags::{ALLOWED_TAGS, BASIC_TAGS};
-
 use super::validators::*;
 use super::*;
 use clap::{crate_authors, crate_name, App, Arg};
+use collection::tags::{ALLOWED_TAGS, BASIC_TAGS};
 
 type Parser<'a> = App<'a, 'a>;
 
