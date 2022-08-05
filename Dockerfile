@@ -52,7 +52,6 @@ ARG CARGO_RELEASE
 VOLUME /audiobooks
 COPY --from=build /audioserve/target/${CARGO_RELEASE:-debug}/audioserve /audioserve/audioserve
 COPY --from=client /audioserve_client/dist /audioserve/client/dist
-COPY --from=build /ssl /audioserve/ssl
 
 RUN adduser -D -u 1000 audioserve &&\
     chown -R audioserve:audioserve /audioserve &&\
