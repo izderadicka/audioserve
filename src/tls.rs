@@ -164,23 +164,22 @@ fn load_certs(filename: impl AsRef<Path>) -> anyhow::Result<Vec<rustls::Certific
     Ok(certs.into_iter().map(rustls::Certificate).collect())
 }
 
-// Load private key from file.
-fn load_private_key(filename: impl AsRef<Path>) -> anyhow::Result<rustls::PrivateKey> {
+// Loads first private key from file.
+fn load_private_key(filename: impl AsRef<Path>+std::fmt::Debug) -> anyhow::Result<rustls::PrivateKey> {
     // Open keyfile.
-    let keyfile = fs::File::open(filename).context("open private key file")?;
+    let keyfile = fs::File::open(filename.as_ref()).context("open private key file")?;
     let mut reader = io::BufReader::new(keyfile);
 
     // Load and return a single private key.
-    match rustls_pemfile::read_one(&mut reader).context("read private keys")? {
-        Some(r) => match r {
-            rustls_pemfile::Item::X509Certificate(_) => {
-                anyhow::bail!("looks like file contains certificates")
-            }
-            rustls_pemfile::Item::RSAKey(data) => Ok(rustls::PrivateKey(data)),
-            rustls_pemfile::Item::PKCS8Key(data) => Ok(rustls::PrivateKey(data)),
+    while let Some(r)  = rustls_pemfile::read_one(&mut reader).context("read private keys")? {
+        match r {
+            rustls_pemfile::Item::X509Certificate(_) => (), //just ignore them
+            rustls_pemfile::Item::RSAKey(data) => return Ok(rustls::PrivateKey(data)),
+            rustls_pemfile::Item::PKCS8Key(data) => return Ok(rustls::PrivateKey(data)),
             rustls_pemfile::Item::ECKey(_) => anyhow::bail!("EC keys are not supported"),
             _ => anyhow::bail!("unknown PEM item"),
-        },
-        None => anyhow::bail!("there is no private key in file"),
+        }
+        
     }
+    anyhow::bail!("there is no private key in file {:?}", filename);
 }

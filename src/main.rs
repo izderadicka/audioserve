@@ -11,6 +11,7 @@ use error::{bail, Context, Error};
 use futures::prelude::*;
 use hyper::{service::make_service_fn, Server as HttpServer};
 use ring::rand::{SecureRandom, SystemRandom};
+use tokio::sync::oneshot;
 use services::{
     auth::SharedSecretAuthenticator, search::Search, ServiceFactory, TranscodingDetails,
 };
@@ -134,7 +135,7 @@ fn restore_positions<P: AsRef<Path>>(backup_file: collection::BackupFile<P>) -> 
     .map_err(Error::new)
 }
 
-fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> tokio::runtime::Runtime {
+fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> (tokio::runtime::Runtime, oneshot::Receiver<()>) {
     let cfg = get_config();
 
     let addr = cfg.listen;
@@ -205,8 +206,14 @@ fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> tokio:
         .build()
         .unwrap();
 
-    rt.spawn(start_server.map_err(|e| error!("Http Server Error: {}", e)));
-    rt
+    let (term_sender,term_receiver) = oneshot::channel();
+    rt.spawn(start_server.map_err(|e| error!("Http Server Error: {}", e))
+    .then(move |_| {
+        term_sender.send(()).ok();
+        futures::future::ready(())
+    }
+    ));
+    (rt, term_receiver)
 }
 
 #[cfg(not(unix))]
@@ -216,7 +223,7 @@ async fn terminate_server() {
 }
 
 #[cfg(unix)]
-async fn terminate_server() {
+async fn terminate_server(term_receiver: oneshot::Receiver<()>) {
     use tokio::signal::unix::{signal, SignalKind};
     let mut sigint = signal(SignalKind::interrupt()).expect("Cannot create SIGINT handler");
     let mut sigterm = signal(SignalKind::terminate()).expect("Cannot create SIGTERM handler");
@@ -226,6 +233,7 @@ async fn terminate_server() {
         _ = sigint.recv() => {info!("Terminated on SIGINT")},
         _ = sigterm.recv() => {info!("Terminated on SIGTERM")},
         _ = sigquit.recv() => {info!("Terminated on SIGQUIT")}
+        _ = term_receiver => {warn!("Terminated because HTTP server finished unexpectedly")}
     )
 }
 
@@ -352,7 +360,7 @@ fn main() -> anyhow::Result<()> {
 
     let collections = create_collections()?;
 
-    let runtime = start_server(server_secret, collections.clone());
+    let (runtime, term_receiver) = start_server(server_secret, collections.clone());
 
     #[cfg(unix)]
     {
@@ -361,7 +369,7 @@ fn main() -> anyhow::Result<()> {
         runtime.spawn(watch_for_positions_backup_signal(collections.clone()));
     }
 
-    runtime.block_on(terminate_server());
+    runtime.block_on(terminate_server(term_receiver));
 
     //graceful shutdown of server will wait till transcoding ends, so rather shut it down hard
     runtime.shutdown_timeout(std::time::Duration::from_millis(300));
