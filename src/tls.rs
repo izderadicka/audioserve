@@ -165,13 +165,15 @@ fn load_certs(filename: impl AsRef<Path>) -> anyhow::Result<Vec<rustls::Certific
 }
 
 // Loads first private key from file.
-fn load_private_key(filename: impl AsRef<Path>+std::fmt::Debug) -> anyhow::Result<rustls::PrivateKey> {
+fn load_private_key(
+    filename: impl AsRef<Path> + std::fmt::Debug,
+) -> anyhow::Result<rustls::PrivateKey> {
     // Open keyfile.
     let keyfile = fs::File::open(filename.as_ref()).context("open private key file")?;
     let mut reader = io::BufReader::new(keyfile);
 
     // Load and return a single private key.
-    while let Some(r)  = rustls_pemfile::read_one(&mut reader).context("read private keys")? {
+    while let Some(r) = rustls_pemfile::read_one(&mut reader).context("read private keys")? {
         match r {
             rustls_pemfile::Item::X509Certificate(_) => (), //just ignore them
             rustls_pemfile::Item::RSAKey(data) => return Ok(rustls::PrivateKey(data)),
@@ -179,7 +181,6 @@ fn load_private_key(filename: impl AsRef<Path>+std::fmt::Debug) -> anyhow::Resul
             rustls_pemfile::Item::ECKey(_) => anyhow::bail!("EC keys are not supported"),
             _ => anyhow::bail!("unknown PEM item"),
         }
-        
     }
     anyhow::bail!("there is no private key in file {:?}", filename);
 }

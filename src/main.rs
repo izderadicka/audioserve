@@ -11,7 +11,6 @@ use error::{bail, Context, Error};
 use futures::prelude::*;
 use hyper::{service::make_service_fn, Server as HttpServer};
 use ring::rand::{SecureRandom, SystemRandom};
-use tokio::sync::oneshot;
 use services::{
     auth::SharedSecretAuthenticator, search::Search, ServiceFactory, TranscodingDetails,
 };
@@ -24,6 +23,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use tokio::sync::oneshot;
 
 use crate::tls::TlsStream;
 
@@ -135,7 +135,10 @@ fn restore_positions<P: AsRef<Path>>(backup_file: collection::BackupFile<P>) -> 
     .map_err(Error::new)
 }
 
-fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> (tokio::runtime::Runtime, oneshot::Receiver<()>) {
+fn start_server(
+    server_secret: Vec<u8>,
+    collections: Arc<Collections>,
+) -> (tokio::runtime::Runtime, oneshot::Receiver<()>) {
     let cfg = get_config();
 
     let addr = cfg.listen;
@@ -206,13 +209,15 @@ fn start_server(server_secret: Vec<u8>, collections: Arc<Collections>) -> (tokio
         .build()
         .unwrap();
 
-    let (term_sender,term_receiver) = oneshot::channel();
-    rt.spawn(start_server.map_err(|e| error!("Http Server Error: {}", e))
-    .then(move |_| {
-        term_sender.send(()).ok();
-        futures::future::ready(())
-    }
-    ));
+    let (term_sender, term_receiver) = oneshot::channel();
+    rt.spawn(
+        start_server
+            .map_err(|e| error!("Http Server Error: {}", e))
+            .then(move |_| {
+                term_sender.send(()).ok();
+                futures::future::ready(())
+            }),
+    );
     (rt, term_receiver)
 }
 
