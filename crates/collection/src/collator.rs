@@ -6,7 +6,7 @@ pub(crate) trait Collate<T = Self> {
     fn collate(&self, other: &T) -> Ordering;
 }
 
-#[cfg(not(feature = "collation"))]
+#[cfg(not(any(feature = "collation", feature="collation-static")))]
 pub(crate) mod standard {
     use super::*;
 
@@ -23,7 +23,7 @@ pub(crate) mod standard {
     }
 }
 
-#[cfg(feature = "collation")]
+#[cfg(any(feature = "collation", feature="collation-static"))]
 pub(crate) mod locale {
     use super::*;
     use lazy_static::lazy_static;
