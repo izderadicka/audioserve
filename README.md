@@ -5,7 +5,7 @@
 
 [ [**DEMO AVAILABLE** - shared secret: mypass] ](https://audioserve.zderadicka.eu)
 
-**New web client is coming - it'll be now default for master branch and soon it'll be also in stable image release. New client is in  [separate project](https://github.com/izderadicka/audioserve-web)**
+**[New web client](https://github.com/izderadicka/audioserve-web) is now default. If you do not like it let me know (old client is available, but you'll need to enable it yourself, [see](#web-client)**
 
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalist design.
 
@@ -329,8 +329,9 @@ All audioserve parameters can be also provided in configuration file via `--conf
 
 ## Web client
 
-Finally I think **new web client**  is ready for prime time, so I'll become default - it resides in it's [own project](https://github.com/izderadicka/audioserve-web) and it's integrated into Docker image build, so it's part of the image (TBD for stable image). New web client uses latest and greatest web technologies and it's intended to replace Android client (can be installed as PWA app). However if you do not like new client for any reason (please let me know what's wrong with new client), you can still use old client (residing in this repo, it's just HTML5 and javascript, so less demanding, but also code is bit clumsy), which will be around for some time. You can easily enable in Docker build with `OLD_CLIENT` build argument, or just build separately with npm and direct do resulting `dist` directory with `--client-dir` argument.
+Finally I think **new web client**  is ready for prime time, so it's default client - it resides in it's [own project](https://github.com/izderadicka/audioserve-web) and it's integrated into Docker image build, so it's part of the image. New web client uses latest and greatest web technologies and it's intended to replace Android client (can be installed as PWA app). 
 
+However if you do not like new client for any reason (please let me know what's wrong with new client), you can still use old client (residing still in this repo, it's just HTML5 and javascript, so less demanding, but also code is bit clumsy), which will be around for some time. You can easily enable in Docker build with `OLD_CLIENT` build argument, or just build it separately with npm and direct use resulting `dist` directory with `--client-dir` argument.
 
 I'm testing web clients on recent Firefox and Chrome/Chromium (on Linux and Android platforms, occasionally on Win and Edge, assuming that Edge is now basically Chrome, so it should work). For Apple platforms, new client should work for Safari after some additional configuration - check [this chapter](#alternative-transcodings-and-transcoding-configuration-for-apple-users).
 
@@ -352,11 +353,11 @@ audioserve server provides very simple API, [defined in OAS 3](https://validator
 
 Easiest way how to test audioserve (but do not use `--no-authentication` in production) is to run it as docker container with prebuild [Docker image](https://cloud.docker.com/u/izderadicka/repository/docker/izderadicka/audioserve) (from Docker Hub). To quickly test audioserve run:
 
-    docker run -d --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve --no-authentication /audiobooks
+    RUST_LOG=info docker run --rm -it --name audioserve -p 3000:3000 -v /path/to/your/audiobooks:/audiobooks  izderadicka/audioserve --no-authentication /audiobooks
 
-Then open <http://localhost:3000> - and browse your collection. This is indeed the very minimal configuration of audioserve and **should not be used in production**. For real deployment you'd like provide provide more command line arguments (or environment variables or your custom config file) and it's **essential** to map persistent volume or bind writable host directory to audioserve data-dir (defaulted to /home/audioserve/.audioserve or can be set via `--data-dir` argument) - see more complex example below.
+You should see some basic audioserve log. Then open <http://localhost:3000> - and browse your collection. This is indeed the very minimal configuration of audioserve and **should not be used in production**. For real deployment you'd like provide provide more command line arguments (or environment variables or your custom config file) and it's **essential** to map persistent volume or bind writable host directory to audioserve data-dir (defaulted to /home/audioserve/.audioserve or can be set via `--data-dir` argument) - see more complex example below.
 
-There is also `izderadicka/audioserve:unstable` image, which is automatically built overnight from current master branch (so it contains latest features, but may have some issues). And of course you can build your own image very easily with provided `Dockerfile`, just run:
+There is also `izderadicka/audioserve:unstable` image, which is automatically built overnight (if code changes) from current master branch (so it contains latest features, but may have some issues). And of course you can build your own image very easily with provided `Dockerfile`, just run:
 
     docker build --tag audioserve .
 
