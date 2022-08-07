@@ -5,7 +5,7 @@
 
 [ [**DEMO AVAILABLE** - shared secret: mypass] ](https://audioserve.zderadicka.eu)
 
-**[New web client](https://github.com/izderadicka/audioserve-web) is now default. If you do not like it let me know (old client is available, but you'll need to enable it yourself, [see](#web-client))**
+**[New web client](https://github.com/izderadicka/audioserve-web) is now default. If you do not like it let me know (old client is available, but you'll need to enable it yourself, [see below](#web-client))**
 
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalist design.
 
