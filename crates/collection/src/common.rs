@@ -259,6 +259,8 @@ pub(crate) trait CollectionTrait {
     where
         P: AsRef<Path>;
 
+    fn get_folder_cover_path(&self, dir_path: impl AsRef<Path>) -> Result<Option<PathBuf>>;
+
     fn flush(&self) -> Result<()>;
 
     fn search<S: AsRef<str>>(&self, q: S, group: Option<String>) -> Vec<AudioFolderShort>;

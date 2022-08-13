@@ -1,6 +1,6 @@
 //#[cfg(feature = "folder-download")]
 use super::{
-    resp,
+    resp::{self, not_found},
     search::{Search, SearchTrait},
     transcode::{guess_format, AudioFilePath, ChosenTranscoding, QualityLevel, Transcoder},
     types::*,
@@ -406,6 +406,23 @@ pub fn get_folder(
             })
             .map_err(Error::new),
     )
+}
+
+pub fn send_folder_icon(
+    collection: usize,
+    folder_path: PathBuf,
+    collections: Arc<collection::Collections>,
+) -> ResponseFuture {
+   Box::pin(async move {
+        match collections.get_folder_cover_path_async(collection, folder_path).await {
+            Ok(Some(p)) => todo!(),
+            Ok(None) => Ok(not_found()),
+            Err(e) => {
+                error!("error while getting folder icon: {}", e);
+                Ok(not_found())
+            }
+        }
+   })
 }
 
 #[cfg(feature = "folder-download")]

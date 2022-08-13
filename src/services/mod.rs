@@ -2,7 +2,7 @@ use self::auth::{AuthResult, Authenticator};
 use self::search::Search;
 use self::subs::{
     collections_list, get_folder, recent, search, send_file, send_file_simple, transcodings_list,
-    ResponseFuture,
+    ResponseFuture, send_folder_icon,
 };
 use self::transcode::QualityLevel;
 use crate::config::get_config;
@@ -46,6 +46,7 @@ pub mod resp;
 pub mod search;
 mod subs;
 pub mod transcode;
+pub mod icon;
 mod types;
 
 type Counter = Arc<AtomicUsize>;
@@ -610,6 +611,12 @@ impl<C: 'static> FileSendService<C> {
                             base_dir,
                             get_subpath(path, "/cover"),
                             get_config().folder_file_cache_age,
+                        )
+                    } else if path.starts_with("/icon/") {
+                        send_folder_icon(
+                            colllection_index,
+                            get_subpath(path, "/icon/"),
+                            collections,
                         )
                     } else if path.starts_with("/desc/") {
                         send_file_simple(

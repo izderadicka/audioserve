@@ -124,6 +124,14 @@ impl Collections {
             .list_dir(dir_path, ordering, group)
     }
 
+    pub fn get_folder_cover_path(
+        &self,
+        collection: usize,
+        dir_path: impl AsRef<Path>,
+    ) -> Result<Option<PathBuf>> {
+        self.get_cache(collection)?.get_folder_cover_path(dir_path)
+    }
+
     pub fn flush(&self) -> Result<()> {
         let mut result = vec![];
         for c in &self.caches {
@@ -468,6 +476,17 @@ impl Collections {
                 folder_finished,
                 None,
             )
+        })
+        .unwrap_or_else(|e| Err(Error::from(e)))
+    }
+
+    pub async fn get_folder_cover_path_async<P>(
+        self: Arc<Self>,
+        collection: usize,
+        dir_path: P,
+    ) -> Result<Option<PathBuf>> where P: AsRef<Path> + Send + 'static {
+        spawn_blocking!({
+            self.get_folder_cover_path(collection, dir_path)
         })
         .unwrap_or_else(|e| Err(Error::from(e)))
     }

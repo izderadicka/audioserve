@@ -339,6 +339,11 @@ impl CollectionTrait for CollectionCache {
             })
     }
 
+    fn get_folder_cover_path(&self, dir_path: impl AsRef<Path>) -> Result<Option<PathBuf>> {
+        Ok(self.get(dir_path).and_then(|af| af.cover).map(|f| f.path))
+        // TODO: Rescaning folder if not cached?
+    }
+
     fn flush(&self) -> Result<()> {
         self.inner.flush()
     }
