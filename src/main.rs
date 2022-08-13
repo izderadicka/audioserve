@@ -410,6 +410,12 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    if !get_config().icons.cache_disabled {
+        if let Err(e) = crate::services::icon::cache::get_cache().save_index() {
+            error!("Error saving icons cache index {}", e);
+        }
+    }
+
     info!("Server finished");
 
     Ok(())

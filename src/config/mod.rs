@@ -43,6 +43,69 @@ fn base_data_dir() -> &'static PathBuf {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct IconsConfig {
+    pub cache_dir: PathBuf,
+    pub cache_max_size: u32,
+    pub cache_max_files: u32,
+    pub cache_disabled: bool,
+    pub size: u32,
+    pub cache_save_often: bool,
+    pub fast_scaling: bool,
+}
+
+impl Default for IconsConfig {
+    fn default() -> Self {
+        let data_base_dir = base_data_dir();
+        let cache_dir = data_base_dir.join("icons-cache");
+        IconsConfig {
+            cache_dir,
+            cache_max_size: 100,
+            cache_max_files: 1024,
+            cache_disabled: false,
+            cache_save_often: false,
+            size: 128,
+            fast_scaling: false,
+        }
+    }
+}
+
+impl IconsConfig {
+    //TODO delete
+    // pub fn new_for_name(name: impl AsRef<str>) -> Self {
+    //     let mut me = Self::default();
+    //     me.root_dir = me.root_dir.join(name.as_ref());
+    //     me
+    // }
+
+    pub fn check(&self) -> Result<()> {
+        if !util::parent_dir_exists(&self.cache_dir) {
+            return value_error!(
+                "icons.cache_root_dir",
+                "Parent directory does not exists for {:?}",
+                self.cache_dir
+            );
+        };
+
+        if self.cache_max_size < 10 {
+            return value_error!(
+                "max_size",
+                "Icons cache small then 10 MB does not make sense"
+            );
+        }
+
+        if self.cache_max_files < 100 {
+            return value_error!(
+                "max_size",
+                "Icons cache with less the 100 files does not make sense"
+            );
+        }
+
+        Ok(())
+    }
+}
+
 #[cfg(feature = "transcoding-cache")]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
@@ -460,6 +523,7 @@ pub struct Config {
     pub collapse_cd_folders: Option<CollapseCDFolderConfig>,
     #[cfg(feature = "tags-encoding")]
     pub tags_encoding: Option<String>,
+    pub icons: IconsConfig,
 }
 
 impl Config {
@@ -565,6 +629,7 @@ impl Config {
         }
 
         self.transcoding.check()?;
+        self.icons.check()?;
         self.thread_pool.check()?;
         self.chapters.check()?;
         #[cfg(feature = "shared-positions")]
@@ -672,6 +737,7 @@ impl Default for Config {
             collapse_cd_folders: None,
             #[cfg(feature = "tags-encoding")]
             tags_encoding: None,
+            icons: IconsConfig::default(),
         }
     }
 }

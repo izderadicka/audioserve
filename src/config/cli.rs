@@ -226,6 +226,51 @@ fn create_parser<'a>() -> Parser<'a> {
             .requires("collapse-cd-folders")
             .env("AUDIOSERVE_CD_FOLDER_REGEX")
             .help("Regular expression to recognize CD subfolder, if want to use other then default")
+        )
+        .arg(
+            Arg::with_name("icons-cache-dir")
+            .long("icons-cache-dir")
+            .takes_value(true)
+            .env("AUDIOSERVE_ICONS_CACHE_DIR")
+            .validator_os(parent_dir_exists)
+            .help("Directory for icons cache [default is ~/.audioserve/icons-cache]")
+        ).arg(
+            Arg::with_name("icons-cache-size")
+            .long("icons-cache-size")
+            .takes_value(true)
+            .env("AUDIOSERVE_ICONS_CACHE_SIZE")
+            .validator(is_number)
+            .help("Max size of icons cache in MBi, when reached LRU items are deleted, [default is 100]")
+        ).arg(
+            Arg::with_name("icons-cache-max-files")
+            .long("icons-cache-max-files")
+            .takes_value(true)
+            .env("AUDIOSERVE_ICONS_CACHE_MAX_FILES")
+            .validator(is_number)
+            .help("Max number of files in icons cache, when reached LRU items are deleted, [default is 1024]")
+        ).arg(
+            Arg::with_name("icons-cache-disable")
+            .long("icons-cache-disable")
+            .conflicts_with_all(&["icons-cache-save-often", "icons-cache-max-files", "icons-cache-size", "icons-cache-dir"])
+            .help("Icons cache is disabled.")
+            )
+        .arg(
+            Arg::with_name("icons-cache-save-often")
+            .long("icons-cache-save-often")
+            .help("Save additions to icons cache often, after each addition, this is normally not necessary")
+        )
+        .arg(
+            Arg::with_name("icons-size")
+            .long("icons-size")
+            .takes_value(true)
+            .env("AUDIOSERVE_ICONS_SIZE")
+            .validator(is_number)
+            .help("Size of folder icon, [default is 1128]")
+        )
+        .arg(
+            Arg::with_name("icons-fast-scaling")
+            .long("icons-fast-scaling")
+            .help("Use faster image scaling (linear triangle), by default slower, but better method (Lanczos3)")
         );
 
     if cfg!(feature = "behind-proxy") {
@@ -571,6 +616,37 @@ where
 
     if let Some(age) = args.value_of("folder-file-cache-age") {
         config.folder_file_cache_age = parse_cache_age(age)?;
+    }
+
+    if let Some(n) = args.value_of("icons-size") {
+        config.icons.size = n.parse().unwrap()
+    }
+
+    if let Some(d) = args.value_of_os("icons-cache-dir") {
+        config.icons.cache_dir = d.into()
+    }
+
+    if let Some(n) = args.value_of("icons-cache-size") {
+        config.icons.cache_max_size = n.parse().unwrap()
+    }
+
+    if let Some(n) = args.value_of("t-cache-max-files") {
+        config.icons.cache_max_files = n.parse().unwrap()
+    }
+
+    if is_present_or_env("icons-cache-disable", "AUDIOSERVE_ICONS_CACHE_DISABLE") {
+        config.icons.cache_disabled = true;
+    }
+
+    if is_present_or_env("icons-fast-scaling", "AUDIOSERVE_ICONS_FAST_SCALING") {
+        config.icons.fast_scaling = true;
+    }
+
+    if is_present_or_env(
+        "icons-cache-save-often",
+        "AUDIOSERVE_ICONS_CACHE_SAVE_OFTEN",
+    ) {
+        config.icons.cache_save_often = true;
     }
 
     if cfg!(feature = "symlinks")
