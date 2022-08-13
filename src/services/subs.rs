@@ -413,8 +413,11 @@ pub fn send_folder_icon(
     folder_path: PathBuf,
     collections: Arc<collection::Collections>,
 ) -> ResponseFuture {
-   Box::pin(async move {
-        match collections.get_folder_cover_path_async(collection, folder_path).await {
+    Box::pin(async move {
+        match collections
+            .get_folder_cover_path_async(collection, folder_path)
+            .await
+        {
             Ok(Some(p)) => todo!(),
             Ok(None) => Ok(not_found()),
             Err(e) => {
@@ -422,7 +425,7 @@ pub fn send_folder_icon(
                 Ok(not_found())
             }
         }
-   })
+    })
 }
 
 #[cfg(feature = "folder-download")]

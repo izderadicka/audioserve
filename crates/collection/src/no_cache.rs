@@ -45,9 +45,14 @@ impl CollectionTrait for CollectionDirect {
     }
 
     fn get_folder_cover_path(&self, dir_path: impl AsRef<Path>) -> Result<Option<PathBuf>> {
-        self.lister.list_dir(&self.base_dir, dir_path, crate::FoldersOrdering::Alphabetical)
-        .map(|af| af.cover.map(|f| f.path))
-        .map_err(Error::from)
+        self.lister
+            .list_dir(
+                &self.base_dir,
+                dir_path,
+                crate::FoldersOrdering::Alphabetical,
+            )
+            .map(|af| af.cover.map(|f| f.path))
+            .map_err(Error::from)
         // TODO: This is quite ineffective to list whole folder
     }
 

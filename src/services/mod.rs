@@ -1,8 +1,8 @@
 use self::auth::{AuthResult, Authenticator};
 use self::search::Search;
 use self::subs::{
-    collections_list, get_folder, recent, search, send_file, send_file_simple, transcodings_list,
-    ResponseFuture, send_folder_icon,
+    collections_list, get_folder, recent, search, send_file, send_file_simple, send_folder_icon,
+    transcodings_list, ResponseFuture,
 };
 use self::transcode::QualityLevel;
 use crate::config::get_config;
@@ -40,13 +40,13 @@ use std::{
 use url::form_urlencoded;
 
 pub mod auth;
+pub mod icon;
 #[cfg(feature = "shared-positions")]
 pub mod position;
 pub mod resp;
 pub mod search;
 mod subs;
 pub mod transcode;
-pub mod icon;
 mod types;
 
 type Counter = Arc<AtomicUsize>;

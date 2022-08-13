@@ -484,11 +484,12 @@ impl Collections {
         self: Arc<Self>,
         collection: usize,
         dir_path: P,
-    ) -> Result<Option<PathBuf>> where P: AsRef<Path> + Send + 'static {
-        spawn_blocking!({
-            self.get_folder_cover_path(collection, dir_path)
-        })
-        .unwrap_or_else(|e| Err(Error::from(e)))
+    ) -> Result<Option<PathBuf>>
+    where
+        P: AsRef<Path> + Send + 'static,
+    {
+        spawn_blocking!({ self.get_folder_cover_path(collection, dir_path) })
+            .unwrap_or_else(|e| Err(Error::from(e)))
     }
 
     pub async fn insert_position_if_newer_async<S, P>(
