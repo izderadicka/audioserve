@@ -135,6 +135,32 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
+          $ref: "#/components/responses/NotFound"
+
+  # Icon endpoint
+  /{col_id}/icon/{path}:
+    get:
+      tags:
+        - "Collections"
+      description: | 
+        Returns folder icon (icon is scaled down normalize cover image) 
+        for indicated path `path` (if cover exists).
+        Path is folder path.
+      parameters:
+        - $ref: "#/components/parameters/CollectionId"
+        - $ref: "#/components/parameters/Path"
+          
+      responses:
+        '200':
+          description: Success - returns image binary - png
+          content:
+            "image/png":
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
           $ref: "#/components/responses/NotFound"    
       
   /{col_id}/desc/{path}:
