@@ -129,7 +129,9 @@ impl Collections {
         collection: usize,
         dir_path: impl AsRef<Path>,
     ) -> Result<Option<PathBuf>> {
-        self.get_cache(collection)?.get_folder_cover_path(dir_path)
+        let col = self.get_cache(collection)?;
+        col.get_folder_cover_path(dir_path)
+            .map(|p| p.map(|p| col.base_dir().join(&p)))
     }
 
     pub fn flush(&self) -> Result<()> {
