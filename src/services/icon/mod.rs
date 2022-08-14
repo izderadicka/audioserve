@@ -12,6 +12,8 @@ use crate::{config::get_config, util::ResponseBuilderExt};
 
 use self::cache::{cache_icon, cached_icon};
 
+use super::subs::add_cache_headers;
+
 pub mod cache;
 
 pub fn icon_response(path: impl AsRef<Path>) -> Result<Response<Body>> {
@@ -36,17 +38,19 @@ pub fn icon_response(path: impl AsRef<Path>) -> Result<Response<Body>> {
         }
     };
 
-    Response::builder()
+    let mut builder = Response::builder()
         .status(200)
         .typed_header(ContentLength(data.len() as u64))
-        .typed_header(ContentType::png())
-        .body(data.into())
-        .map_err(anyhow::Error::from)
+        .typed_header(ContentType::png());
+
+    builder = add_cache_headers(builder, get_config().folder_file_cache_age, None);
+
+    builder.body(data.into()).map_err(anyhow::Error::from)
 }
 
 pub fn scale_cover(path: impl AsRef<Path>) -> Result<Vec<u8>> {
     use image::imageops::FilterType;
-    let img = ImageReader::open(path)?.decode()?;
+    let img = ImageReader::open(&path)?.with_guessed_format()?.decode()?;
     let sz = get_config().icons.size;
     let scaled = img.resize(
         sz,

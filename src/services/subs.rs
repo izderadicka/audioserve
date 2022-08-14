@@ -16,7 +16,7 @@ use collection::{guess_mime_type, parse_chapter_path, FoldersOrdering, TimeSpan}
 use futures::prelude::*;
 use futures::{future, ready, Stream};
 use headers::{AcceptRanges, CacheControl, ContentLength, ContentRange, ContentType, LastModified};
-use hyper::{Body, Response as HyperResponse, StatusCode};
+use hyper::{http::response::Builder, Body, Response as HyperResponse, StatusCode};
 use std::{
     collections::Bound,
     ffi::OsStr,
@@ -25,6 +25,7 @@ use std::{
     pin::Pin,
     sync::{atomic::Ordering, Arc},
     task::{Context, Poll},
+    time::SystemTime,
 };
 use tokio::{
     io::{AsyncRead, AsyncSeekExt, ReadBuf},
@@ -265,19 +266,11 @@ impl<T: AsyncRead> ChunkStream<T> {
     }
 }
 
-async fn serve_opened_file(
-    mut file: tokio::fs::File,
-    range: Option<ByteRange>,
+pub fn add_cache_headers(
+    mut resp: Builder,
     caching: Option<u32>,
-    mime: mime::Mime,
-) -> Result<Response, io::Error> {
-    let meta = file.metadata().await?;
-    let file_len = meta.len();
-    if file_len == 0 {
-        warn!("File has zero size ")
-    }
-    let last_modified = meta.modified().ok();
-    let mut resp = HyperResponse::builder().typed_header(ContentType::from(mime));
+    last_modified: Option<SystemTime>,
+) -> Builder {
     if let Some(age) = caching {
         if age > 0 {
             let cache = CacheControl::new()
@@ -291,6 +284,24 @@ async fn serve_opened_file(
     } else {
         resp = resp.typed_header(CacheControl::new().with_no_store());
     }
+
+    resp
+}
+
+async fn serve_opened_file(
+    mut file: tokio::fs::File,
+    range: Option<ByteRange>,
+    caching: Option<u32>,
+    mime: mime::Mime,
+) -> Result<Response, io::Error> {
+    let meta = file.metadata().await?;
+    let file_len = meta.len();
+    if file_len == 0 {
+        warn!("File has zero size ")
+    }
+    let last_modified = meta.modified().ok();
+    let mut resp = HyperResponse::builder().typed_header(ContentType::from(mime));
+    resp = add_cache_headers(resp, caching, last_modified);
 
     let (start, end) = match range {
         Some(range) => match to_satisfiable_range(range, file_len) {
