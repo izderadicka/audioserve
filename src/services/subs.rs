@@ -1,7 +1,7 @@
 //#[cfg(feature = "folder-download")]
 use super::{
     icon::icon_response,
-    resp::{self, not_found},
+    resp::{self, not_found, not_found_cached},
     search::{Search, SearchTrait},
     transcode::{guess_format, AudioFilePath, ChosenTranscoding, QualityLevel, Transcoder},
     types::*,
@@ -428,7 +428,7 @@ pub fn send_folder_icon(
     let r = blocking(
         move || match collections.get_folder_cover_path(collection, folder_path) {
             Ok(Some(p)) => icon_response(p),
-            Ok(None) => Ok(not_found()),
+            Ok(None) => Ok(not_found_cached(get_config().folder_file_cache_age)),
             Err(e) => {
                 error!("error while getting folder icon: {}", e);
                 Ok(not_found())

@@ -2,7 +2,7 @@ use futures::future;
 use headers::{ContentLength, ContentType};
 use hyper::{Body, Response, StatusCode};
 
-use super::ResponseFuture;
+use super::{subs::add_cache_headers, ResponseFuture};
 use crate::util::ResponseBuilderExt;
 
 const NOT_FOUND_MESSAGE: &str = "Not Found";
@@ -21,6 +21,17 @@ fn short_response(status: StatusCode, msg: &'static str) -> Response<Body> {
         .typed_header(ContentType::text())
         .body(msg.into())
         .unwrap()
+}
+
+pub fn not_found_cached(caching: Option<u32>) -> Response<Body> {
+    let mut builder = Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .typed_header(ContentLength(NOT_FOUND_MESSAGE.len() as u64))
+        .typed_header(ContentType::text());
+
+    builder = add_cache_headers(builder, caching, None);
+
+    builder.body(NOT_FOUND_MESSAGE.into()).unwrap()
 }
 
 #[inline]
