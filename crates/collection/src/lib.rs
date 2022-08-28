@@ -17,7 +17,7 @@ use serde_json::{Map, Value};
 use std::sync::Arc;
 use std::{
     collections::HashMap,
-    fs::File,
+    fs::{File, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
     thread::JoinHandle,
@@ -49,19 +49,23 @@ fn check_version<P: AsRef<Path>>(db_dir: P) -> Result<()> {
     let version_file = db_dir.join(".version");
     if version_file.exists() {
         let mut col_db_version = String::new();
-        File::open(version_file)?.read_to_string(&mut col_db_version)?;
+        File::open(&version_file)?.read_to_string(&mut col_db_version)?;
         if col_db_version != VERSION {
             warn!(
                 "Your collection cache {:?} is version {}, which is different from current {}, \
-            if experiencing problems delete it and restore positions from backup",
-                db_dir, col_db_version, VERSION
+            if experiencing problems force full reload, in worst case delete it and restore positions from backup. \
+            You can delete {:?}, if everything is OK, and warning will disapear till next version change",
+                db_dir, col_db_version, VERSION, version_file
             );
         }
     } else {
         if !db_dir.exists() {
             std::fs::create_dir_all(db_dir)?
         }
-        let mut f = File::create(version_file)?;
+        let mut f = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(version_file)?;
         f.write_all(VERSION.as_bytes())?;
     }
 
