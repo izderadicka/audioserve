@@ -606,7 +606,7 @@ where
         } else {
             age.parse::<u32>()
                 .or_else(|_| arg_error!("*-resource-cache-age", "Invalid value"))
-                .map(|n| Some(n))
+                .map(Some)
         }
     };
 
@@ -824,7 +824,7 @@ Preferred tags are:
 
 fn print_tags(list: &[&str]) {
     list.chunks(8).for_each(|c| {
-        let row = c.iter().copied().collect::<Vec<_>>().join(", ");
+        let row = c.to_vec().join(", ");
         println!("{},", row)
     })
 }

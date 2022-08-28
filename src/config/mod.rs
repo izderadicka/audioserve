@@ -236,7 +236,7 @@ impl TranscodingConfig {
         }
 
         if let Some(alt_configs) = self.alt_configs.as_ref() {
-            for (re, _alt) in alt_configs {
+            for re in alt_configs.keys() {
                 regex::Regex::new(re)
                     .map(|_re| ())
                     .or_else(|e| value_error!("alt_encodings", "Invalid User Agent regex {}", e))?
@@ -249,7 +249,7 @@ impl TranscodingConfig {
 
     pub fn prepare(&mut self) -> Result<()> {
         if let Some(alt_configs) = self.alt_configs.take() {
-            if alt_configs.len() > 0 {
+            if !alt_configs.is_empty() {
                 self.alt_configs_inner = Some(
                     alt_configs
                         .into_iter()

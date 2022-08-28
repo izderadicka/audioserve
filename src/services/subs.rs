@@ -648,7 +648,7 @@ pub fn all_positions(
 
 pub fn transcodings_list(user_agent: Option<&str>) -> ResponseFuture {
     let transcodings = user_agent
-        .map(|ua| Transcodings::for_user_agent(ua))
+        .map(Transcodings::for_user_agent)
         .unwrap_or_default();
     Box::pin(future::ok(json_response(&transcodings)))
 }

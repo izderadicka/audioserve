@@ -65,6 +65,7 @@ pub type DirRef<'a> = NodeRef<'a, DirEntry>;
 pub struct SearchItem<'a>(DirRef<'a>);
 
 impl<'a> SearchItem<'a> {
+    #[allow(clippy::needless_collect)]
     pub fn path(&self) -> PathBuf {
         let segments: Vec<_> = self
             .0
@@ -123,7 +124,7 @@ impl<'a> Iterator for SearchResult<'a> {
             } else if let Some(mut parent) = self.current_node.parent() {
                 self.matched_terms_stack.pop().unwrap();
                 trace!("Pop {:?}", self.matched_terms_stack.last().unwrap());
-                while let None = parent.next_sibling() {
+                while parent.next_sibling().is_none() {
                     parent = match parent.parent() {
                         Some(p) => {
                             self.matched_terms_stack.pop().unwrap();

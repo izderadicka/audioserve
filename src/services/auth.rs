@@ -83,7 +83,7 @@ fn deny(req: &RequestWrapper) -> Result<AuthResult<()>> {
                 "{}=; Expires={}; {}",
                 COOKIE_NAME,
                 COOKIE_DELETE_DATE,
-                cookie_params(&req)
+                cookie_params(req)
             ))
             .unwrap(),
         ); // unwrap is safe as we control
@@ -291,7 +291,7 @@ impl Token {
         rng.fill(&mut random)
             .expect("Cannot generate random number");
         let validity: u64 = now() + u64::from(token_validity_hours) * 3600;
-        let validity: [u8; 8] = unsafe { ::std::mem::transmute(validity.to_be()) };
+        let validity: [u8; 8] = validity.to_be_bytes();
         let to_sign = prepare_data(&random, validity);
         let key = hmac::Key::new(hmac::HMAC_SHA256, secret);
         let sig = hmac::sign(&key, &to_sign);
