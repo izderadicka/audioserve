@@ -186,7 +186,7 @@ pub struct TranscodingConfig {
 impl Default for TranscodingConfig {
     fn default() -> Self {
         TranscodingConfig {
-            max_parallel_processes: (2 * num_cpus::get()),
+            max_parallel_processes: (2 * num_cpus::get()).max(4),
             max_runtime_hours: 24,
             #[cfg(feature = "transcoding-cache")]
             cache: TranscodingCacheConfig::default(),
@@ -219,15 +219,15 @@ macro_rules! implement_get_transcoding {
 
 impl TranscodingConfig {
     pub fn check(&self) -> Result<()> {
-        if self.max_parallel_processes < 2 {
+        if self.max_parallel_processes < 4 {
             return value_error!(
                 "max_parallel_processes",
-                "With less then 2 transcoding processes audioserve will not work properly"
+                "With less then 4 transcoding processes audioserve will not work properly"
             );
-        } else if self.max_parallel_processes > 100 {
+        } else if self.max_parallel_processes > 200 {
             return value_error!(
                 "max_parallel_processes",
-                "As transcodings are resource intesive, having more then 100 is not wise"
+                "As transcodings are resource intesive, having more then 200 is not wise"
             );
         }
 
