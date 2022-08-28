@@ -86,9 +86,9 @@ impl OngoingUpdater {
     }
 
     fn send_actions(&mut self) {
-        if self.pending.len() > 0 {
+        if !self.pending.is_empty() {
             // TODO: Would replacing map with empty be more efficient then iterating?
-            let done = std::mem::replace(&mut self.pending, HashMap::new());
+            let done = std::mem::take(&mut self.pending);
             let mut ready = done.into_iter().collect::<Vec<_>>();
             ready.sort_unstable_by(|a, b| b.1.cmp(&a.1));
 

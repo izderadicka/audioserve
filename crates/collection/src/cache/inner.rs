@@ -384,7 +384,7 @@ impl CacheInner {
     pub(crate) fn update_subfolders<S: AsRef<str>>(
         &self,
         group: S,
-        subfolders: &mut Vec<AudioFolderShort>,
+        subfolders: &mut [AudioFolderShort],
     ) {
         subfolders
             .iter_mut()
@@ -821,9 +821,9 @@ impl CacheInner {
                     FolderType::RegularDir
                 } else {
                     if self.lister.is_collapsable_folder(col_path) {
-                        return FolderType::CollapsedDir;
+                        FolderType::CollapsedDir
                     } else {
-                        return FolderType::NewDir;
+                        FolderType::NewDir
                     }
                 }
             }
@@ -865,10 +865,7 @@ enum FolderType {
 impl FolderType {
     fn is_dir(&self) -> bool {
         use FolderType::*;
-        match self {
-            RegularFile | Unknown | CollapsedDir => false,
-            _ => true,
-        }
+        !matches!(self, RegularFile | Unknown | CollapsedDir)
     }
 
     fn is_collapsed(&self) -> bool {

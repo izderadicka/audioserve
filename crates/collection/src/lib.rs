@@ -378,9 +378,7 @@ impl Collections {
                 continue;
             }
             for (col_path, pos) in m.into_iter() {
-                let (col_no, path) = col_path
-                    .split_once('/')
-                    .unwrap_or_else(|| (col_path.as_str(), ""));
+                let (col_no, path) = col_path.split_once('/').unwrap_or((col_path.as_str(), ""));
 
                 let col_no: usize = col_no.parse().map_err(|_| {
                     Error::JsonDataError(format!(

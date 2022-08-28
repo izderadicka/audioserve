@@ -56,7 +56,7 @@ impl PartialOrd for DirEntryTimed {
 }
 impl Ord for DirEntryTimed {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(&other).unwrap()
+        self.partial_cmp(other).unwrap()
     }
 }
 
