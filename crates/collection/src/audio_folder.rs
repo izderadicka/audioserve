@@ -314,7 +314,7 @@ impl FolderLister {
                             if will_collapse {
                                 is_collapsed = true;
                                 debug!("Can collapse CD subfolders on path {:?}", full_path);
-                                let folders = mem::replace(&mut subfolders, vec![]);
+                                let folders = mem::take(&mut subfolders);
                                 for fld in folders {
                                     if can_collapse(&fld) {
                                         let prefix: String = fld.name.into();
@@ -455,7 +455,7 @@ impl FolderLister {
     }
 }
 
-fn extract_folder_tags(files: &mut Vec<AudioFile>) -> Option<HashMap<String, String>> {
+fn extract_folder_tags(files: &mut [AudioFile]) -> Option<HashMap<String, String>> {
     let mut iter = (files).iter();
     let mut folder_tags = iter
         .next()?
@@ -744,9 +744,9 @@ pub fn list_dir_files_with_subdirs(
                         io::Error::new(io::ErrorKind::Other, "Invalid folder name - not UTF8")
                     })?;
 
-                return Ok(folder.to_string() + " " + name);
+                Ok(folder.to_string() + " " + name)
             } else {
-                return Ok(name.into());
+                Ok(name.into())
             }
         },
     )

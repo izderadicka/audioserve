@@ -2,7 +2,6 @@ use super::{error::Error, CacheInner};
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
-use tokio;
 use tokio::task::spawn_blocking;
 
 impl From<tokio::task::JoinError> for Error {
@@ -49,7 +48,7 @@ impl Cache {
                         tokio::fs::File::from_std(f),
                         Finisher {
                             cache: cache.clone(),
-                            key: key,
+                            key,
                             file: f2,
                         },
                     )
@@ -63,7 +62,7 @@ impl Cache {
         let inner = self.inner.clone();
         let r = spawn_blocking(move || {
             let mut c = inner.write().expect("Cannot lock cache");
-            c.get(key).map(|f| f.map(|f| tokio::fs::File::from_std(f)))
+            c.get(key).map(|f| f.map(tokio::fs::File::from_std))
         })
         .await?;
         invert(r)

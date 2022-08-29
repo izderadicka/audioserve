@@ -23,6 +23,8 @@ impl<P> Zipper<P>
 where
     P: AsRef<Path> + Send + Sync + 'static,
 {
+    #[allow(clippy::should_implement_trait)]
+    // need iter to be Send+'static so cannot use trait
     pub fn from_iter<I>(files: I) -> Self
     where
         I: Iterator<Item = (P, String)> + Send + 'static,

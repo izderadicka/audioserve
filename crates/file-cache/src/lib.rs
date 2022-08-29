@@ -156,7 +156,7 @@ fn gen_cache_key() -> String {
     BASE64URL_NOPAD.encode(&random)
 }
 
-fn entry_path_helper<P: AsRef<Path>>(root: &PathBuf, file_key: P) -> PathBuf {
+fn entry_path_helper<P: AsRef<Path>>(root: &Path, file_key: P) -> PathBuf {
     root.join(ENTRIES).join(file_key)
 }
 
@@ -444,14 +444,12 @@ impl CacheInner {
                 let file_keys_set = index.values().collect::<HashSet<&String>>();
                 let base_dir = self.root.join(ENTRIES);
                 if let Ok(dir_list) = fs::read_dir(&base_dir) {
-                    for f in dir_list {
-                        if let Ok(dir_entry) = f {
-                            if dir_entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
-                                if let Ok(file_name) = dir_entry.file_name().into_string() {
-                                    if !file_keys_set.contains(&file_name) {
-                                        fs::remove_file(dir_entry.path()).ok();
-                                        warn!("Removing file not in index {:?}", dir_entry.path());
-                                    }
+                    for dir_entry in dir_list.flatten() {
+                        if dir_entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+                            if let Ok(file_name) = dir_entry.file_name().into_string() {
+                                if !file_keys_set.contains(&file_name) {
+                                    fs::remove_file(dir_entry.path()).ok();
+                                    warn!("Removing file not in index {:?}", dir_entry.path());
                                 }
                             }
                         }

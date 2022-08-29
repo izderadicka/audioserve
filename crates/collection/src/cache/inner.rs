@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     ops::Deref,
     path::{Path, PathBuf},
     time::SystemTime,
@@ -238,7 +237,7 @@ impl CacheInner {
                                 .map_err(|e| error!("Db item deserialization error: {}", e))
                                 .ok()
                         })
-                        .unwrap_or_else(HashMap::new);
+                        .unwrap_or_default();
 
                     if let Some(ts) = ts {
                         if let Some(current_record) = folder_rec.get(group.as_ref()) {
@@ -262,12 +261,12 @@ impl CacheInner {
                         folder_finished: finished
                             || (file.eq(&last_file)
                                 && last_file_duration
-                                    .map(|d| d.checked_sub(position.round() as u32).unwrap_or(0))
+                                    .map(|d| d.saturating_sub(position.round() as u32))
                                     .map(|dif| dif < CacheInner::EOB_LIMIT)
                                     .unwrap_or(false)),
                         file: file.into(),
-                        timestamp: if use_ts && ts.is_some() {
-                            ts.unwrap()
+                        timestamp: if let (true, Some(ts)) = (use_ts, ts) {
+                            ts
                         } else {
                             TimeStamp::now()
                         },
@@ -819,12 +818,10 @@ impl CacheInner {
             Ok(DirType::Dir) => {
                 if self.has_key(col_path) {
                     FolderType::RegularDir
+                } else if self.lister.is_collapsable_folder(col_path) {
+                    FolderType::CollapsedDir
                 } else {
-                    if self.lister.is_collapsable_folder(col_path) {
-                        FolderType::CollapsedDir
-                    } else {
-                        FolderType::NewDir
-                    }
+                    FolderType::NewDir
                 }
             }
             Ok(DirType::File { .. }) => {
@@ -839,12 +836,10 @@ impl CacheInner {
                 if !matches!(e.kind(), std::io::ErrorKind::NotFound) {
                     error!("Error determining dir type: {}", e);
                     FolderType::Unknown
+                } else if self.has_key(col_path) {
+                    FolderType::DeletedDir
                 } else {
-                    if self.has_key(col_path) {
-                        FolderType::DeletedDir
-                    } else {
-                        FolderType::Unknown
-                    }
+                    FolderType::Unknown
                 }
             }
         }

@@ -36,7 +36,7 @@ pub fn cache_key<P: AsRef<Path>>(
 ) -> String {
     let mut key: String = quality.level.to_letter().into();
     if !quality.tag.is_empty() {
-        key.push_str(&quality.tag);
+        key.push_str(quality.tag);
     }
     key.push_str(&file.as_ref().to_string_lossy());
 

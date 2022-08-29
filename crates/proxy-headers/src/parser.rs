@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 use std::{borrow::Cow, str::Utf8Error, string::FromUtf8Error};
 
 use nom::{

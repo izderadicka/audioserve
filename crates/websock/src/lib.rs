@@ -9,7 +9,6 @@ use hyper::{Body, Request, Response, StatusCode};
 use std::io;
 use std::{fmt, time::Duration};
 use thiserror::Error;
-use tokio;
 use tokio_tungstenite::{
     tungstenite::{self, protocol},
     WebSocketStream,
