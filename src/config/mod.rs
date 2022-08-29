@@ -7,7 +7,6 @@ pub use self::error::{Error, Result};
 use super::services::transcode::{QualityLevel, TranscodingFormat};
 use crate::services::transcode::codecs::{Bandwidth, Opus};
 use crate::util;
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::env;

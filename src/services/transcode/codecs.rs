@@ -1,5 +1,3 @@
-use serde::{Deserialize, Serialize};
-
 use super::AudioCodec;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
