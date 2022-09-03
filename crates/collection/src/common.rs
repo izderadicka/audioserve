@@ -44,6 +44,7 @@ pub struct CollectionOptions {
 }
 
 impl PartialEq for CollectionOptions {
+    #[allow(clippy::let_and_return)]
     fn eq(&self, other: &Self) -> bool {
         let res = self.chapters_duration == other.chapters_duration
             && self.chapters_from_duration == other.chapters_from_duration

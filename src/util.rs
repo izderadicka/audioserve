@@ -6,9 +6,10 @@ use std::{
     path::Path,
 };
 
+/// exists or is current dir
 pub fn parent_dir_exists<P: AsRef<Path>>(p: &P) -> bool {
     match p.as_ref().parent() {
-        Some(parent) => !(!parent.as_os_str().is_empty() && !parent.is_dir()),
+        Some(parent) => parent.as_os_str().is_empty() || parent.is_dir(),
         None => true,
     }
 }

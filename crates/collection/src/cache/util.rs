@@ -9,7 +9,7 @@ pub fn update_path(
 ) -> std::result::Result<PathBuf, std::path::StripPrefixError> {
     let p = p.strip_prefix(from)?;
     //Unfortunatelly join adds traling slash if joined path is empty, which causes problem, so we need to handle this special case
-    if p.to_str().map(|s| s.is_empty()).unwrap_or(false) {
+    if p.as_os_str().is_empty() {
         return Ok(to.into());
     }
     Ok(to.join(p))
