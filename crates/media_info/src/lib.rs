@@ -2,6 +2,7 @@
 use encoding::{label::encoding_from_whatwg_label, DecoderTrap, EncodingRef};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
+use std::marker::PhantomData;
 use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
@@ -42,6 +43,11 @@ fn string_from_ptr_lossy(ptr: *const c_char) -> String {
     String::from_utf8_lossy(data).into()
 }
 
+fn norm_time(t: i64, time_base: ffi::AVRational) -> u64 {
+    assert!(t >= 0);
+    t as u64 * 1000 * time_base.num as u64 / time_base.den as u64
+}
+
 #[cfg(feature = "alternate-encoding")]
 fn string_from_ptr_lossy(ptr: *const c_char, alternate_encoding: Option<EncodingRef>) -> String {
     if ptr.is_null() {
@@ -63,7 +69,7 @@ struct Dictionary {
 }
 
 impl Dictionary {
-    fn new(dic: *mut ffi::AVDictionary) -> Self {
+    pub fn new(dic: *mut ffi::AVDictionary) -> Self {
         #[cfg(feature = "alternate-encoding")]
         return Dictionary {
             dic,
@@ -71,6 +77,13 @@ impl Dictionary {
         };
         #[cfg(not(feature = "alternate-encoding"))]
         return Dictionary { dic };
+    }
+
+    pub fn len(&self) -> usize {
+        if self.dic.is_null() {
+            return 0;
+        }
+        unsafe { ffi::av_dict_count(self.dic) as usize }
     }
 
     #[cfg(feature = "alternate-encoding")]
@@ -87,7 +100,7 @@ impl Dictionary {
         })
     }
 
-    fn get<S: AsRef<str>>(&self, key: S) -> Option<String> {
+    pub fn get<S: AsRef<str>>(&self, key: S) -> Option<String> {
         if self.dic.is_null() {
             return None;
         }
@@ -110,7 +123,7 @@ impl Dictionary {
         }
     }
 
-    fn get_all(&self) -> HashMap<String, String> {
+    pub fn get_all(&self) -> HashMap<String, String> {
         let empty = CString::new("").unwrap();
         let mut map = HashMap::new();
         let mut prev = ptr::null();
@@ -192,17 +205,10 @@ macro_rules! meta_methods {
 
 impl MediaFile {
     pub fn open<S: AsRef<str>>(fname: S) -> Result<Self> {
-        MediaFile::prepare_open(fname).map(|(ctx, m)| MediaFile {
-            ctx,
-            meta: Dictionary::new(m),
-        })
-    }
-
-    fn prepare_open(
-        fname: impl AsRef<str>,
-    ) -> Result<(*mut ffi::AVFormatContext, *mut ffi::AVDictionary)> {
+        let mut ctx;
+        let meta;
         unsafe {
-            let mut ctx = ffi::avformat_alloc_context();
+            ctx = ffi::avformat_alloc_context();
             assert!(ctx as usize > 0);
             //(*ctx).probesize = 5*1024*1024*1024;
             let name = CString::new(fname.as_ref()).unwrap();
@@ -215,23 +221,33 @@ impl MediaFile {
             let ret = ffi::avformat_find_stream_info(ctx, ptr::null_mut());
             check_ret(ret)?;
 
-            let mut m = (*ctx).metadata;
+            meta = Dictionary::new((*ctx).metadata);
+        }
 
-            if ffi::av_dict_count(m) == 0 && (*ctx).nb_streams > 0 {
-                //OK we do not have meta in main header, let's look at streams
+        let mut mf = MediaFile { ctx, meta };
 
-                let streams = slice::from_raw_parts((*ctx).streams, (*ctx).nb_streams as usize);
-
-                for s in streams {
-                    let codec_type = (*(**s).codecpar).codec_type;
-                    if codec_type == ffi::AVMediaType_AVMEDIA_TYPE_AUDIO {
-                        m = (**s).metadata;
-                        break;
-                    }
+        if mf.meta.len() == 0 && mf.streams_count() > 0 {
+            //OK we do not have meta in main header, let's look at streams
+            for idx in 0..mf.streams_count() {
+                let s = mf.stream(idx);
+                if matches!(s.kind(), StreamKind::AUDIO) {
+                    mf.meta = s.meta();
+                    break;
                 }
             }
+        }
+        Ok(mf)
+    }
 
-            Ok((ctx, m))
+    pub fn streams_count(&self) -> usize {
+        unsafe { (*self.ctx).nb_streams.try_into().unwrap_or_default() }
+    }
+
+    pub fn stream(&self, idx: usize) -> Stream {
+        let streams = unsafe { slice::from_raw_parts((*self.ctx).streams, self.streams_count()) };
+        Stream {
+            ctx: streams[idx],
+            _parent: PhantomData,
         }
     }
 
@@ -285,10 +301,6 @@ impl MediaFile {
     }
 
     pub fn chapters(&self) -> Option<Vec<Chapter>> {
-        fn norm_time(t: i64, time_base: ffi::AVRational) -> u64 {
-            assert!(t >= 0);
-            t as u64 * 1000 * time_base.num as u64 / time_base.den as u64
-        }
         unsafe {
             let num_chapters = (*self.ctx).nb_chapters as usize;
             if num_chapters == 0 {
@@ -324,6 +336,78 @@ impl Drop for MediaFile {
             ffi::avformat_close_input(&mut self.ctx);
         }
     }
+}
+
+pub struct Stream<'a> {
+    ctx: *mut ffi::AVStream,
+    _parent: PhantomData<&'a MediaFile>,
+}
+
+impl<'a> Stream<'a> {
+    pub fn kind(&self) -> StreamKind {
+        let codec_type = unsafe { (*(*self.ctx).codecpar).codec_type };
+        use StreamKind::*;
+        match codec_type {
+            ffi::AVMediaType_AVMEDIA_TYPE_VIDEO => VIDEO,
+            ffi::AVMediaType_AVMEDIA_TYPE_AUDIO => AUDIO,
+            ffi::AVMediaType_AVMEDIA_TYPE_DATA => DATA,
+            ffi::AVMediaType_AVMEDIA_TYPE_SUBTITLE => SUBTITLE,
+            ffi::AVMediaType_AVMEDIA_TYPE_ATTACHMENT => ATTACHMENT,
+            _ => UNKNOWN,
+        }
+    }
+
+    fn meta(&self) -> Dictionary {
+        Dictionary::new(unsafe { (*self.ctx).metadata })
+    }
+
+    pub fn duration(&self) -> u64 {
+        norm_time(
+            unsafe { *self.ctx }.duration,
+            unsafe { *self.ctx }.time_base,
+        )
+    }
+
+    pub fn frames_count(&self) -> u64 {
+        unsafe { *self.ctx }
+            .nb_frames
+            .try_into()
+            .unwrap_or_default()
+    }
+
+    pub fn id(&self) -> i32 {
+        unsafe { *self.ctx }.id
+    }
+
+    pub fn codec_id(&self) -> u32 {
+        unsafe { *(*self.ctx).codecpar }.codec_id
+    }
+
+    pub fn codec_four_cc(&self) -> String {
+        let n = unsafe { *(*self.ctx).codecpar }.codec_tag;
+        let bytes = n.to_le_bytes();
+        std::str::from_utf8(&bytes)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|_| format!("#{:X}", n))
+    }
+
+    pub fn codec_four_cc_raw(&self) -> u32 {
+        unsafe { *(*self.ctx).codecpar }.codec_tag
+    }
+
+    pub fn bitrate(&self) -> u32 {
+        (unsafe { *(*self.ctx).codecpar }.bit_rate / 1000) as u32
+    }
+}
+
+#[derive(Debug)]
+pub enum StreamKind {
+    AUDIO,
+    VIDEO,
+    DATA,
+    SUBTITLE,
+    ATTACHMENT,
+    UNKNOWN,
 }
 
 #[cfg(test)]

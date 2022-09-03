@@ -37,11 +37,35 @@ fn main() {
     let fname = &args[1];
 
     let mf = MediaFile::open(fname).expect(&format!("Cannot open file {}", fname));
+    println!("BASIC INFORMATION:");
     println!("file: {}", fname);
     println!("duration: {}", pretty_time(mf.duration()));
     println!("bitrate: {} kbps", mf.bitrate());
+    println!();
+    println!("META TAGS:");
     print_meta!(mf title artist album composer genre);
+    println!();
+
+    if mf.streams_count() > 0 {
+        println!("STREAMS:");
+        for idx in 0..mf.streams_count() {
+            let s = mf.stream(idx);
+            println!(
+                "Stream type {:?}, codec id {}, 4cc {}({}), duration {}, frames {}, bitrate {}",
+                s.kind(),
+                s.codec_id(),
+                s.codec_four_cc(),
+                s.codec_four_cc_raw(),
+                s.duration(),
+                s.frames_count(),
+                s.bitrate()
+            );
+        }
+        println!();
+    }
+
     if let Some(chapters) = mf.chapters() {
+        println!("CHAPTERS:");
         for chap in chapters {
             println!(
                 "Chapter {} - {} ({} - {})",
