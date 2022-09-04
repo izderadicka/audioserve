@@ -13,6 +13,7 @@ use thiserror::Error;
 #[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
 #[allow(deref_nullptr)]
+#[allow(clippy::type_complexity)]
 mod ffi;
 pub mod tags;
 
@@ -29,6 +30,8 @@ pub enum Error {
     #[error("Invalid encoding name {0}")]
     InvalidEncoding(String),
 }
+
+const CODEC_ID_MJPEG: u32 = 7;
 
 // fn string_from_ptr(ptr: *const c_char) -> Result<Option<String>> {
 //     if ptr.is_null() {
@@ -251,6 +254,21 @@ impl MediaFile {
         }
     }
 
+    pub fn cover(&self) -> Option<Vec<u8>> {
+        for idx in 0..self.streams_count() {
+            let s = self.stream(idx);
+            if matches!(s.kind(), StreamKind::VIDEO) && s.codec_id() == CODEC_ID_MJPEG {
+                let pic = s.picture();
+                if let Some(p) = pic {
+                    if p.len() > 100 {
+                        return Some(p.to_vec());
+                    }
+                }
+            }
+        }
+        None
+    }
+
     #[cfg(feature = "alternate-encoding")]
     pub fn open_with_encoding<S: AsRef<str>>(
         fname: S,
@@ -397,6 +415,20 @@ impl<'a> Stream<'a> {
 
     pub fn bitrate(&self) -> u32 {
         (unsafe { *(*self.ctx).codecpar }.bit_rate / 1000) as u32
+    }
+
+    pub fn disposition(&self) -> i32 {
+        unsafe { *self.ctx }.disposition
+    }
+
+    pub fn picture(&self) -> Option<&[u8]> {
+        let pic: ffi::AVPacket = unsafe { *self.ctx }.attached_pic;
+        if pic.size <= 0 {
+            None
+        } else {
+            // may not panic as int is positive
+            Some(unsafe { slice::from_raw_parts(pic.data, pic.size.try_into().unwrap()) })
+        }
     }
 }
 

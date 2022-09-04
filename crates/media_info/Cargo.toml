@@ -1,6 +1,6 @@
 [package]
 name = "media_info"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2021"
 build = "build.rs"
@@ -9,6 +9,8 @@ build = "build.rs"
 thiserror = "1.0"
 encoding = {version="0.2", optional=true}
 
+[dev-dependencies]
+structopt ="0.3"
 
 [features]
 static=[]
