@@ -288,14 +288,14 @@ pub trait MediaInfo<'a>: Sized {
 }
 
 pub fn extract_description(file_path: impl AsRef<Path> + std::fmt::Debug) -> Option<String> {
-    libavformat::Info::from_file(file_path.as_ref(), None::<&str>)
+    get_audio_properties_uni(file_path.as_ref())
         .map_err(|e| error!("Error {} when extracting metadata from {:?}", e, file_path))
         .ok()
         .and_then(|m| m.description())
 }
 
 pub fn extract_cover(file_path: impl AsRef<Path> + std::fmt::Debug) -> Option<Vec<u8>> {
-    libavformat::Info::from_file(file_path.as_ref(), None::<&str>)
+    get_audio_properties_uni(file_path.as_ref())
         .map_err(|e| error!("Error {} when extracting metadata from {:?}", e, file_path))
         .ok()
         .and_then(|m| m.cover())
@@ -406,6 +406,14 @@ pub fn get_audio_properties(
     alternate_encoding: Option<impl AsRef<str>>,
 ) -> Result<impl MediaInfo> {
     libavformat::Info::from_file(audio_file_path, alternate_encoding)
+}
+
+pub fn get_audio_properties_uni(audio_file_path: &Path) -> Result<impl MediaInfo> {
+    #[cfg(not(feature = "tags-encoding"))]
+    return libavformat::Info::from_file(audio_file_path);
+
+    #[cfg(feature = "tags-encoding")]
+    return libavformat::Info::from_file(audio_file_path, None::<&str>);
 }
 
 pub fn init_media_lib() {
