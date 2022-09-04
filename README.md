@@ -111,7 +111,9 @@ audioserve also supports single file audiobooks like .m4b (one big file with cha
 
 Also long audiofile without chapters metadata, can be split into equaly sized parts/chapters (this has a slight disadvantage as split can be in middle of word). To enable this use `--chapters-from-duration` to set a limit, from which it should be used, and `chapters-duration` to set a duration of a part. Also for large files, which do not have chapters metadata, you can easily supply them in a separate file, with same name as the audio file but with additional extension `.chapters` - so it looks like `your_audiobook.mp3.chapters`. This file is simple CSV file (with header), where first column is chapter title, second is chapter start time, third (and last) is the chapter end time. Time is either in seconds (like `23.836`) or in `HH:MM:SS.mmm` format (like `02:35:23.386`).
 
-If chaptered file is a single file in a directory (and there are no other subdirectories), then chapters are presented within this directory, as if they were files in this directory and cover and description is shown from this directory. If you do not like this feature you can disable by `--no-dir-collaps` option.
+For MPEG-4 containers, .m4b files and similar, cover image and description can extracted directly from file (cover is MJPEG video stream with attached picture flag, description is metadata tag named "description").
+
+If chaptered file is a single file in a directory (and there are no other subdirectories), then chapters are presented within this directory, as if they were files in this directory and cover and description can be overriden from this directory (remplaces embeded metadata). If you do not like this feature you can disable by `--no-dir-collaps` option.
 
 Also note that web client will often load same part of chapter again if you're seeking within it (especially Firefox with m4b), so it's definitely not bandwidth optimal (similar issue appears when often seeking in transcoded file).
 
