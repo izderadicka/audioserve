@@ -12,11 +12,16 @@ use crate::util::{get_meta, get_modified, get_real_file_type, guess_mime_type};
 use lazy_static::lazy_static;
 use regex::Regex;
 
+#[derive(Debug)]
+pub struct FullAudioMeta {
+    chapters: Vec<Chapter>,
+    audio_meta: AudioMeta,
+    has_cover: bool,
+    has_description: bool,
+}
+
 pub enum DirType {
-    File {
-        chapters: Vec<Chapter>,
-        audio_meta: AudioMeta,
-    },
+    File(FullAudioMeta),
     Dir,
     Other,
 }
@@ -82,10 +87,7 @@ impl FolderLister {
                 }
                 self.list_dir_dir(base_dir, full_path, ordering, true)
             }
-            DirType::File {
-                chapters,
-                audio_meta,
-            } => self.list_dir_file(base_dir, full_path, audio_meta, chapters, false),
+            DirType::File(full_meta) => self.list_dir_file(base_dir, full_path, full_meta, false),
             DirType::Other => Err(io::Error::new(
                 io::ErrorKind::Other,
                 "Not folder or chapterised audio file",
@@ -145,18 +147,24 @@ impl FolderLister {
             #[cfg(not(feature = "tags-encoding"))]
             let audio_info = get_audio_properties(path);
             let meta = audio_info.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            let has_cover = meta.has_cover();
+            let has_description = meta.has_description();
             match (meta.get_chapters(), meta.get_audio_info(&self.config.tags)) {
-                (Some(chapters), Some(audio_meta)) => Ok(DirType::File {
+                (Some(chapters), Some(audio_meta)) => Ok(DirType::File(FullAudioMeta {
                     chapters,
                     audio_meta,
-                }),
+                    has_cover,
+                    has_description,
+                })),
                 (None, Some(audio_meta)) => match chapters_from_csv(path)? {
                     Some(chapters) => {
                         if chapters.len() > 1 {
-                            Ok(DirType::File {
+                            Ok(DirType::File(FullAudioMeta {
                                 chapters,
                                 audio_meta,
-                            })
+                                has_cover,
+                                has_description,
+                            }))
                         } else {
                             error!("Chapter file for {:?} has less then two chapters!", &path);
                             Ok(DirType::Other)
@@ -165,10 +173,12 @@ impl FolderLister {
                     None => {
                         if self.is_long_file(Some(&audio_meta)) {
                             let chapters = self.split_chapters(audio_meta.duration);
-                            Ok(DirType::File {
+                            Ok(DirType::File(FullAudioMeta {
                                 chapters,
                                 audio_meta,
-                            })
+                                has_cover,
+                                has_description,
+                            }))
                         } else {
                             Ok(DirType::Other)
                         }
@@ -286,12 +296,8 @@ impl FolderLister {
                 {
                     let full_path = base_dir.as_ref().join(subfolders.pop().unwrap().path);
                     match self.get_dir_type(&full_path)? {
-                        DirType::File {
-                            chapters,
-                            audio_meta,
-                        } => {
-                            let f = self
-                                .list_dir_file(base_dir, full_path, audio_meta, chapters, true)?;
+                        DirType::File(full_meta) => {
+                            let f = self.list_dir_file(base_dir, full_path, full_meta, true)?;
                             files = f.files;
                             tags = f.tags;
                             is_file = true;
@@ -396,8 +402,7 @@ impl FolderLister {
         &self,
         base_dir: P,
         full_path: PathBuf,
-        audio_meta: AudioMeta,
-        chapters: Vec<Chapter>,
+        full_meta: FullAudioMeta,
         collapse: bool,
     ) -> Result<AudioFolder, io::Error> {
         let path = full_path.strip_prefix(&base_dir).unwrap();
@@ -414,12 +419,13 @@ impl FolderLister {
                 .and_then(|m| m.get_audio_info(&self.config.tags));
             tags = meta.and_then(|m| m.tags);
         }
-        let files = chapters
+        let files = full_meta
+            .chapters
             .into_iter()
             .map(|chap| {
                 let new_meta = {
                     AudioMeta {
-                        bitrate: audio_meta.bitrate,
+                        bitrate: full_meta.audio_meta.bitrate,
                         duration: ((chap.end - chap.start) / 1000) as u32,
                         tags: None, // TODO: consider extracting metadata from chapters too - but what will make sense?
                     }
@@ -437,6 +443,16 @@ impl FolderLister {
             })
             .collect::<io::Result<Vec<_>>>()?;
 
+        let self_file = |include| {
+            if include {
+                Some(TypedFile {
+                    path: path.into(),
+                    mime: mime.to_string(),
+                })
+            } else {
+                None
+            }
+        };
         extend_audiofolder(
             &full_path,
             AudioFolder {
@@ -446,8 +462,8 @@ impl FolderLister {
                 total_time: None,
                 files,
                 subfolders: vec![],
-                cover: None,
-                description: None,
+                cover: self_file(full_meta.has_cover),
+                description: self_file(full_meta.has_description),
                 position: None,
                 tags,
             },

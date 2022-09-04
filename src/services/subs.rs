@@ -1,7 +1,7 @@
 //#[cfg(feature = "folder-download")]
 use super::{
     icon::icon_response,
-    resp::{self, not_found, not_found_cached},
+    resp::{self, fut, not_found, not_found_cached},
     search::{Search, SearchTrait},
     transcode::{guess_format, AudioFilePath, ChosenTranscoding, QualityLevel, Transcoder},
     types::*,
@@ -12,7 +12,10 @@ use crate::{
     error::{Error, Result},
     util::{checked_dec, into_range_bounds, to_satisfiable_range, ResponseBuilderExt},
 };
-use collection::{guess_mime_type, parse_chapter_path, FoldersOrdering, TimeSpan};
+use collection::{
+    audio_meta::is_audio, extract_cover, extract_description, guess_mime_type, parse_chapter_path,
+    FoldersOrdering, TimeSpan,
+};
 use futures::prelude::*;
 use futures::{future, ready, Stream};
 use headers::{AcceptRanges, CacheControl, ContentLength, ContentRange, ContentType, LastModified};
@@ -400,6 +403,74 @@ pub fn send_file<P: AsRef<Path>>(
     } else {
         debug!("Sending file directly from fs");
         serve_file_from_fs(&full_path, range, None)
+    }
+}
+
+async fn send_buffer(
+    buf: Vec<u8>,
+    mime: mime::Mime,
+    cache: Option<u32>,
+    last_modified: Option<SystemTime>,
+) -> Result<Response, Error> {
+    let mut resp = HyperResponse::builder()
+        .typed_header(ContentType::from(mime))
+        .typed_header(ContentLength(buf.len() as u64))
+        .status(StatusCode::OK);
+    resp = add_cache_headers(resp, cache, last_modified);
+
+    resp.body(Body::from(buf)).map_err(Error::from)
+}
+
+pub fn send_description(
+    base_path: &'static Path,
+    file_path: impl AsRef<Path>,
+    cache: Option<u32>,
+) -> ResponseFuture {
+    send_data(base_path, file_path, "text/plain", cache, |p| {
+        extract_description(p).map(|s| s.into())
+    })
+}
+
+pub fn send_cover(
+    base_path: &'static Path,
+    file_path: impl AsRef<Path>,
+    cache: Option<u32>,
+) -> ResponseFuture {
+    send_data(base_path, file_path, "image/jpeg", cache, |p| {
+        extract_cover(p)
+    })
+}
+
+pub fn send_data(
+    base_path: &'static Path,
+    file_path: impl AsRef<Path>,
+    mime: impl AsRef<str> + Send + 'static,
+    cache: Option<u32>,
+    extractor: impl FnOnce(PathBuf) -> Option<Vec<u8>> + Send + 'static,
+) -> ResponseFuture {
+    if is_audio(&file_path) {
+        // extract description from audio file
+        let full_path = base_path.join(file_path);
+        let fut = blocking(move || {
+            let m = std::fs::metadata(&full_path)
+                .and_then(|meta| meta.modified())
+                .ok();
+            (extractor(full_path), m)
+        })
+        .map_err(Error::from)
+        .and_then(move |(data, last_modified)| match data {
+            None => fut(not_found),
+            Some(data) => Box::pin(send_buffer(
+                data,
+                mime.as_ref().parse().unwrap(),
+                cache,
+                last_modified,
+            )),
+        });
+
+        Box::pin(fut)
+    } else {
+        send_file_simple(base_path, file_path, cache)
     }
 }
 

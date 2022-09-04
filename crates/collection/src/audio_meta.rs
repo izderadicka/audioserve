@@ -234,6 +234,7 @@ impl Ord for FolderByModification {
     }
 }
 
+#[derive(Debug)]
 pub struct Chapter {
     pub number: u32,
     pub title: String,
@@ -280,6 +281,24 @@ pub trait MediaInfo<'a>: Sized {
     fn get_audio_info(&self, required_tags: &Option<HashSet<String>>) -> Option<AudioMeta>;
     fn get_chapters(&self) -> Option<Vec<Chapter>>;
     fn has_chapters(&self) -> bool;
+    fn has_cover(&self) -> bool;
+    fn cover(&self) -> Option<Vec<u8>>;
+    fn has_description(&self) -> bool;
+    fn description(&self) -> Option<String>;
+}
+
+pub fn extract_description(file_path: impl AsRef<Path> + std::fmt::Debug) -> Option<String> {
+    libavformat::Info::from_file(file_path.as_ref(), None::<&str>)
+        .map_err(|e| error!("Error {} when extracting metadata from {:?}", e, file_path))
+        .ok()
+        .and_then(|m| m.description())
+}
+
+pub fn extract_cover(file_path: impl AsRef<Path> + std::fmt::Debug) -> Option<Vec<u8>> {
+    libavformat::Info::from_file(file_path.as_ref(), None::<&str>)
+        .map_err(|e| error!("Error {} when extracting metadata from {:?}", e, file_path))
+        .ok()
+        .and_then(|m| m.cover())
 }
 
 mod libavformat {
@@ -287,6 +306,8 @@ mod libavformat {
     use std::{collections::HashSet, sync::Once};
 
     static INIT_LIBAV: Once = Once::new();
+
+    const DESCRIPTION_KEY: &str = "description";
 
     pub fn init() {
         INIT_LIBAV.call_once(media_info::init)
@@ -319,6 +340,22 @@ mod libavformat {
                     })
                     .collect()
             })
+        }
+
+        fn has_cover(&self) -> bool {
+            self.media_file.has_cover()
+        }
+
+        fn cover(&self) -> Option<Vec<u8>> {
+            self.media_file.cover()
+        }
+
+        fn has_description(&self) -> bool {
+            self.media_file.has_meta(DESCRIPTION_KEY)
+        }
+
+        fn description(&self) -> Option<String> {
+            self.media_file.meta(DESCRIPTION_KEY)
         }
     }
 

@@ -1,8 +1,8 @@
 use self::auth::{AuthResult, Authenticator};
 use self::search::Search;
 use self::subs::{
-    collections_list, get_folder, recent, search, send_file, send_file_simple, send_folder_icon,
-    transcodings_list, ResponseFuture,
+    collections_list, get_folder, recent, search, send_cover, send_description, send_file,
+    send_file_simple, send_folder_icon, transcodings_list, ResponseFuture,
 };
 use self::transcode::QualityLevel;
 use crate::config::get_config;
@@ -607,7 +607,7 @@ impl<C: 'static> FileSendService<C> {
                         let group = params.get_string("group");
                         recent(colllection_index, searcher, group)
                     } else if path.starts_with("/cover/") {
-                        send_file_simple(
+                        send_cover(
                             base_dir,
                             get_subpath(path, "/cover"),
                             get_config().folder_file_cache_age,
@@ -619,7 +619,7 @@ impl<C: 'static> FileSendService<C> {
                             collections,
                         )
                     } else if path.starts_with("/desc/") {
-                        send_file_simple(
+                        send_description(
                             base_dir,
                             get_subpath(path, "/desc"),
                             get_config().folder_file_cache_age,

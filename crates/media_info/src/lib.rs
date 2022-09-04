@@ -103,12 +103,21 @@ impl Dictionary {
         })
     }
 
-    pub fn get<S: AsRef<str>>(&self, key: S) -> Option<String> {
+    pub fn has_key(&self, key: impl AsRef<str>) -> bool {
+        let res = self.get_entry(key);
+        !res.is_null()
+    }
+
+    fn get_entry(&self, key: impl AsRef<str>) -> *const ffi::AVDictionaryEntry {
         if self.dic.is_null() {
-            return None;
+            return ptr::null();
         }
         let cs = CString::new(key.as_ref()).expect("zero byte in key");
-        let res = unsafe { ffi::av_dict_get(self.dic, cs.as_ptr(), ptr::null(), 0) };
+        unsafe { ffi::av_dict_get(self.dic, cs.as_ptr(), ptr::null(), 0) }
+    }
+
+    pub fn get<S: AsRef<str>>(&self, key: S) -> Option<String> {
+        let res = self.get_entry(key);
         if res.is_null() {
             return None;
         }
@@ -254,14 +263,14 @@ impl MediaFile {
         }
     }
 
-    pub fn cover(&self) -> Option<Vec<u8>> {
+    fn attached_stream(&self) -> Option<Stream> {
         for idx in 0..self.streams_count() {
             let s = self.stream(idx);
             if matches!(s.kind(), StreamKind::VIDEO) && s.codec_id() == CODEC_ID_MJPEG {
                 let pic = s.picture();
                 if let Some(p) = pic {
                     if p.len() > 100 {
-                        return Some(p.to_vec());
+                        return Some(s);
                     }
                 }
             }
@@ -269,17 +278,31 @@ impl MediaFile {
         None
     }
 
+    pub fn cover(&self) -> Option<Vec<u8>> {
+        self.attached_stream()
+            .and_then(|s| s.picture().map(|s| s.to_vec()))
+    }
+
+    pub fn has_cover(&self) -> bool {
+        self.attached_stream().is_some()
+    }
+
+    pub fn has_meta(&self, key: impl AsRef<str>) -> bool {
+        self.meta.has_key(key)
+    }
+
     #[cfg(feature = "alternate-encoding")]
     pub fn open_with_encoding<S: AsRef<str>>(
         fname: S,
         alternate_encoding: Option<impl AsRef<str>>,
     ) -> Result<Self> {
-        MediaFile::prepare_open(fname).and_then(|(ctx, m)| {
-            let meta = match alternate_encoding {
-                Some(e) => Dictionary::new_with_encoding(m, e)?,
-                None => Dictionary::new(m),
-            };
-            Ok(MediaFile { ctx, meta })
+        MediaFile::open(fname).and_then(|mut mf| match alternate_encoding {
+            Some(e) => {
+                let new_dict = Dictionary::new_with_encoding(mf.meta.dic, e)?;
+                mf.meta = new_dict;
+                Ok(mf)
+            }
+            None => Ok(mf),
         })
     }
 

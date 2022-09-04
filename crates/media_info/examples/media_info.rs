@@ -60,6 +60,8 @@ fn main() {
         println!("file: {}", opts.file_name);
         println!("duration: {}", pretty_time(mf.duration()));
         println!("bitrate: {} kbps", mf.bitrate());
+        println!("has cover image: {}", mf.has_cover());
+        println!("has description: {}", mf.has_meta("description"));
         println!();
     }
 
