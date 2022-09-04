@@ -1,4 +1,5 @@
 use anyhow::Result;
+use collection::{audio_meta::is_audio, extract_cover};
 use headers::{ContentLength, ContentType};
 use hyper::{Body, Response};
 use image::io::Reader as ImageReader;
@@ -16,7 +17,7 @@ use super::subs::add_cache_headers;
 
 pub mod cache;
 
-pub fn icon_response(path: impl AsRef<Path>) -> Result<Response<Body>> {
+pub fn icon_response(path: impl AsRef<Path> + std::fmt::Debug) -> Result<Response<Body>> {
     let cache_enabled = !get_config().icons.cache_disabled;
     let data = match if cache_enabled {
         cached_icon(&path)
@@ -48,9 +49,17 @@ pub fn icon_response(path: impl AsRef<Path>) -> Result<Response<Body>> {
     builder.body(data.into()).map_err(anyhow::Error::from)
 }
 
-pub fn scale_cover(path: impl AsRef<Path>) -> Result<Vec<u8>> {
+pub fn scale_cover(path: impl AsRef<Path> + std::fmt::Debug) -> Result<Vec<u8>> {
     use image::imageops::FilterType;
-    let img = ImageReader::open(&path)?.with_guessed_format()?.decode()?;
+    let img = if is_audio(&path) {
+        let data = extract_cover(&path)
+            .ok_or_else(|| anyhow::Error::msg("Cover is missing, but is expected"))?;
+        ImageReader::new(Cursor::new(data))
+            .with_guessed_format()?
+            .decode()?
+    } else {
+        ImageReader::open(&path)?.with_guessed_format()?.decode()?
+    };
     let sz = get_config().icons.size;
     let scaled = img.resize(
         sz,

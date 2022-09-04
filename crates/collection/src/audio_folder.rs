@@ -301,6 +301,12 @@ impl FolderLister {
                             files = f.files;
                             tags = f.tags;
                             is_file = true;
+                            if cover.is_none() {
+                                cover = f.cover;
+                            }
+                            if description.is_none() {
+                                description = f.description;
+                            }
                             // TODO: Should this be also collapsed?
                             //is_collapsed = true;
                         }
