@@ -1,7 +1,10 @@
 use anyhow::{bail, Context};
 
 use crate::util;
-use std::{path::{Path, PathBuf}, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 pub fn is_existing_dir(p: &str) -> Result<PathBuf, anyhow::Error> {
     let p = Path::new(p);

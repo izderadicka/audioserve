@@ -500,7 +500,8 @@ pub struct Config {
     pub url_path_prefix: Option<String>,
     pub shared_secret: Option<String>,
     pub limit_rate: Option<f32>,
-    #[serde(with = "serde_yaml::with::singleton_map_recursive")] // to keep backward compatibility with existing configs
+    #[serde(with = "serde_yaml::with::singleton_map_recursive")]
+    // to keep backward compatibility with existing configs
     pub transcoding: TranscodingConfig,
     pub token_validity_hours: u32,
     pub secret_file: PathBuf,
