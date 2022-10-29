@@ -23,10 +23,12 @@ fn create_parser() -> Parser {
             )
         .arg(Arg::new("features")
             .long("features")
+            .action(ArgAction::SetTrue)
             .help("Prints features, with which program is compiled and exits")
             )
         .arg(Arg::new("print-config")
             .long("print-config")
+            .action(ArgAction::SetTrue)
             .help("Will print current config, with all other options to stdout, useful for creating config file")
             )
         .arg(Arg::new("data-dir")
@@ -39,7 +41,8 @@ fn create_parser() -> Parser {
         .arg(Arg::new("debug")
             .short('d')
             .long("debug")
-            .help("Enable debug logging (detailed logging config can be done via RUST_LOG env. variable)")
+            .action(ArgAction::SetTrue)
+            .help("Enable debug logging (detailed logging config can be done via RUST_LOG env. variable). Program must be compiled in debug configuration")
             )
         .arg(Arg::new("listen")
             .short('l')
@@ -73,10 +76,12 @@ fn create_parser() -> Parser {
             )
         .arg(Arg::new("help-dir-options")
             .long("help-dir-options")
+            .action(ArgAction::SetTrue)
             .help("Prints help for collections directories options")
             )
         .arg(Arg::new("help-tags")
             .long("help-tags")
+            .action(ArgAction::SetTrue)
             .help("Prints help for tags options")
         )
         .arg(Arg::new("tags")
@@ -97,6 +102,7 @@ fn create_parser() -> Parser {
             )
         .arg(Arg::new("no-authentication")
             .long("no-authentication")
+            .action(ArgAction::SetTrue)
             .help("no authentication required - mainly for testing purposes")
             )
         .arg(Arg::new("shared-secret")
@@ -127,7 +133,7 @@ fn create_parser() -> Parser {
             .short('x')
             .long("transcoding-max-parallel-processes")
             .num_args(1)
-            .value_parser(value_parser!(u32))
+            .value_parser(value_parser!(usize))
             .env("AUDIOSERVE_MAX_PARALLEL_PROCESSES")
             .help("Maximum number of concurrent transcoding processes, minimum is 4 [default: 2 * number of cores]")
             )
@@ -427,7 +433,7 @@ fn create_parser() -> Parser {
             .long("t-cache-max-files")
             .num_args(1)
             .env("AUDIOSERVE_T_CACHE_MAX_FILES")
-            .value_parser(value_parser!(u64))
+            .value_parser(value_parser!(u32))
             .help("Max number of files in transcoding cache, when reached LRU items are deleted, [default is 1024]")
         ).arg(
             Arg::new("t-cache-disable")
@@ -483,17 +489,17 @@ where
     let p = create_parser();
     let mut args = p.get_matches_from(args);
 
-    if args.contains_id("help-dir-options") {
+    if has_flag!(args, "help-dir-options") {
         print_dir_options_help();
         exit(0);
     }
 
-    if args.contains_id("help-tags") {
+    if has_flag!(args, "help-tags") {
         print_tags_help();
         exit(0);
     }
 
-    if args.contains_id("features") {
+    if has_flag!(args, "features") {
         println!("{}", FEATURES);
         exit(0);
     }
@@ -545,10 +551,10 @@ where
     };
 
     // let is_present_or_env = |name: &str, env_name: &str| {
-    //     args.contains_id(name) || env::var(env_name).map(|s| !s.is_empty()).unwrap_or(false)
+    //     has_flag!(args,name) || env::var(env_name).map(|s| !s.is_empty()).unwrap_or(false)
     // };
 
-    if args.contains_id("debug") {
+    if has_flag!(args, "debug") {
         let name = "RUST_LOG";
         if env::var_os(name).is_none() {
             env::set_var(name, "debug");
@@ -579,11 +585,11 @@ where
         };
     }
 
-    if args.contains_id("no-authentication") {
+    if has_flag!(args, "no-authentication") {
         config.shared_secret = None;
         no_authentication_confirmed = true
-    } else if let Some(secret) = args.remove_one::<String>("shared-secret") {
-        config.shared_secret = Some(secret.into())
+    } else if let Some(secret) = args.remove_one("shared-secret") {
+        config.shared_secret = Some(secret)
     } else if let Some(file) = args.remove_one::<PathBuf>("shared-secret-file") {
         config.set_shared_secret_from_file(file)?
     };
@@ -675,10 +681,6 @@ where
 
     if let Some(n) = args.remove_one("icons-cache-size") {
         config.icons.cache_max_size = n;
-    }
-
-    if let Some(n) = args.remove_one("t-cache-max-files") {
-        config.icons.cache_max_files = n;
     }
 
     if has_flag!(args, "icons-cache-disable") {
@@ -800,7 +802,7 @@ where
 
     config.check()?;
     config.prepare()?;
-    if args.contains_id("print-config") {
+    if has_flag!(args, "print-config") {
         println!("{}", serde_yaml::to_string(&config).unwrap());
         exit(0);
     }
