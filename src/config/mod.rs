@@ -655,8 +655,8 @@ impl Config {
         }
 
         if let Some(url) = &self.url_path_prefix {
-            if let Err(e) = validators::is_valid_url_path_prefix(url.clone()) {
-                return value_error!("url_path_prefix", e);
+            if let Err(e) = validators::is_valid_url_path_prefix(url.as_str()) {
+                return value_error!("url_path_prefix", e.to_string());
             }
         }
 

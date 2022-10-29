@@ -1,6 +1,8 @@
+use anyhow::bail;
+
 use crate::util;
 use std::ffi::{OsStr, OsString};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 type ValidatorResult = Result<(), String>;
 
@@ -28,36 +30,36 @@ pub fn is_positive_float(v: String) -> ValidatorResult {
     Ok(())
 }
 
-pub fn is_existing_dir(p: &OsStr) -> Result<(), OsString> {
+pub fn is_existing_dir(p: &str) -> Result<PathBuf, anyhow::Error> {
     let p = Path::new(p);
     if !p.is_dir() {
-        return Err(format!("{:?} is not existing directory", p).into());
+        bail!("{:?} is not existing directory", p);
     }
 
-    Ok(())
+    Ok(p.into())
 }
 
-pub fn is_existing_file(p: &OsStr) -> Result<(), OsString> {
+pub fn is_existing_file(p: &str) -> Result<PathBuf, anyhow::Error> {
     let p = Path::new(p);
     if !p.is_file() {
-        return Err(format!("{:?} is not existing file", p).into());
+        bail!("{:?} is not existing file", p);
     }
 
-    Ok(())
+    Ok(p.into())
 }
 
-pub fn parent_dir_exists(p: &OsStr) -> Result<(), OsString> {
+pub fn parent_dir_exists(p: &str) -> Result<PathBuf, anyhow::Error> {
     if !util::parent_dir_exists(&p) {
-        Err(format!("parent dir for {:?} does not exists", p).into())
+        bail!("parent dir for {:?} does not exists", p);
     } else {
-        Ok(())
+        Ok(Path::new(p).into())
     }
 }
 
-pub fn is_valid_url_path_prefix(s: String) -> ValidatorResult {
+pub fn is_valid_url_path_prefix(s: &str) -> Result<String, anyhow::Error> {
     if s.starts_with('/') && !s.ends_with('/') {
-        Ok(())
+        Ok(s.into())
     } else {
-        Err("Must start with / but not end with it".into())
+        bail!("Must start with / but not end with it");
     }
 }

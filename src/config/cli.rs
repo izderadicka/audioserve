@@ -2,7 +2,9 @@ use std::process::exit;
 
 use super::validators::*;
 use super::*;
-use clap::{crate_authors, crate_name, Command, Arg};
+use clap::{
+    builder::FalseyValueParser, crate_authors, crate_name, value_parser, Arg, ArgAction, Command,
+};
 use collection::tags::{ALLOWED_TAGS, BASIC_TAGS};
 
 type Parser = Command;
@@ -44,11 +46,14 @@ fn create_parser() -> Parser {
             .long("listen")
             .help("Address and port server is listening on as address:port (by default listen on port 3000 on all interfaces)")
             .num_args(1)
-            .value_parser(is_socket_addr)
+            .value_parser(value_parser!(SocketAddr))
             .env("AUDIOSERVE_LISTEN")
             )
         .arg(Arg::new("thread-pool-large")
             .long("thread-pool-large")
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+            .env("AUDIOSERVE_THREAD_POOL_LARGE")
             .help("Use larger thread pool (usually will not be needed)")       
             )
         .arg(Arg::new("thread-pool-keep-alive-secs")
@@ -56,7 +61,7 @@ fn create_parser() -> Parser {
             .num_args(1)
             .help("Threads in pool will shutdown after given seconds, if there is no work. Default is to keep threads forever.")
             .env("AUDIOSERVE_THREAD_POOL_KEEP_ALIVE")
-            .value_parser(is_number)
+            .value_parser(value_parser!(u64))
             )
         .arg(Arg::new("base-dir")
             .value_name("BASE_DIR")
@@ -76,6 +81,9 @@ fn create_parser() -> Parser {
         )
         .arg(Arg::new("tags")
             .long("tags")
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+            .env("AUDIOSERVE_TAGS")
             .help("Collects prefered tags from audiofiles, use argument --help-tags for more details")
             .conflicts_with("tags-custom")
             )
@@ -104,7 +112,7 @@ fn create_parser() -> Parser {
             .long("limit-rate")
             .env("AUDIOSERVE_LIMIT_RATE")
             .num_args(1)
-            .value_parser(is_positive_float)
+            .value_parser(value_parser!(f32))
             .help("Limits number of http request to x req/sec. Assures that resources are not exhausted in case of DDoS (but will also limit you). It's bit experimental now.")
             )
         .arg(Arg::new("shared-secret-file")
@@ -119,14 +127,14 @@ fn create_parser() -> Parser {
             .short('x')
             .long("transcoding-max-parallel-processes")
             .num_args(1)
-            .value_parser(is_number)
+            .value_parser(value_parser!(u32))
             .env("AUDIOSERVE_MAX_PARALLEL_PROCESSES")
             .help("Maximum number of concurrent transcoding processes, minimum is 4 [default: 2 * number of cores]")
             )
         .arg(Arg::new("transcoding-max-runtime")
             .long("transcoding-max-runtime")
             .num_args(1)
-            .value_parser(is_number)
+            .value_parser(value_parser!(u32))
             .env("AUDIOSERVE_TRANSCODING_MAX_RUNTIME")
             .help("Max duration of transcoding process in hours. If takes longer process is killed. [default is 24h]")
 
@@ -134,7 +142,7 @@ fn create_parser() -> Parser {
         .arg(Arg::new("token-validity-days")
             .long("token-validity-days")
             .num_args(1)
-            .value_parser(is_number)
+            .value_parser(value_parser!(u32))
             .env("AUDIOSERVE_TOKEN_VALIDITY_DAYS")
             .help("Validity of authentication token issued by this server in days[default 365, min 10]")
             )
@@ -156,6 +164,9 @@ fn create_parser() -> Parser {
             )
         .arg(Arg::new("cors")
             .long("cors")
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+            .env("AUDIOSERVE_CORS")
             .help("Enable CORS for all origins unless more specific origin is specified with --cors-regex")
             )
         .arg(Arg::new("cors-regex")
@@ -168,23 +179,29 @@ fn create_parser() -> Parser {
         .arg(Arg::new("chapters-from-duration")
             .long("chapters-from-duration")
             .num_args(1)
-            .value_parser(is_number)
+            .value_parser(value_parser!(u32))
             .env("AUDIOSERVE_CHAPTERS_FROM_DURATION")
             .help("forces split of audio file larger then x mins into chapters (not physically, but it'll be just visible as folder with chapters)[default:0 e.g. disabled]")
             )
         .arg(Arg::new("chapters-duration")
             .long("chapters-duration")
             .num_args(1)
-            .value_parser(is_number)
+            .value_parser(value_parser!(u32))
             .env("AUDIOSERVE_CHAPTERS_FROM_DURATION")
             .help("If long files is presented as chapters, one chapter has x mins [default: 30]")
             )
         .arg(Arg::new("no-dir-collaps")
             .long("no-dir-collaps")
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+            .env("AUDIOSERVE_NO_DIR_COLLAPS")
             .help("Prevents automatic collaps/skip of directory with single chapterized audio file")
             )
         .arg(Arg::new("ignore-chapters-meta")
             .long("ignore-chapters-meta")
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+            .env("AUDIOSERVE_IGNORE_CHAPTERS_META")
             .help("Ignore chapters metadata, so files with chapters will not be presented as folders")
             )
         .arg(Arg::new("url-path-prefix")
@@ -196,6 +213,9 @@ fn create_parser() -> Parser {
             )
         .arg(Arg::new("force-cache-update")
             .long("force-cache-update")
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+            .env("AUDIOSERVE_FORCE_CACHE_UPDATE")
             .help("Forces full reload of metadata cache on start")
             )
         .arg(Arg::new("static-resource-cache-age")
@@ -213,6 +233,9 @@ fn create_parser() -> Parser {
         .arg(
             Arg::new("collapse-cd-folders")
             .long("collapse-cd-folders")
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+            .env("AUDIOSERVE_COLLAPSE_CD_FOLDERS")
             .help("Collapses multi CD folders into one root folder, CD subfolders are recognized by regular expression")
         )
         .arg(
@@ -235,24 +258,30 @@ fn create_parser() -> Parser {
             .long("icons-cache-size")
             .num_args(1)
             .env("AUDIOSERVE_ICONS_CACHE_SIZE")
-            .value_parser(is_number)
+            .value_parser(value_parser!(u64))
             .help("Max size of icons cache in MBi, when reached LRU items are deleted, [default is 100]")
         ).arg(
             Arg::new("icons-cache-max-files")
             .long("icons-cache-max-files")
             .num_args(1)
             .env("AUDIOSERVE_ICONS_CACHE_MAX_FILES")
-            .value_parser(is_number)
+            .value_parser(value_parser!(u64))
             .help("Max number of files in icons cache, when reached LRU items are deleted, [default is 1024]")
         ).arg(
             Arg::new("icons-cache-disable")
             .long("icons-cache-disable")
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+            .env("AUDIOSERVE_ICONS_CACHE_DISABLE")
             .conflicts_with_all(&["icons-cache-save-often", "icons-cache-max-files", "icons-cache-size", "icons-cache-dir"])
             .help("Icons cache is disabled.")
             )
         .arg(
             Arg::new("icons-cache-save-often")
             .long("icons-cache-save-often")
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+            .env("AUDIOSERVE_ICONS_CACHE_SAVE_OFTEN")
             .help("Save additions to icons cache often, after each addition, this is normally not necessary")
         )
         .arg(
@@ -260,18 +289,24 @@ fn create_parser() -> Parser {
             .long("icons-size")
             .num_args(1)
             .env("AUDIOSERVE_ICONS_SIZE")
-            .value_parser(is_number)
-            .help("Size of folder icon, [default is 1128]")
+            .value_parser(value_parser!(u64))
+            .help("Size of folder icon in pixels, [default is 128]")
         )
         .arg(
             Arg::new("icons-fast-scaling")
             .long("icons-fast-scaling")
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+            .env("AUDIOSERVE_ICONS_FAST_SCALING")
             .help("Use faster image scaling (linear triangle), by default slower, but better method (Lanczos3)")
         );
 
     if cfg!(feature = "behind-proxy") {
         parser = parser.arg(Arg::new("behind-proxy")
         .long("behind-proxy")
+        .action(ArgAction::SetTrue)
+        .value_parser(FalseyValueParser::new())
+        .env("AUDIOSERVE_BEHIND_PROXY")
         .help("Informs program that it is behind remote proxy, now used only for logging (to get true remote client ip)")
         )
     }
@@ -280,6 +315,9 @@ fn create_parser() -> Parser {
         parser = parser.arg(
             Arg::new("disable-folder-download")
                 .long("disable-folder-download")
+                .action(ArgAction::SetTrue)
+                .value_parser(FalseyValueParser::new())
+                .env("AUDIOSERVE_DISABLE_FOLDER_DOWNLOAD")
                 .help("Disables API point for downloading whole folder"),
         );
     }
@@ -319,7 +357,7 @@ fn create_parser() -> Parser {
         .arg(
             Arg::new("positions-ws-timeout")
             .long("positions-ws-timeout")
-            .value_parser(is_number)
+            .value_parser(value_parser!(u64))
             .env("AUDIOSERVE_POSITIONS_WS_TIMEOUT")
             .help("Timeout in seconds for idle websocket connection use for playback position sharing [default 600s]")
         )
@@ -327,7 +365,7 @@ fn create_parser() -> Parser {
             Arg::new("positions-restore")
             .long("positions-restore")
             .num_args(1)
-            .possible_values(&["legacy", "v1"])
+            .value_parser(["legacy", "v1"])
             .env("AUDIOSERVE_POSITIONS_RESTORE")
             .requires("positions-backup-file")
             .help("Restores positions from backup JSON file, value is version of file legacy is before audioserve v0.16,  v1 is current")
@@ -346,6 +384,9 @@ fn create_parser() -> Parser {
         parser = parser.arg(
             Arg::new("allow-symlinks")
                 .long("allow-symlinks")
+                .action(ArgAction::SetTrue)
+                .value_parser(FalseyValueParser::new())
+                .env("AUDIOSERVE_ALLOW_SYMLINKS")
                 .help("Will follow symbolic/soft links in collections directories"),
         );
     }
@@ -379,24 +420,30 @@ fn create_parser() -> Parser {
             .long("t-cache-size")
             .num_args(1)
             .env("AUDIOSERVE_T_CACHE_SIZE")
-            .value_parser(is_number)
+            .value_parser(value_parser!(u64))
             .help("Max size of transcoding cache in MBi, when reached LRU items are deleted, [default is 1024]")
         ).arg(
             Arg::new("t-cache-max-files")
             .long("t-cache-max-files")
             .num_args(1)
             .env("AUDIOSERVE_T_CACHE_MAX_FILES")
-            .value_parser(is_number)
+            .value_parser(value_parser!(u64))
             .help("Max number of files in transcoding cache, when reached LRU items are deleted, [default is 1024]")
         ).arg(
             Arg::new("t-cache-disable")
             .long("t-cache-disable")
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+            .env("AUDIOSERVE_T_CACHE_DISABLE")
             .conflicts_with_all(&["t-cache-save-often", "t-cache-max-files", "t-cache-size", "t-cache-dir"])
             .help("Transaction cache is disabled. If you want to completely get rid of it, compile without 'transcoding-cache'")
             )
         .arg(
             Arg::new("t-cache-save-often")
             .long("t-cache-save-often")
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+            .env("AUDIOSERVE_T_CACHE_SAVE_OFTEN")
             .help("Save additions to cache often, after each addition, this is normally not necessary")
         )
     }
@@ -420,6 +467,12 @@ pub fn parse_args() -> Result<Config> {
     parse_args_from(env::args_os())
 }
 
+macro_rules! has_flag {
+    ($args:ident, $name:expr) => {
+        $args.remove_one($name).unwrap_or_default()
+    };
+}
+
 // Although function  is bit too long it does not make sense to split, as it deals with each config option in very plain matter
 #[allow(clippy::cognitive_complexity)]
 pub fn parse_args_from<I, T>(args: I) -> Result<Config>
@@ -428,24 +481,24 @@ where
     T: Into<std::ffi::OsString> + Clone,
 {
     let p = create_parser();
-    let args = p.get_matches_from(args);
+    let mut args = p.get_matches_from(args);
 
-    if args.is_present("help-dir-options") {
+    if args.contains_id("help-dir-options") {
         print_dir_options_help();
         exit(0);
     }
 
-    if args.is_present("help-tags") {
+    if args.contains_id("help-tags") {
         print_tags_help();
         exit(0);
     }
 
-    if args.is_present("features") {
+    if args.contains_id("features") {
         println!("{}", FEATURES);
         exit(0);
     }
 
-    if let Some(dir) = args.value_of_os("data-dir") {
+    if let Some(dir) = args.get_one::<PathBuf>("data-dir") {
         unsafe {
             BASE_DATA_DIR.take();
             BASE_DATA_DIR = Some(dir.into());
@@ -469,7 +522,7 @@ where
 
     let mut no_authentication_confirmed = false;
 
-    let mut config: Config = if let Some(config_file) = args.value_of_os("config") {
+    let mut config: Config = if let Some(config_file) = args.get_one::<PathBuf>("config") {
         let f = File::open(config_file).or_else(|e| {
             arg_error!(
                 "config",
@@ -491,18 +544,18 @@ where
         Config::default()
     };
 
-    let is_present_or_env = |name: &str, env_name: &str| {
-        args.is_present(name) || env::var(env_name).map(|s| !s.is_empty()).unwrap_or(false)
-    };
+    // let is_present_or_env = |name: &str, env_name: &str| {
+    //     args.contains_id(name) || env::var(env_name).map(|s| !s.is_empty()).unwrap_or(false)
+    // };
 
-    if args.is_present("debug") {
+    if args.contains_id("debug") {
         let name = "RUST_LOG";
         if env::var_os(name).is_none() {
             env::set_var(name, "debug");
         }
     }
 
-    if let Some(base_dirs) = args.values_of("base-dir") {
+    if let Some(base_dirs) = args.get_many::<String>("base-dir") {
         for dir in base_dirs {
             config.add_base_dir(dir)?;
         }
@@ -514,11 +567,11 @@ where
             .parse()
             .or_else(|_| arg_error!("listen", "Invalid value in $PORT"))?;
         config.listen = SocketAddr::from(([0, 0, 0, 0], port));
-    } else if let Some(addr) = args.value_of("listen") {
-        config.listen = addr.parse().unwrap();
+    } else if let Some(addr) = args.remove_one::<SocketAddr>("listen") {
+        config.listen = addr;
     }
 
-    if is_present_or_env("thread-pool-large", "AUDIOSERVE_THREAD_POOL_LARGE") {
+    if has_flag!(args, "thread-pool-large") {
         config.thread_pool = ThreadPoolConfig {
             num_threads: 16,
             queue_size: 1000,
@@ -526,73 +579,71 @@ where
         };
     }
 
-    if args.is_present("no-authentication") {
+    if args.contains_id("no-authentication") {
         config.shared_secret = None;
         no_authentication_confirmed = true
-    } else if let Some(secret) = args.value_of("shared-secret") {
+    } else if let Some(secret) = args.remove_one::<String>("shared-secret") {
         config.shared_secret = Some(secret.into())
-    } else if let Some(file) = args.value_of_os("shared-secret-file") {
+    } else if let Some(file) = args.remove_one::<PathBuf>("shared-secret-file") {
         config.set_shared_secret_from_file(file)?
     };
 
-    if let Some(r) = args.value_of("limit-rate").and_then(|s| s.parse().ok()) {
+    if let Some(r) = args.remove_one("limit-rate") {
         config.limit_rate = Some(r)
     }
 
-    if let Some(n) = args.value_of("transcoding-max-parallel-processes") {
-        config.transcoding.max_parallel_processes = n.parse().unwrap()
+    if let Some(n) = args.remove_one("transcoding-max-parallel-processes") {
+        config.transcoding.max_parallel_processes = n;
     }
 
-    if let Some(n) = args.value_of("transcoding-max-runtime") {
-        config.transcoding.max_runtime_hours = n.parse().unwrap()
+    if let Some(n) = args.remove_one("transcoding-max-runtime") {
+        config.transcoding.max_runtime_hours = n;
     }
 
-    if let Some(v) = args.value_of("thread-pool-keep-alive-secs") {
-        config.thread_pool.keep_alive = Some(Duration::from_secs(v.parse().unwrap()))
+    if let Some(v) = args.remove_one("thread-pool-keep-alive-secs") {
+        config.thread_pool.keep_alive = Some(Duration::from_secs(v))
     }
 
-    if let Some(validity) = args.value_of("token-validity-days") {
-        config.token_validity_hours = validity.parse::<u32>().unwrap() * 24
+    if let Some(validity) = args.remove_one::<u32>("token-validity-days") {
+        config.token_validity_hours = validity * 24
     }
 
-    if let Some(client_dir) = args.value_of_os("client-dir") {
-        config.client_dir = client_dir.into()
+    if let Some(client_dir) = args.remove_one("client-dir") {
+        config.client_dir = client_dir;
     }
-    if let Some(secret_file) = args.value_of_os("secret-file") {
-        config.secret_file = secret_file.into()
+    if let Some(secret_file) = args.remove_one("secret-file") {
+        config.secret_file = secret_file;
     }
 
-    if is_present_or_env("cors", "AUDIOSERVE_CORS") {
-        config.cors = match args.value_of("cors-regex") {
+    if has_flag!(args, "cors") {
+        config.cors = match args.remove_one("cors-regex") {
             Some(o) => Some(CorsConfig {
                 inner: Cors::default(),
-                regex: Some(o.to_string()),
+                regex: Some(o),
             }),
             None => Some(CorsConfig::default()),
         }
     }
 
-    if is_present_or_env("collapse-cd-folders", "AUDIOSERVE_COLLAPSE_CD_FOLDERS") {
-        config.collapse_cd_folders = match args.value_of("cd-folder-regex") {
-            Some(re) => Some(CollapseCDFolderConfig {
-                regex: Some(re.into()),
-            }),
+    if has_flag!(args, "collapse-cd-folders") {
+        config.collapse_cd_folders = match args.remove_one("cd-folder-regex") {
+            Some(re) => Some(CollapseCDFolderConfig { regex: Some(re) }),
             None => Some(CollapseCDFolderConfig::default()),
         }
     }
 
-    if is_present_or_env("force-cache-update", "AUDIOSERVE_FORCE_CACHE_UPDATE") {
+    if has_flag!(args, "force-cache-update") {
         config.force_cache_update_on_init = true
     }
 
-    if let Some(tags) = args.values_of("tags-custom") {
+    if let Some(tags) = args.remove_many("tags-custom") {
         for t in tags {
             if !ALLOWED_TAGS.contains(&t) {
                 arg_error!("tags-custom", "Unknown tag")?
             }
             config.tags.insert(t.to_string());
         }
-    } else if is_present_or_env("tags", "AUDIOSERVE_TAGS") {
+    } else if has_flag!(args, "tags") {
         config.tags.extend(BASIC_TAGS.iter().map(|i| i.to_string()));
     }
 
@@ -606,56 +657,51 @@ where
         }
     };
 
-    if let Some(age) = args.value_of("static-resource-cache-age") {
+    if let Some(age) = args.remove_one("static-resource-cache-age") {
         config.static_resource_cache_age = parse_cache_age(age)?;
     }
 
-    if let Some(age) = args.value_of("folder-file-cache-age") {
+    if let Some(age) = args.remove_one("folder-file-cache-age") {
         config.folder_file_cache_age = parse_cache_age(age)?;
     }
 
-    if let Some(n) = args.value_of("icons-size") {
-        config.icons.size = n.parse().unwrap()
+    if let Some(n) = args.remove_one("icons-size") {
+        config.icons.size = n;
     }
 
-    if let Some(d) = args.value_of_os("icons-cache-dir") {
-        config.icons.cache_dir = d.into()
+    if let Some(d) = args.remove_one("icons-cache-dir") {
+        config.icons.cache_dir = d;
     }
 
-    if let Some(n) = args.value_of("icons-cache-size") {
-        config.icons.cache_max_size = n.parse().unwrap()
+    if let Some(n) = args.remove_one("icons-cache-size") {
+        config.icons.cache_max_size = n;
     }
 
-    if let Some(n) = args.value_of("t-cache-max-files") {
-        config.icons.cache_max_files = n.parse().unwrap()
+    if let Some(n) = args.remove_one("t-cache-max-files") {
+        config.icons.cache_max_files = n;
     }
 
-    if is_present_or_env("icons-cache-disable", "AUDIOSERVE_ICONS_CACHE_DISABLE") {
+    if has_flag!(args, "icons-cache-disable") {
         config.icons.cache_disabled = true;
     }
 
-    if is_present_or_env("icons-fast-scaling", "AUDIOSERVE_ICONS_FAST_SCALING") {
+    if has_flag!(args, "icons-fast-scaling") {
         config.icons.fast_scaling = true;
     }
 
-    if is_present_or_env(
-        "icons-cache-save-often",
-        "AUDIOSERVE_ICONS_CACHE_SAVE_OFTEN",
-    ) {
+    if has_flag!(args, "icons-cache-save-often") {
         config.icons.cache_save_often = true;
     }
 
-    if cfg!(feature = "symlinks")
-        && is_present_or_env("allow-symlinks", "AUDIOSERVE_ALLOW_SYMLINKS")
-    {
+    if cfg!(feature = "symlinks") && has_flag!(args, "allow-symlinks") {
         config.allow_symlinks = true
     }
 
     #[cfg(feature = "tls")]
     {
-        if let Some(key) = args.value_of("ssl-key") {
-            let key_file = key.into();
-            let cert_file = args.value_of("ssl-cert").unwrap().into();
+        if let Some(key) = args.remove_one("ssl-key") {
+            let key_file = key;
+            let cert_file = args.remove_one("ssl-cert").unwrap();
             config.ssl = Some(SslConfig {
                 key_file,
                 cert_file,
@@ -666,81 +712,78 @@ where
 
     #[cfg(feature = "transcoding-cache")]
     {
-        if let Some(d) = args.value_of_os("t-cache-dir") {
-            config.transcoding.cache.root_dir = d.into()
+        if let Some(d) = args.remove_one("t-cache-dir") {
+            config.transcoding.cache.root_dir = d;
         }
 
-        if let Some(n) = args.value_of("t-cache-size") {
-            config.transcoding.cache.max_size = n.parse().unwrap()
+        if let Some(n) = args.remove_one("t-cache-size") {
+            config.transcoding.cache.max_size = n;
         }
 
-        if let Some(n) = args.value_of("t-cache-max-files") {
-            config.transcoding.cache.max_files = n.parse().unwrap()
+        if let Some(n) = args.remove_one("t-cache-max-files") {
+            config.transcoding.cache.max_files = n;
         }
 
-        if is_present_or_env("t-cache-disable", "AUDIOSERVE_T_CACHE_DISABLE") {
+        if has_flag!(args, "t-cache-disable") {
             config.transcoding.cache.disabled = true;
         }
 
-        if is_present_or_env("t-cache-save-often", "AUDIOSERVE_T_CACHE_SAVE_OFTEN") {
+        if has_flag!(args, "t-cache-save-often") {
             config.transcoding.cache.save_often = true;
         }
     };
     if cfg!(feature = "folder-download") {
-        if is_present_or_env(
-            "disable-folder-download",
-            "AUDIOSERVE_DISABLE_FOLDER_DOWNLOAD",
-        ) {
+        if has_flag!(args, "disable-folder-download") {
             config.disable_folder_download = true
         }
     } else {
         config.disable_folder_download = true
     };
 
-    if is_present_or_env("behind-proxy", "AUDIOSERVE_BEHIND_PROXY") {
+    if has_flag!(args, "behind-proxy") {
         config.behind_proxy = true;
     }
 
-    if let Some(d) = args.value_of("chapters-from-duration") {
-        config.chapters.from_duration = d.parse().unwrap()
+    if let Some(d) = args.remove_one("chapters-from-duration") {
+        config.chapters.from_duration = d;
     }
 
-    if let Some(d) = args.value_of("chapters-duration") {
-        config.chapters.duration = d.parse().unwrap()
+    if let Some(d) = args.remove_one("chapters-duration") {
+        config.chapters.duration = d;
     }
 
-    if is_present_or_env("no-dir-collaps", "AUDIOSERVE_NO_DIR_COLLAPS") {
+    if has_flag!(args, "no-dir-collaps") {
         config.no_dir_collaps = true;
     }
 
-    if is_present_or_env("ignore-chapters-meta", "AUDIOSERVE_IGNORE_CHAPTERS_META") {
+    if has_flag!(args, "ignore-chapters-meta") {
         config.ignore_chapters_meta = true;
     }
 
     #[cfg(feature = "shared-positions")]
     {
-        if let Some(ps) = args.value_of("positions-restore") {
-            config.positions.restore = ps.parse().expect("Value was checked by clap");
+        if let Some(ps) = args.remove_one("positions-restore") {
+            config.positions.restore = ps;
             no_authentication_confirmed = true;
         }
 
-        if let Some(positions_backup_file) = args.value_of_os("positions-backup-file") {
-            config.positions.backup_file = Some(positions_backup_file.into());
+        if let Some(positions_backup_file) = args.remove_one("positions-backup-file") {
+            config.positions.backup_file = Some(positions_backup_file);
         }
 
-        if let Some(positions_ws_timeout) = args.value_of("positions-ws-timeout") {
-            config.positions.ws_timeout = Duration::from_secs(positions_ws_timeout.parse().unwrap())
+        if let Some(positions_ws_timeout) = args.remove_one("positions-ws-timeout") {
+            config.positions.ws_timeout = Duration::from_secs(positions_ws_timeout)
         }
 
-        if let Some(positions_backup_schedule) = args.value_of("positions-backup-schedule") {
-            config.positions.backup_schedule = Some(positions_backup_schedule.into());
+        if let Some(positions_backup_schedule) = args.remove_one("positions-backup-schedule") {
+            config.positions.backup_schedule = Some(positions_backup_schedule);
         }
     }
 
     #[cfg(feature = "tags-encoding")]
     {
-        if let Some(enc) = args.value_of("tags-encoding") {
-            config.tags_encoding = Some(enc.into())
+        if let Some(enc) = args.remove_one("tags-encoding") {
+            config.tags_encoding = Some(enc)
         }
     }
 
@@ -751,16 +794,13 @@ where
         );
     }
 
-    if let Some(s) = args
-        .value_of("url-path-prefix")
-        .map(std::string::ToString::to_string)
-    {
+    if let Some(s) = args.remove_one("url-path-prefix") {
         config.url_path_prefix = Some(s);
     };
 
     config.check()?;
     config.prepare()?;
-    if args.is_present("print-config") {
+    if args.contains_id("print-config") {
         println!("{}", serde_yaml::to_string(&config).unwrap());
         exit(0);
     }
