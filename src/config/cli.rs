@@ -7,9 +7,7 @@ use clap::{
 };
 use collection::tags::{ALLOWED_TAGS, BASIC_TAGS};
 
-type Parser = Command;
-
-fn create_parser() -> Parser {
+fn create_parser() -> Command {
     let mut parser = Command::new(crate_name!())
         .version(LONG_VERSION)
         .author(crate_authors!())
@@ -469,14 +467,14 @@ macro_rules!  arg_error {
 
 }
 
-pub fn parse_args() -> Result<Config> {
-    parse_args_from(env::args_os())
-}
-
 macro_rules! has_flag {
     ($args:ident, $name:expr) => {
         $args.remove_one($name).unwrap_or_default()
     };
+}
+
+pub fn parse_args() -> Result<Config> {
+    parse_args_from(env::args_os())
 }
 
 // Although function  is bit too long it does not make sense to split, as it deals with each config option in very plain matter
