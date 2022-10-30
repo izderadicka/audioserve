@@ -7,64 +7,64 @@ use clap::{
 };
 use collection::tags::{ALLOWED_TAGS, BASIC_TAGS};
 
-const ARG_CONFIG:&str = "config";
-const ARG_FEATURES:&str = "features";
-const ARG_PRINT_CONFIG:&str = "print-config";
-const ARG_DATA_DIR:&str = "data-dir";
-const ARG_DEBUG:&str = "debug";
-const ARG_LISTEN:&str = "listen";
-const ARG_THREAD_POOL_LARGE:&str = "thread-pool-large";
-const ARG_THREAD_POOL_KEEP_ALIVE_SECS:&str = "thread-pool-keep-alive-secs";
-const ARG_BASE_DIR:&str = "base-dir";
-const ARG_HELP_DIR_OPTIONS:&str = "help-dir-options";
-const ARG_HELP_TAGS:&str = "help-tags";
-const ARG_TAGS:&str = "tags";
-const ARG_TAGS_CUSTOM:&str = "tags-custom";
-const ARG_NO_AUTHENTICATION:&str = "no-authentication";
-const ARG_SHARED_SECRET:&str = "shared-secret";
-const ARG_LIMIT_RATE:&str = "limit-rate";
-const ARG_SHARED_SECRET_FILE:&str = "shared-secret-file";
-const ARG_TRANSCODING_MAX_PARALLEL_PROCESSES:&str = "transcoding-max-parallel-processes";
-const ARG_TRANSCODING_MAX_RUNTIME:&str = "transcoding-max-runtime";
-const ARG_TOKEN_VALIDITY_DAYS:&str = "token-validity-days";
-const ARG_CLIENT_DIR:&str = "client-dir";
-const ARG_SECRET_FILE:&str = "secret-file";
-const ARG_CORS:&str = "cors";
-const ARG_CORS_REGEX:&str = "cors-regex";
-const ARG_CHAPTERS_FROM_DURATION:&str = "chapters-from-duration";
-const ARG_CHAPTERS_DURATION:&str = "chapters-duration";
-const ARG_NO_DIR_COLLAPS:&str = "no-dir-collaps";
-const ARG_IGNORE_CHAPTERS_META:&str = "ignore-chapters-meta";
-const ARG_URL_PATH_PREFIX:&str = "url-path-prefix";
-const ARG_FORCE_CACHE_UPDATE:&str = "force-cache-update";
-const ARG_STATIC_RESOURCE_CACHE_AGE:&str = "static-resource-cache-age";
-const ARG_FOLDER_FILE_CACHE_AGE:&str = "folder-file-cache-age";
-const ARG_COLLAPSE_CD_FOLDERS:&str = "collapse-cd-folders";
-const ARG_CD_FOLDER_REGEX:&str = "cd-folder-regex";
-const ARG_ICONS_CACHE_DIR:&str = "icons-cache-dir";
-const ARG_ICONS_CACHE_SIZE:&str = "icons-cache-size";
-const ARG_ICONS_CACHE_MAX_FILES:&str = "icons-cache-max-files";
-const ARG_ICONS_CACHE_DISABLE:&str = "icons-cache-disable";
-const ARG_ICONS_CACHE_SAVE_OFTEN:&str = "icons-cache-save-often";
-const ARG_ICONS_SIZE:&str = "icons-size";
-const ARG_ICONS_FAST_SCALING:&str = "icons-fast-scaling";
-const ARG_BEHIND_PROXY:&str = "behind-proxy";
-const ARG_DISABLE_FOLDER_DOWNLOAD:&str = "disable-folder-download";
-const ARG_SSL_KEY:&str = "ssl-key";
-const ARG_SSL_CERT:&str = "ssl-cert";
-const ARG_SSL_KEY_PASSWORD:&str = "ssl-key-password";
-const ARG_POSITIONS_BACKUP_FILE:&str = "positions-backup-file";
-const ARG_POSITIONS_WS_TIMEOUT:&str = "positions-ws-timeout";
-const ARG_POSITIONS_RESTORE:&str = "positions-restore";
-const ARG_POSITIONS_BACKUP_SCHEDULE:&str = "positions-backup-schedule";
-const ARG_ALLOW_SYMLINKS:&str = "allow-symlinks";
-const ARG_TAGS_ENCODING:&str = "tags-encoding";
-const ARG_SEARCH_CACHE:&str = "search-cache";
-const ARG_T_CACHE_DIR:&str = "t-cache-dir";
-const ARG_T_CACHE_SIZE:&str = "t-cache-size";
-const ARG_T_CACHE_MAX_FILES:&str = "t-cache-max-files";
-const ARG_T_CACHE_DISABLE:&str = "t-cache-disable";
-const ARG_T_CACHE_SAVE_OFTEN:&str = "t-cache-save-often";
+const ARG_CONFIG: &str = "config";
+const ARG_FEATURES: &str = "features";
+const ARG_PRINT_CONFIG: &str = "print-config";
+const ARG_DATA_DIR: &str = "data-dir";
+const ARG_DEBUG: &str = "debug";
+const ARG_LISTEN: &str = "listen";
+const ARG_THREAD_POOL_LARGE: &str = "thread-pool-large";
+const ARG_THREAD_POOL_KEEP_ALIVE_SECS: &str = "thread-pool-keep-alive-secs";
+const ARG_BASE_DIR: &str = "base-dir";
+const ARG_HELP_DIR_OPTIONS: &str = "help-dir-options";
+const ARG_HELP_TAGS: &str = "help-tags";
+const ARG_TAGS: &str = "tags";
+const ARG_TAGS_CUSTOM: &str = "tags-custom";
+const ARG_NO_AUTHENTICATION: &str = "no-authentication";
+const ARG_SHARED_SECRET: &str = "shared-secret";
+const ARG_LIMIT_RATE: &str = "limit-rate";
+const ARG_SHARED_SECRET_FILE: &str = "shared-secret-file";
+const ARG_TRANSCODING_MAX_PARALLEL_PROCESSES: &str = "transcoding-max-parallel-processes";
+const ARG_TRANSCODING_MAX_RUNTIME: &str = "transcoding-max-runtime";
+const ARG_TOKEN_VALIDITY_DAYS: &str = "token-validity-days";
+const ARG_CLIENT_DIR: &str = "client-dir";
+const ARG_SECRET_FILE: &str = "secret-file";
+const ARG_CORS: &str = "cors";
+const ARG_CORS_REGEX: &str = "cors-regex";
+const ARG_CHAPTERS_FROM_DURATION: &str = "chapters-from-duration";
+const ARG_CHAPTERS_DURATION: &str = "chapters-duration";
+const ARG_NO_DIR_COLLAPS: &str = "no-dir-collaps";
+const ARG_IGNORE_CHAPTERS_META: &str = "ignore-chapters-meta";
+const ARG_URL_PATH_PREFIX: &str = "url-path-prefix";
+const ARG_FORCE_CACHE_UPDATE: &str = "force-cache-update";
+const ARG_STATIC_RESOURCE_CACHE_AGE: &str = "static-resource-cache-age";
+const ARG_FOLDER_FILE_CACHE_AGE: &str = "folder-file-cache-age";
+const ARG_COLLAPSE_CD_FOLDERS: &str = "collapse-cd-folders";
+const ARG_CD_FOLDER_REGEX: &str = "cd-folder-regex";
+const ARG_ICONS_CACHE_DIR: &str = "icons-cache-dir";
+const ARG_ICONS_CACHE_SIZE: &str = "icons-cache-size";
+const ARG_ICONS_CACHE_MAX_FILES: &str = "icons-cache-max-files";
+const ARG_ICONS_CACHE_DISABLE: &str = "icons-cache-disable";
+const ARG_ICONS_CACHE_SAVE_OFTEN: &str = "icons-cache-save-often";
+const ARG_ICONS_SIZE: &str = "icons-size";
+const ARG_ICONS_FAST_SCALING: &str = "icons-fast-scaling";
+const ARG_BEHIND_PROXY: &str = "behind-proxy";
+const ARG_DISABLE_FOLDER_DOWNLOAD: &str = "disable-folder-download";
+const ARG_SSL_KEY: &str = "ssl-key";
+const ARG_SSL_CERT: &str = "ssl-cert";
+const ARG_SSL_KEY_PASSWORD: &str = "ssl-key-password";
+const ARG_POSITIONS_BACKUP_FILE: &str = "positions-backup-file";
+const ARG_POSITIONS_WS_TIMEOUT: &str = "positions-ws-timeout";
+const ARG_POSITIONS_RESTORE: &str = "positions-restore";
+const ARG_POSITIONS_BACKUP_SCHEDULE: &str = "positions-backup-schedule";
+const ARG_ALLOW_SYMLINKS: &str = "allow-symlinks";
+const ARG_TAGS_ENCODING: &str = "tags-encoding";
+const ARG_SEARCH_CACHE: &str = "search-cache";
+const ARG_T_CACHE_DIR: &str = "t-cache-dir";
+const ARG_T_CACHE_SIZE: &str = "t-cache-size";
+const ARG_T_CACHE_MAX_FILES: &str = "t-cache-max-files";
+const ARG_T_CACHE_DISABLE: &str = "t-cache-disable";
+const ARG_T_CACHE_SAVE_OFTEN: &str = "t-cache-save-often";
 
 fn create_parser() -> Command {
     let mut parser = Command::new(crate_name!())
@@ -321,7 +321,7 @@ fn create_parser() -> Command {
             .long(ARG_ICONS_CACHE_SIZE)
             .num_args(1)
             .env("AUDIOSERVE_ICONS_CACHE_SIZE")
-            .value_parser(value_parser!(u64))
+            .value_parser(value_parser!(u32))
             .help("Max size of icons cache in MBi, when reached LRU items are deleted, [default is 100]")
         ).arg(
             Arg::new(ARG_ICONS_CACHE_MAX_FILES)
@@ -352,7 +352,7 @@ fn create_parser() -> Command {
             .long(ARG_ICONS_SIZE)
             .num_args(1)
             .env("AUDIOSERVE_ICONS_SIZE")
-            .value_parser(value_parser!(u64))
+            .value_parser(value_parser!(u32))
             .help("Size of folder icon in pixels, [default is 128]")
         )
         .arg(
@@ -483,7 +483,7 @@ fn create_parser() -> Command {
             .long(ARG_T_CACHE_SIZE)
             .num_args(1)
             .env("AUDIOSERVE_T_CACHE_SIZE")
-            .value_parser(value_parser!(u64))
+            .value_parser(value_parser!(u32))
             .help("Max size of transcoding cache in MBi, when reached LRU items are deleted, [default is 1024]")
         ).arg(
             Arg::new(ARG_T_CACHE_MAX_FILES)
@@ -529,6 +529,28 @@ macro_rules!  arg_error {
 macro_rules! has_flag {
     ($args:ident, $name:expr) => {
         $args.remove_one($name).unwrap_or_default()
+    };
+}
+
+macro_rules! set_config {
+    ($args:ident, $cfg: expr,  Some($arg:expr)) => {
+        if let Some(n) = $args.remove_one($arg) {
+            $cfg = Some(n);
+        }
+    };
+
+    ($args:ident, $cfg: expr, $arg:expr) => {
+        if let Some(n) = $args.remove_one($arg) {
+            $cfg = n;
+        }
+    };
+}
+
+macro_rules! set_config_flag {
+    ($args:ident, $cfg: expr, $arg:expr) => {
+        if has_flag!($args, $arg) {
+            $cfg = true;
+        }
     };
 }
 
@@ -651,17 +673,17 @@ where
         config.set_shared_secret_from_file(file)?
     };
 
-    if let Some(r) = args.remove_one(ARG_LIMIT_RATE) {
-        config.limit_rate = Some(r)
-    }
-
-    if let Some(n) = args.remove_one(ARG_TRANSCODING_MAX_PARALLEL_PROCESSES) {
-        config.transcoding.max_parallel_processes = n;
-    }
-
-    if let Some(n) = args.remove_one(ARG_TRANSCODING_MAX_RUNTIME) {
-        config.transcoding.max_runtime_hours = n;
-    }
+    set_config!(args, config.limit_rate, Some(ARG_LIMIT_RATE));
+    set_config!(
+        args,
+        config.transcoding.max_parallel_processes,
+        ARG_TRANSCODING_MAX_PARALLEL_PROCESSES
+    );
+    set_config!(
+        args,
+        config.transcoding.max_runtime_hours,
+        ARG_TRANSCODING_MAX_RUNTIME
+    );
 
     if let Some(v) = args.remove_one(ARG_THREAD_POOL_KEEP_ALIVE_SECS) {
         config.thread_pool.keep_alive = Some(Duration::from_secs(v))
@@ -670,13 +692,8 @@ where
     if let Some(validity) = args.remove_one::<u32>(ARG_TOKEN_VALIDITY_DAYS) {
         config.token_validity_hours = validity * 24
     }
-
-    if let Some(client_dir) = args.remove_one(ARG_CLIENT_DIR) {
-        config.client_dir = client_dir;
-    }
-    if let Some(secret_file) = args.remove_one(ARG_SECRET_FILE) {
-        config.secret_file = secret_file;
-    }
+    set_config!(args, config.client_dir, ARG_CLIENT_DIR);
+    set_config!(args, config.secret_file, ARG_SECRET_FILE);
 
     if has_flag!(args, ARG_CORS) {
         config.cors = match args.remove_one(ARG_CORS_REGEX) {
@@ -694,10 +711,11 @@ where
             None => Some(CollapseCDFolderConfig::default()),
         }
     }
-
-    if has_flag!(args, ARG_FORCE_CACHE_UPDATE) {
-        config.force_cache_update_on_init = true
-    }
+    set_config_flag!(
+        args,
+        config.force_cache_update_on_init,
+        ARG_FORCE_CACHE_UPDATE
+    );
 
     if let Some(tags) = args.remove_many(ARG_TAGS_CUSTOM) {
         for t in tags {
@@ -728,29 +746,29 @@ where
         config.folder_file_cache_age = parse_cache_age(age)?;
     }
 
-    if let Some(n) = args.remove_one(ARG_ICONS_SIZE) {
-        config.icons.size = n;
-    }
+    set_config!(args, config.icons.size, ARG_ICONS_SIZE);
+    set_config!(args, config.icons.cache_dir, ARG_ICONS_CACHE_DIR);
+    set_config!(args, config.icons.cache_max_size, ARG_ICONS_CACHE_SIZE);
+    set_config_flag!(args, config.icons.cache_disabled, ARG_ICONS_CACHE_DISABLE);
+    set_config_flag!(args, config.icons.fast_scaling, ARG_ICONS_FAST_SCALING);
+    set_config_flag!(
+        args,
+        config.icons.cache_save_often,
+        ARG_ICONS_CACHE_SAVE_OFTEN
+    );
 
-    if let Some(d) = args.remove_one(ARG_ICONS_CACHE_DIR) {
-        config.icons.cache_dir = d;
-    }
+    set_config!(args, config.url_path_prefix, Some(ARG_URL_PATH_PREFIX));
 
-    if let Some(n) = args.remove_one(ARG_ICONS_CACHE_SIZE) {
-        config.icons.cache_max_size = n;
-    }
+    set_config!(
+        args,
+        config.chapters.from_duration,
+        ARG_CHAPTERS_FROM_DURATION
+    );
+    set_config!(args, config.chapters.duration, ARG_CHAPTERS_DURATION);
+    set_config_flag!(args, config.no_dir_collaps, ARG_NO_DIR_COLLAPS);
+    set_config_flag!(args, config.ignore_chapters_meta, ARG_IGNORE_CHAPTERS_META);
 
-    if has_flag!(args, ARG_ICONS_CACHE_DISABLE) {
-        config.icons.cache_disabled = true;
-    }
-
-    if has_flag!(args, ARG_ICONS_FAST_SCALING) {
-        config.icons.fast_scaling = true;
-    }
-
-    if has_flag!(args, ARG_ICONS_CACHE_SAVE_OFTEN) {
-        config.icons.cache_save_often = true;
-    }
+    // Arguments for optional features
 
     if cfg!(feature = "symlinks") && has_flag!(args, ARG_ALLOW_SYMLINKS) {
         config.allow_symlinks = true
@@ -771,52 +789,35 @@ where
 
     #[cfg(feature = "transcoding-cache")]
     {
-        if let Some(d) = args.remove_one(ARG_T_CACHE_DIR) {
-            config.transcoding.cache.root_dir = d;
-        }
-
-        if let Some(n) = args.remove_one(ARG_T_CACHE_SIZE) {
-            config.transcoding.cache.max_size = n;
-        }
-
-        if let Some(n) = args.remove_one(ARG_T_CACHE_MAX_FILES) {
-            config.transcoding.cache.max_files = n;
-        }
-
-        if has_flag!(args, ARG_T_CACHE_DISABLE) {
-            config.transcoding.cache.disabled = true;
-        }
-
-        if has_flag!(args, ARG_T_CACHE_SAVE_OFTEN) {
-            config.transcoding.cache.save_often = true;
-        }
+        set_config!(args, config.transcoding.cache.root_dir, ARG_T_CACHE_DIR);
+        set_config!(args, config.transcoding.cache.max_size, ARG_T_CACHE_SIZE);
+        set_config!(
+            args,
+            config.transcoding.cache.max_files,
+            ARG_T_CACHE_MAX_FILES
+        );
+        set_config_flag!(args, config.transcoding.cache.disabled, ARG_T_CACHE_DISABLE);
+        set_config_flag!(
+            args,
+            config.transcoding.cache.save_often,
+            ARG_T_CACHE_SAVE_OFTEN
+        );
     };
+
     if cfg!(feature = "folder-download") {
-        if has_flag!(args, ARG_DISABLE_FOLDER_DOWNLOAD) {
-            config.disable_folder_download = true
-        }
+        set_config_flag!(
+            args,
+            config.disable_folder_download,
+            ARG_DISABLE_FOLDER_DOWNLOAD
+        );
     } else {
         config.disable_folder_download = true
-    };
-
-    if has_flag!(args, ARG_BEHIND_PROXY) {
-        config.behind_proxy = true;
     }
 
-    if let Some(d) = args.remove_one(ARG_CHAPTERS_FROM_DURATION) {
-        config.chapters.from_duration = d;
-    }
-
-    if let Some(d) = args.remove_one(ARG_CHAPTERS_DURATION) {
-        config.chapters.duration = d;
-    }
-
-    if has_flag!(args, ARG_NO_DIR_COLLAPS) {
-        config.no_dir_collaps = true;
-    }
-
-    if has_flag!(args, ARG_IGNORE_CHAPTERS_META) {
-        config.ignore_chapters_meta = true;
+    if cfg!(feature = "behind-proxy") {
+        set_config_flag!(args, config.behind_proxy, ARG_BEHIND_PROXY);
+    } else {
+        config.behind_proxy = false;
     }
 
     #[cfg(feature = "shared-positions")]
@@ -825,25 +826,25 @@ where
             config.positions.restore = ps;
             no_authentication_confirmed = true;
         }
-
-        if let Some(positions_backup_file) = args.remove_one(ARG_POSITIONS_BACKUP_FILE) {
-            config.positions.backup_file = Some(positions_backup_file);
-        }
+        set_config!(
+            args,
+            config.positions.backup_file,
+            ARG_POSITIONS_BACKUP_FILE
+        );
 
         if let Some(positions_ws_timeout) = args.remove_one(ARG_POSITIONS_WS_TIMEOUT) {
             config.positions.ws_timeout = Duration::from_secs(positions_ws_timeout)
         }
-
-        if let Some(positions_backup_schedule) = args.remove_one(ARG_POSITIONS_BACKUP_SCHEDULE) {
-            config.positions.backup_schedule = Some(positions_backup_schedule);
-        }
+        set_config!(
+            args,
+            config.positions.backup_schedule,
+            ARG_POSITIONS_BACKUP_SCHEDULE
+        );
     }
 
     #[cfg(feature = "tags-encoding")]
     {
-        if let Some(enc) = args.remove_one(ARG_TAGS_ENCODING) {
-            config.tags_encoding = Some(enc)
-        }
+        set_config!(args, config.tags_encoding, Some(ARG_TAGS_ENCODING));
     }
 
     if !no_authentication_confirmed && config.shared_secret.is_none() {
@@ -852,10 +853,6 @@ where
             "Shared secret is None, but no authentication is not confirmed"
         );
     }
-
-    if let Some(s) = args.remove_one(ARG_URL_PATH_PREFIX) {
-        config.url_path_prefix = Some(s);
-    };
 
     config.check()?;
     config.prepare()?;
