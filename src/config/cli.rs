@@ -1,7 +1,9 @@
-use std::process::exit;
+use std::{env, fs::File, net::SocketAddr, path::PathBuf, process::exit};
 
-use super::validators::*;
-use super::*;
+use super::{
+    base_data_dir, validators::*, CollapseCDFolderConfig, Config, Cors, CorsConfig, Error, Result,
+    SslConfig, ThreadPoolConfig, BASE_DATA_DIR, FEATURES, LONG_VERSION,
+};
 use clap::{
     builder::FalseyValueParser, crate_authors, crate_name, value_parser, Arg, ArgAction, Command,
 };
@@ -121,7 +123,7 @@ fn create_parser() -> Command {
             .num_args(1)
             .help("Threads in pool will shutdown after given seconds, if there is no work. Default is to keep threads forever.")
             .env("AUDIOSERVE_THREAD_POOL_KEEP_ALIVE")
-            .value_parser(value_parser!(u64))
+            .value_parser(duration_secs)
             )
         .arg(Arg::new(ARG_BASE_DIR)
             .value_name("BASE_DIR")
@@ -364,6 +366,11 @@ fn create_parser() -> Command {
             .help("Use faster image scaling (linear triangle), by default slower, but better method (Lanczos3)")
         );
 
+    // deprecated
+    parser = parser.arg(Arg::new(ARG_SEARCH_CACHE).long(ARG_SEARCH_CACHE).help(
+        "Deprecated: does nothing. For caching config use :<options> on individual collections dirs params",
+    ));
+
     if cfg!(feature = "behind-proxy") {
         parser = parser.arg(Arg::new(ARG_BEHIND_PROXY)
         .long(ARG_BEHIND_PROXY)
@@ -420,7 +427,7 @@ fn create_parser() -> Command {
         .arg(
             Arg::new(ARG_POSITIONS_WS_TIMEOUT)
             .long(ARG_POSITIONS_WS_TIMEOUT)
-            .value_parser(value_parser!(u64))
+            .value_parser(duration_secs)
             .env("AUDIOSERVE_POSITIONS_WS_TIMEOUT")
             .help("Timeout in seconds for idle websocket connection use for playback position sharing [default 600s]")
         )
@@ -465,10 +472,6 @@ fn create_parser() -> Command {
                 ),
         )
     }
-
-    parser = parser.arg(Arg::new(ARG_SEARCH_CACHE).long(ARG_SEARCH_CACHE).help(
-        "Deprecated: does nothing. For caching config use :<options> on individual collections dirs params",
-    ));
 
     if cfg!(feature = "transcoding-cache") {
         parser=parser.arg(
@@ -685,9 +688,11 @@ where
         ARG_TRANSCODING_MAX_RUNTIME
     );
 
-    if let Some(v) = args.remove_one(ARG_THREAD_POOL_KEEP_ALIVE_SECS) {
-        config.thread_pool.keep_alive = Some(Duration::from_secs(v))
-    }
+    set_config!(
+        args,
+        config.thread_pool.keep_alive,
+        Some(ARG_THREAD_POOL_KEEP_ALIVE_SECS)
+    );
 
     if let Some(validity) = args.remove_one::<u32>(ARG_TOKEN_VALIDITY_DAYS) {
         config.token_validity_hours = validity * 24
@@ -831,10 +836,7 @@ where
             config.positions.backup_file,
             ARG_POSITIONS_BACKUP_FILE
         );
-
-        if let Some(positions_ws_timeout) = args.remove_one(ARG_POSITIONS_WS_TIMEOUT) {
-            config.positions.ws_timeout = Duration::from_secs(positions_ws_timeout)
-        }
+        set_config!(args, config.positions.ws_timeout, ARG_POSITIONS_WS_TIMEOUT);
         set_config!(
             args,
             config.positions.backup_schedule,
@@ -925,6 +927,8 @@ fn print_tags(list: &[&str]) {
 mod test {
     use super::*;
     use crate::config::init::init_default_config;
+    use std::path::Path;
+    use std::time::Duration;
     #[test]
     fn test_basic_args() {
         init_default_config();

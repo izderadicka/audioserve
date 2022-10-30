@@ -1,7 +1,7 @@
-use anyhow::bail;
+use anyhow::{bail, Context};
 
 use crate::util;
-use std::path::{Path, PathBuf};
+use std::{path::{Path, PathBuf}, time::Duration};
 
 pub fn is_existing_dir(p: &str) -> Result<PathBuf, anyhow::Error> {
     let p = Path::new(p);
@@ -35,4 +35,9 @@ pub fn is_valid_url_path_prefix(s: &str) -> Result<String, anyhow::Error> {
     } else {
         bail!("Must start with / but not end with it");
     }
+}
+
+pub fn duration_secs(s: &str) -> Result<Duration, anyhow::Error> {
+    let secs: u64 = s.parse().context("Invalid Duration")?;
+    Ok(Duration::from_secs(secs))
 }
