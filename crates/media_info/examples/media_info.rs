@@ -2,8 +2,8 @@ extern crate media_info;
 
 use std::{fs::File, io::Write, path::PathBuf};
 
-use media_info::MediaFile;
 use clap::Parser;
+use media_info::MediaFile;
 
 // macro_rules! print_meta {
 //     ($mf: ident $($name:ident)+) => {

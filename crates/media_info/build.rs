@@ -1,7 +1,8 @@
 fn main() {
     const FFMPEG_VERSION: &str = "ffmpeg-5.0.1";
     let ffi_src = format!("src/ffi_{}.rs", FFMPEG_VERSION);
-    let  ffi_target = std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("current_ffi.rs");
+    let ffi_target =
+        std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("current_ffi.rs");
     std::fs::copy(ffi_src, ffi_target).unwrap();
     #[cfg(any(feature = "static", feature = "partially-static"))]
     {
