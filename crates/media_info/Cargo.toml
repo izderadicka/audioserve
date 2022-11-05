@@ -10,7 +10,7 @@ thiserror = "1.0"
 encoding = {version="0.2", optional=true}
 
 [dev-dependencies]
-structopt ="0.3"
+clap ={version="4", features=["derive"]}
 
 [features]
 static=[]

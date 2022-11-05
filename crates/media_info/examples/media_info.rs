@@ -3,7 +3,7 @@ extern crate media_info;
 use std::{fs::File, io::Write, path::PathBuf};
 
 use media_info::MediaFile;
-use structopt::StructOpt;
+use clap::Parser;
 
 // macro_rules! print_meta {
 //     ($mf: ident $($name:ident)+) => {
@@ -15,24 +15,24 @@ use structopt::StructOpt;
 //     };
 // }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 struct Opts {
-    #[structopt(name = "FILE", help = "audio file")]
+    #[arg(name = "FILE", help = "audio file")]
     file_name: String,
 
-    #[structopt(long, help = "do not display basic info")]
+    #[arg(long, help = "do not display basic info")]
     no_basic: bool,
 
-    #[structopt(long, help = "display chapters info")]
+    #[arg(long, help = "display chapters info")]
     chapters: bool,
 
-    #[structopt(long, help = "do not diplay tags")]
+    #[arg(long, help = "do not diplay tags")]
     no_tags: bool,
 
-    #[structopt(long, help = "do not diplay streams")]
+    #[arg(long, help = "do not diplay streams")]
     no_streams: bool,
 
-    #[structopt(long, help = "write cover to file")]
+    #[arg(long, help = "write cover to file")]
     cover_file: Option<PathBuf>,
 }
 
@@ -49,7 +49,7 @@ fn pretty_time(mut time: u64) -> String {
 }
 
 fn main() {
-    let opts = Opts::from_args();
+    let opts = Opts::parse();
     media_info::init();
 
     let mf =
