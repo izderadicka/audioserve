@@ -1,4 +1,10 @@
 #! /bin/bash
+
+if [[ -z "$FFMPEG_VERSION" ]]; then
+  echo FFMPEG_VERSION environmet variable must be defined like FFMPEG_VERSION=ffmpeg-4.1.5 >&2
+  exit 2
+fi
+
 bindgen \
 --no-doc-comments \
 --whitelist-type AVFormatContext \
@@ -18,5 +24,5 @@ bindgen \
 --whitelist-var AV_LOG_QUIET \
 --whitelist-var AV_DICT_IGNORE_SUFFIX \
 --whitelist-var AV_TIME_BASE \
-wrapper.h -- -I ffmpeg-4.3.1 \
-> src/ffi.rs
+wrapper.h -- -I $FFMPEG_VERSION \
+> src/ffi_$FFMPEG_VERSION.rs

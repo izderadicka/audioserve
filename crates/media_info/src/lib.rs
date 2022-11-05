@@ -184,7 +184,7 @@ fn check_ret(res: i32) -> Result<()> {
 pub fn init() {
     unsafe {
         ffi::av_log_set_level(ffi::AV_LOG_QUIET);
-        ffi::av_register_all()
+        //ffi::av_register_all()
     }
 }
 
@@ -360,7 +360,7 @@ impl MediaFile {
                 let start = norm_time(chap.start, chap.time_base);
                 let end = norm_time(chap.end, chap.time_base);
                 c.push(Chapter {
-                    num,
+                    num: num.try_into().unwrap_or(std::i32::MAX),
                     title,
                     start,
                     end,
