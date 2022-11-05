@@ -1,5 +1,5 @@
 fn main() {
-    const FFMPEG_VERSION: &str = "ffmpeg-5.0.1";
+    const FFMPEG_VERSION: &str = "ffmpeg-4.3.1"; //"ffmpeg-5.0.1";
     let ffi_src = format!("src/ffi_{}.rs", FFMPEG_VERSION);
     let ffi_target =
         std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("current_ffi.rs");
