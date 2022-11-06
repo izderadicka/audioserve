@@ -6,6 +6,8 @@ See [example code](examples/media_info.rs) for usage.
 
 ## requirements
 
-Under Linux you'll need regular build environment (gcc, make ...) and nasm/yasm and zlib and bz2lib to build this crate.
+Under Linux you'll need regular build environment (gcc, make, pkg-config ...) and nasm/yasm and zlib and bz2lib to build this crate.
 
-Build process requires wget and access to Internet to get ffmpeg-4.1 source.
+Can also be statically linked with ffmpeg libraries - features partially-static or static (former statically links only ffmpeg libraries, later tries to link everything statically).
+
+Static build process requires wget and access to Internet to get ffmpeg source.

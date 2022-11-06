@@ -1,6 +1,46 @@
+const FFMPEG_VERSION_4: &str = "ffmpeg-4.3.1";
+const FFMPEG_VERSION_5: &str = "ffmpeg-5.0.1";
+
+macro_rules! warn {
+    ($fmt:literal $(, $arg:expr)* ) => {
+        println!(concat!("cargo:warning=", $fmt), $($arg)*)
+    };
+}
+
+fn parse_main_version(version: &str) -> Option<u32> {
+    let mut parts = version.split('.');
+    parts.next().and_then(|first| first.parse().ok())
+}
+
 fn main() {
-    const FFMPEG_VERSION: &str = "ffmpeg-4.3.1"; //"ffmpeg-5.0.1";
-    let ffi_src = format!("src/ffi_{}.rs", FFMPEG_VERSION);
+    println!("cargo:rerun-if-changed=build.rs");
+    let ffmpeg_version = if cfg!(feature = "static") || cfg!(feature = "partially-static") {
+        FFMPEG_VERSION_5
+    } else {
+        match pkg_config::probe_library("libavformat") {
+            Ok(lib) => {
+                if let Some(version) = parse_main_version(&lib.version) {
+                    if version > 59 {
+                        warn!("libavformat is too new - will try latest ffi, but may not work");
+                        FFMPEG_VERSION_5
+                    } else if version == 59 {
+                        FFMPEG_VERSION_5
+                    } else if version == 58 {
+                        FFMPEG_VERSION_4
+                    } else {
+                        panic!("libavformat version is too old {}", lib.version);
+                    }
+                } else {
+                    panic!("Invalid version of libavformat: {}", lib.version);
+                }
+            }
+            Err(e) => {
+                warn!("Cannot find libavformat: {}", e);
+                FFMPEG_VERSION_4
+            }
+        }
+    };
+    let ffi_src = format!("src/ffi_{}.rs", ffmpeg_version);
     let ffi_target =
         std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("current_ffi.rs");
     std::fs::copy(ffi_src, ffi_target).unwrap();
@@ -11,14 +51,14 @@ fn main() {
         use std::process;
 
         let out_dir = env::var("OUT_DIR").unwrap();
-        let ffmpeg_dir = path::Path::new(&out_dir).join(FFMPEG_VERSION);
+        let ffmpeg_dir = path::Path::new(&out_dir).join(ffmpeg_version);
         if !ffmpeg_dir.exists() {
             use std::fs::File;
             let fflog = File::create(path::Path::new(&out_dir).join("ffmpeg-compilation.log"))
                 .expect("cannot create log file");
             let rc = process::Command::new("./build_ffmpeg.sh")
                 .arg(&out_dir)
-                .env("FFMPEG_VERSION", FFMPEG_VERSION)
+                .env("FFMPEG_VERSION", ffmpeg_version)
                 .stdout(fflog.try_clone().expect("Cannot clone file"))
                 .stderr(fflog)
                 .status()
@@ -37,15 +77,15 @@ fn main() {
         println!("cargo:rustc-link-lib=static=avcodec");
         println!(
             "cargo:rustc-link-search=native={}/{}/libavformat",
-            out_dir, FFMPEG_VERSION
+            out_dir, ffmpeg_version
         );
         println!(
             "cargo:rustc-link-search=native={}/{}/libavutil",
-            out_dir, FFMPEG_VERSION
+            out_dir, ffmpeg_version
         );
         println!(
             "cargo:rustc-link-search=native={}/{}/libavcodec",
-            out_dir, FFMPEG_VERSION
+            out_dir, ffmpeg_version
         );
     }
 

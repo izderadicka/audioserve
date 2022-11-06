@@ -2,14 +2,14 @@ ARG CARGO_ARGS
 ARG CARGO_RELEASE="release"
 ARG OLD_CLIENT
 
-FROM alpine:3.15 AS build
+FROM alpine:3.16 AS build
 LABEL maintainer="Ivan <ivan@zderadicka.eu>"
 
 ARG CARGO_ARGS
 ARG CARGO_RELEASE
 
 RUN apk update &&\
-    apk add git bash curl yasm build-base \
+    apk add git bash curl yasm build-base pkgconfig \
     wget libbz2 bzip2-dev zlib zlib-dev rust cargo ffmpeg-dev ffmpeg \
     clang clang-dev gawk ctags llvm-dev icu icu-libs icu-dev
 

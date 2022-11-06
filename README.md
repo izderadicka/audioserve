@@ -435,7 +435,7 @@ You can also create your own static build with script `build_static.sh` (Docker 
 
 ### Local build (Linux)
 
-Now audioserve depends on ffmpeg's libavformat 4.3/4.4 (and its dependent libavutil and libavcodec libs), which is a complex beast. If you are building locally you need this dependence (plus couple of others). If you have available right version on your system you can dynamically link against it (remember it has to be correct version, if you have wrong wersion you'll probably see Segmentation Faults when running the program). Other option is to use feature `partially-static`, which will download right version of ffmpeg, compile it and statically link it into audioserve (but then binary will be indeed bigger).
+Now audioserve depends on ffmpeg's libavformat 4.3/4.4 or 5.0/5.1 (and its dependent libavutil and libavcodec libs), which is a complex beast. If you are building locally you need this dependence (plus couple of others). If you have available right versions on your system you can dynamically link against it (remember it has to be correct version, if you have wrong wersion you'll probably see Segmentation Faults when running the program). Other option is to use feature `partially-static`, which will download right version of ffmpeg, compile it and statically link it into audioserve (but then binary will be indeed bigger).
 
 Install required dependencies (some dependencies are optional, depending on features chosen in build):
 
@@ -467,7 +467,7 @@ git clone https://github.com/izderadicka/audioserve-web.git /audioserve_client &
     mv public dist  # The directory that audioserve will recognize as --client-dir
 ```
 
-Optionally you can build old client (in its directory `cd client`):
+Alternativelly you can build old client (which is still in this repo, chage to its directory `cd client`):
 
     npm install
     npm run build

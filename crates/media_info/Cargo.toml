@@ -12,6 +12,9 @@ encoding = {version="0.2", optional=true}
 [dev-dependencies]
 clap ={version="4", features=["derive"]}
 
+[build-dependencies]
+pkg-config="0.3"
+
 [features]
 static=[]
 partially-static=[]
