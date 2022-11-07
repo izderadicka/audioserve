@@ -44,7 +44,7 @@ RUN if [[ -n "$OLD_CLIENT" ]]; then \
     mv public dist ;\
     fi
 
-FROM alpine:3.15
+FROM alpine:3.16
 
 ARG CARGO_ARGS
 ARG CARGO_RELEASE
