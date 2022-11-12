@@ -49,35 +49,38 @@ impl CollectionCache {
     ) -> Result<CollectionCache> {
         let root_path = path.into();
         let db_path = CollectionCache::db_path(&root_path, &db_dir)?;
-        let mut options_file = db_path.clone();
-        options_file.set_extension("options.json");
-        let mut force_update = opt.force_cache_update_on_init;
+        let mut force_update = opt.force_cache_update_on_init && !opt.read_only;
 
-        let save_options = || match File::create(&options_file) {
-            Ok(f) => match serde_json::to_writer(f, &opt) {
-                Ok(_) => debug!("Created options file {:?}", options_file),
+        if !opt.read_only {
+            let mut options_file = db_path.clone();
+            options_file.set_extension("options.json");
+
+            let save_options = || match File::create(&options_file) {
+                Ok(f) => match serde_json::to_writer(f, &opt) {
+                    Ok(_) => debug!("Created options file {:?}", options_file),
+                    Err(e) => error!("Cannot create {:?} : {}", options_file, e),
+                },
                 Err(e) => error!("Cannot create {:?} : {}", options_file, e),
-            },
-            Err(e) => error!("Cannot create {:?} : {}", options_file, e),
-        };
-        match File::open(&options_file).and_then(|f| {
-            serde_json::from_reader::<_, CollectionOptions>(f)
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
-        }) {
-            Ok(prev_options) => {
-                if prev_options != opt {
-                    info!(
+            };
+            match File::open(&options_file).and_then(|f| {
+                serde_json::from_reader::<_, CollectionOptions>(f)
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+            }) {
+                Ok(prev_options) => {
+                    if prev_options != opt {
+                        info!(
                         "Previous folder options differ on {:?}, lets enforce full cache update",
                         root_path
                     );
+                        force_update = true;
+                        save_options();
+                    }
+                }
+                Err(e) => {
+                    warn!("Cannot read previous folder options on {:?} due to {}, will enforce full cache update", root_path, e);
                     force_update = true;
                     save_options();
                 }
-            }
-            Err(e) => {
-                warn!("Cannot read previous folder options on {:?} due to {}, will enforce full cache update", root_path, e);
-                force_update = true;
-                save_options();
             }
         }
 
@@ -476,6 +479,15 @@ impl PositionsTrait for CollectionCache {
     {
         self.inner
             .get_positions_recursive(group, folder, collection_no, res)
+    }
+}
+
+impl CollectionCache {
+    pub fn list_keys(&self) -> impl Iterator<Item = String> {
+        self.inner.iter_folders().filter_map(|i| {
+            i.ok()
+                .and_then(|(k, v)| String::from_utf8(k.as_ref().to_owned()).ok())
+        })
     }
 }
 

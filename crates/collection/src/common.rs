@@ -41,6 +41,8 @@ pub struct CollectionOptions {
     pub force_cache_update_on_init: bool,
     #[serde(skip)]
     pub(crate) cd_folder_regex: Option<Regex>,
+    #[serde(skip)]
+    pub read_only: bool,
 }
 
 impl PartialEq for CollectionOptions {
@@ -75,6 +77,7 @@ impl Default for CollectionOptions {
             tags_encoding: None,
             cd_folder_regex_str: None,
             cd_folder_regex: None,
+            read_only: false
         }
     }
 }
@@ -250,7 +253,7 @@ pub(crate) trait PositionsTrait {
 }
 
 #[enum_dispatch]
-pub(crate) trait CollectionTrait {
+pub trait CollectionTrait {
     fn list_dir<P>(
         &self,
         dir_path: P,

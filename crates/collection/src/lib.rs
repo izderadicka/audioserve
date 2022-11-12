@@ -34,7 +34,7 @@ use crate::{
 
 pub mod audio_folder;
 pub mod audio_meta;
-mod cache;
+pub mod cache;
 pub(crate) mod collator;
 pub mod common;
 pub mod error;
