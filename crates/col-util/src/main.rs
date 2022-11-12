@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use collection::{CollectionOptions, common::CollectionTrait};
+use collection::{common::CollectionTrait, CollectionOptions};
 
 fn default_db() -> String {
     let home = std::env::var("HOME").expect("Cannot get HOME for default db-path arg");
@@ -42,8 +42,8 @@ pub fn main() -> anyhow::Result<()> {
 
     let mut col_opts = CollectionOptions::default();
     col_opts.read_only = true;
-    let col = collection::cache::CollectionCache::new(args.collection,
-    args.db_path,col_opts).expect("Cannot open collection");
+    let col = collection::cache::CollectionCache::new(args.collection, args.db_path, col_opts)
+        .expect("Cannot open collection");
 
     match args.command {
         Commands::List { prefix } => {
@@ -58,7 +58,7 @@ pub fn main() -> anyhow::Result<()> {
             for folder in res {
                 println!("{:?}", folder.path);
             }
-        },
+        }
     }
 
     Ok(())

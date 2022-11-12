@@ -360,6 +360,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "col-util"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.0.18",
+ "collection",
+ "env_logger 0.9.0",
+]
+
+[[package]]
 name = "collection"
 version = "0.3.2"
 dependencies = [

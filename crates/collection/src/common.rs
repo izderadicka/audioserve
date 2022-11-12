@@ -77,7 +77,7 @@ impl Default for CollectionOptions {
             tags_encoding: None,
             cd_folder_regex_str: None,
             cd_folder_regex: None,
-            read_only: false
+            read_only: false,
         }
     }
 }
