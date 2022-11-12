@@ -834,13 +834,13 @@ where
         set_config!(
             args,
             config.positions.backup_file,
-            ARG_POSITIONS_BACKUP_FILE
+            Some(ARG_POSITIONS_BACKUP_FILE)
         );
         set_config!(args, config.positions.ws_timeout, ARG_POSITIONS_WS_TIMEOUT);
         set_config!(
             args,
             config.positions.backup_schedule,
-            ARG_POSITIONS_BACKUP_SCHEDULE
+            Some(ARG_POSITIONS_BACKUP_SCHEDULE)
         );
     }
 
@@ -963,6 +963,10 @@ mod test {
             "mameluci",
             "--url-path-prefix",
             "/user/audioserve",
+            "--positions-backup-file",
+            "test_data/as-backup-json",
+            "--positions-backup-schedule",
+            "3 3 * * *",
             "test_data",
             "client",
         ])
