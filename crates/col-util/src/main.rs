@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-
 use clap::{Parser, Subcommand};
 use collection::{common::CollectionTrait, CollectionOptions};
 

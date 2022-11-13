@@ -527,6 +527,10 @@ impl Iterator for Search {
                             .take()
                             .map(|mut v| {
                                 v.push(path.to_owned());
+                                //this is just a size fuse, we do not want too big vec, rather tolerate too detailed and slower search
+                                if v.len() > 100 {
+                                    v.remove(0);
+                                }
                                 v
                             })
                             .or_else(|| Some(vec![path.to_owned()])); //Some(path.to_owned());
