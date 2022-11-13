@@ -10,3 +10,4 @@ clap={version="4", features=["derive"]}
 collection={path="../collection"}
 env_logger="0.9"
 anyhow="1"
+libc="0.2"

@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use collection::{common::CollectionTrait, CollectionOptions};
+use std::path::PathBuf;
 
 fn default_db() -> String {
     let home = std::env::var("HOME").expect("Cannot get HOME for default db-path arg");
@@ -38,9 +38,22 @@ macro_rules! exit {
         std::process::exit(1);
     };
 }
+#[cfg(unix)]
+fn reset_sigpipe() {
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+}
 
+#[cfg(not(unix))]
+fn reset_sigpipe() {
+    // no-op
+}
 pub fn main() -> anyhow::Result<()> {
+    // restore C like sigpipe handling
+    reset_sigpipe();
     env_logger::init();
+
     let args = Args::parse();
 
     if !args.collection.is_dir() || !args.collection.exists() {
@@ -54,7 +67,6 @@ pub fn main() -> anyhow::Result<()> {
 
     match args.command {
         Commands::List { ref prefix } => {
-            println!("Listing collection");
             for folder in col.list_keys() {
                 let can_output = prefix
                     .as_ref()
@@ -66,10 +78,9 @@ pub fn main() -> anyhow::Result<()> {
             }
         }
         Commands::Search { query } => {
-            println!("Searching collection for {}", query);
             let res = col.search(query, None);
             for folder in res {
-                println!("{:?}", folder.path);
+                println!("{}", folder.path.to_str().unwrap_or("<NOT_UTF8>"));
             }
         }
         Commands::Get { path } => {
