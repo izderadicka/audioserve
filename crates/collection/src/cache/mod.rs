@@ -494,7 +494,7 @@ impl CollectionCache {
 pub struct Search {
     tokens: Vec<String>,
     iter: sled::Iter,
-    prev_match: Option<String>,
+    prev_match: Option<Vec<String>>,
     group: Option<String>,
     inner: Arc<CacheInner>,
 }
@@ -510,8 +510,11 @@ impl Iterator for Search {
                     if self
                         .prev_match
                         .as_ref()
-                        .and_then(|m| path.strip_prefix(m))
-                        .map(|s| s.contains(std::path::MAIN_SEPARATOR)) // only match was parent path
+                        .map(|v| {
+                            v.iter()
+                                .filter_map(|prev| path.strip_prefix(prev))
+                                .any(|s| s.contains(std::path::MAIN_SEPARATOR))
+                        })
                         .unwrap_or(false)
                     {
                         continue;
@@ -519,12 +522,21 @@ impl Iterator for Search {
                     let path_lower_case = path.to_lowercase();
                     let is_match = self.tokens.iter().all(|t| path_lower_case.contains(t));
                     if is_match {
-                        self.prev_match = Some(path.to_owned());
+                        self.prev_match = self
+                            .prev_match
+                            .take()
+                            .map(|mut v| {
+                                v.push(path.to_owned());
+                                v
+                            })
+                            .or_else(|| Some(vec![path.to_owned()])); //Some(path.to_owned());
                         let mut sf = kv_to_audiofolder(path, val);
                         if let Some(ref group) = self.group {
                             self.inner.update_subfolder(group, &mut sf);
                         }
                         return Some(sf);
+                    } else {
+                        self.prev_match = None
                     }
                 }
                 Err(e) => error!("Error iterating collection db: {}", e),
