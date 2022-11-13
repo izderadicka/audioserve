@@ -486,7 +486,7 @@ impl CollectionCache {
     pub fn list_keys(&self) -> impl Iterator<Item = String> {
         self.inner.iter_folders().filter_map(|i| {
             i.ok()
-                .and_then(|(k, v)| String::from_utf8(k.as_ref().to_owned()).ok())
+                .and_then(|(k, _v)| String::from_utf8(k.as_ref().to_owned()).ok())
         })
     }
 }

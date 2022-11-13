@@ -21,8 +21,16 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
-    List { prefix: Option<String> },
-    Search { query: String },
+    List {
+        #[arg(short, long)]
+        prefix: Option<String>,
+    },
+    Search {
+        query: String,
+    },
+    Get {
+        path: String,
+    },
 }
 
 macro_rules! exit {
@@ -46,10 +54,16 @@ pub fn main() -> anyhow::Result<()> {
         .expect("Cannot open collection");
 
     match args.command {
-        Commands::List { prefix } => {
+        Commands::List { ref prefix } => {
             println!("Listing collection");
             for folder in col.list_keys() {
-                println!("{}", folder);
+                let can_output = prefix
+                    .as_ref()
+                    .map(|p| folder.find(p).map(|i| i == 0).unwrap_or(false))
+                    .unwrap_or(true);
+                if can_output {
+                    println!("{}", folder);
+                }
             }
         }
         Commands::Search { query } => {
@@ -57,6 +71,11 @@ pub fn main() -> anyhow::Result<()> {
             let res = col.search(query, None);
             for folder in res {
                 println!("{:?}", folder.path);
+            }
+        }
+        Commands::Get { path } => {
+            if let Some(f) = col.get(path) {
+                println!("{:?}", f);
             }
         }
     }
