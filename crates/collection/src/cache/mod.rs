@@ -49,35 +49,38 @@ impl CollectionCache {
     ) -> Result<CollectionCache> {
         let root_path = path.into();
         let db_path = CollectionCache::db_path(&root_path, &db_dir)?;
-        let mut options_file = db_path.clone();
-        options_file.set_extension("options.json");
-        let mut force_update = opt.force_cache_update_on_init;
+        let mut force_update = opt.force_cache_update_on_init && !opt.passive_init;
 
-        let save_options = || match File::create(&options_file) {
-            Ok(f) => match serde_json::to_writer(f, &opt) {
-                Ok(_) => debug!("Created options file {:?}", options_file),
+        if !opt.passive_init {
+            let mut options_file = db_path.clone();
+            options_file.set_extension("options.json");
+
+            let save_options = || match File::create(&options_file) {
+                Ok(f) => match serde_json::to_writer(f, &opt) {
+                    Ok(_) => debug!("Created options file {:?}", options_file),
+                    Err(e) => error!("Cannot create {:?} : {}", options_file, e),
+                },
                 Err(e) => error!("Cannot create {:?} : {}", options_file, e),
-            },
-            Err(e) => error!("Cannot create {:?} : {}", options_file, e),
-        };
-        match File::open(&options_file).and_then(|f| {
-            serde_json::from_reader::<_, CollectionOptions>(f)
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
-        }) {
-            Ok(prev_options) => {
-                if prev_options != opt {
-                    info!(
+            };
+            match File::open(&options_file).and_then(|f| {
+                serde_json::from_reader::<_, CollectionOptions>(f)
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+            }) {
+                Ok(prev_options) => {
+                    if prev_options != opt {
+                        info!(
                         "Previous folder options differ on {:?}, lets enforce full cache update",
                         root_path
                     );
+                        force_update = true;
+                        save_options();
+                    }
+                }
+                Err(e) => {
+                    warn!("Cannot read previous folder options on {:?} due to {}, will enforce full cache update", root_path, e);
                     force_update = true;
                     save_options();
                 }
-            }
-            Err(e) => {
-                warn!("Cannot read previous folder options on {:?} due to {}, will enforce full cache update", root_path, e);
-                force_update = true;
-                save_options();
             }
         }
 
@@ -479,10 +482,19 @@ impl PositionsTrait for CollectionCache {
     }
 }
 
+impl CollectionCache {
+    pub fn list_keys(&self) -> impl Iterator<Item = String> {
+        self.inner.iter_folders().filter_map(|i| {
+            i.ok()
+                .and_then(|(k, _v)| String::from_utf8(k.as_ref().to_owned()).ok())
+        })
+    }
+}
+
 pub struct Search {
     tokens: Vec<String>,
     iter: sled::Iter,
-    prev_match: Option<String>,
+    prev_match: Option<Vec<String>>,
     group: Option<String>,
     inner: Arc<CacheInner>,
 }
@@ -498,8 +510,11 @@ impl Iterator for Search {
                     if self
                         .prev_match
                         .as_ref()
-                        .and_then(|m| path.strip_prefix(m))
-                        .map(|s| s.contains(std::path::MAIN_SEPARATOR)) // only match was parent path
+                        .map(|v| {
+                            v.iter()
+                                .filter_map(|prev| path.strip_prefix(prev))
+                                .any(|s| s.contains(std::path::MAIN_SEPARATOR))
+                        })
                         .unwrap_or(false)
                     {
                         continue;
@@ -507,12 +522,25 @@ impl Iterator for Search {
                     let path_lower_case = path.to_lowercase();
                     let is_match = self.tokens.iter().all(|t| path_lower_case.contains(t));
                     if is_match {
-                        self.prev_match = Some(path.to_owned());
+                        self.prev_match = self
+                            .prev_match
+                            .take()
+                            .map(|mut v| {
+                                v.push(path.to_owned());
+                                //this is just a size fuse, we do not want too big vec, rather tolerate too detailed and slower search
+                                if v.len() > 100 {
+                                    v.remove(0);
+                                }
+                                v
+                            })
+                            .or_else(|| Some(vec![path.to_owned()])); //Some(path.to_owned());
                         let mut sf = kv_to_audiofolder(path, val);
                         if let Some(ref group) = self.group {
                             self.inner.update_subfolder(group, &mut sf);
                         }
                         return Some(sf);
+                    } else {
+                        self.prev_match = None
                     }
                 }
                 Err(e) => error!("Error iterating collection db: {}", e),
