@@ -49,9 +49,9 @@ impl CollectionCache {
     ) -> Result<CollectionCache> {
         let root_path = path.into();
         let db_path = CollectionCache::db_path(&root_path, &db_dir)?;
-        let mut force_update = opt.force_cache_update_on_init && !opt.read_only;
+        let mut force_update = opt.force_cache_update_on_init && !opt.passive_init;
 
-        if !opt.read_only {
+        if !opt.passive_init {
             let mut options_file = db_path.clone();
             options_file.set_extension("options.json");
 

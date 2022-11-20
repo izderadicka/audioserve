@@ -42,7 +42,7 @@ pub struct CollectionOptions {
     #[serde(skip)]
     pub(crate) cd_folder_regex: Option<Regex>,
     #[serde(skip)]
-    pub read_only: bool,
+    pub passive_init: bool,
 }
 
 impl PartialEq for CollectionOptions {
@@ -77,7 +77,7 @@ impl Default for CollectionOptions {
             tags_encoding: None,
             cd_folder_regex_str: None,
             cd_folder_regex: None,
-            read_only: false,
+            passive_init: false,
         }
     }
 }

@@ -61,7 +61,7 @@ pub fn main() -> anyhow::Result<()> {
     }
 
     let mut col_opts = CollectionOptions::default();
-    col_opts.read_only = true;
+    col_opts.passive_init = true;
     let col = collection::cache::CollectionCache::new(args.collection, args.db_path, col_opts)
         .expect("Cannot open collection");
 
