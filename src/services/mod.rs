@@ -413,7 +413,7 @@ impl<C: 'static> FileSendService<C> {
                 req.uri(),
                 req.headers()
             );
-            return Box::pin(future::ok(preflight_cors_response(&req)));
+            return resp::fut(|| preflight_cors_response(&req));
         }
 
         let req = match RequestWrapper::new(
@@ -425,7 +425,7 @@ impl<C: 'static> FileSendService<C> {
             Ok(r) => r,
             Err(e) => {
                 error!("Request URL error: {}", e);
-                return resp::fut(resp::not_found);
+                return resp::fut(resp::bad_request);
             }
         };
         //static files

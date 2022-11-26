@@ -528,9 +528,17 @@ pub fn download_folder(
     use hyper::header::CONTENT_DISPOSITION;
     let full_path = base_path.join(&folder_path);
     let f = async move {
-        let meta = tokio::fs::metadata(&full_path)
-            .await
-            .context("metadata for folder download")?;
+        let meta_result = tokio::fs::metadata(&full_path).await;
+        let meta = match meta_result {
+            Ok(meta) => meta,
+            Err(err) => {
+                if matches!(err.kind(), std::io::ErrorKind::NotFound) {
+                    return Ok(resp::not_found());
+                } else {
+                    return Err(Error::new(err)).context("metadata for folder download");
+                }
+            }
+        };
         if meta.is_file() {
             serve_file_from_fs(&full_path, None, None).await
         } else {
