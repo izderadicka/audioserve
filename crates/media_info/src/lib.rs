@@ -195,7 +195,7 @@ pub fn version() -> u32 {
 #[derive(Debug, Clone)]
 pub struct Chapter {
     pub title: String,
-    pub num: i32,
+    pub number: u32,
     pub start: u64,
     pub end: u64,
 }
@@ -360,7 +360,7 @@ impl MediaFile {
                 let start = norm_time(chap.start, chap.time_base);
                 let end = norm_time(chap.end, chap.time_base);
                 c.push(Chapter {
-                    num: num.try_into().unwrap_or(std::i32::MAX),
+                    number: num.try_into().unwrap_or(std::u32::MAX),
                     title,
                     start,
                     end,

@@ -111,7 +111,7 @@ fn main() {
             for chap in chapters {
                 println!(
                     "Chapter {} - {} ({} - {})",
-                    chap.num,
+                    chap.number,
                     chap.title,
                     pretty_time(chap.start as u64),
                     pretty_time(chap.end as u64)

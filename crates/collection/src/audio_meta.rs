@@ -234,14 +234,6 @@ impl Ord for FolderByModification {
     }
 }
 
-#[derive(Debug)]
-pub struct Chapter {
-    pub number: u32,
-    pub title: String,
-    pub start: u64,
-    pub end: u64,
-}
-
 fn has_subtype(mime: &Mime, subtypes: &[&str]) -> bool {
     subtypes.iter().any(|&s| s == mime.subtype())
 }
@@ -275,6 +267,8 @@ pub fn is_description<P: AsRef<Path>>(path: P) -> bool {
     mime.type_() == "text" && has_subtype(&mime, DESCRIPTIONS)
 }
 
+// have to propagate this type further - ideally this should be in separate crate with other types used throwout other crates
+pub use media_info::Chapter;
 /// trait to generalize access to media metadata
 /// (so that underlying library can be easily changed)
 pub trait MediaInfo<'a>: Sized {
@@ -326,20 +320,30 @@ mod libavformat {
         }
 
         fn has_chapters(&self) -> bool {
-            self.media_file.chapters_count() > 1
+            self.get_chapters().is_some()
         }
 
         fn get_chapters(&self) -> Option<Vec<Chapter>> {
-            self.media_file.chapters().map(|l| {
-                l.into_iter()
-                    .map(|c| Chapter {
-                        number: c.num as u32,
-                        title: c.title,
-                        start: c.start,
-                        end: c.end,
-                    })
-                    .collect()
-            })
+            self.media_file
+                .chapters()
+                .map(|l| {
+                    l.into_iter()
+                        .filter(|ch| {
+                            if ch.start + 100 >= ch.end {
+                                // ignore chapters below 1000 ms
+                                warn!(
+                                    "Invalid chapter {}  too short duration {}-{}",
+                                    ch.title, ch.start, ch.end
+                                );
+                                false
+                            } else {
+                                true
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                })
+                // ignore files with only one chapter
+                .and_then(|c| if c.len() < 2 { None } else { Some(c) })
         }
 
         fn has_cover(&self) -> bool {
