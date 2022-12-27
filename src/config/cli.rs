@@ -186,6 +186,7 @@ fn create_parser() -> Command {
             // .conflicts_with(ARG_NO_AUTHENTICATION)
             // .required_unless_one(&[ARG_NO_AUTHENTICATION, ARG_SHARED_SECRET])
             .env("AUDIOSERVE_SHARED_SECRET_FILE")
+            .value_parser(is_existing_file)
             .help("File containing shared secret, it's slightly safer to read it from file, then provide as command argument")
             )
         .arg(Arg::new(ARG_TRANSCODING_MAX_PARALLEL_PROCESSES)
