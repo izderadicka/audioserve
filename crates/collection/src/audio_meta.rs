@@ -253,7 +253,7 @@ pub fn is_audio<P: AsRef<Path>>(path: P) -> bool {
     mime.type_() == "audio" && has_subtype(&mime, AUDIO)
 }
 
-const COVERS: &[&str] = &["jpeg", "png"];
+const COVERS: &[&str] = &["jpeg", "png", "webp"];
 
 pub fn is_cover<P: AsRef<Path>>(path: P) -> bool {
     let mime = guess_mime_type(path);
