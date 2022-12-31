@@ -88,6 +88,20 @@ pub(crate) mod locale {
         static ref LOCALE_COLLATOR: Collator = Collator::new();
     }
 
+    fn cmp_natural(me: &str, other: &str) -> Ordering {
+        if LEADING_NUMBER_RE.is_match(me) && LEADING_NUMBER_RE.is_match(other) {
+            let (my_pos, my_rest) = split_name(me);
+            let (other_pos, other_rest) = split_name(other);
+
+            match my_pos.cmp(&other_pos) {
+                Ordering::Equal => LOCALE_COLLATOR.collate(my_rest, other_rest),
+                other => other,
+            }
+        } else {
+            LOCALE_COLLATOR.collate(me, other)
+        }
+    }
+
     struct Collator(UCollator);
 
     // According to ICU documentation C implementation should be thread safe for ucol_strcoll methods
@@ -135,11 +149,19 @@ pub(crate) mod locale {
         fn collate(&self, other: &AudioFile) -> Ordering {
             LOCALE_COLLATOR.collate(&self.name, &other.name)
         }
+
+        fn collate_natural(&self, other: &Self) -> Ordering {
+            cmp_natural(&self.name, &other.name)
+        }
     }
 
     impl Collate for AudioFolderShort {
         fn collate(&self, other: &AudioFolderShort) -> Ordering {
             LOCALE_COLLATOR.collate(&self.name, &other.name)
+        }
+
+        fn collate_natural(&self, other: &Self) -> Ordering {
+            cmp_natural(&self.name, &other.name)
         }
     }
 

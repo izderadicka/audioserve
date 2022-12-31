@@ -284,7 +284,7 @@ impl CollectionTrait for CollectionCache {
         self.inner
             .get_if_actual(dir_path, ts)
             .map(|mut af| {
-                if matches!(ordering, FoldersOrdering::RecentFirst) {
+                if !matches!(ordering, FoldersOrdering::Alphabetical) {
                     af.subfolders
                         .sort_unstable_by(|a, b| a.compare_as(ordering, b));
                 }
@@ -300,7 +300,7 @@ impl CollectionTrait for CollectionCache {
                         // We should update cache as we got new info
                         debug!("Updating cache for dir {:?}", full_path);
                         let mut af = af_ref.clone();
-                        if matches!(ordering, FoldersOrdering::RecentFirst) {
+                        if !matches!(ordering, FoldersOrdering::Alphabetical) {
                             af.subfolders.sort_unstable_by(|a, b| {
                                 a.compare_as(FoldersOrdering::Alphabetical, b)
                             });

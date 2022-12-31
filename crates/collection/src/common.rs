@@ -34,7 +34,6 @@ pub struct CollectionOptions {
     pub allow_symlinks: bool,
     pub no_dir_collaps: bool,
     pub natural_files_ordering: bool,
-    pub natural_subfolders_ordering: bool,
     pub tags: Option<HashSet<String>>,
     #[cfg(feature = "tags-encoding")]
     pub tags_encoding: Option<String>,
@@ -75,7 +74,6 @@ impl Default for CollectionOptions {
             allow_symlinks: false,
             no_dir_collaps: false,
             natural_files_ordering: true,
-            natural_subfolders_ordering: true,
             tags: None,
             #[cfg(feature = "tags-encoding")]
             tags_encoding: None,
