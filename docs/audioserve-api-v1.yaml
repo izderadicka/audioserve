@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: audioserve API
   description: REST API for audioserve
-  version: 1.3.0
+  version: 1.3.1
 servers:
   - url: https://audioserve.zderadicka.eu
     description: Public demo server
@@ -1088,8 +1088,9 @@ components:
       name: ord
       in: query
       description: |-
-        ordering of subfolders, two values are now supported:
+        ordering of subfolders, three values are now supported:
         - `a` alphabetical (default if not present)
+        - `n` natural - if starts by number sort by that number then by rest ("10" is behind "9")
         - `m` recent first (using folder mtime)
       schema:
         type: string
