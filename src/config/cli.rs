@@ -67,6 +67,7 @@ const ARG_T_CACHE_SIZE: &str = "t-cache-size";
 const ARG_T_CACHE_MAX_FILES: &str = "t-cache-max-files";
 const ARG_T_CACHE_DISABLE: &str = "t-cache-disable";
 const ARG_T_CACHE_SAVE_OFTEN: &str = "t-cache-save-often";
+const ARG_NO_NATURAL_FILES_ORDERING: &str = "no-natural-files-ordering";
 
 fn create_parser() -> Command {
     let mut parser = Command::new(crate_name!())
@@ -365,6 +366,14 @@ fn create_parser() -> Command {
             .value_parser(FalseyValueParser::new())
             .env("AUDIOSERVE_ICONS_FAST_SCALING")
             .help("Use faster image scaling (linear triangle), by default slower, but better method (Lanczos3)")
+        )
+        .arg(
+            Arg::new(ARG_NO_NATURAL_FILES_ORDERING)
+            .long(ARG_NO_NATURAL_FILES_ORDERING)
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+            .env("AUDIOSERVE_ICONS_FAST_SCALING")
+            .help("Disable natural ordering (first number in name is used for ordering ) of files")
         );
 
     // deprecated
@@ -716,6 +725,9 @@ where
             Some(re) => Some(CollapseCDFolderConfig { regex: Some(re) }),
             None => Some(CollapseCDFolderConfig::default()),
         }
+    }
+    if has_flag!(args, ARG_NO_NATURAL_FILES_ORDERING) {
+        config.natural_files_ordering = false;
     }
     set_config_flag!(
         args,

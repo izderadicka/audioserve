@@ -520,6 +520,7 @@ pub struct Config {
     pub collections_cache_dir: PathBuf,
     pub tags: HashSet<String>,
     pub force_cache_update_on_init: bool,
+    pub natural_files_ordering: bool,
     pub static_resource_cache_age: Option<u32>,
     pub folder_file_cache_age: Option<u32>,
     pub collapse_cd_folders: Option<CollapseCDFolderConfig>,
@@ -732,6 +733,7 @@ impl Default for Config {
             collections_cache_dir: data_base_dir.join("col_db"),
             tags: HashSet::new(),
             force_cache_update_on_init: false,
+            natural_files_ordering: true,
             #[cfg(feature = "shared-positions")]
             positions: Default::default(),
             static_resource_cache_age: None,
