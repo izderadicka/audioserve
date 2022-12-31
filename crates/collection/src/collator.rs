@@ -1,24 +1,78 @@
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::cmp::Ordering;
 
 use crate::{AudioFile, AudioFolderShort};
 
+lazy_static! {
+    static ref LEADING_NUMBER_RE: Regex = Regex::new(r"^\d+").unwrap();
+}
+
 pub(crate) trait Collate<T = Self> {
     fn collate(&self, other: &T) -> Ordering;
+    fn collate_natural(&self, other: &T) -> Ordering {
+        self.collate(other)
+    }
+}
+
+/// Assuming digits were already found at beginning of name
+fn split_name(name: &str) -> (u32, &str) {
+    let prefix = LEADING_NUMBER_RE.find(name).unwrap();
+    let pos: u32 = prefix.as_str().parse().unwrap();
+    let rest = &name[prefix.end()..];
+    (pos, rest)
 }
 
 #[cfg(not(any(feature = "collation", feature = "collation-static")))]
 pub(crate) mod standard {
     use super::*;
 
+    fn cmp_natural(me: &str, other: &str) -> Ordering {
+        if LEADING_NUMBER_RE.is_match(me) && LEADING_NUMBER_RE.is_match(other) {
+            let (my_pos, my_rest) = split_name(me);
+            let (other_pos, other_rest) = split_name(other);
+
+            match my_pos.cmp(&other_pos) {
+                Ordering::Equal => my_rest.cmp(other_rest),
+                other => other,
+            }
+        } else {
+            me.cmp(other)
+        }
+    }
+
     impl Collate for AudioFile {
         fn collate(&self, other: &AudioFile) -> Ordering {
             self.name.cmp(&other.name)
+        }
+
+        fn collate_natural(&self, other: &Self) -> Ordering {
+            cmp_natural(&self.name, &other.name)
         }
     }
 
     impl Collate for AudioFolderShort {
         fn collate(&self, other: &AudioFolderShort) -> Ordering {
             self.name.cmp(&other.name)
+        }
+
+        fn collate_natural(&self, other: &Self) -> Ordering {
+            cmp_natural(&self.name, &other.name)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_natural_order() {
+            let mut terms = vec!["10 - v deset", "2 - dve", "10 - deset", "3 - tri"];
+            terms.sort_by(|a, b| cmp_natural(a, b));
+            assert_eq!("2 - dve", terms[0]);
+            assert_eq!("3 - tri", terms[1]);
+            assert_eq!("10 - deset", terms[2]);
+            assert_eq!("10 - v deset", terms[3]);
         }
     }
 }

@@ -110,6 +110,7 @@ pub struct AudioFolder {
 #[derive(Clone, Copy)]
 pub enum FoldersOrdering {
     Alphabetical,
+    Natural, // if starts by number first by this number then by rest
     RecentFirst,
 }
 
@@ -117,6 +118,7 @@ impl FoldersOrdering {
     pub fn from_letter(l: &str) -> Self {
         match l {
             "m" => FoldersOrdering::RecentFirst,
+            "n" => FoldersOrdering::Natural,
             _ => FoldersOrdering::Alphabetical,
         }
     }
@@ -194,6 +196,7 @@ impl AudioFolderShort {
     pub fn compare_as(&self, ord: FoldersOrdering, other: &Self) -> Ordering {
         match ord {
             FoldersOrdering::Alphabetical => self.collate(other),
+            FoldersOrdering::Natural => self.collate_natural(other),
             FoldersOrdering::RecentFirst => match (self.modified, other.modified) {
                 (Some(ref a), Some(ref b)) => b.cmp(a),
                 (Some(_), None) => Ordering::Less,

@@ -33,6 +33,8 @@ pub(crate) struct FolderOptions {
     pub ignore_chapters_meta: bool,
     pub allow_symlinks: bool,
     pub no_dir_collaps: bool,
+    pub natural_files_ordering: bool,
+    pub natural_subfolders_ordering: bool,
     pub tags: Option<HashSet<String>>,
     pub cd_folder_regex: Option<Regex>,
     #[cfg(feature = "tags-encoding")]
@@ -47,6 +49,8 @@ impl From<CollectionOptions> for FolderOptions {
             ignore_chapters_meta: o.ignore_chapters_meta,
             allow_symlinks: o.allow_symlinks,
             no_dir_collaps: o.no_dir_collaps,
+            natural_files_ordering: o.natural_files_ordering,
+            natural_subfolders_ordering: o.natural_subfolders_ordering,
             tags: o.tags,
             cd_folder_regex: o.cd_folder_regex,
             #[cfg(feature = "tags-encoding")]
@@ -367,7 +371,13 @@ impl FolderLister {
                             }
                         }
                     }
-                    files.sort_unstable_by(|a, b| a.collate(b));
+                    files.sort_unstable_by(|a, b| {
+                        if self.config.natural_files_ordering {
+                            a.collate_natural(b)
+                        } else {
+                            a.collate(b)
+                        }
+                    });
                     tags = if extract_tags {
                         extract_folder_tags(&mut files)
                     } else {
