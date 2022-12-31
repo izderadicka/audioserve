@@ -1,6 +1,6 @@
 [package]
 name = "audioserve"
-version = "0.23.4"
+version = "0.24.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2021"
 rust-version = "1.60"
@@ -11,7 +11,7 @@ members = ["crates/*"]
 [dependencies]
 
 bytes = "1.2"
-env_logger = "0.9"
+env_logger = "0.10"
 log = {version="0.4", features = ["release_max_level_info", "max_level_trace"]}
 hyper = {version="0.14", features = ["full"]}
 headers = "0.3"
@@ -45,7 +45,7 @@ rustls-pemfile = { version = "1", optional=true}
 
 leaky-cauldron = {path="crates/leaky-cauldron"}
 tokio-util = {version="0.7", optional=true, features=["codec"]}
-cron = {version="0.11", optional=true}
+cron = {version="0.12", optional=true}
 chrono = {version="0.4", optional=true}
 
 
@@ -58,7 +58,7 @@ async-zip = {path="crates/async-zip", optional=true}
 websock = {path="crates/websock", optional = true}
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.24"
+nix = "0.26"
 
 [features]
 default = ["tls", "symlinks", "folder-download", "shared-positions", "behind-proxy"]

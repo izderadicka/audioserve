@@ -15,7 +15,7 @@ impl Timestamp {
     }
 
     pub fn dos_datepart(&self) -> Result<u16> {
-        let d = self.0.date();
+        let d = self.0.date_naive();
         if d.year() < 1980 || d.year() > 2107 {
             return Err(Error::InvalidYear(d.year()));
         }

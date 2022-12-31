@@ -8,6 +8,6 @@ edition = "2021"
 [dependencies]
 clap={version="4", features=["derive"]}
 collection={path="../collection"}
-env_logger="0.9"
+env_logger="0.10"
 anyhow="1"
 libc="0.2"

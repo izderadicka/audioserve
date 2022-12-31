@@ -19,7 +19,7 @@ tokio = { version="1.20", optional=true, features=[ "rt", "fs"] }
 asynch = ["tokio"]
 
 [dev-dependencies]
-env_logger = "0.9"
+env_logger = "0.10"
 tempfile ="3.3"
 tokio = { version="1.20", features=["io-util", "macros",] }
 
