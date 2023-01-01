@@ -20,7 +20,11 @@ fn split_name(name: &str) -> Option<(&str, u32, &str)> {
     let num = NUMBER_RE.find(name);
     match num {
         Some(num) => {
-            let pos: u32 = num.as_str().parse().unwrap();
+            let pos: u32 = num
+                .as_str()
+                .parse()
+                .map_err(|_e| warn!("Cannot parse number {} in name {}", num.as_str(), name))
+                .ok()?;
             let rest = &name[num.end()..];
             let prefix = &name[..num.start()];
             Some((prefix, pos, rest))
