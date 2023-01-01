@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use crate::{AudioFile, AudioFolderShort};
 
 lazy_static! {
-    static ref LEADING_NUMBER_RE: Regex = Regex::new(r"^\d+").unwrap();
+    static ref NUMBER_RE: Regex = Regex::new(r"\d+").unwrap();
 }
 
 pub(crate) trait Collate<T = Self> {
@@ -16,30 +16,37 @@ pub(crate) trait Collate<T = Self> {
 }
 
 /// Assuming digits were already found at beginning of name
-fn split_name(name: &str) -> (u32, &str) {
-    let prefix = LEADING_NUMBER_RE.find(name).unwrap();
-    let pos: u32 = prefix.as_str().parse().unwrap();
-    let rest = &name[prefix.end()..];
-    (pos, rest)
+fn split_name(name: &str) -> Option<(&str, u32, &str)> {
+    let num = NUMBER_RE.find(name);
+    match num {
+        Some(num) => {
+            let pos: u32 = num.as_str().parse().unwrap();
+            let rest = &name[num.end()..];
+            let prefix = &name[..num.start()];
+            Some((prefix, pos, rest))
+        }
+        None => None,
+    }
+}
+
+fn cmp_natural(me: &str, other: &str, compare: impl Fn(&str, &str) -> Ordering) -> Ordering {
+    if let Some((my_prefix, my_pos, my_rest)) = split_name(me) {
+        if let Some((other_prefix, other_pos, other_rest)) = split_name(other) {
+            if my_prefix == other_prefix {
+                return match my_pos.cmp(&other_pos) {
+                    Ordering::Equal => compare(my_rest, other_rest),
+                    other => other,
+                };
+            }
+        }
+    }
+
+    compare(me, other)
 }
 
 #[cfg(not(any(feature = "collation", feature = "collation-static")))]
 pub(crate) mod standard {
     use super::*;
-
-    fn cmp_natural(me: &str, other: &str) -> Ordering {
-        if LEADING_NUMBER_RE.is_match(me) && LEADING_NUMBER_RE.is_match(other) {
-            let (my_pos, my_rest) = split_name(me);
-            let (other_pos, other_rest) = split_name(other);
-
-            match my_pos.cmp(&other_pos) {
-                Ordering::Equal => my_rest.cmp(other_rest),
-                other => other,
-            }
-        } else {
-            me.cmp(other)
-        }
-    }
 
     impl Collate for AudioFile {
         fn collate(&self, other: &AudioFile) -> Ordering {
@@ -47,7 +54,7 @@ pub(crate) mod standard {
         }
 
         fn collate_natural(&self, other: &Self) -> Ordering {
-            cmp_natural(&self.name, &other.name)
+            cmp_natural(&self.name, &other.name, |a, b| a.cmp(b))
         }
     }
 
@@ -57,7 +64,7 @@ pub(crate) mod standard {
         }
 
         fn collate_natural(&self, other: &Self) -> Ordering {
-            cmp_natural(&self.name, &other.name)
+            cmp_natural(&self.name, &other.name, |a, b| a.cmp(b))
         }
     }
 
@@ -68,11 +75,21 @@ pub(crate) mod standard {
         #[test]
         fn test_natural_order() {
             let mut terms = vec!["10 - v deset", "2 - dve", "10 - deset", "3 - tri"];
-            terms.sort_by(|a, b| cmp_natural(a, b));
+            terms.sort_by(|a, b| cmp_natural(a, b, |a, b| a.cmp(b)));
             assert_eq!("2 - dve", terms[0]);
             assert_eq!("3 - tri", terms[1]);
             assert_eq!("10 - deset", terms[2]);
             assert_eq!("10 - v deset", terms[3]);
+        }
+
+        #[test]
+        fn test_natural_order_with_prefix() {
+            let mut terms = vec!["Chapter 10", "Chapter 3", "Chapter 20", "Chapter 1"];
+            terms.sort_unstable_by(|a, b| cmp_natural(a, b, |a, b| a.cmp(b)));
+            assert_eq!("Chapter 1", terms[0]);
+            assert_eq!("Chapter 3", terms[1]);
+            assert_eq!("Chapter 10", terms[2]);
+            assert_eq!("Chapter 20", terms[3]);
         }
     }
 }
@@ -86,20 +103,6 @@ pub(crate) mod locale {
 
     lazy_static! {
         static ref LOCALE_COLLATOR: Collator = Collator::new();
-    }
-
-    fn cmp_natural(me: &str, other: &str) -> Ordering {
-        if LEADING_NUMBER_RE.is_match(me) && LEADING_NUMBER_RE.is_match(other) {
-            let (my_pos, my_rest) = split_name(me);
-            let (other_pos, other_rest) = split_name(other);
-
-            match my_pos.cmp(&other_pos) {
-                Ordering::Equal => LOCALE_COLLATOR.collate(my_rest, other_rest),
-                other => other,
-            }
-        } else {
-            LOCALE_COLLATOR.collate(me, other)
-        }
     }
 
     struct Collator(UCollator);
@@ -151,7 +154,9 @@ pub(crate) mod locale {
         }
 
         fn collate_natural(&self, other: &Self) -> Ordering {
-            cmp_natural(&self.name, &other.name)
+            cmp_natural(&self.name, &other.name, |a, b| {
+                LOCALE_COLLATOR.collate(a, b)
+            })
         }
     }
 
@@ -161,7 +166,9 @@ pub(crate) mod locale {
         }
 
         fn collate_natural(&self, other: &Self) -> Ordering {
-            cmp_natural(&self.name, &other.name)
+            cmp_natural(&self.name, &other.name, |a, b| {
+                LOCALE_COLLATOR.collate(a, b)
+            })
         }
     }
 
