@@ -943,6 +943,7 @@ mod test {
     use std::path::Path;
     use std::time::Duration;
     #[test]
+    #[cfg(feature = "shared-positions")]
     fn test_basic_args() {
         init_default_config();
         let c = parse_args_from(&["audioserve", "--no-authentication", "test_data"]).unwrap();

@@ -3,6 +3,8 @@ extern crate log;
 #[macro_use]
 extern crate lazy_static;
 
+#[cfg(feature = "tls")]
+use crate::tls::TlsStream;
 use collection::{CollectionOptions, CollectionOptionsMap, Collections};
 use config::{get_config, init_config};
 use error::{bail, Context, Error};
@@ -22,8 +24,6 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use tokio::sync::oneshot;
-
-use crate::tls::TlsStream;
 
 mod config;
 mod error;
