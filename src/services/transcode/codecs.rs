@@ -5,7 +5,7 @@ use std::borrow::Cow;
 // Opus codec parameters
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Bandwidth {
     NarrowBand,
     MediumBand,
@@ -28,7 +28,7 @@ impl Bandwidth {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Opus {
     bitrate: u16,
     compression_level: u8,
@@ -74,7 +74,7 @@ impl AudioCodec for Opus {
 }
 
 // MP3 codec
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Mp3 {
     bitrate: u32,
     /// Quality 0 best 9 worst - opposite of opus!
@@ -115,7 +115,7 @@ impl AudioCodec for Mp3 {
 }
 
 // AAC codec
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SampleRate {
     #[serde(rename = "8kHz")]
     _8kHz,
@@ -154,7 +154,7 @@ impl Default for SampleRate {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Aac {
     bitrate: u32,
     #[serde(default)]

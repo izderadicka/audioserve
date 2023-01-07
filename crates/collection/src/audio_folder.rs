@@ -254,7 +254,7 @@ impl FolderLister {
                                             )?)
                                         } else {
                                             let meta = meta.get_audio_info(&self.config.tags);
-                                            if self.is_long_file((&meta).as_ref())
+                                            if self.is_long_file(meta.as_ref())
                                                 || chapters_file_path(&audio_file_path)
                                                     .map(|p| p.is_file())
                                                     .unwrap_or(false)
@@ -401,11 +401,7 @@ impl FolderLister {
                 )
             }
             Err(e) => {
-                error!(
-                    "Requesting wrong directory {:?} : {}",
-                    (&full_path).as_os_str(),
-                    e
-                );
+                error!("Requesting wrong directory {:?} : {}", full_path, e);
                 Err(e)
             }
         }
@@ -420,7 +416,7 @@ impl FolderLister {
         collapse: bool,
     ) -> Result<AudioFolder, io::Error> {
         let path = full_path.strip_prefix(&base_dir).unwrap();
-        let mime = guess_mime_type(&path);
+        let mime = guess_mime_type(path);
         let mut tags = None;
         if self.config.tags.is_some() {
             #[cfg(feature = "tags-encoding")]
@@ -864,11 +860,7 @@ where
             Ok(files)
         }
         Err(e) => {
-            error!(
-                "Requesting wrong directory {:?} : {}",
-                (&full_path).as_os_str(),
-                e
-            );
+            error!("Requesting wrong directory {:?} : {}", full_path, e);
             Err(e)
         }
     }

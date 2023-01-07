@@ -167,7 +167,6 @@ impl FoldersSearch {
         let mut recents: BinaryHeap<DirEntry> = BinaryHeap::with_capacity(limit);
 
         fn search_recursive(
-            base_path: &Path,
             path: &Path,
             res: &mut BinaryHeap<DirEntry>,
             allow_symlinks: bool,
@@ -178,7 +177,7 @@ impl FoldersSearch {
                     if let Ok(ft) = get_real_file_type(&f, path, allow_symlinks) {
                         if ft.is_dir() {
                             let p = f.path();
-                            search_recursive(base_path, &p, res, allow_symlinks, limit);
+                            search_recursive(&p, res, allow_symlinks, limit);
                             if let Ok(meta) = p.metadata() {
                                 let changed = meta.modified();
 
@@ -199,7 +198,7 @@ impl FoldersSearch {
         }
         let base_path = base_dir.as_ref();
         let allow_symlinks = self.allow_symlinks;
-        search_recursive(base_path, base_path, &mut recents, allow_symlinks, limit);
+        search_recursive(base_path, &mut recents, allow_symlinks, limit);
         let dirs = recents.into_sorted_vec();
         dirs.into_iter()
             .map(|e| AudioFolderShort::from_path(base_path, e.path))

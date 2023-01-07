@@ -161,7 +161,7 @@ impl AudioFolderShort {
     pub fn from_path<P: AsRef<Path>>(base_path: &Path, p: P) -> Self {
         let p = p.as_ref();
         AudioFolderShort {
-            name: get_file_name(&p).into(),
+            name: get_file_name(p).into(),
             path: p.strip_prefix(base_path).unwrap().into(),
             is_file: false,
             modified: None,

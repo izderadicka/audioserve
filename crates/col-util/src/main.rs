@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 fn default_db() -> String {
     let home = std::env::var("HOME").expect("Cannot get HOME for default db-path arg");
-    return home + "/.audioserve/col_db";
+    home + "/.audioserve/col_db"
 }
 
 #[derive(Parser)]

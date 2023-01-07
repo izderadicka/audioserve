@@ -174,8 +174,8 @@ fn recreate_dir<P: AsRef<Path>>(dir: P) -> io::Result<bool> {
     let dir = dir.as_ref();
     if dir.exists() {
         debug!("Recreating {:?}", dir);
-        fs::remove_dir_all(&dir)?;
-        fs::create_dir(&dir)?;
+        fs::remove_dir_all(dir)?;
+        fs::create_dir(dir)?;
         Ok(true)
     } else {
         Ok(false)
@@ -295,7 +295,7 @@ impl CacheInner {
     fn get2<S: AsRef<str>>(&mut self, key: S) -> Option<Result<(fs::File, PathBuf)>> {
         let file_name = self.get_entry_path(&key);
         let res = file_name.as_ref().map(|file_name| {
-            fs::File::open(&file_name)
+            fs::File::open(file_name)
                 .map_err(|e| e.into())
                 .map(|f| (f, file_name.clone()))
         });

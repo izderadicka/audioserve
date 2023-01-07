@@ -340,7 +340,7 @@ fn create_parser() -> Command {
             .action(ArgAction::SetTrue)
             .value_parser(FalseyValueParser::new())
             .env("AUDIOSERVE_ICONS_CACHE_DISABLE")
-            .conflicts_with_all(&[ARG_ICONS_CACHE_SAVE_OFTEN, ARG_ICONS_CACHE_MAX_FILES, ARG_ICONS_CACHE_SIZE, ARG_ICONS_CACHE_DIR])
+            .conflicts_with_all([ARG_ICONS_CACHE_SAVE_OFTEN, ARG_ICONS_CACHE_MAX_FILES, ARG_ICONS_CACHE_SIZE, ARG_ICONS_CACHE_DIR])
             .help("Icons cache is disabled.")
             )
         .arg(
@@ -511,7 +511,7 @@ fn create_parser() -> Command {
             .action(ArgAction::SetTrue)
             .value_parser(FalseyValueParser::new())
             .env("AUDIOSERVE_T_CACHE_DISABLE")
-            .conflicts_with_all(&[ARG_T_CACHE_SAVE_OFTEN, ARG_T_CACHE_MAX_FILES, ARG_T_CACHE_SIZE, ARG_T_CACHE_DIR])
+            .conflicts_with_all([ARG_T_CACHE_SAVE_OFTEN, ARG_T_CACHE_MAX_FILES, ARG_T_CACHE_SIZE, ARG_T_CACHE_DIR])
             .help("Transaction cache is disabled. If you want to completely get rid of it, compile without 'transcoding-cache'")
             )
         .arg(
@@ -607,7 +607,7 @@ where
     {
         let d = base_data_dir();
         if !d.is_dir() {
-            std::fs::create_dir(&d).or_else(|e| {
+            std::fs::create_dir(d).or_else(|e| {
                 arg_error!(
                     ARG_DATA_DIR,
                     "Audioserve data directory {:?} cannot be created due to error {}",

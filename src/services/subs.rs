@@ -554,13 +554,13 @@ pub fn download_folder(
                 let allow_symlinks = get_config().allow_symlinks;
                 if let Some(folder_re) = include_subfolders {
                     collection::list_dir_files_with_subdirs(
-                        &base_path,
+                        base_path,
                         &folder_path,
                         allow_symlinks,
                         folder_re,
                     )
                 } else {
-                    collection::list_dir_files_only(&base_path, &folder_path, allow_symlinks)
+                    collection::list_dir_files_only(base_path, &folder_path, allow_symlinks)
                 }
             })
             .await

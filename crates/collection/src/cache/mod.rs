@@ -186,7 +186,7 @@ impl CollectionCache {
                     .map_err(|e| error!("Failed to create fs watcher: {}", e));
                 if let Ok(ref mut watcher) = watcher {
                     watcher
-                        .watch(&root_path, notify::RecursiveMode::Recursive)
+                        .watch(root_path, notify::RecursiveMode::Recursive)
                         .map_err(|e| error!("failed to start watching: {}", e))
                         .ok();
                 }
@@ -387,7 +387,7 @@ impl CollectionTrait for CollectionCache {
         if let Some(ref group) = group {
             result
                 .iter_mut()
-                .for_each(|sf| self.inner.update_subfolder(&group, sf));
+                .for_each(|sf| self.inner.update_subfolder(group, sf));
         }
 
         result

@@ -33,7 +33,7 @@ pub trait AudioCodec {
     fn bitrate(&self) -> u32;
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum TranscodingFormat {
     OpusInOgg(Opus),
@@ -144,7 +144,7 @@ impl ChosenTranscoding {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Copy)]
+#[derive(Clone, Debug, PartialEq, Eq, Copy)]
 pub enum QualityLevel {
     Low,
     Medium,
@@ -211,14 +211,14 @@ impl Transcoder {
 
     fn base_ffmpeg(&self, seek: Option<f32>, span: Option<TimeSpan>) -> Command {
         let mut cmd = Command::new("ffmpeg");
-        cmd.args(&["-nostdin", "-v", "error"]);
+        cmd.args(["-nostdin", "-v", "error"]);
         let offset = span.as_ref().map(|s| s.start).unwrap_or(0) as f32;
         let time = span.and_then(|s| s.duration).unwrap_or(0);
         let seek = seek.unwrap_or(0f32);
         let start = offset as f32 / 1000.0 + seek;
 
         if start > 0.0 {
-            cmd.args(&["-accurate_seek", "-ss"]);
+            cmd.args(["-accurate_seek", "-ss"]);
             let time_spec = format!("{:3}", start);
             cmd.arg(time_spec);
         }
@@ -236,7 +236,7 @@ impl Transcoder {
     }
 
     fn input_file_args<S: AsRef<OsStr>>(&self, cmd: &mut Command, file: S) {
-        cmd.arg("-i").arg(file).args(&[
+        cmd.arg("-i").arg(file).args([
             "-y",
             "-map_metadata",
             "-1", // removing metadata as we do not need them
@@ -283,7 +283,7 @@ impl Transcoder {
             self.quality.format.args().format
         };
         self.input_file_args(&mut cmd, file);
-        cmd.args(&["-acodec", "copy"])
+        cmd.args(["-acodec", "copy"])
             .arg("-f")
             .arg(fmt)
             .arg("pipe:1")

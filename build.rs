@@ -26,7 +26,7 @@ fn get_features() -> String {
 
 fn get_commit() -> String {
     Command::new("git")
-        .args(&["rev-parse", "HEAD"])
+        .args(["rev-parse", "HEAD"])
         .output()
         .map(|mut o| {
             o.stdout.truncate(7);

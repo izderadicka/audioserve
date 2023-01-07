@@ -13,7 +13,7 @@ lazy_static! {
         } else {
             let cache_dir = &cfg.icons.cache_dir;
             if !cache_dir.exists() {
-                fs::create_dir(&cache_dir).expect("Cannot create directory for icons cache")
+                fs::create_dir(cache_dir).expect("Cannot create directory for icons cache")
             }
             Some(
                 Cache::new(

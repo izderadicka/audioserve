@@ -224,11 +224,11 @@ impl CacheInner {
         P: AsRef<str>,
     {
         let (path, file) = split_path(&path);
-        if let Some((last_file, last_file_duration)) = self.get_last_file(&path) {
+        if let Some((last_file, last_file_duration)) = self.get_last_file(path) {
             (&self.pos_latest, &self.pos_folder)
                 .transaction(move |(pos_latest, pos_folder)| {
                     let mut folder_rec = pos_folder
-                        .get(&path)
+                        .get(path)
                         .map_err(|e| error!("Db get error: {}", e))
                         .ok()
                         .flatten()
@@ -792,7 +792,7 @@ impl CacheInner {
         if self.lister.collapse_cd_enabled()
             && full_path
                 .parent()
-                .map(|p| self.is_dir(&p).is_collapsed())
+                .map(|p| self.is_dir(p).is_collapsed())
                 .unwrap_or(false)
         {
             parent_path(parent)

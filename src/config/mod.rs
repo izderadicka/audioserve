@@ -279,10 +279,10 @@ impl TranscodingConfig {
 
 fn generate_tag(s: &str) -> String {
     let hash = ring::digest::digest(&ring::digest::SHA256, s.as_bytes());
-    return format!(
+    format!(
         "{:016x}",
         u64::from_be_bytes(hash.as_ref()[..8].try_into().expect("Invalid size"))
-    );
+    )
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
