@@ -320,6 +320,12 @@ impl FolderLister {
                         }
                     }
                 } else {
+                    let mut sorted = false;
+                    let file_sorter = if self.config.natural_files_ordering {
+                        |a: &AudioFile, b: &AudioFile| a.collate_natural(b)
+                    } else {
+                        |a: &AudioFile, b: &AudioFile| a.collate(b)
+                    };
                     if !subfolders.is_empty() {
                         if let Some(ref re) = self.config.cd_folder_regex {
                             let can_collapse =
@@ -327,14 +333,23 @@ impl FolderLister {
                             let will_collapse = subfolders.iter().any(can_collapse);
                             if will_collapse {
                                 is_collapsed = true;
+                                sorted = true;
                                 debug!("Can collapse CD subfolders on path {:?}", full_path);
-                                let folders = mem::take(&mut subfolders);
+                                let mut folders = mem::take(&mut subfolders);
+                                files.sort_unstable_by(file_sorter);
+                                folders.sort_unstable_by(|a, b| {
+                                    if self.config.natural_files_ordering {
+                                        a.collate_natural(b)
+                                    } else {
+                                        a.collate(b)
+                                    }
+                                });
                                 for fld in folders {
                                     if can_collapse(&fld) {
                                         let prefix: String = fld.name.into();
                                         let subdir_path = base_dir.as_ref().join(&fld.path);
                                         let subdir_name = fld.path.file_name();
-                                        let subdir = self.list_dir_dir(
+                                        let mut subdir = self.list_dir_dir(
                                             base_dir.as_ref(),
                                             subdir_path,
                                             FoldersOrdering::Alphabetical,
@@ -343,6 +358,7 @@ impl FolderLister {
                                         if !subdir.subfolders.is_empty() {
                                             warn!("CD folder contains subfolders, these will not be visible");
                                         }
+                                        subdir.files.sort_unstable_by(file_sorter);
                                         for mut f in subdir.files {
                                             if let (Some(file_name), Some(subdir_name)) =
                                                 (f.path.file_name(), subdir_name)
@@ -369,13 +385,9 @@ impl FolderLister {
                             }
                         }
                     }
-                    files.sort_unstable_by(|a, b| {
-                        if self.config.natural_files_ordering {
-                            a.collate_natural(b)
-                        } else {
-                            a.collate(b)
-                        }
-                    });
+                    if !sorted {
+                        files.sort_unstable_by(file_sorter);
+                    }
                     tags = if extract_tags {
                         extract_folder_tags(&mut files)
                     } else {
