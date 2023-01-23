@@ -981,6 +981,7 @@ mod test {
             "test_data/as-backup-json",
             "--positions-backup-schedule",
             "3 3 * * *",
+            "--tags",
             "test_data",
             "client",
         ])
@@ -1069,10 +1070,18 @@ mod test {
             "audioserve",
             "--shared-secret-file",
             "test_data/shared-secret",
+            "--tags-custom",
+            "album,artist,comment,title,performer",
             "--",
             "test_data",
         ])
         .unwrap();
+
+        assert!(c.tags.contains("album"));
+        assert!(c.tags.contains("artist"));
+        assert!(c.tags.contains("comment"));
+        assert!(c.tags.contains("title"));
+        assert!(c.tags.contains("performer"));
 
         assert_eq!(Some("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".into()), c.shared_secret);
     }
