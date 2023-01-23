@@ -735,10 +735,10 @@ where
         ARG_FORCE_CACHE_UPDATE
     );
 
-    if let Some(tags) = args.remove_many(ARG_TAGS_CUSTOM) {
+    if let Some(tags) = args.remove_many::<String>(ARG_TAGS_CUSTOM) {
         for t in tags {
-            if !ALLOWED_TAGS.contains(&t) {
-                arg_error!(ARG_TAGS_CUSTOM, "Unknown tag")?
+            if !ALLOWED_TAGS.iter().any(|&allowed| t == allowed) {
+                arg_error!(ARG_TAGS_CUSTOM, "Unknown tag {}", t)?
             }
             config.tags.insert(t.to_string());
         }
