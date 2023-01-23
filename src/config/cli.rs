@@ -1063,6 +1063,24 @@ mod test {
     }
 
     #[test]
+    fn test_alternative_args() {
+        init_default_config();
+        let c = parse_args_from(&[
+            "audioserve",
+            "--shared-secret-file",
+            "test_data/shared-secret",
+            "--",
+            "test_data",
+        ])
+        .unwrap();
+
+        assert_eq!(
+            Some("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".into()),
+            c.shared_secret
+        );
+    }
+
+    #[test]
     fn test_from_config() {
         init_default_config();
         let c =
