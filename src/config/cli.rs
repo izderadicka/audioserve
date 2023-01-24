@@ -735,10 +735,10 @@ where
         ARG_FORCE_CACHE_UPDATE
     );
 
-    if let Some(tags) = args.remove_many(ARG_TAGS_CUSTOM) {
+    if let Some(tags) = args.remove_many::<String>(ARG_TAGS_CUSTOM) {
         for t in tags {
-            if !ALLOWED_TAGS.contains(&t) {
-                arg_error!(ARG_TAGS_CUSTOM, "Unknown tag")?
+            if !ALLOWED_TAGS.iter().any(|&allowed| t == allowed) {
+                arg_error!(ARG_TAGS_CUSTOM, "Unknown tag {}", t)?
             }
             config.tags.insert(t.to_string());
         }
@@ -981,6 +981,7 @@ mod test {
             "test_data/as-backup-json",
             "--positions-backup-schedule",
             "3 3 * * *",
+            "--tags",
             "test_data",
             "client",
         ])
@@ -1060,6 +1061,32 @@ mod test {
 
         assert!(c.allow_symlinks);
         env::remove_var("AUDIOSERVE_ALLOW_SYMLINKS");
+    }
+
+    #[test]
+    fn test_alternative_args() {
+        init_default_config();
+        let c = parse_args_from(&[
+            "audioserve",
+            "--shared-secret-file",
+            "test_data/shared-secret",
+            "--tags-custom",
+            "album,artist,comment,title,performer",
+            "--",
+            "test_data",
+        ])
+        .unwrap();
+
+        assert!(c.tags.contains("album"));
+        assert!(c.tags.contains("artist"));
+        assert!(c.tags.contains("comment"));
+        assert!(c.tags.contains("title"));
+        assert!(c.tags.contains("performer"));
+
+        assert_eq!(
+            Some("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".into()),
+            c.shared_secret
+        );
     }
 
     #[test]
