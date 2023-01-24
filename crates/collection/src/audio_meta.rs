@@ -304,7 +304,7 @@ mod libavformat {
 
     static INIT_LIBAV: Once = Once::new();
 
-    const DESCRIPTION_KEY: &str = "description";
+    const DESCRIPTION_KEYS: &[&str] = &["description", "comment"];
 
     pub fn init() {
         INIT_LIBAV.call_once(media_info::init)
@@ -358,11 +358,15 @@ mod libavformat {
         }
 
         fn has_description(&self) -> bool {
-            self.media_file.has_meta(DESCRIPTION_KEY)
+            DESCRIPTION_KEYS
+                .iter()
+                .any(|&key| self.media_file.has_meta(key))
         }
 
         fn description(&self) -> Option<String> {
-            self.media_file.meta(DESCRIPTION_KEY)
+            DESCRIPTION_KEYS
+                .iter()
+                .find_map(|&key| self.media_file.meta(key))
         }
     }
 
