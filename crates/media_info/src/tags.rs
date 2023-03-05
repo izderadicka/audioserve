@@ -32,6 +32,9 @@ variant_bitrate -- the total bitrate of the bitrate variant that the current str
 Following tags are not from ffmpeg documentation, but work for some formats mpeg4 aka .m4b
 series       -- name of the audiobook series
 series_sequence -- specifies the part of the series
+show         -- alias for 'series'
+episode_id   -- alias for 'series_sequence'
+season_number -- specific "season" grouping part within the show/series
 
  */
 
@@ -58,6 +61,9 @@ pub const TRACK: &str = "track";
 pub const VARIANT_BITRATE: &str = "variant_bitrate";
 pub const SERIES: &str = "series";
 pub const SERIES_SEQUENCE: &str = "series_sequence";
+pub const SHOW: &str = "show";
+pub const EPISODE_ID: &str = "episode_id";
+pub const SEASON_NUMBER: &str = "season_number";
 
 pub const ALLOWED_TAGS: &[&str] = &[
     ALBUM,
@@ -83,6 +89,9 @@ pub const ALLOWED_TAGS: &[&str] = &[
     VARIANT_BITRATE,
     SERIES,
     SERIES_SEQUENCE,
+    SHOW,
+    EPISODE_ID,
+    SEASON_NUMBER,
 ];
 
 pub const BASIC_TAGS: &[&str] = &[ALBUM, ARTIST, COMPOSER, DATE, GENRE, PERFORMER, TITLE];
