@@ -614,6 +614,8 @@ mod tests {
             Path::new("usak/kulisak/desc.txt"),
             af.description.unwrap().path
         );
+        // wait a bit before renaming, so mtime is different
+        thread::sleep(Duration::from_millis(10));
         let new_info_name = test_data_dir.join("usak/kulisak/info.txt");
         fs::rename(info_file, new_info_name)?;
         let af2 = col.list_dir("usak/kulisak", FoldersOrdering::RecentFirst, None)?;
