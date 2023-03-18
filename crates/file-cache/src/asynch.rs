@@ -2,6 +2,7 @@ use super::{error::Error, CacheInner};
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
+use std::time::SystemTime;
 use tokio::task::spawn_blocking;
 
 impl From<tokio::task::JoinError> for Error {
@@ -36,12 +37,16 @@ impl Cache {
         (c.max_files - c.num_files, c.max_size - c.size)
     }
 
-    pub async fn add<S: AsRef<str>>(&self, key: S) -> Result<(tokio::fs::File, Finisher)> {
+    pub async fn add<S: AsRef<str>>(
+        &self,
+        key: S,
+        mtime: SystemTime,
+    ) -> Result<(tokio::fs::File, Finisher)> {
         let cache = self.inner.clone();
         let key = key.as_ref().to_string();
         spawn_blocking(move || {
             let mut c = cache.write().expect("Cannot lock cache");
-            c.add(key.clone())
+            c.add(key.clone(), mtime)
                 .and_then(|f| f.try_clone().map_err(|e| e.into()).map(|f2| (f, f2)))
                 .map(|(f, f2)| {
                     (
@@ -129,7 +134,7 @@ mod tests {
     const MSG: &str = "Hello there you lonely bastard";
 
     async fn cache_rw(c: Cache) -> Result<()> {
-        let (mut f, fin) = c.add(MY_KEY).await?;
+        let (mut f, fin) = c.add(MY_KEY, SystemTime::now()).await?;
         f.write_all(MSG.as_bytes()).await?;
         fin.commit().await?;
         match c.get(MY_KEY).await? {

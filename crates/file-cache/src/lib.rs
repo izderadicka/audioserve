@@ -13,6 +13,7 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
+use std::time::{Duration, SystemTime};
 //use std::time::SystemTime;
 
 pub use self::error::Error;
@@ -46,10 +47,10 @@ impl Cache {
         })
     }
 
-    pub fn add<S: AsRef<str>>(&self, key: S) -> Result<FileGuard> {
+    pub fn add<S: AsRef<str>>(&self, key: S, mtime: SystemTime) -> Result<FileGuard> {
         let key: String = key.as_ref().into();
         let mut c = self.inner.write().expect("Cannot lock cache");
-        c.add(key.clone()).map(move |file| FileGuard {
+        c.add(key.clone(), mtime).map(move |file| FileGuard {
             cache: self.inner.clone(),
             file,
             key,
@@ -160,9 +161,43 @@ fn entry_path_helper<P: AsRef<Path>>(root: &Path, file_key: P) -> PathBuf {
     root.join(ENTRIES).join(file_key)
 }
 
+fn mtime_from_system_time(t: SystemTime) -> u64 {
+    let d = t
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_else(|_| Duration::from_millis(0));
+    let t = d.as_millis();
+    // Should be OK for all reasonable times
+    let res = t.try_into();
+    if res.is_err() {
+        error!("SystemTime outside of range of u64");
+    }
+    res.unwrap_or(u64::MAX)
+}
+
+#[derive(Debug, Clone)]
+struct FileEntry {
+    key: String,
+    mtime: u64,
+}
+
+impl FileEntry {
+    fn new(key: String, mtime: SystemTime) -> Self {
+        FileEntry {
+            key,
+            mtime: mtime_from_system_time(mtime),
+        }
+    }
+}
+
+impl AsRef<Path> for FileEntry {
+    fn as_ref(&self) -> &Path {
+        Path::new(&self.key)
+    }
+}
+
 struct CacheInner {
-    files: LinkedHashMap<String, String>,
-    opened: HashMap<String, String>,
+    files: LinkedHashMap<String, FileEntry>,
+    opened: HashMap<String, FileEntry>,
     root: PathBuf,
     max_size: u64,
     max_files: u64,
@@ -253,7 +288,7 @@ impl CacheInner {
         Ok(cache)
     }
 
-    fn add(&mut self, key: String) -> Result<fs::File> {
+    fn add(&mut self, key: String, mtime: SystemTime) -> Result<fs::File> {
         if key.len() > MAX_KEY_SIZE {
             return Err(Error::InvalidKey);
         }
@@ -266,10 +301,10 @@ impl CacheInner {
         let mut new_file_key: String;
         loop {
             new_file_key = gen_cache_key();
-            let new_path = self.partial_path(new_file_key.clone());
+            let new_path = self.partial_path(&new_file_key);
             if !new_path.exists() {
                 let f = fs::File::create(&new_path)?;
-                self.opened.insert(key, new_file_key);
+                self.opened.insert(key, FileEntry::new(new_file_key, mtime));
                 return Ok(f);
             }
         }
@@ -383,8 +418,9 @@ impl CacheInner {
             for (key, value) in self.files.iter() {
                 f.write_u16::<BigEndian>(key.len() as u16)?;
                 f.write_all(key.as_bytes())?;
-                f.write_u16::<BigEndian>(value.len() as u16)?;
-                f.write_all(value.as_bytes())?;
+                f.write_u64::<BigEndian>(value.mtime)?;
+                f.write_u16::<BigEndian>(value.key.len() as u16)?;
+                f.write_all(value.key.as_bytes())?;
             }
         }
         fs::rename(tmp_index, self.root.join(INDEX))?;
@@ -396,7 +432,7 @@ impl CacheInner {
         let index_path = self.root.join(INDEX);
 
         if index_path.exists() {
-            let mut index = LinkedHashMap::<String, String>::new();
+            let mut index = LinkedHashMap::<String, FileEntry>::new();
             let mut f = fs::File::open(index_path)?;
 
             loop {
@@ -416,6 +452,7 @@ impl CacheInner {
                 f.read_exact(&mut buf[..key_len])?;
                 let key = String::from_utf8(Vec::from(&buf[..key_len]))
                     .map_err(|_| Error::InvalidIndex)?;
+                let mtime = f.read_u64::<BigEndian>()?;
                 let value_len = f.read_u16::<BigEndian>()? as usize;
                 if value_len > 2 * FILE_KEY_LEN {
                     return Err(Error::InvalidIndex);
@@ -432,16 +469,18 @@ impl CacheInner {
                         fs::remove_file(&file_path)?;
                         warn!("Removing file above limit {:?}", file_path);
                     } else {
-                        index.insert(key, value);
+                        index.insert(key, FileEntry { key: value, mtime });
                         self.num_files += 1;
                         self.size += file_size;
                     }
+                } else {
+                    warn!("Nonexisting file {:?} in index", file_path);
                 }
             }
 
             //cleanup files not in index
             {
-                let file_keys_set = index.values().collect::<HashSet<&String>>();
+                let file_keys_set = index.values().map(|e| &e.key).collect::<HashSet<&String>>();
                 let base_dir = self.root.join(ENTRIES);
                 if let Ok(dir_list) = fs::read_dir(&base_dir) {
                     for dir_entry in dir_list.flatten() {
@@ -486,7 +525,7 @@ mod tests {
         {
             let c = Cache::new(temp_dir.path(), 10000, 10).unwrap();
             {
-                let mut f = c.add(MY_KEY).unwrap();
+                let mut f = c.add(MY_KEY, SystemTime::now()).unwrap();
 
                 f.write(msg.as_bytes()).unwrap();
                 f.finish().unwrap();
@@ -522,10 +561,10 @@ mod tests {
         {
             let c = Cache::new(temp_dir.path(), 10000, 10).unwrap();
             {
-                let mut f = c.add(MY_KEY).unwrap();
+                let mut f = c.add(MY_KEY, SystemTime::now()).unwrap();
                 f.write(msg.as_bytes()).unwrap();
                 f.finish().unwrap();
-                let mut f = c.add("second").unwrap();
+                let mut f = c.add("second", SystemTime::now()).unwrap();
                 f.write("0123456789".as_bytes()).unwrap();
                 f.finish().unwrap();
             }
@@ -580,7 +619,7 @@ mod tests {
             for i in 0..10 {
                 let c = c.clone();
                 threads.push(thread::spawn(move || {
-                    let mut f = c.add(format!("Key {}", i)).unwrap();
+                    let mut f = c.add(format!("Key {}", i), SystemTime::now()).unwrap();
                     let msg = format!("Cached content {}", i);
                     f.write_all(msg.as_bytes()).unwrap();
                     f.finish().unwrap();
@@ -640,7 +679,7 @@ mod tests {
             for i in 0..10 {
                 let c = c.clone();
                 threads.push(thread::spawn(move || {
-                    let mut f = c.add(format!("Key {}", i)).unwrap();
+                    let mut f = c.add(format!("Key {}", i), SystemTime::now()).unwrap();
                     let mut rng = rand::thread_rng();
                     for j in 0..8 {
                         f.write_all(&data[128 * j..128 * (j + 1)]).unwrap();
@@ -673,7 +712,7 @@ mod tests {
         };
 
         {
-            let _f = c.add("usak");
+            let _f = c.add("usak", SystemTime::now());
             assert_eq!(1, list_path());
         }
 
