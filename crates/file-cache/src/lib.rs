@@ -58,9 +58,9 @@ impl Cache {
         })
     }
 
-    pub fn get<S: AsRef<str>>(&self, key: S) -> Option<Result<fs::File>> {
+    pub fn get<S: AsRef<str>>(&self, key: S, mtime: SystemTime) -> Option<Result<fs::File>> {
         let mut cache = self.inner.write().expect("Cannot lock cache");
-        cache.get(key)
+        cache.get(key, mtime)
     }
 
     pub fn save_index(&self) -> Result<()> {
@@ -224,7 +224,7 @@ macro_rules! get_cleanup {
         {
 
         // Code to use if we wanted to update timestamp of file too, but generally should not be necessary
-        // let now = filetime::FileTime::from_system_time(SystemTime::now());
+        // let now = filetime::FileTime::from_system_time();
         // if let Err(e) = filetime::set_file_times(&file_name, now, now) {
         //     error!("Cannot set mtime for file {:?} error {}", file_name, e)
         // }
@@ -311,15 +311,41 @@ impl CacheInner {
         }
     }
 
-    fn get_entry_path<S: AsRef<str>>(&mut self, key: S) -> Option<PathBuf> {
+    fn get_entry_path<S: AsRef<str>>(&mut self, key: S, mtime: SystemTime) -> Option<PathBuf> {
         let root = &self.root;
-        self.files
+        let mut is_stalled = false;
+        let res = self
+            .files
             .get_refresh(key.as_ref())
-            .map(|file_key| entry_path_helper(root, file_key))
+            .and_then(|entry| {
+                let mtime = mtime_from_system_time(mtime);
+                if mtime > entry.mtime {
+                    //stall entry
+                    is_stalled = true;
+                    warn!("Stalled entry {} >{}", mtime, entry.mtime);
+                    None
+                } else {
+                    Some(entry)
+                }
+            })
+            .map(|file_key| entry_path_helper(root, file_key));
+        if is_stalled {
+            self.remove(&key)
+                .or_else(|e| {
+                    Err(error!(
+                        "Cannot remove key {} from cache: {}",
+                        key.as_ref(),
+                        e
+                    ))
+                })
+                .ok();
+        }
+
+        res
     }
 
-    fn get<S: AsRef<str>>(&mut self, key: S) -> Option<Result<fs::File>> {
-        let file_name = self.get_entry_path(&key);
+    fn get<S: AsRef<str>>(&mut self, key: S, mtime: SystemTime) -> Option<Result<fs::File>> {
+        let file_name = self.get_entry_path(&key, mtime);
         let res = file_name
             .as_ref()
             .map(|file_name| fs::File::open(file_name).map_err(|e| e.into()));
@@ -328,8 +354,12 @@ impl CacheInner {
     }
 
     #[allow(dead_code)]
-    fn get2<S: AsRef<str>>(&mut self, key: S) -> Option<Result<(fs::File, PathBuf)>> {
-        let file_name = self.get_entry_path(&key);
+    fn get2<S: AsRef<str>>(
+        &mut self,
+        key: S,
+        mtime: SystemTime,
+    ) -> Option<Result<(fs::File, PathBuf)>> {
+        let file_name = self.get_entry_path(&key, mtime);
         let res = file_name.as_ref().map(|file_name| {
             fs::File::open(file_name)
                 .map_err(|e| e.into())
@@ -536,22 +566,47 @@ mod tests {
 
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn basic_stalled() {
+        env_logger::try_init().ok();
+        const MY_KEY: &str = "muj_test_1";
+        let temp_dir = tempdir().unwrap();
+
+        let t = SystemTime::now();
+
+        let msg = "Hello there";
+        {
+            let c = Cache::new(temp_dir.path(), 10000, 10).unwrap();
+            {
+                let mut f = c.add(MY_KEY, t).unwrap();
+
+                f.write(msg.as_bytes()).unwrap();
+                f.finish().unwrap();
+            }
+            let f = c.get(MY_KEY, t + Duration::from_secs(1));
+            assert!(f.is_none());
+        }
+    }
+
     #[test]
     fn basic_test() {
         env_logger::try_init().ok();
         const MY_KEY: &str = "muj_test_1";
         let temp_dir = tempdir().unwrap();
 
+        let t = SystemTime::now();
+
         let msg = "Hello there";
         {
             let c = Cache::new(temp_dir.path(), 10000, 10).unwrap();
             {
-                let mut f = c.add(MY_KEY, SystemTime::now()).unwrap();
+                let mut f = c.add(MY_KEY, t).unwrap();
 
                 f.write(msg.as_bytes()).unwrap();
                 f.finish().unwrap();
             }
-            let mut f = c.get(MY_KEY).unwrap().unwrap();
+            let mut f = c.get(MY_KEY, t).unwrap().unwrap();
 
             let mut msg2 = String::new();
             f.read_to_string(&mut msg2).unwrap();
@@ -562,7 +617,7 @@ mod tests {
 
         {
             let c = Cache::new(temp_dir.path(), 10000, 10).unwrap();
-            let mut f = c.get(MY_KEY).unwrap().unwrap();
+            let mut f = c.get(MY_KEY, t).unwrap().unwrap();
 
             let mut msg2 = String::new();
             f.read_to_string(&mut msg2).unwrap();
@@ -577,25 +632,26 @@ mod tests {
         env_logger::try_init().ok();
         const MY_KEY: &str = "muj_test_1";
         let temp_dir = tempdir().unwrap();
+        let t = SystemTime::now();
 
         let msg = "Hello there";
         {
             let c = Cache::new(temp_dir.path(), 10000, 10).unwrap();
             {
-                let mut f = c.add(MY_KEY, SystemTime::now()).unwrap();
+                let mut f = c.add(MY_KEY, t).unwrap();
                 f.write(msg.as_bytes()).unwrap();
                 f.finish().unwrap();
-                let mut f = c.add("second", SystemTime::now()).unwrap();
+                let mut f = c.add("second", t).unwrap();
                 f.write("0123456789".as_bytes()).unwrap();
                 f.finish().unwrap();
             }
             let (_f, fname) = {
                 let mut cache = c.inner.write().unwrap();
-                cache.get2(MY_KEY).unwrap().unwrap()
+                cache.get2(MY_KEY, t).unwrap().unwrap()
             };
             fs::remove_file(fname).unwrap();
 
-            if let Some(Err(_)) = c.get(MY_KEY) {
+            if let Some(Err(_)) = c.get(MY_KEY, t) {
                 let num_files = c.inner.read().unwrap().num_files;
                 assert_eq!(1, num_files);
                 let size = c.inner.read().unwrap().size;
@@ -611,15 +667,16 @@ mod tests {
         use std::thread;
         env_logger::try_init().ok();
         let tmp_folder = tempdir().unwrap();
+        let t = SystemTime::now();
 
-        fn test_cache(c: &Cache) {
+        fn test_cache(c: &Cache, t: SystemTime) {
             {
                 let cache = c.inner.read().unwrap();
                 assert_eq!(5, cache.files.len());
             }
             let mut count = 0;
             for i in 0..10 {
-                match c.get(&format!("Key {}", i)) {
+                match c.get(&format!("Key {}", i), t) {
                     None => (),
                     Some(res) => {
                         let mut f = res.unwrap();
@@ -640,7 +697,7 @@ mod tests {
             for i in 0..10 {
                 let c = c.clone();
                 threads.push(thread::spawn(move || {
-                    let mut f = c.add(format!("Key {}", i), SystemTime::now()).unwrap();
+                    let mut f = c.add(format!("Key {}", i), t).unwrap();
                     let msg = format!("Cached content {}", i);
                     f.write_all(msg.as_bytes()).unwrap();
                     f.finish().unwrap();
@@ -651,12 +708,12 @@ mod tests {
                 t.join().unwrap();
             }
 
-            test_cache(&c);
+            test_cache(&c, t);
         }
 
         {
             let c = Cache::new(tmp_folder.path(), 10_000, 5).unwrap();
-            test_cache(&c);
+            test_cache(&c, t);
         }
     }
 
@@ -670,16 +727,17 @@ mod tests {
 
         let mut data = [0_u8; 1024];
         let mut rng = rand::thread_rng();
+        let t = SystemTime::now();
         rng.fill_bytes(&mut data);
 
-        fn test_cache(c: &Cache, data: &[u8]) {
+        fn test_cache(c: &Cache, data: &[u8], t: SystemTime) {
             {
                 let cache = c.inner.read().unwrap();
                 assert_eq!(5, cache.files.len());
             }
             let mut count = 0;
             for i in 0..10 {
-                match c.get(&format!("Key {}", i)) {
+                match c.get(&format!("Key {}", i), t) {
                     None => (),
                     Some(res) => {
                         let mut f = res.unwrap();
@@ -700,7 +758,7 @@ mod tests {
             for i in 0..10 {
                 let c = c.clone();
                 threads.push(thread::spawn(move || {
-                    let mut f = c.add(format!("Key {}", i), SystemTime::now()).unwrap();
+                    let mut f = c.add(format!("Key {}", i), t).unwrap();
                     let mut rng = rand::thread_rng();
                     for j in 0..8 {
                         f.write_all(&data[128 * j..128 * (j + 1)]).unwrap();
@@ -716,7 +774,7 @@ mod tests {
                 t.join().unwrap();
             }
 
-            test_cache(&c, &data);
+            test_cache(&c, &data, t);
         }
     }
 
