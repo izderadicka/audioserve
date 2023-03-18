@@ -58,14 +58,14 @@ fn serve_file_cached_or_transcoded(
 }
 
 #[cfg(feature = "transcoding-cache")]
-fn serve_file_cached_or_transcoded(
+async fn serve_file_cached_or_transcoded(
     full_path: PathBuf,
     seek: Option<f32>,
     span: Option<TimeSpan>,
     range: Option<ByteRange>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: ChosenTranscoding,
-) -> ResponseFuture {
+) -> Result<Response> {
     if get_config().transcoding.cache.disabled {
         return serve_file_transcoded_checked(
             AudioFilePath::Original(full_path),
@@ -73,54 +73,52 @@ fn serve_file_cached_or_transcoded(
             span,
             transcoding,
             transcoding_quality,
-        );
+        )
+        .await;
     }
 
-    use super::transcode::cache::{cache_key, get_cache};
+    use super::transcode::cache::{cache_key_async, get_cache};
     let cache = get_cache();
-    let cache_key = cache_key(&full_path, &transcoding_quality, span);
-    let fut = cache
-        .get2(cache_key)
-        .then(|res| match res {
-            Err(e) => {
-                error!("Cache lookup error: {}", e);
-                future::ok(None)
+    let (cache_key, mtime) = cache_key_async(&full_path, &transcoding_quality, span).await?;
+    let maybe_file = cache.get2(cache_key, mtime).await.unwrap_or_else(|e| {
+        error!("Cache lookup error: {}", e);
+        None
+    });
+    match maybe_file {
+        Some((f, path)) => {
+            if seek.is_some() {
+                debug!(
+                    "File is in cache and seek is needed -  will send remuxed from {:?} {:?}",
+                    path, span
+                );
+                serve_file_transcoded_checked(
+                    AudioFilePath::Transcoded(path),
+                    seek,
+                    None,
+                    transcoding,
+                    transcoding_quality,
+                )
+                .await
+            } else {
+                debug!("Sending file {:?} from transcoded cache", &full_path);
+                let mime = transcoding_quality.format.mime();
+                serve_opened_file(f, range, None, mime).await.map_err(|e| {
+                    error!("Error sending cached file: {}", e);
+                    Error::new(e).context("sending cached file")
+                })
             }
-            Ok(f) => future::ok(f),
-        })
-        .and_then(move |maybe_file| match maybe_file {
-            None => serve_file_transcoded_checked(
+        }
+        None => {
+            serve_file_transcoded_checked(
                 AudioFilePath::Original(full_path),
                 seek,
                 span,
                 transcoding,
                 transcoding_quality,
-            ),
-            Some((f, path)) => {
-                if seek.is_some() {
-                    debug!(
-                        "File is in cache and seek is needed -  will send remuxed from {:?} {:?}",
-                        path, span
-                    );
-                    serve_file_transcoded_checked(
-                        AudioFilePath::Transcoded(path),
-                        seek,
-                        None,
-                        transcoding,
-                        transcoding_quality,
-                    )
-                } else {
-                    debug!("Sending file {:?} from transcoded cache", &full_path);
-                    let mime = transcoding_quality.format.mime();
-                    Box::pin(serve_opened_file(f, range, None, mime).map_err(|e| {
-                        error!("Error sending cached file: {}", e);
-                        Error::new(e).context("sending cached file")
-                    }))
-                }
-            }
-        });
-
-    Box::pin(fut)
+            )
+            .await
+        }
+    }
 }
 
 fn serve_file_transcoded_checked(
@@ -383,14 +381,14 @@ pub fn send_file<P: AsRef<Path>>(
             "Sending file transcoded in quality {:?}",
             transcoding_quality.level
         );
-        serve_file_cached_or_transcoded(
+        Box::pin(serve_file_cached_or_transcoded(
             full_path,
             seek,
             span,
             range,
             transcoding,
             transcoding_quality,
-        )
+        ))
     } else if span.is_some() {
         debug!("Sending part of file remuxed");
         serve_file_transcoded_checked(

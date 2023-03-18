@@ -142,7 +142,7 @@ mod tests {
         let (mut f, fin) = c.add(MY_KEY, t).await?;
         f.write_all(MSG.as_bytes()).await?;
         fin.commit().await?;
-        match c.get(MY_KEY, SystemTime::now()).await? {
+        match c.get(MY_KEY, t).await? {
             None => panic!("cache file not found"),
             Some(mut f) => {
                 let mut v = Vec::new();

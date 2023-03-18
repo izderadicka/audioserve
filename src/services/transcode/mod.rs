@@ -201,8 +201,6 @@ pub struct Transcoder {
 #[cfg(feature = "transcoding-cache")]
 type TranscodedStream =
     Pin<Box<dyn futures::Stream<Item = Result<Vec<u8>, std::io::Error>> + Send + Sync + 'static>>;
-#[cfg(feature = "transcoding-cache")]
-type TranscodedFuture = Pin<Box<dyn Future<Output = Result<TranscodedStream>> + Send>>;
 
 impl Transcoder {
     pub fn new(quality: ChosenTranscoding) -> Self {
@@ -319,14 +317,14 @@ impl Transcoder {
     }
 
     #[cfg(feature = "transcoding-cache")]
-    pub fn transcode<S: AsRef<OsStr> + Debug + Send + 'static>(
+    pub async fn transcode<S: AsRef<OsStr> + Debug + Send + 'static>(
         self,
         file: AudioFilePath<S>,
         seek: Option<f32>,
         span: Option<TimeSpan>,
         counter: super::Counter,
-    ) -> TranscodedFuture {
-        use self::cache::{cache_key, get_cache};
+    ) -> Result<TranscodedStream> {
+        use self::cache::get_cache;
         use futures::channel::mpsc;
         use std::io;
 
@@ -337,29 +335,28 @@ impl Transcoder {
             || get_config().transcoding.cache.disabled
         {
             debug!("Shoud not add to cache as is already transcoded, seeking, remuxing or cache is disabled");
-            return Box::pin(future::ready(
+            return self
+                .transcode_inner(file, seek, span, counter)
+                .map(|(stream, f)| {
+                    tokio::spawn(f);
+                    Box::pin(stream) as TranscodedStream
+                });
+        }
+
+        //TODO: this is ugly -  unify either we will use Path or OsStr!
+        let (key, mtime) = cache::cache_key_async(file.as_ref().as_ref(), &self.quality, span)
+            .await
+            .map_err(|e| crate::error::Error::msg(format!("Cache key error: {}", e)))?;
+        match get_cache().add(key, mtime).await {
+            Err(e) => {
+                warn!("Cannot create cache entry: {}", e);
                 self.transcode_inner(file, seek, span, counter)
                     .map(|(stream, f)| {
                         tokio::spawn(f);
                         Box::pin(stream) as TranscodedStream
-                    }),
-            ));
-        }
-
-        //TODO: this is ugly -  unify either we will use Path or OsStr!
-        let key = cache_key(file.as_ref().as_ref(), &self.quality, span);
-        let fut = get_cache().add(key).then(move |res| match res {
-            Err(e) => {
-                warn!("Cannot create cache entry: {}", e);
-                future::ready(
-                    self.transcode_inner(file, seek, span, counter)
-                        .map(|(stream, f)| {
-                            tokio::spawn(f);
-                            Box::pin(stream) as TranscodedStream
-                        }),
-                )
+                    })
             }
-            Ok((cache_file, cache_finish)) => future::ready(
+            Ok((cache_file, cache_finish)) => {
                 self.transcode_inner(file, seek, span, counter)
                     .map(|(mut stream, f)| {
                         tokio::spawn(f.then(|res| {
@@ -399,10 +396,9 @@ impl Transcoder {
                         };
                         tokio::spawn(f);
                         Box::pin(rx.map(Ok)) as TranscodedStream
-                    }),
-            ),
-        });
-        Box::pin(fut)
+                    })
+            }
+        }
     }
 
     fn transcode_inner<S: AsRef<OsStr> + Debug + Send + 'static>(

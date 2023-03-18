@@ -3,6 +3,7 @@ use crate::services::transcode::TimeSpan;
 use simple_file_cache::AsyncCache as Cache;
 use std::fs;
 use std::path::Path;
+use std::time::SystemTime;
 
 use super::ChosenTranscoding;
 
@@ -45,6 +46,18 @@ pub fn cache_key<P: AsRef<Path>>(
         key.push_str(&span.to_string());
     }
     key
+}
+
+pub async fn cache_key_async<P: AsRef<Path>>(
+    file: P,
+    quality: &ChosenTranscoding,
+    span: Option<TimeSpan>,
+) -> std::io::Result<(String, SystemTime)> {
+    let mtime = tokio::fs::metadata(&file)
+        .await
+        .and_then(|m| m.modified())?;
+    let key: String = cache_key(file, quality, span);
+    Ok((key, mtime))
 }
 
 pub fn get_cache() -> &'static Cache {
