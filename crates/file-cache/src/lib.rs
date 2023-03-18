@@ -27,7 +27,8 @@ mod error;
 
 const PARTIAL: &str = "partial";
 const ENTRIES: &str = "entries";
-const INDEX: &str = "index";
+const INDEX_OLD: &str = "index";
+const INDEX: &str = "index_v2";
 const MAX_KEY_SIZE: usize = 4096;
 const FILE_KEY_LEN: usize = 32;
 
@@ -429,6 +430,17 @@ impl CacheInner {
     }
 
     fn load_index(&mut self) -> Result<bool> {
+        let tmp_index = self.root.join(String::from(INDEX) + ".tmp");
+        if tmp_index.exists() {
+            warn!("Found unfinished index, previous save failed, cache might be empty now");
+            fs::remove_file(&tmp_index)
+                .or_else(|e| Err(error!("Cannot delete {:?}:{}", tmp_index, e)))
+                .ok();
+        }
+        let old_index_path = self.root.join(INDEX_OLD);
+        if old_index_path.exists() {
+            warn!("Found previous version of cache, will clean and start empty");
+        }
         let index_path = self.root.join(INDEX);
 
         if index_path.exists() {
@@ -491,6 +503,24 @@ impl CacheInner {
                                     warn!("Removing file not in index {:?}", dir_entry.path());
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            //cleanup unfinished files
+            {
+                let base_dir = self.root.join(PARTIAL);
+                if let Ok(dir_list) = fs::read_dir(&base_dir) {
+                    for dir_entry in dir_list.flatten() {
+                        if let Some(f) = dir_entry.file_type().ok().and_then(|t| {
+                            if t.is_file() {
+                                Some(dir_entry.path())
+                            } else {
+                                None
+                            }
+                        }) {
+                            fs::remove_file(f).ok();
                         }
                     }
                 }
