@@ -208,13 +208,18 @@ struct CacheInner {
 
 fn recreate_dir<P: AsRef<Path>>(dir: P) -> io::Result<bool> {
     let dir = dir.as_ref();
-    if dir.exists() {
+    let is_empty = dir
+        .read_dir()
+        .map(|mut rd| rd.next().is_none())
+        .unwrap_or(false);
+
+    if dir.exists() && !is_empty {
         debug!("Recreating {:?}", dir);
         fs::remove_dir_all(dir)?;
         fs::create_dir(dir)?;
         Ok(true)
     } else {
-        Ok(false)
+        Ok(is_empty)
     }
 }
 
