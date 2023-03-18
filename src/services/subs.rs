@@ -498,7 +498,7 @@ pub fn send_folder_icon(
 ) -> ResponseFuture {
     let r = blocking(
         move || match collections.get_folder_cover_path(collection, folder_path) {
-            Ok(Some(p)) => icon_response(p),
+            Ok(Some((p, mtime))) => icon_response(p, mtime),
             Ok(None) => Ok(not_found_cached(get_config().folder_file_cache_age)),
             Err(e) => {
                 error!("error while getting folder icon: {}", e);

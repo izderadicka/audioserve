@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
+use std::time::SystemTime;
 
 lazy_static! {
     pub static ref CACHE: Option<Cache> = {
@@ -27,10 +28,10 @@ lazy_static! {
     };
 }
 
-pub fn cached_icon(file: impl AsRef<Path>) -> Option<File> {
+pub fn cached_icon(file: impl AsRef<Path>, mtime: SystemTime) -> Option<File> {
     let key = cache_key(&file);
     get_cache()
-        .get(key.as_ref())
+        .get(key.as_ref(), mtime)
         .transpose()
         .unwrap_or_else(|e| {
             error!("Icons cache error: {}", e);
@@ -38,9 +39,13 @@ pub fn cached_icon(file: impl AsRef<Path>) -> Option<File> {
         })
 }
 
-pub fn cache_icon(file: impl AsRef<Path>, data: impl AsRef<[u8]>) -> anyhow::Result<()> {
+pub fn cache_icon(
+    file: impl AsRef<Path>,
+    data: impl AsRef<[u8]>,
+    mtime: SystemTime,
+) -> anyhow::Result<()> {
     let key = cache_key(&file);
-    let mut f = get_cache().add(key)?;
+    let mut f = get_cache().add(key, mtime)?;
     f.write_all(data.as_ref())?;
     f.finish()?;
     Ok(())

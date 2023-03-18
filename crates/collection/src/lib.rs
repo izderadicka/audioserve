@@ -24,6 +24,7 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
     thread::JoinHandle,
+    time::SystemTime,
 };
 pub use util::guess_mime_type;
 
@@ -135,10 +136,19 @@ impl Collections {
         &self,
         collection: usize,
         dir_path: impl AsRef<Path>,
-    ) -> Result<Option<PathBuf>> {
+    ) -> Result<Option<(PathBuf, SystemTime)>> {
         let col = self.get_cache(collection)?;
-        col.get_folder_cover_path(dir_path)
-            .map(|p| p.map(|p| col.base_dir().join(&p)))
+        col.get_folder_cover_path(dir_path).and_then(|p| {
+            p.and_then(|p| {
+                let path = col.base_dir().join(&p);
+                match path.metadata().and_then(|m| m.modified()) {
+                    Ok(mtime) => Some(Ok((path, mtime))),
+                    Err(e) => Some(Err(e)),
+                }
+            })
+            .transpose()
+            .map_err(Error::from)
+        })
     }
 
     pub fn flush(&self) -> Result<()> {
@@ -485,18 +495,6 @@ impl Collections {
             )
         })
         .unwrap_or_else(|e| Err(Error::from(e)))
-    }
-
-    pub async fn get_folder_cover_path_async<P>(
-        self: Arc<Self>,
-        collection: usize,
-        dir_path: P,
-    ) -> Result<Option<PathBuf>>
-    where
-        P: AsRef<Path> + Send + 'static,
-    {
-        spawn_blocking!({ self.get_folder_cover_path(collection, dir_path) })
-            .unwrap_or_else(|e| Err(Error::from(e)))
     }
 
     pub async fn insert_position_if_newer_async<S, P>(

@@ -7,6 +7,7 @@ use image::ImageOutputFormat;
 use std::{
     io::{Cursor, Read},
     path::Path,
+    time::SystemTime,
 };
 
 use crate::{config::get_config, util::ResponseBuilderExt};
@@ -17,10 +18,13 @@ use super::subs::add_cache_headers;
 
 pub mod cache;
 
-pub fn icon_response(path: impl AsRef<Path> + std::fmt::Debug) -> Result<Response<Body>> {
+pub fn icon_response(
+    path: impl AsRef<Path> + std::fmt::Debug,
+    mtime: SystemTime,
+) -> Result<Response<Body>> {
     let cache_enabled = !get_config().icons.cache_disabled;
     let data = match if cache_enabled {
-        cached_icon(&path)
+        cached_icon(&path, mtime)
     } else {
         None
     } {
@@ -32,7 +36,7 @@ pub fn icon_response(path: impl AsRef<Path> + std::fmt::Debug) -> Result<Respons
         None => {
             let data = scale_cover(&path)?;
             if cache_enabled {
-                cache_icon(path, &data)
+                cache_icon(path, &data, mtime)
                     .unwrap_or_else(|e| error!("error adding icon to cache: {}", e));
             }
             data
