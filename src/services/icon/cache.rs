@@ -1,10 +1,9 @@
 use crate::config::get_config;
-use simple_file_cache::Cache;
+use simple_file_cache::{Cache, FileModTime};
 use std::borrow::Cow;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
-use std::time::SystemTime;
 
 lazy_static! {
     pub static ref CACHE: Option<Cache> = {
@@ -28,7 +27,7 @@ lazy_static! {
     };
 }
 
-pub fn cached_icon(file: impl AsRef<Path>, mtime: SystemTime) -> Option<File> {
+pub fn cached_icon(file: impl AsRef<Path>, mtime: FileModTime) -> Option<File> {
     let key = cache_key(&file);
     get_cache()
         .get(key.as_ref(), mtime)
@@ -42,7 +41,7 @@ pub fn cached_icon(file: impl AsRef<Path>, mtime: SystemTime) -> Option<File> {
 pub fn cache_icon(
     file: impl AsRef<Path>,
     data: impl AsRef<[u8]>,
-    mtime: SystemTime,
+    mtime: FileModTime,
 ) -> anyhow::Result<()> {
     let key = cache_key(&file);
     let mut f = get_cache().add(key, mtime)?;

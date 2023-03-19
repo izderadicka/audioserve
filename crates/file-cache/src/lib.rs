@@ -11,6 +11,7 @@ use rand::RngCore;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, Metadata};
 use std::io::{self, Read, Write};
+use std::ops::Add;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime};
@@ -92,6 +93,21 @@ impl FileModTime {
             FileModTime::Unix(millis) => *millis,
         }
     }
+
+    pub fn now() -> Self {
+        FileModTime::General(SystemTime::now())
+    }
+}
+
+impl Add<Duration> for FileModTime {
+    type Output = Self;
+
+    fn add(self, rhs: Duration) -> Self::Output {
+        match self {
+            FileModTime::General(t) => FileModTime::General(t + rhs),
+            FileModTime::Unix(t) => FileModTime::Unix(t + rhs.as_millis() as u64),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -107,7 +123,7 @@ impl Cache {
         })
     }
 
-    pub fn add<S: AsRef<str>>(&self, key: S, mtime: SystemTime) -> Result<FileGuard> {
+    pub fn add<S: AsRef<str>>(&self, key: S, mtime: FileModTime) -> Result<FileGuard> {
         let key: String = key.as_ref().into();
         let mut c = self.inner.write().expect("Cannot lock cache");
         c.add(key.clone(), mtime).map(move |file| FileGuard {
@@ -117,7 +133,7 @@ impl Cache {
         })
     }
 
-    pub fn get<S: AsRef<str>>(&self, key: S, mtime: SystemTime) -> Option<Result<fs::File>> {
+    pub fn get<S: AsRef<str>>(&self, key: S, mtime: FileModTime) -> Option<Result<fs::File>> {
         let mut cache = self.inner.write().expect("Cannot lock cache");
         cache.get(key, mtime)
     }
@@ -221,19 +237,6 @@ fn entry_path_helper<P: AsRef<Path>>(root: &Path, file_key: P) -> PathBuf {
     root.join(ENTRIES).join(file_key)
 }
 
-fn mtime_from_system_time(t: SystemTime) -> u64 {
-    let d = t
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_else(|_| Duration::from_millis(0));
-    let t = d.as_millis();
-    // Should be OK for all reasonable times
-    let res = t.try_into();
-    if res.is_err() {
-        error!("SystemTime outside of range of u64");
-    }
-    res.unwrap_or(u64::MAX)
-}
-
 #[derive(Debug, Clone)]
 struct FileEntry {
     key: String,
@@ -241,10 +244,10 @@ struct FileEntry {
 }
 
 impl FileEntry {
-    fn new(key: String, mtime: SystemTime) -> Self {
+    fn new(key: String, mtime: FileModTime) -> Self {
         FileEntry {
             key,
-            mtime: mtime_from_system_time(mtime),
+            mtime: mtime.as_millis(),
         }
     }
 }
@@ -353,7 +356,7 @@ impl CacheInner {
         Ok(cache)
     }
 
-    fn add(&mut self, key: String, mtime: SystemTime) -> Result<fs::File> {
+    fn add(&mut self, key: String, mtime: FileModTime) -> Result<fs::File> {
         if key.len() > MAX_KEY_SIZE {
             return Err(Error::InvalidKey);
         }
@@ -375,14 +378,14 @@ impl CacheInner {
         }
     }
 
-    fn get_entry_path<S: AsRef<str>>(&mut self, key: S, mtime: SystemTime) -> Option<PathBuf> {
+    fn get_entry_path<S: AsRef<str>>(&mut self, key: S, mtime: FileModTime) -> Option<PathBuf> {
         let root = &self.root;
         let mut is_stalled = false;
         let res = self
             .files
             .get_refresh(key.as_ref())
             .and_then(|entry| {
-                let mtime = mtime_from_system_time(mtime);
+                let mtime = mtime.as_millis();
                 if mtime > entry.mtime {
                     //stall entry
                     is_stalled = true;
@@ -408,7 +411,7 @@ impl CacheInner {
         res
     }
 
-    fn get<S: AsRef<str>>(&mut self, key: S, mtime: SystemTime) -> Option<Result<fs::File>> {
+    fn get<S: AsRef<str>>(&mut self, key: S, mtime: FileModTime) -> Option<Result<fs::File>> {
         let file_name = self.get_entry_path(&key, mtime);
         let res = file_name
             .as_ref()
@@ -421,7 +424,7 @@ impl CacheInner {
     fn get2<S: AsRef<str>>(
         &mut self,
         key: S,
-        mtime: SystemTime,
+        mtime: FileModTime,
     ) -> Option<Result<(fs::File, PathBuf)>> {
         let file_name = self.get_entry_path(&key, mtime);
         let res = file_name.as_ref().map(|file_name| {
@@ -652,7 +655,7 @@ mod tests {
         const MY_KEY: &str = "muj_test_1";
         let temp_dir = tempdir().unwrap();
 
-        let t = SystemTime::now();
+        let t = FileModTime::now();
 
         let msg = "Hello there";
         {
@@ -674,7 +677,7 @@ mod tests {
         const MY_KEY: &str = "muj_test_1";
         let temp_dir = tempdir().unwrap();
 
-        let t = SystemTime::now();
+        let t = FileModTime::now();
 
         let msg = "Hello there";
         {
@@ -711,7 +714,7 @@ mod tests {
         env_logger::try_init().ok();
         const MY_KEY: &str = "muj_test_1";
         let temp_dir = tempdir().unwrap();
-        let t = SystemTime::now();
+        let t = FileModTime::now();
 
         let msg = "Hello there";
         {
@@ -746,9 +749,9 @@ mod tests {
         use std::thread;
         env_logger::try_init().ok();
         let tmp_folder = tempdir().unwrap();
-        let t = SystemTime::now();
+        let t = FileModTime::now();
 
-        fn test_cache(c: &Cache, t: SystemTime) {
+        fn test_cache(c: &Cache, t: FileModTime) {
             {
                 let cache = c.inner.read().unwrap();
                 assert_eq!(5, cache.files.len());
@@ -806,10 +809,10 @@ mod tests {
 
         let mut data = [0_u8; 1024];
         let mut rng = rand::thread_rng();
-        let t = SystemTime::now();
+        let t = FileModTime::now();
         rng.fill_bytes(&mut data);
 
-        fn test_cache(c: &Cache, data: &[u8], t: SystemTime) {
+        fn test_cache(c: &Cache, data: &[u8], t: FileModTime) {
             {
                 let cache = c.inner.read().unwrap();
                 assert_eq!(5, cache.files.len());
@@ -870,7 +873,7 @@ mod tests {
         };
 
         {
-            let _f = c.add("usak", SystemTime::now());
+            let _f = c.add("usak", FileModTime::now());
             assert_eq!(1, list_path());
         }
 

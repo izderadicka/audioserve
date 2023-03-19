@@ -1,8 +1,9 @@
+use crate::FileModTime;
+
 use super::{error::Error, CacheInner};
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
-use std::time::SystemTime;
 use tokio::task::spawn_blocking;
 
 impl From<tokio::task::JoinError> for Error {
@@ -40,7 +41,7 @@ impl Cache {
     pub async fn add<S: AsRef<str>>(
         &self,
         key: S,
-        mtime: SystemTime,
+        mtime: FileModTime,
     ) -> Result<(tokio::fs::File, Finisher)> {
         let cache = self.inner.clone();
         let key = key.as_ref().to_string();
@@ -65,7 +66,7 @@ impl Cache {
     pub async fn get<S: AsRef<str>>(
         &self,
         key: S,
-        mtime: SystemTime,
+        mtime: FileModTime,
     ) -> Result<Option<tokio::fs::File>> {
         let key = key.as_ref().to_string();
         let inner = self.inner.clone();
@@ -80,7 +81,7 @@ impl Cache {
     pub async fn get2<S: AsRef<str>>(
         &self,
         key: S,
-        mtime: SystemTime,
+        mtime: FileModTime,
     ) -> Result<Option<(tokio::fs::File, std::path::PathBuf)>> {
         let cache = self.inner.clone();
         let key = key.as_ref().to_string();
@@ -138,7 +139,7 @@ mod tests {
     const MY_KEY: &str = "muj_test_1";
     const MSG: &str = "Hello there you lonely bastard";
 
-    async fn cache_rw(c: Cache, t: SystemTime) -> Result<()> {
+    async fn cache_rw(c: Cache, t: FileModTime) -> Result<()> {
         let (mut f, fin) = c.add(MY_KEY, t).await?;
         f.write_all(MSG.as_bytes()).await?;
         fin.commit().await?;
@@ -162,7 +163,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let c = Cache::new(temp_dir.path(), 10000, 10).unwrap();
         let c2 = c.clone();
-        let t = SystemTime::now();
+        let t = FileModTime::now();
         cache_rw(c, t).await.unwrap();
         let mut f = c2.get(MY_KEY, t).await.unwrap().unwrap();
         let mut s = String::new();

@@ -4,10 +4,10 @@ use headers::{ContentLength, ContentType};
 use hyper::{Body, Response};
 use image::io::Reader as ImageReader;
 use image::ImageOutputFormat;
+use simple_file_cache::FileModTime;
 use std::{
     io::{Cursor, Read},
     path::Path,
-    time::SystemTime,
 };
 
 use crate::{config::get_config, util::ResponseBuilderExt};
@@ -20,7 +20,7 @@ pub mod cache;
 
 pub fn icon_response(
     path: impl AsRef<Path> + std::fmt::Debug,
-    mtime: SystemTime,
+    mtime: FileModTime,
 ) -> Result<Response<Body>> {
     let cache_enabled = !get_config().icons.cache_disabled;
     let data = match if cache_enabled {

@@ -347,7 +347,7 @@ impl Transcoder {
         let (key, meta) = cache::cache_key_async(file.as_ref().as_ref(), &self.quality, span)
             .await
             .map_err(|e| crate::error::Error::msg(format!("Cache key error: {}", e)))?;
-        match get_cache().add(key, meta.modified().unwrap()).await {
+        match get_cache().add(key, meta.into()).await {
             Err(e) => {
                 warn!("Cannot create cache entry: {}", e);
                 self.transcode_inner(file, seek, span, counter)
