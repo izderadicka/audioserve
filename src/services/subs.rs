@@ -79,11 +79,14 @@ async fn serve_file_cached_or_transcoded(
 
     use super::transcode::cache::{cache_key_async, get_cache};
     let cache = get_cache();
-    let (cache_key, mtime) = cache_key_async(&full_path, &transcoding_quality, span).await?;
-    let maybe_file = cache.get2(cache_key, mtime).await.unwrap_or_else(|e| {
-        error!("Cache lookup error: {}", e);
-        None
-    });
+    let (cache_key, meta) = cache_key_async(&full_path, &transcoding_quality, span).await?;
+    let maybe_file = cache
+        .get2(cache_key, meta.modified().unwrap())
+        .await
+        .unwrap_or_else(|e| {
+            error!("Cache lookup error: {}", e);
+            None
+        });
     match maybe_file {
         Some((f, path)) => {
             if seek.is_some() {
@@ -496,7 +499,7 @@ pub fn send_folder_icon(
 ) -> ResponseFuture {
     let r = blocking(
         move || match collections.get_folder_cover_path(collection, folder_path) {
-            Ok(Some((p, mtime))) => icon_response(p, mtime),
+            Ok(Some((p, meta))) => icon_response(p, meta.modified().unwrap()),
             Ok(None) => Ok(not_found_cached(get_config().folder_file_cache_age)),
             Err(e) => {
                 error!("error while getting folder icon: {}", e);

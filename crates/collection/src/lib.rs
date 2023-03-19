@@ -20,11 +20,10 @@ use serde_json::{Map, Value};
 use std::sync::Arc;
 use std::{
     collections::HashMap,
-    fs::{File, OpenOptions},
+    fs::{File, Metadata, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
     thread::JoinHandle,
-    time::SystemTime,
 };
 pub use util::guess_mime_type;
 
@@ -136,13 +135,13 @@ impl Collections {
         &self,
         collection: usize,
         dir_path: impl AsRef<Path>,
-    ) -> Result<Option<(PathBuf, SystemTime)>> {
+    ) -> Result<Option<(PathBuf, Metadata)>> {
         let col = self.get_cache(collection)?;
         col.get_folder_cover_path(dir_path).and_then(|p| {
             p.and_then(|p| {
                 let path = col.base_dir().join(&p);
-                match path.metadata().and_then(|m| m.modified()) {
-                    Ok(mtime) => Some(Ok((path, mtime))),
+                match path.metadata() {
+                    Ok(meta) => Some(Ok((path, meta))),
                     Err(e) => Some(Err(e)),
                 }
             })

@@ -9,7 +9,7 @@ use data_encoding::BASE64URL_NOPAD;
 use linked_hash_map::LinkedHashMap;
 use rand::RngCore;
 use std::collections::{HashMap, HashSet};
-use std::fs;
+use std::fs::{self, Metadata};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
@@ -34,6 +34,65 @@ const FILE_KEY_LEN: usize = 32;
 
 type Result<T> = std::result::Result<T, Error>;
 type CacheInnerType = Arc<RwLock<CacheInner>>;
+
+/// On Unix we use latest of mtime or ctime,
+/// otherwise it's modified time from platform specific impl.
+#[derive(Debug, Clone, Copy)]
+pub enum FileModTime {
+    General(SystemTime),
+    Unix(u64),
+}
+
+impl From<Metadata> for FileModTime {
+    fn from(meta: Metadata) -> Self {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let mtime = meta.mtime();
+            let ctime = meta.ctime();
+            let mod_time = if mtime > ctime {
+                mtime * 1000 + meta.mtime_nsec() / 1_000_000
+            } else if mtime < ctime {
+                ctime * 1000 + meta.ctime_nsec() / 1_000_000
+            } else {
+                if meta.mtime_nsec() > meta.ctime_nsec() {
+                    mtime * 1000 + meta.mtime_nsec() / 1_000_000
+                } else {
+                    ctime * 1000 + meta.ctime_nsec() / 1_000_000
+                }
+            };
+
+            FileModTime::Unix(mod_time.try_into().unwrap_or(0))
+        }
+
+        #[cfg(not(unix))]
+        {
+            // It's OK as we are not targeting platforms that do not have modified time
+            // and worst can happen cache will get stale on these
+            FileModTime::General(meta.modified().unwrap_or(SystemTime::UNIX_EPOCH))
+        }
+    }
+}
+
+impl FileModTime {
+    pub fn as_millis(&self) -> u64 {
+        match self {
+            FileModTime::General(t) => {
+                let d = t
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap_or_else(|_| Duration::from_millis(0));
+                let t = d.as_millis();
+                // Should be OK for all reasonable times
+                let res = t.try_into();
+                if res.is_err() {
+                    error!("SystemTime outside of range of u64");
+                }
+                res.unwrap_or(u64::MAX)
+            }
+            FileModTime::Unix(millis) => *millis,
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct Cache {
@@ -571,6 +630,21 @@ mod tests {
 
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn test_filemodtime() {
+        let now = SystemTime::now();
+        let temp_file = tempfile::tempfile().unwrap();
+        let meta = temp_file.metadata().unwrap();
+        let t: FileModTime = meta.into();
+        let mod_time = t.as_millis() as i64;
+        let start = now
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+        let diff = (start - mod_time).abs();
+        assert!(diff < 1000)
+    }
 
     #[test]
     fn basic_stalled() {
