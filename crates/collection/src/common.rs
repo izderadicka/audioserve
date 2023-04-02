@@ -44,6 +44,8 @@ pub struct CollectionOptions {
     pub(crate) cd_folder_regex: Option<Regex>,
     #[serde(skip)]
     pub passive_init: bool,
+    #[serde(skip)]
+    pub time_to_end_of_folder: u32, // time before end of last file to mark folder finished
 }
 
 impl PartialEq for CollectionOptions {
@@ -80,6 +82,7 @@ impl Default for CollectionOptions {
             cd_folder_regex_str: None,
             cd_folder_regex: None,
             passive_init: false,
+            time_to_end_of_folder: 10,
         }
     }
 }

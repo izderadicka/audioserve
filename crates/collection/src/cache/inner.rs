@@ -39,6 +39,7 @@ pub(crate) struct CacheInner {
     lister: FolderLister,
     base_dir: PathBuf,
     update_sender: Sender<Option<UpdateAction>>,
+    time_to_folder_end: u32,
 }
 
 impl CacheInner {
@@ -48,6 +49,7 @@ impl CacheInner {
         lister: FolderLister,
         base_dir: PathBuf,
         update_sender: Sender<Option<UpdateAction>>,
+        time_to_folder_end: u32,
     ) -> Result<Self> {
         let pos_latest = db.open_tree("pos_latest")?;
         let pos_folder = db.open_tree("pos_folder")?;
@@ -58,6 +60,7 @@ impl CacheInner {
             lister,
             base_dir,
             update_sender,
+            time_to_folder_end,
         })
     }
 }
@@ -208,8 +211,6 @@ impl CacheInner {
 
 // positions
 impl CacheInner {
-    const EOB_LIMIT: u32 = 10;
-
     pub(crate) fn insert_position<S, P>(
         &self,
         group: S,
@@ -262,7 +263,7 @@ impl CacheInner {
                             || (file.eq(&last_file)
                                 && last_file_duration
                                     .map(|d| d.saturating_sub(position.round() as u32))
-                                    .map(|dif| dif < CacheInner::EOB_LIMIT)
+                                    .map(|dif| dif < self.time_to_folder_end)
                                     .unwrap_or(false)),
                         file: file.into(),
                         timestamp: if let (true, Some(ts)) = (use_ts, ts) {

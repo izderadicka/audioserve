@@ -92,12 +92,14 @@ impl CollectionCache {
             .open()?;
         let (update_sender, update_receiver) = channel::<Option<UpdateAction>>();
 
+        let time_to_end_of_folder = opt.time_to_end_of_folder;
         Ok(CollectionCache {
             inner: Arc::new(CacheInner::new(
                 db,
                 FolderLister::new_with_options(opt.into()),
                 root_path,
                 update_sender.clone(),
+                time_to_end_of_folder,
             )?),
             thread_loop: None,
             watcher_sender: Arc::new(Mutex::new(None)),
