@@ -93,6 +93,7 @@ fn create_collections_options() -> anyhow::Result<CollectionOptionsMap> {
     fo.cd_folder_regex_str = c.collapse_cd_folders.as_ref().and_then(|x| x.regex.clone());
     fo.force_cache_update_on_init = c.force_cache_update_on_init;
     fo.natural_files_ordering = c.natural_files_ordering;
+    fo.time_to_end_of_folder = c.time_to_folder_end;
 
     #[cfg(feature = "tags-encoding")]
     {

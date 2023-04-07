@@ -527,6 +527,7 @@ pub struct Config {
     #[cfg(feature = "tags-encoding")]
     pub tags_encoding: Option<String>,
     pub icons: IconsConfig,
+    pub time_to_folder_end: u32,
 }
 
 impl Config {
@@ -742,6 +743,7 @@ impl Default for Config {
             #[cfg(feature = "tags-encoding")]
             tags_encoding: None,
             icons: IconsConfig::default(),
+            time_to_folder_end: 10,
         }
     }
 }
