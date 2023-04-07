@@ -152,6 +152,8 @@ Position tracking is tightly connected with collection cache, so it'll not work 
 
 Shared playback positions are behind default program feature `shared-positions`, so you can compile program without it.
 
+Shared positions also serve for marking finished / listened folders - if last file in the folder is listened till some offset from it's end (configurable via option `time-to-folder-end`, defaults to 10 seconds), folder if then marked as finished.  If you start listening the folder again it is unmarked - folder finished flag is derived directly of last listening position in this folder.
+
 ## Security
 
 Audioserve is not writing anything to your media library, so read only access is enough. However you should assume that any file in published media directories can be accessible via audioserve API (names starting with . (hidden files/directories) are blocked in API) to anybody who can obtain shared secret (or in case you use `--no-authentication` then to anybody).
