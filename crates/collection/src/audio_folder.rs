@@ -624,6 +624,7 @@ fn chapters_from_csv(path: &Path) -> Result<Option<Vec<Chapter>>, io::Error> {
     Ok(None)
 }
 
+const MAX_CHAPTER_SIZE: usize = 255;
 fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> io::Result<PathBuf> {
     let ext = p
         .extension()
@@ -632,11 +633,33 @@ fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> io::Result<Path
         .unwrap_or_else(|| "".to_owned());
 
     // Must sanitize name, should not contain /
-    let pseudo_name = chap.title.replace('/', "-");
-    let pseudo_file = format!(
-        "{:03} - {}$${}-{}$${}",
-        chap.number, pseudo_name, chap.start, chap.end, ext
-    );
+    let mut pseudo_name = chap.title.replace('/', "-");
+    let name_prefix = format!("{:03} - ", chap.number);
+    let name_suffix = format!("$${}-{}$${}", chap.start, chap.end, ext);
+    let allowed_len = MAX_CHAPTER_SIZE - name_prefix.len() - name_suffix.len();
+
+    let name_sz = pseudo_name.len();
+    if name_sz > allowed_len {
+        let sz = (allowed_len - 3) / 2;
+        let mut end = 0;
+        let mut start = 0;
+        let mut pos = 0;
+        for (idx, _) in pseudo_name.char_indices() {
+            if start == 0 && idx > sz {
+                start = pos
+            }
+            pos = idx;
+            if name_sz - pos <= sz {
+                end = pos;
+                break;
+            }
+        }
+        // Now it should be ok to slice string
+
+        pseudo_name = pseudo_name[0..start].to_string() + "..." + &pseudo_name[end..];
+        debug_assert!(pseudo_name.len() <= allowed_len);
+    }
+    let pseudo_file = name_prefix + &pseudo_name + &name_suffix;
     let (base, file_name) = if collapse {
         let base = p.parent().ok_or_else(|| {
             io::Error::new(
@@ -663,13 +686,6 @@ fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> io::Result<Path
     } else {
         (p, pseudo_file)
     };
-
-    if file_name.len() > 255 {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            "Chapter file name too long",
-        ));
-    }
 
     Ok(base.join(file_name))
 }
@@ -988,6 +1004,51 @@ mod tests {
             pseudo.to_str().unwrap(),
             "stoker/dracula/dracula.m4b$$001 - Chapter1$$1000-2000$$.m4b"
         );
+    }
+
+    #[test]
+    fn test_long_chapter_name() {
+        let long_name = "As I ponder the complexities of the world, I am struck by the fragility of human existence and the interconnectedness of all things. From the tiniest microbe to the vast expanses of the universe, everything is connected in ways we may never fully comprehend.";
+        let chap = Chapter {
+            number: 1,
+            title: long_name.into(),
+            start: 1000,
+            end: 2000,
+        };
+
+        let correct = "stoker/dracula/dracula.m4b/001 - As I ponder the complexities of the world, I am struck by the fragility of human existence and the interconnectedn...niest microbe to the vast expanses of the universe, everything is connected in ways we may never fully comprehend.$$1000-2000$$.m4b";
+
+        let p = PathBuf::from("stoker/dracula/dracula.m4b");
+        let pseudo = path_for_chapter(&p, &chap, false).unwrap();
+        assert_eq!(correct, pseudo.to_str().unwrap());
+
+        let limit_case: String = (0..237).into_iter().map(|_| "X").collect();
+        let chap2 = Chapter {
+            number: 1,
+            title: limit_case,
+            start: 1000,
+            end: 2000,
+        };
+        let p2 = PathBuf::from("");
+        let name = path_for_chapter(&p2, &chap2, false).unwrap();
+        let name = name.to_str().unwrap();
+        assert_eq!(254, name.len());
+        assert!(name.find("...").unwrap() > 100);
+
+        let cesky =
+            "příliš žluťoučký kůň úpěl ďábelské ódy. PŘÍLIŠ ŽLUŤOUČKÝ KŮŇ ÚPĚL ĎÁBELSKÉ ÓDY.";
+        let cesky = cesky.to_string() + cesky + cesky + cesky + cesky + cesky;
+        let chap3 = Chapter {
+            number: 1,
+            title: cesky,
+            start: 1000,
+            end: 2000,
+        };
+        let p2 = PathBuf::from("");
+        let name = path_for_chapter(&p2, &chap3, false).unwrap();
+        let name = name.to_str().unwrap();
+        assert_eq!(253, name.len());
+        assert!(name.find("...").unwrap() > 100);
     }
 
     #[test]
