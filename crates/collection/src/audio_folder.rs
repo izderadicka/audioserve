@@ -452,10 +452,11 @@ impl FolderLister {
                         tags: None, // TODO: consider extracting metadata from chapters too - but what will make sense?
                     }
                 };
+                let (name, path) = name_and_path_for_chapter(path, &chap, collapse)?;
                 Ok(AudioFile {
                     meta: Some(new_meta),
-                    path: path_for_chapter(path, &chap, collapse)?,
-                    name: format!("{:03} - {}", chap.number, chap.title).into(),
+                    path,
+                    name: name.into(),
                     section: Some(FileSection {
                         start: chap.start,
                         duration: Some(chap.end - chap.start),
@@ -625,7 +626,11 @@ fn chapters_from_csv(path: &Path) -> Result<Option<Vec<Chapter>>, io::Error> {
 }
 
 const MAX_CHAPTER_SIZE: usize = 255;
-fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> io::Result<PathBuf> {
+fn name_and_path_for_chapter(
+    p: &Path,
+    chap: &Chapter,
+    collapse: bool,
+) -> io::Result<(String, PathBuf)> {
     let ext = p
         .extension()
         .and_then(OsStr::to_str)
@@ -634,9 +639,9 @@ fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> io::Result<Path
 
     // Must sanitize name, should not contain /
     let mut pseudo_name = chap.title.replace('/', "-");
-    let name_prefix = format!("{:03} - ", chap.number);
+    pseudo_name = format!("{:03} - {pseudo_name}", chap.number);
     let name_suffix = format!("$${}-{}$${}", chap.start, chap.end, ext);
-    let allowed_len = MAX_CHAPTER_SIZE - name_prefix.len() - name_suffix.len();
+    let allowed_len = MAX_CHAPTER_SIZE - name_suffix.len();
 
     let name_sz = pseudo_name.len();
     if name_sz > allowed_len {
@@ -659,7 +664,7 @@ fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> io::Result<Path
         pseudo_name = pseudo_name[0..start].to_string() + "..." + &pseudo_name[end..];
         debug_assert!(pseudo_name.len() <= allowed_len);
     }
-    let pseudo_file = name_prefix + &pseudo_name + &name_suffix;
+    let pseudo_file = pseudo_name.clone() + &name_suffix;
     let (base, file_name) = if collapse {
         let base = p.parent().ok_or_else(|| {
             io::Error::new(
@@ -687,7 +692,7 @@ fn path_for_chapter(p: &Path, chap: &Chapter, collapse: bool) -> io::Result<Path
         (p, pseudo_file)
     };
 
-    Ok(base.join(file_name))
+    Ok((pseudo_name, base.join(file_name)))
 }
 
 lazy_static! {
@@ -994,12 +999,12 @@ mod tests {
         };
 
         let p = PathBuf::from("stoker/dracula/dracula.m4b");
-        let pseudo = path_for_chapter(&p, &chap, false).unwrap();
+        let (_, pseudo) = name_and_path_for_chapter(&p, &chap, false).unwrap();
         assert_eq!(
             pseudo.to_str().unwrap(),
             "stoker/dracula/dracula.m4b/001 - Chapter1$$1000-2000$$.m4b"
         );
-        let pseudo = path_for_chapter(&p, &chap, true).unwrap();
+        let (_, pseudo) = name_and_path_for_chapter(&p, &chap, true).unwrap();
         assert_eq!(
             pseudo.to_str().unwrap(),
             "stoker/dracula/dracula.m4b$$001 - Chapter1$$1000-2000$$.m4b"
@@ -1016,10 +1021,10 @@ mod tests {
             end: 2000,
         };
 
-        let correct = "stoker/dracula/dracula.m4b/001 - As I ponder the complexities of the world, I am struck by the fragility of human existence and the interconnectedn...niest microbe to the vast expanses of the universe, everything is connected in ways we may never fully comprehend.$$1000-2000$$.m4b";
+        let correct = "stoker/dracula/dracula.m4b/001 - As I ponder the complexities of the world, I am struck by the fragility of human existence and the interconnect... tiniest microbe to the vast expanses of the universe, everything is connected in ways we may never fully comprehend.$$1000-2000$$.m4b";
 
         let p = PathBuf::from("stoker/dracula/dracula.m4b");
-        let pseudo = path_for_chapter(&p, &chap, false).unwrap();
+        let (_, pseudo) = name_and_path_for_chapter(&p, &chap, false).unwrap();
         assert_eq!(correct, pseudo.to_str().unwrap());
 
         let limit_case: String = (0..237).into_iter().map(|_| "X").collect();
@@ -1030,7 +1035,7 @@ mod tests {
             end: 2000,
         };
         let p2 = PathBuf::from("");
-        let name = path_for_chapter(&p2, &chap2, false).unwrap();
+        let (_, name) = name_and_path_for_chapter(&p2, &chap2, false).unwrap();
         let name = name.to_str().unwrap();
         assert_eq!(254, name.len());
         assert!(name.find("...").unwrap() > 100);
@@ -1045,7 +1050,7 @@ mod tests {
             end: 2000,
         };
         let p2 = PathBuf::from("");
-        let name = path_for_chapter(&p2, &chap3, false).unwrap();
+        let (_, name) = name_and_path_for_chapter(&p2, &chap3, false).unwrap();
         let name = name.to_str().unwrap();
         assert_eq!(253, name.len());
         assert!(name.find("...").unwrap() > 100);
