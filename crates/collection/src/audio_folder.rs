@@ -9,7 +9,7 @@ use super::audio_meta::*;
 use crate::collator::Collate;
 use crate::common::CollectionOptions;
 use crate::playlist::{is_playlist, Playlist};
-use crate::util::{get_meta, get_modified, get_real_file_type, guess_mime_type};
+use crate::util::{get_file_name, get_meta, get_modified, get_real_file_type, guess_mime_type};
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -62,10 +62,7 @@ impl From<CollectionOptions> for FolderOptions {
 
 enum AudioInfo {
     File(AudioFile),
-    Folder {
-        folder: AudioFolderShort,
-        mime: mime_guess::Mime,
-    },
+    Folder(AudioFolderShort),
 }
 
 #[derive(Clone)]
@@ -212,41 +209,46 @@ impl FolderLister {
         .unwrap_or(false)
     }
 
-    // fn audio_info_for_file(
-    //     &self,
-    //     path: PathBuf,
-    //     long_path: &Path,
-    // ) -> crate::error::Result<AudioInfo> {
-    //     #[cfg(feature = "tags-encoding")]
-    //     let audio_info = get_audio_properties(&long_path, self.config.tags_encoding.as_ref());
-    //     #[cfg(not(feature = "tags-encoding"))]
-    //     let audio_info = get_audio_properties(&long_path);
-    //     let meta = audio_info?;
+    fn audio_info_for_file(
+        &self,
+        path: PathBuf,
+        long_path: &Path,
+    ) -> crate::error::Result<AudioInfo> {
+        #[cfg(feature = "tags-encoding")]
+        let audio_info = get_audio_properties(&long_path, self.config.tags_encoding.as_ref());
+        #[cfg(not(feature = "tags-encoding"))]
+        let audio_info = get_audio_properties(&long_path);
+        let meta = audio_info?;
 
-    //     if !self.config.ignore_chapters_meta && meta.has_chapters() {
-    //         // we do have chapters so let present this file as folder
-    //         subfolders.push(AudioFolderShort::from_dir_entry(&f, path, true)?)
-    //     } else {
-    //         let meta = meta.get_audio_info(&self.config.tags);
-    //         if self.is_long_file(meta.as_ref())
-    //             || chapters_file_path(&long_path)
-    //                 .map(|p| p.is_file())
-    //                 .unwrap_or(false)
-    //         {
-    //             // file is bigger then limit present as folder
-    //             subfolders.push(AudioFolderShort::from_dir_entry(&f, path, true)?)
-    //         } else {
-    //             let mime = guess_mime_type(path);
-    //             files.push(AudioFile {
-    //                 meta,
-    //                 path,
-    //                 name: f.file_name().to_string_lossy().into(),
-    //                 section: None,
-    //                 mime: mime.to_string(),
-    //             });
-    //         }
-    //     }
-    // }
+        if !self.config.ignore_chapters_meta && meta.has_chapters() {
+            // we do have chapters so let present this file as folder
+            Ok(AudioInfo::Folder(AudioFolderShort::from_path_complete(
+                &long_path, path, true,
+            )?))
+        } else {
+            let meta = meta.get_audio_info(&self.config.tags);
+            if self.is_long_file(meta.as_ref())
+                || chapters_file_path(&long_path)
+                    .map(|p| p.is_file())
+                    .unwrap_or(false)
+            {
+                // file is bigger then limit present as folder
+                Ok(AudioInfo::Folder(AudioFolderShort::from_path_complete(
+                    &long_path, path, true,
+                )?))
+            } else {
+                let mime = guess_mime_type(&path);
+                let file = AudioFile {
+                    meta,
+                    name: get_file_name(&path).into(),
+                    path,
+                    section: None,
+                    mime: mime.to_string(),
+                };
+                Ok(AudioInfo::File(file))
+            }
+        }
+    }
 
     fn list_dir_dir<P: AsRef<Path>>(
         &self,
@@ -279,51 +281,11 @@ impl FolderLister {
                                     )?)
                                 } else if ft.is_file() {
                                     if is_audio(&path) {
-                                        let mime = guess_mime_type(&path);
-                                        #[cfg(feature = "tags-encoding")]
-                                        let audio_info = get_audio_properties(
-                                            &long_path,
-                                            self.config.tags_encoding.as_ref(),
-                                        );
-                                        #[cfg(not(feature = "tags-encoding"))]
-                                        let audio_info = get_audio_properties(&long_path);
-                                        let meta = match audio_info {
-                                            Ok(meta) => meta,
-                                            Err(e) => {
-                                                error!("Cannot add file {:?} because error in extraction audio meta: {}",path, e);
-                                                continue;
-                                            }
-                                        };
-
-                                        if !self.config.ignore_chapters_meta && meta.has_chapters()
-                                        {
-                                            // we do have chapters so let present this file as folder
-                                            subfolders.push(AudioFolderShort::from_path_complete(
-                                                &long_path, path, true,
-                                            )?)
-                                        } else {
-                                            let meta = meta.get_audio_info(&self.config.tags);
-                                            if self.is_long_file(meta.as_ref())
-                                                || chapters_file_path(&long_path)
-                                                    .map(|p| p.is_file())
-                                                    .unwrap_or(false)
-                                            {
-                                                // file is bigger then limit present as folder
-                                                subfolders.push(
-                                                    AudioFolderShort::from_path_complete(
-                                                        &long_path, path, true,
-                                                    )?,
-                                                )
-                                            } else {
-                                                files.push(AudioFile {
-                                                    meta,
-                                                    path,
-                                                    name: f.file_name().to_string_lossy().into(),
-                                                    section: None,
-                                                    mime: mime.to_string(),
-                                                });
-                                            }
-                                        };
+                                        match self.audio_info_for_file(path, &long_path) {
+                                            Ok(AudioInfo::File(file)) =>  files.push(file),
+                                            Ok(AudioInfo::Folder(folder)) => subfolders.push(folder),
+                                            Err(e) => error!("Cannot add file {:?} because error in extraction audio meta: {}",long_path, e)
+                                        }
                                     } else if cover.is_none() && is_cover(&path) {
                                         cover = Some(TypedFile::new(path))
                                     } else if description.is_none() && is_description(&path) {
@@ -401,7 +363,7 @@ impl FolderLister {
                                 .collect();
                         }
                         // Use items from playlist
-                        let path_in_folder = full_path.strip_prefix(base_dir).unwrap();
+                        let path_in_folder = full_path.strip_prefix(&base_dir).unwrap();
                         let mut old_files: HashMap<_, _> = mem::take(&mut files)
                             .into_iter()
                             .map(|f| (f.path.strip_prefix(path_in_folder).unwrap().to_owned(), f))
@@ -411,7 +373,16 @@ impl FolderLister {
                             if let Some(existing) = old_files.remove(&item_path) {
                                 files.push(existing)
                             } else {
-                                warn!("Not implemented yet for subdir PL item {:?}", item_path);
+                                let full_path = base_dir.as_ref().join(&item_path);
+                                match self.audio_info_for_file(item_path, &full_path) {
+                                    Ok(AudioInfo::File(file)) => files.push(file),
+                                    Ok(AudioInfo::Folder(_)) => {
+                                        warn!("PL item resolved as folder, will not be added")
+                                    }
+                                    Err(e) => {
+                                        error!("Cannot get audio info for {:?}:{}", full_path, e)
+                                    }
+                                }
                             }
 
                             sorted = true;
