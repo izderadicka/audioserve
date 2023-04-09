@@ -40,6 +40,7 @@ pub mod common;
 pub mod error;
 mod legacy_pos;
 pub(crate) mod no_cache;
+pub(crate) mod playlist;
 pub mod position;
 pub mod util;
 
