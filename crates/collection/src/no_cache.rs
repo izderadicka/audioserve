@@ -201,7 +201,7 @@ impl FoldersSearch {
         search_recursive(base_path, &mut recents, allow_symlinks, limit);
         let dirs = recents.into_sorted_vec();
         dirs.into_iter()
-            .map(|e| AudioFolderShort::from_path(base_path, e.path))
+            .map(|e| AudioFolderShort::from_path_simple(base_path, e.path))
             .collect()
     }
 
@@ -228,7 +228,7 @@ impl FoldersSearch {
                                 if m {
                                     debug!("Found {:?} in {}", tokens, lc_s);
                                     let folder =
-                                        AudioFolderShort::from_dir_entry(&f, s.into(), false);
+                                        AudioFolderShort::from_path_complete(&p, s.into(), false);
                                     if let Ok(folder) = folder {
                                         results.push(folder)
                                     }

@@ -573,6 +573,7 @@ mod tests {
         let tmp_dir = TempDir::new("AS_CACHE_TEST").expect("Cannot create temp dir");
         let test_data_dir = Path::new("../../test_data");
         let db_path = tmp_dir.path().join("updater_db");
+        fs::create_dir(&db_path).ok();
         let mut col = CollectionCache::new(test_data_dir, db_path, CollectionOptions::default())
             .expect("Cannot create CollectionCache");
         col.run_update_loop();
@@ -589,7 +590,7 @@ mod tests {
         let entry2 = col.get("usak/kulisak").unwrap();
         assert_eq!(2, entry1.files.len());
         assert_eq!(2, entry1.subfolders.len());
-        assert_eq!(0, entry2.files.len());
+        assert_eq!(1, entry2.files.len());
 
         let entry3 = col.get("01-file.mp3").unwrap();
         assert_eq!(3, entry3.files.len());
@@ -606,6 +607,7 @@ mod tests {
         let info_file = test_data_dir.join("usak/kulisak/desc.txt");
         assert!(info_file.exists());
         let db_path = tmp_dir.path().join("updater_db");
+        fs::create_dir(&db_path).ok();
         let col = CollectionCache::new(&test_data_dir, db_path, CollectionOptions::default())
             .expect("Cannot create CollectionCache");
 

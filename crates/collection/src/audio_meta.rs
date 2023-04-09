@@ -158,7 +158,7 @@ pub struct AudioFolderShort {
 }
 
 impl AudioFolderShort {
-    pub fn from_path<P: AsRef<Path>>(base_path: &Path, p: P) -> Self {
+    pub fn from_path_simple<P: AsRef<Path>>(base_path: &Path, p: P) -> Self {
         let p = p.as_ref();
         AudioFolderShort {
             name: get_file_name(p).into(),
@@ -169,16 +169,16 @@ impl AudioFolderShort {
         }
     }
 
-    pub fn from_dir_entry(
-        f: &std::fs::DirEntry,
+    pub fn from_path_complete(
+        full_path: impl AsRef<Path>,
         path: PathBuf,
         is_file: bool,
     ) -> std::result::Result<Self, std::io::Error> {
         Ok(AudioFolderShort {
+            name: get_file_name(&path).into(),
             path,
-            name: f.file_name().to_string_lossy().into(),
             is_file,
-            modified: get_modified(f.path()).map(|t| t.into()),
+            modified: get_modified(full_path).map(|t| t.into()),
             finished: false,
         })
     }
