@@ -119,6 +119,7 @@ impl CollectionOptions {
                     "ignore-chapters-meta" => self.ignore_chapters_meta = bool_val()?,
                     "allow-symlinks" => self.allow_symlinks = bool_val()?,
                     "no-dir-collaps" => self.no_dir_collaps = bool_val()?,
+                    "read-playlist" => self.read_playlists = bool_val()?,
                     "chapters-duration" => {
                         let val = u32_val()?;
                         if val < MINIMUM_CHAPTER_DURATION {

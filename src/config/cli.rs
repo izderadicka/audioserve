@@ -800,6 +800,8 @@ chapters-from-duration  =x  min.duration (mins) of large audio file to be cut to
 tags                    =tag1+tag2...  metadata tags to collect (supported tags names separated by +)
 default-tags            <=true|false>  collect default tags. Use --help-tags argument to get more 
                         information about supported metadata tags 
+read-playlist           <=true|false> will use .m3u playlist in folder to read audio file
+                        (only files in playlist are available and in its order)
 
 
 "
