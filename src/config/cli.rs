@@ -73,14 +73,12 @@ const AUDIOSERVE_READ_PLAYLIST: &str = "read-playlist";
 
 macro_rules! long_arg_no_env {
     ($name: ident) => {
-
         Arg::new($name).long($name)
     };
 }
 
 macro_rules! long_arg {
     ($name: ident) => {
-
         Arg::new($name).long($name).env(stringify!($name))
     };
 }
@@ -88,9 +86,9 @@ macro_rules! long_arg {
 macro_rules! long_arg_flag {
     ($name: ident) => {
         long_arg!($name)
-        .action(ArgAction::SetTrue)
-        .value_parser(FalseyValueParser::new())
-    }
+            .action(ArgAction::SetTrue)
+            .value_parser(FalseyValueParser::new())
+    };
 }
 
 fn create_parser() -> Command {
@@ -306,7 +304,7 @@ fn create_parser() -> Command {
             .default_value("10")
             .help("Time offset (in seconds) from end of last file in folder, when reached folder is marked as finished")
         )
-        .arg( 
+        .arg(
             long_arg_flag!(AUDIOSERVE_READ_PLAYLIST)
             .help("Read .m3u playlist in the folder, if present, and present it as folder content")
         );
@@ -376,18 +374,15 @@ fn create_parser() -> Command {
     if cfg!(feature = "symlinks") {
         parser = parser.arg(
             long_arg_flag!(AUDIOSERVE_ALLOW_SYMLINKS)
-            .help("Will follow symbolic/soft links in collections directories"),
+                .help("Will follow symbolic/soft links in collections directories"),
         );
     }
 
     if cfg!(feature = "tags-encoding") {
-        parser = parser.arg(
-            long_arg!(AUDIOSERVE_TAGS_ENCODING)
-                .num_args(1)
-                .help(
-                    "Alternate character encoding for audio tags metadata, if UTF8 decoding fails",
-                ),
-        )
+        parser =
+            parser.arg(long_arg!(AUDIOSERVE_TAGS_ENCODING).num_args(1).help(
+                "Alternate character encoding for audio tags metadata, if UTF8 decoding fails",
+            ))
     }
 
     if cfg!(feature = "transcoding-cache") {
@@ -659,16 +654,32 @@ where
 
     set_config!(args, config.icons.size, AUDIOSERVE_ICONS_SIZE);
     set_config!(args, config.icons.cache_dir, AUDIOSERVE_ICONS_CACHE_DIR);
-    set_config!(args, config.icons.cache_max_size, AUDIOSERVE_ICONS_CACHE_SIZE);
-    set_config_flag!(args, config.icons.cache_disabled, AUDIOSERVE_ICONS_CACHE_DISABLE);
-    set_config_flag!(args, config.icons.fast_scaling, AUDIOSERVE_ICONS_FAST_SCALING);
+    set_config!(
+        args,
+        config.icons.cache_max_size,
+        AUDIOSERVE_ICONS_CACHE_SIZE
+    );
+    set_config_flag!(
+        args,
+        config.icons.cache_disabled,
+        AUDIOSERVE_ICONS_CACHE_DISABLE
+    );
+    set_config_flag!(
+        args,
+        config.icons.fast_scaling,
+        AUDIOSERVE_ICONS_FAST_SCALING
+    );
     set_config_flag!(
         args,
         config.icons.cache_save_often,
         AUDIOSERVE_ICONS_CACHE_SAVE_OFTEN
     );
 
-    set_config!(args, config.url_path_prefix, Some(AUDIOSERVE_URL_PATH_PREFIX));
+    set_config!(
+        args,
+        config.url_path_prefix,
+        Some(AUDIOSERVE_URL_PATH_PREFIX)
+    );
 
     set_config!(
         args,
@@ -677,8 +688,16 @@ where
     );
     set_config!(args, config.chapters.duration, AUDIOSERVE_CHAPTERS_DURATION);
     set_config_flag!(args, config.no_dir_collaps, AUDIOSERVE_NO_DIR_COLLAPS);
-    set_config_flag!(args, config.ignore_chapters_meta, AUDIOSERVE_IGNORE_CHAPTERS_META);
-    set_config!(args, config.time_to_folder_end, AUDIOSERVE_TIME_TO_FOLDER_END);
+    set_config_flag!(
+        args,
+        config.ignore_chapters_meta,
+        AUDIOSERVE_IGNORE_CHAPTERS_META
+    );
+    set_config!(
+        args,
+        config.time_to_folder_end,
+        AUDIOSERVE_TIME_TO_FOLDER_END
+    );
     set_config_flag!(args, config.read_playlist, AUDIOSERVE_READ_PLAYLIST);
 
     // Arguments for optional features
@@ -702,14 +721,26 @@ where
 
     #[cfg(feature = "transcoding-cache")]
     {
-        set_config!(args, config.transcoding.cache.root_dir, AUDIOSERVE_T_CACHE_DIR);
-        set_config!(args, config.transcoding.cache.max_size, AUDIOSERVE_T_CACHE_SIZE);
+        set_config!(
+            args,
+            config.transcoding.cache.root_dir,
+            AUDIOSERVE_T_CACHE_DIR
+        );
+        set_config!(
+            args,
+            config.transcoding.cache.max_size,
+            AUDIOSERVE_T_CACHE_SIZE
+        );
         set_config!(
             args,
             config.transcoding.cache.max_files,
             AUDIOSERVE_T_CACHE_MAX_FILES
         );
-        set_config_flag!(args, config.transcoding.cache.disabled, AUDIOSERVE_T_CACHE_DISABLE);
+        set_config_flag!(
+            args,
+            config.transcoding.cache.disabled,
+            AUDIOSERVE_T_CACHE_DISABLE
+        );
         set_config_flag!(
             args,
             config.transcoding.cache.save_often,
@@ -744,7 +775,11 @@ where
             config.positions.backup_file,
             Some(AUDIOSERVE_POSITIONS_BACKUP_FILE)
         );
-        set_config!(args, config.positions.ws_timeout, AUDIOSERVE_POSITIONS_WS_TIMEOUT);
+        set_config!(
+            args,
+            config.positions.ws_timeout,
+            AUDIOSERVE_POSITIONS_WS_TIMEOUT
+        );
         set_config!(
             args,
             config.positions.backup_schedule,
@@ -775,8 +810,7 @@ where
 }
 
 fn print_dir_options_help() {
-
-    let help =  
+    let help =
         "
 Options can be used to change behavior of particular collection directory and override 
 some global arguments.
@@ -806,13 +840,12 @@ read-playlist               <=true|false> will use .m3u playlist in folder to re
 collapse-cd-folder-regex    =regex regex used to identify and collapse CD folders
                             (folders like CD1, CD2 will be merged to parent folder)
 ";
-#[cfg(feature = "tags-encoding")]
-let help = help.to_string() +
-"tags-encoding               =encoding characters encoding of metadata in audio files 
+    #[cfg(feature = "tags-encoding")]
+    let help = help.to_string()
+        + "tags-encoding               =encoding characters encoding of metadata in audio files 
 ";
 
-print!("{}\n\n", help);
-
+    print!("{}\n\n", help);
 }
 
 pub fn print_tags_help() {
