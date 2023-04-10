@@ -69,11 +69,20 @@ const ARG_T_CACHE_DISABLE: &str = "t-cache-disable";
 const ARG_T_CACHE_SAVE_OFTEN: &str = "t-cache-save-often";
 const ARG_NO_NATURAL_FILES_ORDERING: &str = "no-natural-files-ordering";
 const ARG_TIME_TO_FOLDER_END: &str = "time-to-folder-end";
+const ARG_READ_PLAYLIST: &str = "read-playlist";
 
 macro_rules! long_arg {
     ($name: ident) => {
         Arg::new($name).long($name)
     };
+}
+
+macro_rules! long_arg_flag {
+    ($name: ident) => {
+        long_arg!($name)
+        .action(ArgAction::SetTrue)
+        .value_parser(FalseyValueParser::new())
+    }
 }
 
 fn create_parser() -> Command {
@@ -113,9 +122,7 @@ fn create_parser() -> Command {
             .value_parser(value_parser!(SocketAddr))
             .env("AUDIOSERVE_LISTEN")
             )
-        .arg(long_arg!(ARG_THREAD_POOL_LARGE)
-            .action(ArgAction::SetTrue)
-            .value_parser(FalseyValueParser::new())
+        .arg(long_arg_flag!(ARG_THREAD_POOL_LARGE)
             .env("AUDIOSERVE_THREAD_POOL_LARGE")
             .help("Use larger thread pool (usually will not be needed)")       
             )
@@ -141,9 +148,7 @@ fn create_parser() -> Command {
             .action(ArgAction::SetTrue)
             .help("Prints help for tags options")
         )
-        .arg(long_arg!(ARG_TAGS)
-            .action(ArgAction::SetTrue)
-            .value_parser(FalseyValueParser::new())
+        .arg(long_arg_flag!(ARG_TAGS)
             .env("AUDIOSERVE_TAGS")
             .help("Collects prefered tags from audiofiles, use argument --help-tags for more details")
             .conflicts_with(ARG_TAGS_CUSTOM)
@@ -215,9 +220,7 @@ fn create_parser() -> Command {
             .env("AUDIOSERVE_SECRET_FILE")
             .help("Path to file where server secret is kept - it's generated if it does not exists [default: is $HOME/.audioserve.secret]")
             )
-        .arg(long_arg!(ARG_CORS)
-            .action(ArgAction::SetTrue)
-            .value_parser(FalseyValueParser::new())
+        .arg(long_arg_flag!(ARG_CORS)
             .env("AUDIOSERVE_CORS")
             .help("Enable CORS for all origins unless more specific origin is specified with --cors-regex")
             )
@@ -239,15 +242,11 @@ fn create_parser() -> Command {
             .env("AUDIOSERVE_CHAPTERS_FROM_DURATION")
             .help("If long files is presented as chapters, one chapter has x mins [default: 30]")
             )
-        .arg(long_arg!(ARG_NO_DIR_COLLAPS)
-            .action(ArgAction::SetTrue)
-            .value_parser(FalseyValueParser::new())
+        .arg(long_arg_flag!(ARG_NO_DIR_COLLAPS)
             .env("AUDIOSERVE_NO_DIR_COLLAPS")
             .help("Prevents automatic collaps/skip of directory with single chapterized audio file")
             )
-        .arg(long_arg!(ARG_IGNORE_CHAPTERS_META)
-            .action(ArgAction::SetTrue)
-            .value_parser(FalseyValueParser::new())
+        .arg(long_arg_flag!(ARG_IGNORE_CHAPTERS_META)
             .env("AUDIOSERVE_IGNORE_CHAPTERS_META")
             .help("Ignore chapters metadata, so files with chapters will not be presented as folders")
             )
@@ -257,9 +256,7 @@ fn create_parser() -> Command {
             .env("AUDIOSERVE_URL_PATH_PREFIX")
             .help("Base URL is a fixed path that is before audioserve path part, must start with / and not end with /  [default: none]")
             )
-        .arg(long_arg!(ARG_FORCE_CACHE_UPDATE)
-            .action(ArgAction::SetTrue)
-            .value_parser(FalseyValueParser::new())
+        .arg(long_arg_flag!(ARG_FORCE_CACHE_UPDATE)
             .env("AUDIOSERVE_FORCE_CACHE_UPDATE")
             .help("Forces full reload of metadata cache on start")
             )
@@ -274,9 +271,7 @@ fn create_parser() -> Command {
             .help("Age for Cache-Control of cover and text files in audio folders, 'no-store' or number of secs, 0 means Cache-Control is not sent [default 1 day]")
         )
         .arg(
-            long_arg!(ARG_COLLAPSE_CD_FOLDERS)
-            .action(ArgAction::SetTrue)
-            .value_parser(FalseyValueParser::new())
+            long_arg_flag!(ARG_COLLAPSE_CD_FOLDERS)
             .env("AUDIOSERVE_COLLAPSE_CD_FOLDERS")
             .help("Collapses multi CD folders into one root folder, CD subfolders are recognized by regular expression")
         )
@@ -306,17 +301,13 @@ fn create_parser() -> Command {
             .value_parser(value_parser!(u64))
             .help("Max number of files in icons cache, when reached LRU items are deleted, [default is 1024]")
         ).arg(
-            long_arg!(ARG_ICONS_CACHE_DISABLE)
-            .action(ArgAction::SetTrue)
-            .value_parser(FalseyValueParser::new())
+            long_arg_flag!(ARG_ICONS_CACHE_DISABLE)
             .env("AUDIOSERVE_ICONS_CACHE_DISABLE")
             .conflicts_with_all([ARG_ICONS_CACHE_SAVE_OFTEN, ARG_ICONS_CACHE_MAX_FILES, ARG_ICONS_CACHE_SIZE, ARG_ICONS_CACHE_DIR])
             .help("Icons cache is disabled.")
             )
         .arg(
-            long_arg!(ARG_ICONS_CACHE_SAVE_OFTEN)
-            .action(ArgAction::SetTrue)
-            .value_parser(FalseyValueParser::new())
+            long_arg_flag!(ARG_ICONS_CACHE_SAVE_OFTEN)
             .env("AUDIOSERVE_ICONS_CACHE_SAVE_OFTEN")
             .help("Save additions to icons cache often, after each addition, this is normally not necessary")
         )
@@ -328,24 +319,26 @@ fn create_parser() -> Command {
             .help("Size of folder icon in pixels, [default is 128]")
         )
         .arg(
-            long_arg!(ARG_ICONS_FAST_SCALING)
-            .action(ArgAction::SetTrue)
-            .value_parser(FalseyValueParser::new())
+            long_arg_flag!(ARG_ICONS_FAST_SCALING)
             .env("AUDIOSERVE_ICONS_FAST_SCALING")
             .help("Use faster image scaling (linear triangle), by default slower, but better method (Lanczos3)")
         )
         .arg(
-            long_arg!(ARG_NO_NATURAL_FILES_ORDERING)
-            .action(ArgAction::SetTrue)
-            .value_parser(FalseyValueParser::new())
+            long_arg_flag!(ARG_NO_NATURAL_FILES_ORDERING)
             .env("AUDIOSERVE_ICONS_FAST_SCALING")
             .help("Disable natural ordering (first number in name is used for ordering ) of files")
         )
-        .arg(long_arg!(ARG_TIME_TO_FOLDER_END)
-        .value_parser(value_parser!(u32))
-        .env("AUDIOSERVE_TIME_TO_FOLDER_END")
-        .default_value("10")
-        .help("Time offset (in seconds) from end of last file in folder, when reached folder is marked as finished")
+        .arg(
+            long_arg!(ARG_TIME_TO_FOLDER_END)
+            .value_parser(value_parser!(u32))
+            .env("AUDIOSERVE_TIME_TO_FOLDER_END")
+            .default_value("10")
+            .help("Time offset (in seconds) from end of last file in folder, when reached folder is marked as finished")
+        )
+        .arg( 
+            long_arg_flag!(ARG_READ_PLAYLIST)
+            .env("AUDIOSERVE_READ_PLAYLIST")
+            .help("Read .m3u playlist in the folder, if present, and present it as folder content")
         );
 
     // deprecated
@@ -354,9 +347,7 @@ fn create_parser() -> Command {
     ));
 
     if cfg!(feature = "behind-proxy") {
-        parser = parser.arg(long_arg!(ARG_BEHIND_PROXY)
-        .action(ArgAction::SetTrue)
-        .value_parser(FalseyValueParser::new())
+        parser = parser.arg(long_arg_flag!(ARG_BEHIND_PROXY)
         .env("AUDIOSERVE_BEHIND_PROXY")
         .help("Informs program that it is behind remote proxy, now used only for logging (to get true remote client ip)")
         )
@@ -364,9 +355,7 @@ fn create_parser() -> Command {
 
     if cfg!(feature = "folder-download") {
         parser = parser.arg(
-            long_arg!(ARG_DISABLE_FOLDER_DOWNLOAD)
-                .action(ArgAction::SetTrue)
-                .value_parser(FalseyValueParser::new())
+            long_arg_flag!(ARG_DISABLE_FOLDER_DOWNLOAD)
                 .env("AUDIOSERVE_DISABLE_FOLDER_DOWNLOAD")
                 .help("Disables API point for downloading whole folder"),
         );
@@ -425,9 +414,7 @@ fn create_parser() -> Command {
 
     if cfg!(feature = "symlinks") {
         parser = parser.arg(
-            long_arg!(ARG_ALLOW_SYMLINKS)
-                .action(ArgAction::SetTrue)
-                .value_parser(FalseyValueParser::new())
+            long_arg_flag!(ARG_ALLOW_SYMLINKS)
                 .env("AUDIOSERVE_ALLOW_SYMLINKS")
                 .help("Will follow symbolic/soft links in collections directories"),
         );
@@ -464,17 +451,13 @@ fn create_parser() -> Command {
             .value_parser(value_parser!(u32))
             .help("Max number of files in transcoding cache, when reached LRU items are deleted, [default is 1024]")
         ).arg(
-            long_arg!(ARG_T_CACHE_DISABLE)
-            .action(ArgAction::SetTrue)
-            .value_parser(FalseyValueParser::new())
+            long_arg_flag!(ARG_T_CACHE_DISABLE)
             .env("AUDIOSERVE_T_CACHE_DISABLE")
             .conflicts_with_all([ARG_T_CACHE_SAVE_OFTEN, ARG_T_CACHE_MAX_FILES, ARG_T_CACHE_SIZE, ARG_T_CACHE_DIR])
-            .help("Transaction cache is disabled. If you want to completely get rid of it, compile without 'transcoding-cache'")
+            .help("Transcoding cache is disabled. If you want to completely get rid of it, compile without 'transcoding-cache'")
             )
         .arg(
-            long_arg!(ARG_T_CACHE_SAVE_OFTEN)
-            .action(ArgAction::SetTrue)
-            .value_parser(FalseyValueParser::new())
+            long_arg_flag!(ARG_T_CACHE_SAVE_OFTEN)
             .env("AUDIOSERVE_T_CACHE_SAVE_OFTEN")
             .help("Save additions to cache often, after each addition, this is normally not necessary")
         )
@@ -742,6 +725,7 @@ where
     set_config_flag!(args, config.no_dir_collaps, ARG_NO_DIR_COLLAPS);
     set_config_flag!(args, config.ignore_chapters_meta, ARG_IGNORE_CHAPTERS_META);
     set_config!(args, config.time_to_folder_end, ARG_TIME_TO_FOLDER_END);
+    set_config_flag!(args, config.read_playlist, ARG_READ_PLAYLIST);
 
     // Arguments for optional features
 
