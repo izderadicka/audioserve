@@ -466,8 +466,6 @@ pub struct CollapseCDFolderConfig {
     pub regex: Option<String>,
 }
 
-impl CollapseCDFolderConfig {}
-
 #[derive(Debug, Clone)]
 pub enum Cors {
     AllowAllOrigins,

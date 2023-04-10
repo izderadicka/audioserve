@@ -775,7 +775,8 @@ where
 }
 
 fn print_dir_options_help() {
-    print!(
+
+    let help =  
         "
 Options can be used to change behavior of particular collection directory and override 
 some global arguments.
@@ -787,25 +788,31 @@ Examples:
 /other/audio:ignore-chapters-meta=false,allow-symlinks,no-dir-collaps=true,tags=title+album+artist
 
 Available options:
-nc or no-cache          <=true|false> directory will not use cache (browsing and search will be 
-                        slower for large collection, playback position sharing and metadata tags 
-                        will not work)
-force-cache-update      <=true|false> always do full cache update on start
-ignore-chapters-meta    <=true|false> ignore chapters metadata in audio files. Instead present as
-                        one big audio file
-allow-symlinks          <=true|false>  follow symbolic links
-no-dir-collaps          <=true|false> do not collaps directories with single chapterized audio file
-chapters-duration       =x  duration (mins) of chapter for cutting of large audio files
-chapters-from-duration  =x  min.duration (mins) of large audio file to be cut to chapters
-tags                    =tag1+tag2...  metadata tags to collect (supported tags names separated by +)
-default-tags            <=true|false>  collect default tags. Use --help-tags argument to get more 
-                        information about supported metadata tags 
-read-playlist           <=true|false> will use .m3u playlist in folder to read audio file
-                        (only files in playlist are available and in its order)
+nc or no-cache              <=true|false> directory will not use cache (browsing and search will be 
+                            slower for large collection, playback position sharing and metadata tags 
+                            will not work)
+force-cache-update          <=true|false> always do full cache update on start
+ignore-chapters-meta        <=true|false> ignore chapters metadata in audio files. Instead present as
+                            one big audio file
+allow-symlinks              <=true|false>  follow symbolic links
+no-dir-collaps              <=true|false> do not collaps directories with single chapterized audio file
+chapters-duration           =x  duration (mins) of chapter for cutting of large audio files
+chapters-from-duration      =x  min.duration (mins) of large audio file to be cut to chapters
+tags                        =tag1+tag2...  metadata tags to collect (supported tags names separated by +)
+default-tags                <=true|false>  collect default tags. Use --help-tags argument to get more 
+                            information about supported metadata tags 
+read-playlist               <=true|false> will use .m3u playlist in folder to read audio file
+                            (only files in playlist are available and in its order)
+collapse-cd-folder-regex    =regex regex used to identify and collapse CD folders
+                            (folders like CD1, CD2 will be merged to parent folder)
+";
+#[cfg(feature = "tags-encoding")]
+let help = help.to_string() +
+"tags-encoding               =encoding characters encoding of metadata in audio files 
+";
 
+print!("{}\n\n", help);
 
-"
-    )
 }
 
 pub fn print_tags_help() {

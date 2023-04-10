@@ -168,6 +168,21 @@ impl CollectionOptions {
                         }
                     }
 
+                    tag @ "collapse-cd-folder-regex" => {
+                        if let Some(v) = val {
+                            let regex = match Regex::new(v) {
+                                Ok(r) => r,
+                                Err(e) => {
+                                    invalid_option!("Invalid regular expression for {}: {}", tag, e)
+                                }
+                            };
+                            self.cd_folder_regex = Some(regex);
+                            self.cd_folder_regex_str = Some(v.into());
+                        } else {
+                            invalid_option!("Regular expression is required for {}", tag);
+                        }
+                    }
+
                     opt => invalid_option!("Unknown option: {}", opt),
                 }
             }
