@@ -136,7 +136,7 @@ fn create_parser() -> Command {
                         .value_parser(duration_secs)
             )
         .arg(Arg::new(AUDIOSERVE_BASE_DIRS)
-            .value_name("BASE_DIR")
+            .value_name("BASE_DIRS")
             .num_args(1..=100)
             .env("AUDIOSERVE_BASE_DIRS")
             .value_delimiter(';')
