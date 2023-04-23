@@ -29,6 +29,7 @@ impl Bandwidth {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct Opus {
     bitrate: u16,
     compression_level: u8,
@@ -75,6 +76,7 @@ impl AudioCodec for Opus {
 
 // MP3 codec
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct Mp3 {
     bitrate: u32,
     /// Quality 0 best 9 worst - opposite of opus!
@@ -155,6 +157,7 @@ impl Default for SampleRate {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct Aac {
     bitrate: u32,
     #[serde(default)]

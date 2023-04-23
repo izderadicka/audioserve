@@ -45,6 +45,7 @@ fn base_data_dir() -> &'static PathBuf {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
+#[serde(deny_unknown_fields)]
 pub struct IconsConfig {
     pub cache_dir: PathBuf,
     pub cache_max_size: u32,
@@ -109,6 +110,7 @@ impl IconsConfig {
 #[cfg(feature = "transcoding-cache")]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
+#[serde(deny_unknown_fields)]
 pub struct TranscodingCacheConfig {
     pub root_dir: PathBuf,
     pub max_size: u32,
@@ -170,6 +172,7 @@ impl TranscodingCacheConfig {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
+#[serde(deny_unknown_fields)]
 pub struct TranscodingConfig {
     pub max_parallel_processes: usize,
     pub max_runtime_hours: u32,
@@ -286,6 +289,7 @@ fn generate_tag(s: &str) -> String {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct TranscodingDetails {
     #[serde(skip)]
     pub tag: String,
@@ -298,6 +302,7 @@ implement_get_transcoding!(TranscodingConfig, TranscodingDetails);
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
+#[serde(deny_unknown_fields)]
 pub struct ThreadPoolConfig {
     pub num_threads: u16,
     pub queue_size: u16,
@@ -347,6 +352,7 @@ impl ThreadPoolConfig {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
+#[serde(deny_unknown_fields)]
 pub struct ChaptersSize {
     pub from_duration: u32,
     pub duration: u32,
@@ -379,6 +385,7 @@ impl ChaptersSize {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct SslConfig {
     pub key_file: PathBuf,
     pub cert_file: PathBuf,
@@ -417,6 +424,7 @@ impl FromStr for PositionsBackupFormat {
 #[cfg(feature = "shared-positions")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
+#[serde(deny_unknown_fields)]
 pub struct PositionsConfig {
     pub ws_timeout: Duration,
     pub backup_file: Option<PathBuf>,
@@ -453,6 +461,7 @@ impl PositionsConfig {
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CorsConfig {
     #[serde(default)]
     pub regex: Option<String>,
@@ -461,6 +470,7 @@ pub struct CorsConfig {
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CollapseCDFolderConfig {
     #[serde(default)]
     pub regex: Option<String>,
@@ -490,6 +500,7 @@ impl FromStr for Cors {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     pub listen: SocketAddr,
     pub thread_pool: ThreadPoolConfig,

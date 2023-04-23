@@ -301,8 +301,7 @@ fn create_parser() -> Command {
         .arg(
             long_arg!(AUDIOSERVE_TIME_TO_FOLDER_END)
             .value_parser(value_parser!(u32))
-            .default_value("10")
-            .help("Time offset (in seconds) from end of last file in folder, when reached folder is marked as finished")
+            .help("Time offset (in seconds) from end of last file in folder, when reached folder is marked as finished [default 10s]")
         )
         .arg(
             long_arg_flag!(AUDIOSERVE_READ_PLAYLIST)

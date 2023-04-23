@@ -34,7 +34,8 @@ pub trait AudioCodec {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case")] //TODO: There is a problem in config consistency - here is kebab-case, elsewhere is snake_case
+#[serde(deny_unknown_fields)]
 pub enum TranscodingFormat {
     OpusInOgg(Opus),
     OpusInWebm(Opus),
