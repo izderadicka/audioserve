@@ -48,13 +48,7 @@ fn pretty_time(mut time: u64) -> String {
     return format!("{:02}:{:02}:{:02.3}", hours, mins, secs);
 }
 
-fn main() {
-    let opts = Opts::parse();
-    media_info::init();
-
-    let mf: MediaFile<()> =
-        MediaFile::open(&opts.file_name).expect(&format!("Cannot open file {}", opts.file_name));
-
+fn run<T>(mf: MediaFile<T>, opts: Opts) {
     if !opts.no_basic {
         println!("BASIC INFORMATION:");
         println!("file: {}", opts.file_name);
@@ -121,4 +115,19 @@ fn main() {
     }
 
     //println!("All meta {:?}", mf.all_meta());
+}
+
+fn main() {
+    let opts = Opts::parse();
+    media_info::init();
+
+    if opts.file_name == "-" {
+        let stdin = std::io::stdin();  
+        let mf = MediaFile::open_stream(stdin).expect("Cannot use stdin");
+        run(mf, opts);
+    } else {
+        let mf: MediaFile<()> = MediaFile::open(&opts.file_name)
+            .expect(&format!("Cannot open file {}", opts.file_name));
+        run(mf, opts);
+    }
 }

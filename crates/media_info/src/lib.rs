@@ -58,7 +58,9 @@ fn string_from_ptr_lossy(ptr: *const c_char) -> String {
 }
 
 fn norm_time(t: i64, time_base: ffi::AVRational) -> u64 {
-    assert!(t >= 0);
+    if t<0 {
+        return 0
+    }
     t as u64 * 1000 * time_base.num as u64 / time_base.den as u64
 }
 
@@ -269,7 +271,6 @@ impl<T: Read> GenericStream<T> {
 
 impl<T> Drop for GenericStream<T> {
     fn drop(&mut self) {
-        println!("DROP GENERICSTREAM");
         unsafe {
             ffi::av_freep((&mut (*self.io_ctx).buffer) as *mut *mut _ as *mut c_void);
             ffi::avio_context_free(&mut self.io_ctx);
