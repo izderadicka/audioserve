@@ -311,7 +311,7 @@ mod libavformat {
     }
 
     pub struct Info {
-        media_file: media_info::MediaFile,
+        media_file: media_info::MediaFile::<()>,
     }
     impl<'a> MediaInfo<'a> for Info {
         fn get_audio_info(&self, required_tags: &Option<HashSet<String>>) -> Option<AudioMeta> {

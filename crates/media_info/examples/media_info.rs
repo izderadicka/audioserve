@@ -52,7 +52,7 @@ fn main() {
     let opts = Opts::parse();
     media_info::init();
 
-    let mf =
+    let mf: MediaFile<()> =
         MediaFile::open(&opts.file_name).expect(&format!("Cannot open file {}", opts.file_name));
 
     if !opts.no_basic {

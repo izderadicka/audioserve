@@ -20,6 +20,12 @@ pub const AVPictureType_AV_PICTURE_TYPE_SI: AVPictureType = 5;
 pub const AVPictureType_AV_PICTURE_TYPE_SP: AVPictureType = 6;
 pub const AVPictureType_AV_PICTURE_TYPE_BI: AVPictureType = 7;
 pub type AVPictureType = ::std::os::raw::c_uint;
+extern "C" {
+    pub fn av_malloc(size: usize) -> *mut ::std::os::raw::c_void;
+}
+extern "C" {
+    pub fn av_freep(ptr: *mut ::std::os::raw::c_void);
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct AVRational {
@@ -3334,6 +3340,38 @@ fn bindgen_test_layout_AVIOContext() {
             stringify!(bytes_written)
         )
     );
+}
+extern "C" {
+    pub fn avio_alloc_context(
+        buffer: *mut ::std::os::raw::c_uchar,
+        buffer_size: ::std::os::raw::c_int,
+        write_flag: ::std::os::raw::c_int,
+        opaque: *mut ::std::os::raw::c_void,
+        read_packet: ::std::option::Option<
+            unsafe extern "C" fn(
+                opaque: *mut ::std::os::raw::c_void,
+                buf: *mut u8,
+                buf_size: ::std::os::raw::c_int,
+            ) -> ::std::os::raw::c_int,
+        >,
+        write_packet: ::std::option::Option<
+            unsafe extern "C" fn(
+                opaque: *mut ::std::os::raw::c_void,
+                buf: *mut u8,
+                buf_size: ::std::os::raw::c_int,
+            ) -> ::std::os::raw::c_int,
+        >,
+        seek: ::std::option::Option<
+            unsafe extern "C" fn(
+                opaque: *mut ::std::os::raw::c_void,
+                offset: i64,
+                whence: ::std::os::raw::c_int,
+            ) -> i64,
+        >,
+    ) -> *mut AVIOContext;
+}
+extern "C" {
+    pub fn avio_context_free(s: *mut *mut AVIOContext);
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
