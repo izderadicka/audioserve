@@ -1,7 +1,4 @@
-use std::{
-    sync::{Arc, Mutex},
-    time::Instant,
-};
+use std::{sync::Mutex, time::Instant};
 
 struct State {
     counter: usize,
@@ -9,7 +6,7 @@ struct State {
 }
 
 pub struct Leaky {
-    state: Arc<Mutex<State>>,
+    state: Mutex<State>,
     capacity: usize,
     rate: f32,
 }
@@ -37,7 +34,7 @@ impl Leaky {
             counter: 0,
             last_tick: Instant::now(),
         };
-        let state = Arc::new(Mutex::new(state));
+        let state = Mutex::new(state);
 
         Leaky {
             state,

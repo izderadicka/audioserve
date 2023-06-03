@@ -173,7 +173,7 @@ fn create_parser() -> Command {
         .arg(long_arg!(AUDIOSERVE_LIMIT_RATE)
                         .num_args(1)
             .value_parser(value_parser!(f32))
-            .help("Limits number of http request to x req/sec. Assures that resources are not exhausted in case of DDoS (but will also limit you). It's bit experimental now.")
+            .help("Limits number of http request to x req/sec. Assures that resources are not exhausted in case of DDoS (but will also limit you).")
             )
         .arg(long_arg!(AUDIOSERVE_SHARED_SECRET_FILE)
             .num_args(1)
