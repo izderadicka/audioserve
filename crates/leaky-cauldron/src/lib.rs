@@ -67,8 +67,9 @@ impl Leaky {
         }
     }
 
-    /// Returns remaning capacity at this monent - e.g. now many units can pass right now
-    pub fn immediate_capacity(&self) -> usize {
+    #[cfg(test)]
+    /// Returns remaining capacity at use
+    fn immediate_capacity(&self) -> usize {
         let state = self.state.lock().expect("Poisoned lock");
         self.capacity - state.counter
     }
@@ -77,15 +78,12 @@ impl Leaky {
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
-
-    use log::debug;
     use tokio::time::sleep;
 
     use super::*;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_leaky_basic() {
-        env_logger::try_init().ok();
         let leaky = Leaky::new_with_params(50.0, 50);
         for i in 1..=50 {
             let res = leaky.start_one();
@@ -116,7 +114,6 @@ mod tests {
 
         let res = leaky.start_one();
         if let Ok(n) = res {
-            debug!("Taken slots after 300ms {}", n);
             assert!(n <= 50 - 14, "taken slots should decrease by at least 14");
         } else {
             panic!("Slot was not released by leaky")
@@ -125,7 +122,6 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_leaky_pausing() {
-        env_logger::try_init().ok();
         let leaky = Leaky::new_with_params(100.0, 10);
 
         macro_rules! tst {
