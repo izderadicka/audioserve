@@ -7,11 +7,11 @@ edition = "2021"
 [dependencies]
 tar="0.4"
 futures="0.3"
-tokio={version="1.2", features=["fs"]}
+tokio={version="1.28", features=["fs"]}
 
 [dev-dependencies]
 tempfile="3.6"
 bytes = "1.2"
 tokio-util = {version="0.7", features=["codec"]}
-tokio={version="1.20", features=["macros", "rt"]}
+tokio={version="1.28", features=["macros", "rt"]}
 
