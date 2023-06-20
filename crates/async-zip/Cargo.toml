@@ -9,7 +9,7 @@ edition = "2021"
 [dependencies]
 futures = "0.3"
 tokio = {version="1.28", features=["full"]}
-bytes = "1.2"
+bytes = "1.4"
 chrono = "0.4"
 thiserror = "1.0"
 crc32fast = "1.3"

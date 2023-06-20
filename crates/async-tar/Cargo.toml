@@ -11,7 +11,7 @@ tokio={version="1.28", features=["fs"]}
 
 [dev-dependencies]
 tempfile="3.6"
-bytes = "1.2"
+bytes = "1.4"
 tokio-util = {version="0.7", features=["codec"]}
 tokio={version="1.28", features=["macros", "rt"]}
 
