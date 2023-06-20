@@ -24,7 +24,7 @@ clap = {version="4", features=["cargo", "env"]}
 lazy_static = "1.4"
 thiserror = "1.0"
 anyhow = "1.0"
-url = "2.2"
+url = "2.4"
 percent-encoding = "2.3"
 num_cpus = "1.15"
 ring = "0.16"
