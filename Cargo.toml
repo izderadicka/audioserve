@@ -33,7 +33,7 @@ regex = "1.4"
 tokio = {version="1.28", features=["full"]}
 
 dirs = "4.0"
-csv = "1.1"
+csv = "1.2"
 
 image="0.24"
 
