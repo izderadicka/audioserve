@@ -28,7 +28,7 @@ url = "2.2"
 percent-encoding = "2.1"
 num_cpus = "1.13"
 ring = "0.16"
-data-encoding = "2.3"
+data-encoding = "2.4"
 regex = "1.4"
 tokio = {version="1.28", features=["full"]}
 
