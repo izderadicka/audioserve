@@ -29,7 +29,7 @@ percent-encoding = "2.3"
 num_cpus = "1.15"
 ring = "0.16"
 data-encoding = "2.4"
-regex = "1.4"
+regex = "1.8"
 tokio = {version="1.28", features=["full"]}
 
 dirs = "4.0"
