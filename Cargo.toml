@@ -10,7 +10,7 @@ members = ["crates/*"]
 
 [dependencies]
 
-bytes = "1.2"
+bytes = "1.4"
 env_logger = "0.10"
 log = {version="0.4", features = ["release_max_level_info", "max_level_trace"]}
 hyper = {version="0.14", features = ["full"]}
