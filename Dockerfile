@@ -2,7 +2,7 @@ ARG CARGO_ARGS
 ARG CARGO_RELEASE="release"
 ARG OLD_CLIENT
 
-FROM alpine:3.17 AS build
+FROM alpine:3.18 AS build
 LABEL maintainer="Ivan <ivan@zderadicka.eu>"
 
 ARG CARGO_ARGS
@@ -44,7 +44,7 @@ RUN if [[ -n "$OLD_CLIENT" ]]; then \
     mv public dist ;\
     fi
 
-FROM alpine:3.17
+FROM alpine:3.18
 
 ARG CARGO_ARGS
 ARG CARGO_RELEASE
