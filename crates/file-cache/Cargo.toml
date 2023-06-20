@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 linked-hash-map = "0.5.6"
 rand = "0.8"
-data-encoding = "2.3"
+data-encoding = "2.4"
 thiserror ="1.0"
 log = "0.4"
 byteorder = "1.4"
