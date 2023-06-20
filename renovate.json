@@ -6,6 +6,6 @@
   "ignorePaths": [
     "**/node_modules/**",
     "**/bower_components/**",
-    "/client/**"
+    "client/**"
   ]
 }
