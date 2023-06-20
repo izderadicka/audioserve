@@ -20,7 +20,7 @@ asynch = ["tokio"]
 
 [dev-dependencies]
 env_logger = "0.10"
-tempfile ="3.3"
+tempfile ="3.6"
 tokio = { version="1.20", features=["io-util", "macros",] }
 
 
