@@ -32,7 +32,7 @@ data-encoding = "2.4"
 regex = "1.8"
 tokio = {version="1.28", features=["full"]}
 
-dirs = "4.0"
+dirs = "5.0"
 csv = "1.2"
 
 image="0.24"
