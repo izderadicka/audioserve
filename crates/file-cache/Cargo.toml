@@ -12,7 +12,7 @@ thiserror ="1.0"
 log = "0.4"
 byteorder = "1.4"
 
-tokio = { version="1.28", optional=true, features=[ "rt", "fs"] }
+tokio = { version="1.29", optional=true, features=[ "rt", "fs"] }
 
 
 [features]
@@ -21,6 +21,6 @@ asynch = ["tokio"]
 [dev-dependencies]
 env_logger = "0.10"
 tempfile ="3.6"
-tokio = { version="1.28", features=["io-util", "macros",] }
+tokio = { version="1.29", features=["io-util", "macros",] }
 
 

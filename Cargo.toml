@@ -30,7 +30,7 @@ num_cpus = "1.15"
 ring = "0.16"
 data-encoding = "2.4"
 regex = "1.8"
-tokio = {version="1.28", features=["full"]}
+tokio = {version="1.29", features=["full"]}
 
 dirs = "5.0"
 csv = "1.2"
