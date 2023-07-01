@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::vec::Vec;
 use std::{fs, io, sync};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-use tokio_rustls::rustls::ServerConfig;
+use tokio_rustls::rustls;
 
 use crate::config::SslConfig;
 
@@ -51,7 +51,7 @@ pub struct TlsStream {
 }
 
 impl TlsStream {
-    fn new(stream: AddrStream, config: Arc<ServerConfig>) -> TlsStream {
+    fn new(stream: AddrStream, config: Arc<rustls::ServerConfig>) -> TlsStream {
         let remote_addr = stream.remote_addr();
         let accept = tokio_rustls::TlsAcceptor::from(config).accept(stream);
         TlsStream {
@@ -122,12 +122,12 @@ impl AsyncWrite for TlsStream {
 }
 
 pub struct TlsAcceptor {
-    config: Arc<ServerConfig>,
+    config: Arc<rustls::ServerConfig>,
     incoming: AddrIncoming,
 }
 
 impl TlsAcceptor {
-    pub fn new(config: Arc<ServerConfig>, incoming: AddrIncoming) -> TlsAcceptor {
+    pub fn new(config: Arc<rustls::ServerConfig>, incoming: AddrIncoming) -> TlsAcceptor {
         TlsAcceptor { config, incoming }
     }
 }
