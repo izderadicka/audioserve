@@ -119,7 +119,6 @@ dependencies = [
  "regex",
  "reqwest",
  "ring",
- "rustls",
  "rustls-pemfile",
  "serde",
  "serde_json",
@@ -2284,7 +2283,6 @@ version = "0.20.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "539a2bfe908f471bfa933876bd1eb6a19cf2176d375f82ef7f99530a40e48c2c"
 dependencies = [
- "log",
  "ring",
  "sct",
  "webpki",
