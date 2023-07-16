@@ -8,14 +8,15 @@ extern crate derive_builder;
 
 pub use self::tree::{DirTree, SearchResult};
 use self::utils::{Cond, CondAll};
-use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+use notify::EventKind;
+use notify::{recommended_watcher, RecursiveMode, Watcher};
 use std::borrow;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::channel;
+use std::sync::mpsc::{channel, RecvTimeoutError};
 use std::sync::{Arc, RwLock};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 mod tree;
 mod utils;
@@ -69,11 +70,11 @@ impl DirCache {
             let _watcher = thread::spawn(move || match dc.load() {
                 Ok(_) => {
                     let (tx, rx) = channel();
-                    let mut watcher =
-                        watcher(tx, Duration::from_secs(options.watch_delay)).unwrap();
+                    let mut watcher = recommended_watcher(tx).unwrap();
+                    let timeout = Duration::from_secs(options.watch_delay);
                     watcher
                         .watch(
-                            root,
+                            &root,
                             if options.watch_recursively {
                                 RecursiveMode::Recursive
                             } else {
@@ -81,20 +82,46 @@ impl DirCache {
                             },
                         )
                         .unwrap();
+                    let mut deadline: Option<Instant> = None;
+
+                    macro_rules! update_event {
+                        ($evt: expr) => {
+                            match $evt {
+                                Ok(event) => {
+                                debug!("directory change - event {:?}", event);
+                                match event.kind {
+                                    EventKind::Create(_)
+                                    | EventKind::Remove(_)
+                                    | EventKind::Modify(_) => deadline = Some(Instant::now()+timeout),
+                                    _ => (),
+                                }}
+                                Err(e) => error!("watch error: {:?}", e),
+                            }
+                            
+                        };
+                    }
 
                     loop {
-                        match rx.recv() {
-                            Ok(event) => {
-                                debug!("directory change - event {:?}", event);
-                                match event {
-                                    DebouncedEvent::Create(_)
-                                    | DebouncedEvent::Remove(_)
-                                    | DebouncedEvent::Rename(_, _)
-                                    | DebouncedEvent::Rescan => cond.notify(),
-                                    _ => (),
+                        match deadline {
+                            Some(d) => match rx.recv_timeout(d.duration_since(Instant::now())) {
+                                Ok(evt) => update_event!(evt),
+                                Err(RecvTimeoutError::Timeout) => {
+                                    debug!("Directory change debounced");
+                                    cond.notify();
+                                    deadline = None;
+                                }
+                                Err(RecvTimeoutError::Disconnected) => {
+                                    error!("watcher disconnected");
+                                    break;
+                                }
+                            },
+                            None => match rx.recv() {
+                                Ok(evt) => update_event!(evt),
+                                Err(_) => {
+                                    error!("watcher disconnected");
+                                    break;
                                 }
                             }
-                            Err(e) => error!("watch error: {:?}", e),
                         }
                     }
                 }
