@@ -5,7 +5,7 @@ use std::{
 };
 
 use crossbeam_channel::Sender;
-use notify::DebouncedEvent;
+use notify::Event;
 use serde_json::Value;
 use sled::{
     transaction::{self, TransactionError, Transactional},

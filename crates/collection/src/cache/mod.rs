@@ -14,7 +14,7 @@ use crate::{
     AudioFolderShort, FoldersOrdering,
 };
 use crossbeam_channel::{unbounded as channel, Receiver, Sender};
-use notify::{watcher, DebouncedEvent, Watcher};
+use notify::{recommended_watcher, Event, Watcher};
 use std::{
     collections::BinaryHeap,
     convert::TryInto,
@@ -32,7 +32,7 @@ mod util;
 
 pub struct CollectionCache {
     thread_loop: Option<thread::JoinHandle<()>>,
-    watcher_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<DebouncedEvent>>>>,
+    watcher_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<std::result::Result<Event, notify::Error>>>>>,
     thread_updater: Option<thread::JoinHandle<()>>,
     cond: Arc<(Condvar, Mutex<bool>)>,
     pub(crate) inner: Arc<CacheInner>,
@@ -184,7 +184,7 @@ impl CollectionCache {
                 }
                 let (tx, rx) = std::sync::mpsc::channel();
 
-                let mut watcher = watcher(tx.clone(), Duration::from_secs(1))
+                let mut watcher = recommended_watcher(tx.clone())
                     .map_err(|e| error!("Failed to create fs watcher: {}", e));
                 if let Ok(ref mut watcher) = watcher {
                     watcher
@@ -398,7 +398,12 @@ impl CollectionTrait for CollectionCache {
     fn signal_rescan(&self) {
         if let Ok(tx) = self.watcher_sender.lock() {
             tx.as_ref()
-                .and_then(|tx| tx.send(DebouncedEvent::Rescan).ok());
+                .and_then(|tx| {
+                    let mut rescan_evt = Event::new(notify::EventKind::Other);
+                    rescan_evt.set_flag(notify::event::Flag::Rescan);
+                    tx.send(Ok(rescan_evt)).ok()
+        });
+                
         }
     }
 

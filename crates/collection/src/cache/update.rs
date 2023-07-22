@@ -6,7 +6,7 @@ use std::{
 };
 
 use crossbeam_channel::{Receiver, RecvTimeoutError};
-use notify::DebouncedEvent;
+use notify::Event;
 
 use crate::{util::get_modified, AudioFolderShort};
 
@@ -193,23 +193,32 @@ impl<'a> RecursiveUpdater<'a> {
 }
 
 pub(crate) enum FilteredEvent {
-    Pass(DebouncedEvent),
+    Pass(Event),
     Error(notify::Error, Option<PathBuf>),
     Rescan,
     Ignore,
 }
 
-pub(crate) fn filter_event(evt: DebouncedEvent) -> FilteredEvent {
+pub(crate) fn filter_event(evt: Result<Event, notify::Error>) -> FilteredEvent {
     use FilteredEvent::*;
     match evt {
-        DebouncedEvent::NoticeWrite(_) => Ignore,
-        DebouncedEvent::NoticeRemove(_) => Ignore,
-        evt @ DebouncedEvent::Create(_) => Pass(evt),
-        evt @ DebouncedEvent::Write(_) => Pass(evt),
-        DebouncedEvent::Chmod(_) => Ignore,
-        evt @ DebouncedEvent::Remove(_) => Pass(evt),
-        evt @ DebouncedEvent::Rename(_, _) => Pass(evt),
-        DebouncedEvent::Rescan => Rescan,
-        DebouncedEvent::Error(e, p) => Error(e, p),
+        Ok(evt) => {
+            if evt.need_rescan() {
+                Rescan
+            } else {
+                match evt.kind {
+                    notify::EventKind::Any| 
+                    notify::EventKind::Access(_) |
+                    notify::EventKind::Other => Ignore,
+
+                    notify::EventKind::Create(_) |
+                    notify::EventKind::Modify(_) |
+                    notify::EventKind::Remove(_)=> Pass(evt),
+                     
+                }
+            }
+        }
+        Err(e) => Error(e, None),
     }
+   
 }
