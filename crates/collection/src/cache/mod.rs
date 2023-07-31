@@ -1,8 +1,4 @@
-use self::{
-    inner::CacheInner,
-    update::{OngoingUpdater, UpdateAction},
-    util::kv_to_audiofolder,
-};
+use self::{inner::CacheInner, update::OngoingUpdater, util::kv_to_audiofolder};
 use crate::{
     audio_folder::FolderLister,
     audio_meta::{AudioFolder, FolderByModification, TimeStamp},
@@ -30,14 +26,17 @@ mod inner;
 mod update;
 mod util;
 
+const TERMINATE_INFO: &str = "_TERMINATE_";
+
 pub struct CollectionCache {
     thread_loop: Option<thread::JoinHandle<()>>,
-    watcher_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<std::result::Result<Event, notify::Error>>>>>,
+    watcher_sender:
+        Arc<Mutex<Option<std::sync::mpsc::Sender<std::result::Result<Event, notify::Error>>>>>,
     thread_updater: Option<thread::JoinHandle<()>>,
     cond: Arc<(Condvar, Mutex<bool>)>,
     pub(crate) inner: Arc<CacheInner>,
-    update_sender: Sender<Option<UpdateAction>>,
-    update_receiver: Option<Receiver<Option<UpdateAction>>>,
+    event_sender: Sender<Option<Event>>,
+    event_receiver: Option<Receiver<Option<Event>>>,
     force_update: bool,
 }
 
@@ -90,7 +89,7 @@ impl CollectionCache {
             .flush_every_ms(Some(10_000))
             .cache_capacity(100 * 1024 * 1024)
             .open()?;
-        let (update_sender, update_receiver) = channel::<Option<UpdateAction>>();
+        let (update_sender, update_receiver) = channel::<Option<Event>>();
 
         let time_to_end_of_folder = opt.time_to_end_of_folder;
         Ok(CollectionCache {
@@ -98,7 +97,6 @@ impl CollectionCache {
                 db,
                 FolderLister::new_with_options(opt.into()),
                 root_path,
-                update_sender.clone(),
                 time_to_end_of_folder,
             )?),
             thread_loop: None,
@@ -111,8 +109,8 @@ impl CollectionCache {
                 // Not sure why clippy warns, as this is taken from example cor condition in std doc
                 Mutex::new(false),
             )),
-            update_sender,
-            update_receiver: Some(update_receiver),
+            event_sender: update_sender,
+            event_receiver: Some(update_receiver),
             force_update,
         })
     }
@@ -161,9 +159,10 @@ impl CollectionCache {
     }
 
     pub(crate) fn run_update_loop(&mut self) {
-        let update_receiver = self.update_receiver.take().expect("run multiple times");
+        let event_receiver = self.event_receiver.take().expect("run multiple times");
+        let event_sender = self.event_sender.clone();
         let inner = self.inner.clone();
-        let ongoing_updater = OngoingUpdater::new(update_receiver, inner.clone());
+        let ongoing_updater = OngoingUpdater::new(event_receiver, inner.clone());
         self.thread_updater = Some(thread::spawn(move || ongoing_updater.run()));
         let cond = self.cond.clone();
         let mut force_update = self.force_update;
@@ -227,6 +226,7 @@ impl CollectionCache {
                         Ok(event) => {
                             trace!("Change in collection {:?} => {:?}", root_path, event);
                             let interesting_event = match filter_event(event) {
+                                FilteredEvent::Stop => return,
                                 FilteredEvent::Ignore => continue,
                                 FilteredEvent::Pass(evt) => evt,
                                 FilteredEvent::Rescan => {
@@ -239,7 +239,10 @@ impl CollectionCache {
                                     continue;
                                 }
                             };
-                            inner.proceed_event(interesting_event)
+                            if let Err(e) = event_sender.send(Some(interesting_event)) {
+                                error!("Channel to updater is broken ({}), will stop thread", e);
+                                return;
+                            }
                         }
                         Err(e) => {
                             error!("Error in collection watcher channel: {}", e);
@@ -270,6 +273,16 @@ impl CollectionCache {
     #[allow(dead_code)]
     pub fn force_update<P: AsRef<Path>>(&self, dir_path: P) -> Result<()> {
         self.inner.force_update(dir_path, false).map(|_| ())
+    }
+
+    fn signal_end(&self) {
+        if let Ok(tx) = self.watcher_sender.lock() {
+            tx.as_ref().and_then(|tx| {
+                let mut rescan_evt = Event::new(notify::EventKind::Other);
+                rescan_evt = rescan_evt.set_info(TERMINATE_INFO);
+                tx.send(Ok(rescan_evt)).ok()
+            });
+        }
     }
 }
 
@@ -397,13 +410,11 @@ impl CollectionTrait for CollectionCache {
 
     fn signal_rescan(&self) {
         if let Ok(tx) = self.watcher_sender.lock() {
-            tx.as_ref()
-                .and_then(|tx| {
-                    let mut rescan_evt = Event::new(notify::EventKind::Other);
-                    rescan_evt.set_flag(notify::event::Flag::Rescan);
-                    tx.send(Ok(rescan_evt)).ok()
-        });
-                
+            tx.as_ref().and_then(|tx| {
+                let mut rescan_evt = Event::new(notify::EventKind::Other);
+                rescan_evt = rescan_evt.set_flag(notify::event::Flag::Rescan);
+                tx.send(Ok(rescan_evt)).ok()
+            });
         }
     }
 
@@ -414,7 +425,8 @@ impl CollectionTrait for CollectionCache {
 
 impl Drop for CollectionCache {
     fn drop(&mut self) {
-        self.update_sender.send(None).ok();
+        self.event_sender.send(None).ok();
+        self.signal_end();
         if let Some(t) = self.thread_updater.take() {
             t.join().ok();
             debug!("Update thread joined");
