@@ -88,16 +88,18 @@ impl DirCache {
                         ($evt: expr) => {
                             match $evt {
                                 Ok(event) => {
-                                debug!("directory change - event {:?}", event);
-                                match event.kind {
-                                    EventKind::Create(_)
-                                    | EventKind::Remove(_)
-                                    | EventKind::Modify(_) => deadline = Some(Instant::now()+timeout),
-                                    _ => (),
-                                }}
+                                    debug!("directory change - event {:?}", event);
+                                    match event.kind {
+                                        EventKind::Create(_)
+                                        | EventKind::Remove(_)
+                                        | EventKind::Modify(_) => {
+                                            deadline = Some(Instant::now() + timeout)
+                                        }
+                                        _ => (),
+                                    }
+                                }
                                 Err(e) => error!("watch error: {:?}", e),
                             }
-                            
                         };
                     }
 
@@ -121,7 +123,7 @@ impl DirCache {
                                     error!("watcher disconnected");
                                     break;
                                 }
-                            }
+                            },
                         }
                     }
                 }

@@ -10,7 +10,7 @@ use crossbeam_channel::{Receiver, RecvTimeoutError};
 use indexmap::IndexMap;
 use notify::{
     event::{ModifyKind, RemoveKind, RenameMode},
-    ErrorKind, Event, EventKind,
+    Event, EventKind,
 };
 
 use crate::{cache::TERMINATE_INFO, util::get_modified, AudioFolderShort};
@@ -71,6 +71,7 @@ impl AsRef<Path> for UpdateAction {
     }
 }
 
+#[derive(Debug)]
 pub enum Modification {
     Created,
     Deleted,
@@ -93,7 +94,7 @@ impl Modification {
         }
     }
 }
-
+#[derive(Debug)]
 struct PendingEvent {
     last_change: Instant,
     change_type: Modification,
@@ -148,6 +149,7 @@ impl OngoingUpdater {
             let mut actions: IndexMap<PathBuf, UpdateActionKind> = IndexMap::new();
 
             for (path, evt) in done.into_iter() {
+                debug!("Notify debounced event: {:?} {:?}", path, evt);
                 let event_actions = self.list_actions_for_event(&path, evt);
                 for action in event_actions.into_iter() {
                     let parent = action.path.parent();
