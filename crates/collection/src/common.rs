@@ -47,6 +47,10 @@ pub struct CollectionOptions {
     #[serde(skip)]
     pub time_to_end_of_folder: u32, // time before end of last file to mark folder finished
     pub read_playlists: bool,
+    #[serde(skip)]
+    pub watch_for_changes: bool,
+    #[serde(skip)]
+    pub changes_debounce_interval: u32,
 }
 
 impl PartialEq for CollectionOptions {
@@ -85,6 +89,8 @@ impl Default for CollectionOptions {
             passive_init: false,
             time_to_end_of_folder: 10,
             read_playlists: false,
+            watch_for_changes: true,
+            changes_debounce_interval: 10,
         }
     }
 }

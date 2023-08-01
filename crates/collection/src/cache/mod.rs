@@ -41,6 +41,8 @@ pub struct CollectionCache {
     pub full_initial_update_required: bool,
     pub is_initialized: bool,
     notify_watcher: Arc<Mutex<Option<notify::RecommendedWatcher>>>,
+    pub watch_for_changes: bool,
+    pub changes_debounce_interval: u32,
 }
 
 impl CollectionCache {
@@ -97,6 +99,8 @@ impl CollectionCache {
 
         let time_to_end_of_folder = opt.time_to_end_of_folder;
         Ok(CollectionCache {
+            watch_for_changes: opt.watch_for_changes,
+            changes_debounce_interval: opt.changes_debounce_interval,
             inner: Arc::new(CacheInner::new(
                 db,
                 FolderLister::new_with_options(opt.into()),
@@ -168,7 +172,9 @@ impl CollectionCache {
     pub fn init(mut self) -> Self {
         let thread = self.start_recursive_update(self.full_initial_update_required);
         *self.thread_rescan.lock().unwrap() = Some(thread);
-        self.start_update_threads();
+        if self.watch_for_changes {
+            self.start_update_threads();
+        }
         self.is_initialized = true;
         self
     }
@@ -256,6 +262,7 @@ impl CollectionCache {
             event_receiver,
             self.update_sender.clone(),
             self.inner.clone(),
+            self.changes_debounce_interval,
         );
         self.thread_events = Some(spawn_named_thread("collection-events", || {
             ongoing_updater.run_event_loop()

@@ -113,12 +113,13 @@ impl OngoingUpdater {
         channel: Receiver<Option<Event>>,
         update_sender: Sender<Option<UpdateAction>>,
         inner: Arc<CacheInner>,
+        debounce_interval: u32,
     ) -> Self {
         OngoingUpdater {
             input_channel: channel,
             inner,
             pending: HashMap::new(),
-            interval: Duration::from_secs(10),
+            interval: Duration::from_secs(debounce_interval as u64),
             update_sender,
         }
     }
