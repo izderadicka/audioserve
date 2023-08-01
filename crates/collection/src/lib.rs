@@ -102,10 +102,7 @@ impl Collections {
                     Ok(CollectionDirect::new(collection_path, opt).into())
                 } else {
                     CollectionCache::new(collection_path, db_path, opt)
-                        .map(|mut cache| {
-                            cache.start_update_threads();
-                            cache
-                        })
+                        .map(|cache| cache.init())
                         .map(Collection::from)
                 }
             })

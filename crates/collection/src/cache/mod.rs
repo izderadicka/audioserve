@@ -23,18 +23,14 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Condvar, Mutex},
     thread,
-    time::Duration,
 };
 
 mod inner;
 mod update;
 mod util;
 
-const TERMINATE_INFO: &str = "_TERMINATE_";
-
 pub struct CollectionCache {
-    thread_loop: Option<thread::JoinHandle<()>>,
-    watcher_sender: Arc<Mutex<Option<Sender<std::result::Result<Event, notify::Error>>>>>,
+    thread_rescan: Arc<Mutex<Option<thread::JoinHandle<()>>>>,
     thread_events: Option<thread::JoinHandle<()>>,
     thread_updates: Option<thread::JoinHandle<()>>,
     cond: Arc<(Condvar, Mutex<bool>)>,
@@ -42,7 +38,9 @@ pub struct CollectionCache {
     event_sender: Sender<Option<Event>>,
     event_receiver: Option<Receiver<Option<Event>>>,
     update_sender: Sender<Option<UpdateAction>>,
-    force_update: bool,
+    pub full_initial_update_required: bool,
+    pub is_initialized: bool,
+    notify_watcher: Arc<Mutex<Option<notify::RecommendedWatcher>>>,
 }
 
 impl CollectionCache {
@@ -106,8 +104,7 @@ impl CollectionCache {
                 time_to_end_of_folder,
                 update_receiver,
             )?),
-            thread_loop: None,
-            watcher_sender: Arc::new(Mutex::new(None)),
+            thread_rescan: Arc::new(Mutex::new(None)),
             thread_events: None,
             thread_updates: None,
             cond: Arc::new((
@@ -119,7 +116,9 @@ impl CollectionCache {
             event_sender,
             event_receiver: Some(event_receiver),
             update_sender,
-            force_update,
+            full_initial_update_required: force_update,
+            is_initialized: false,
+            notify_watcher: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -166,10 +165,93 @@ impl CollectionCache {
         Ok(thread)
     }
 
+    pub fn init(mut self) -> Self {
+        let thread = self.start_recursive_update(self.full_initial_update_required);
+        *self.thread_rescan.lock().unwrap() = Some(thread);
+        self.start_update_threads();
+        self.is_initialized = true;
+        self
+    }
+
+    /// can run only once!
+    pub(crate) fn start_recursive_update(&self, force_update: bool) -> thread::JoinHandle<()> {
+        let cond = self.cond.clone();
+        let inner = self.inner.clone();
+        let thread_rescan = self.thread_rescan.clone();
+        let thread = spawn_named_thread("collection-rescan", move || {
+            let (cond_var, cond_mtx) = &*cond;
+            {
+                let mut started = cond_mtx.lock().unwrap();
+                *started = false;
+            }
+
+            // clean up non-exitent directories
+            inner.clean_up_folders();
+
+            // initial scan of directory
+            let updater = RecursiveUpdater::new(&inner, None, force_update);
+            updater.process();
+
+            // clean up positions for non existent folders
+            inner.clean_up_positions();
+
+            // Notify about finish of initial scan
+            {
+                let mut started = cond_mtx.lock().unwrap();
+                *started = true;
+                cond_var.notify_all();
+            }
+
+            info!(
+                "{} scan for collection {:?} finished",
+                if force_update { "Full" } else { "Quick" },
+                inner.base_dir()
+            );
+
+            *thread_rescan.lock().unwrap() = None;
+        });
+        thread
+    }
+
+    pub(crate) fn start_notify_watcher(&self) {
+        let event_sender = self.event_sender.clone();
+        let root_path = self.inner.base_dir().to_owned();
+        let event_passing_fn = move |event: std::result::Result<Event, notify::Error>| {
+            trace!("Change in collection {:?} => {:?}", root_path, event);
+            let interesting_event = match filter_event(event) {
+                FilteredEvent::Pass(evt) => evt,
+                FilteredEvent::Rescan => {
+                    info!("Rescaning of collection required");
+                    return;
+                }
+                FilteredEvent::Error(e, p) => {
+                    error!("Watch event error {} on {:?}", e, p);
+                    return;
+                }
+                FilteredEvent::Ignore => return,
+            };
+            if let Err(e) = event_sender.send(Some(interesting_event)) {
+                error!(
+                    "Channel to event debouncer is broken ({}), will stop thread",
+                    e
+                );
+            }
+        };
+
+        let watcher = recommended_watcher(event_passing_fn)
+            .map_err(|e| error!("Failed to create fs watcher: {}", e));
+        if let Ok(mut watcher) = watcher {
+            watcher
+                .watch(self.inner.base_dir(), notify::RecursiveMode::Recursive)
+                .map_err(|e| error!("failed to start watching: {}", e))
+                .ok();
+            *self.notify_watcher.lock().unwrap() = Some(watcher);
+        }
+    }
+
     /// can run only once!
     pub(crate) fn start_update_threads(&mut self) {
         let event_receiver = self.event_receiver.take().expect("run multiple times");
-        let event_sender = self.event_sender.clone();
         let ongoing_updater = OngoingUpdater::new(
             event_receiver,
             self.update_sender.clone(),
@@ -182,99 +264,8 @@ impl CollectionCache {
         self.thread_updates = Some(spawn_named_thread("collection_updates", || {
             inner.run_update_loop()
         }));
-        let cond = self.cond.clone();
-        let mut force_update = self.force_update;
-        let watcher_sender = self.watcher_sender.clone();
-        let inner = self.inner.clone();
-        let thread = spawn_named_thread("collection-main", move || {
-            let root_path = inner.base_dir();
-            loop {
-                let (cond_var, cond_mtx) = &*cond;
-                {
-                    let mut started = cond_mtx.lock().unwrap();
-                    *started = false;
-                }
-                // Not ready to receive reload signals until scan is done
-                {
-                    let mut ws = watcher_sender.lock().unwrap();
-                    *ws = None;
-                }
-                let (tx, rx) = channel();
 
-                let mut watcher = recommended_watcher(tx.clone())
-                    .map_err(|e| error!("Failed to create fs watcher: {}", e));
-                if let Ok(ref mut watcher) = watcher {
-                    watcher
-                        .watch(root_path, notify::RecursiveMode::Recursive)
-                        .map_err(|e| error!("failed to start watching: {}", e))
-                        .ok();
-                }
-
-                // clean up non-exitent directories
-                inner.clean_up_folders();
-
-                // initial scan of directory
-                let updater = RecursiveUpdater::new(&inner, None, force_update);
-                updater.process();
-                force_update = false;
-
-                // clean up positions for non existent folders
-                inner.clean_up_positions();
-
-                // Notify about finish of initial scan
-                {
-                    let mut started = cond_mtx.lock().unwrap();
-                    *started = true;
-                    cond_var.notify_all();
-                }
-                // And can wait for rescan signal
-                {
-                    let mut ws = watcher_sender.lock().unwrap();
-                    *ws = Some(tx);
-                }
-
-                info!(
-                    "Initial scan for collection {:?} finished",
-                    inner.base_dir()
-                );
-
-                // now update changed directories
-                loop {
-                    match rx.recv() {
-                        Ok(event) => {
-                            trace!("Change in collection {:?} => {:?}", root_path, event);
-                            let interesting_event = match filter_event(event) {
-                                FilteredEvent::Stop => return,
-                                FilteredEvent::Ignore => continue,
-                                FilteredEvent::Pass(evt) => evt,
-                                FilteredEvent::Rescan => {
-                                    info!("Rescaning of collection required");
-                                    force_update = true;
-                                    break;
-                                }
-                                FilteredEvent::Error(e, p) => {
-                                    error!("Watch event error {} on {:?}", e, p);
-                                    continue;
-                                }
-                            };
-                            if let Err(e) = event_sender.send(Some(interesting_event)) {
-                                error!(
-                                    "Channel to event debouncer is broken ({}), will stop thread",
-                                    e
-                                );
-                                return;
-                            }
-                        }
-                        Err(e) => {
-                            error!("Error in collection watcher channel, will rescan and restart watcher: {}", e);
-                            thread::sleep(Duration::from_secs(10));
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-        self.thread_loop = Some(thread);
+        self.start_notify_watcher();
     }
 
     #[allow(dead_code)]
@@ -294,16 +285,6 @@ impl CollectionCache {
     #[allow(dead_code)]
     pub fn force_update<P: AsRef<Path>>(&self, dir_path: P) -> Result<()> {
         self.inner.force_update(dir_path, false).map(|_| ())
-    }
-
-    fn signal_end(&self) {
-        if let Ok(tx) = self.watcher_sender.lock() {
-            tx.as_ref().and_then(|tx| {
-                let mut rescan_evt = Event::new(notify::EventKind::Other);
-                rescan_evt = rescan_evt.set_info(TERMINATE_INFO);
-                tx.send(Ok(rescan_evt)).ok()
-            });
-        }
     }
 }
 
@@ -430,12 +411,14 @@ impl CollectionTrait for CollectionCache {
     }
 
     fn signal_rescan(&self) {
-        if let Ok(tx) = self.watcher_sender.lock() {
-            tx.as_ref().and_then(|tx| {
-                let mut rescan_evt = Event::new(notify::EventKind::Other);
-                rescan_evt = rescan_evt.set_flag(notify::event::Flag::Rescan);
-                tx.send(Ok(rescan_evt)).ok()
-            });
+        debug!("Required rescan on collection {:?}", self.base_dir());
+        let mut running = self.thread_rescan.lock().unwrap();
+        match *running {
+            Some(_) => warn!("Rescan is still running, cannot start another"),
+            None => {
+                let thread = self.start_recursive_update(true);
+                *running = Some(thread);
+            }
         }
     }
 
@@ -448,7 +431,8 @@ impl Drop for CollectionCache {
     fn drop(&mut self) {
         self.event_sender.send(None).ok();
         self.update_sender.send(None).ok();
-        self.signal_end();
+        // Drop watcher early - just to be sure
+        self.notify_watcher.lock().unwrap().take();
         if let Some(t) = self.thread_events.take() {
             t.join().ok();
             debug!("Events thread joined");
@@ -603,7 +587,7 @@ mod tests {
     use std::{
         fs::{self, File},
         io::{Read, Write},
-        time::SystemTime,
+        time::{Duration, SystemTime},
     };
 
     use fs_extra::dir::{copy, CopyOptions};
@@ -619,9 +603,9 @@ mod tests {
         let test_data_dir = Path::new("../../test_data");
         let db_path = tmp_dir.path().join("updater_db");
         fs::create_dir(&db_path).ok();
-        let mut col = CollectionCache::new(test_data_dir, db_path, CollectionOptions::default())
+        let col = CollectionCache::new(test_data_dir, db_path, CollectionOptions::default())
             .expect("Cannot create CollectionCache");
-        col.start_update_threads();
+        col.start_recursive_update(true);
         col.wait_until_inital_scan_is_done();
         (col, tmp_dir)
     }

@@ -13,7 +13,7 @@ use notify::{
     Event, EventKind,
 };
 
-use crate::{cache::TERMINATE_INFO, util::get_modified, AudioFolderShort};
+use crate::{util::get_modified, AudioFolderShort};
 
 use super::{util::parent_path, CacheInner};
 
@@ -178,7 +178,6 @@ impl OngoingUpdater {
 
             for (path, kind) in actions.into_iter() {
                 let action = UpdateAction::new(path, kind);
-                debug!("Identified following update action: {:?}", action);
                 self.update_sender
                     .send(Some(action))
                     .unwrap_or_else(|_| error!("Update receiver removed early"));
@@ -438,9 +437,8 @@ impl<'a> RecursiveUpdater<'a> {
 pub(crate) enum FilteredEvent {
     Pass(Event),
     Error(notify::Error, Option<PathBuf>),
-    Rescan,
     Ignore,
-    Stop,
+    Rescan,
 }
 
 pub(crate) fn filter_event(evt: Result<Event, notify::Error>) -> FilteredEvent {
@@ -451,9 +449,7 @@ pub(crate) fn filter_event(evt: Result<Event, notify::Error>) -> FilteredEvent {
                 Rescan
             } else {
                 match evt.kind {
-                    EventKind::Other if evt.info() == Some(TERMINATE_INFO) => Stop,
                     EventKind::Any | EventKind::Access(_) | EventKind::Other => Ignore,
-
                     EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => Pass(evt),
                 }
             }
