@@ -1,11 +1,11 @@
 use std::{
     ops::Deref,
     path::{Path, PathBuf},
+    sync::Arc,
     time::SystemTime,
 };
 
-use crossbeam_channel::Sender;
-use notify::DebouncedEvent;
+use crossbeam_channel::Receiver;
 use serde_json::Value;
 use sled::{
     transaction::{self, TransactionError, Transactional},
@@ -16,7 +16,7 @@ use crate::{
     audio_folder::{DirType, FolderLister},
     audio_meta::{AudioFolder, TimeStamp},
     cache::{
-        update::RecursiveUpdater,
+        update::{RecursiveUpdater, UpdateActionKind},
         util::{split_path, update_path},
     },
     common::PositionsData,
@@ -38,8 +38,8 @@ pub(crate) struct CacheInner {
     pos_folder: Tree,
     lister: FolderLister,
     base_dir: PathBuf,
-    update_sender: Sender<Option<UpdateAction>>,
     time_to_folder_end: u32,
+    update_receiver: Option<Receiver<Option<UpdateAction>>>,
 }
 
 impl CacheInner {
@@ -48,8 +48,8 @@ impl CacheInner {
 
         lister: FolderLister,
         base_dir: PathBuf,
-        update_sender: Sender<Option<UpdateAction>>,
         time_to_folder_end: u32,
+        update_receiver: Option<Receiver<Option<UpdateAction>>>,
     ) -> Result<Self> {
         let pos_latest = db.open_tree("pos_latest")?;
         let pos_folder = db.open_tree("pos_folder")?;
@@ -59,9 +59,24 @@ impl CacheInner {
             pos_folder,
             lister,
             base_dir,
-            update_sender,
             time_to_folder_end,
+            update_receiver,
         })
+    }
+
+    pub(crate) fn run_update_loop(self: Arc<Self>) {
+        if let Some(ref receiver) = self.update_receiver {
+            loop {
+                match receiver.recv() {
+                    Ok(Some(action)) => self.proceed_update(action),
+                    Ok(None) => break,
+                    Err(_) => {
+                        error!("Update channel disconnected");
+                        break;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -662,21 +677,29 @@ impl CacheInner {
 
     pub(crate) fn proceed_update(&self, update: UpdateAction) {
         debug!("Update action: {:?}", update);
-        match update {
-            UpdateAction::RefreshFolder(folder) => {
+        let folder = update.path;
+        match update.kind {
+            UpdateActionKind::RefreshFolder => {
                 self.force_update(&folder, false)
                     .map_err(|e| warn!("Error updating folder in cache: {}", e))
                     .ok();
             }
-            UpdateAction::RefreshFolderRecursive(folder) => {
+            UpdateActionKind::RefreshFolderRecursive => {
                 self.force_update_recursive(folder);
             }
-            UpdateAction::RemoveFolder(folder) => {
+            UpdateActionKind::RemoveFolder => {
                 self.remove_tree(&folder)
                     .map_err(|e| warn!("Error removing folder from cache: {}", e))
                     .ok();
             }
-            UpdateAction::RenameFolder { from, to } => {
+            UpdateActionKind::RenameFolder { to } => {
+                //if destination exists in cache let's delete it
+                if self.has_key(&to) {
+                    self.remove_tree(&to)
+                        .map_err(|e| warn!("Error removing folder from cache: {}", e))
+                        .ok();
+                }
+                let from = folder;
                 if let Err(e) = self.update_recursive_after_rename(&from, &to) {
                     error!("Failed to do recursive rename, error: {}, we will have to do rescan of {:?}", e, &to);
                     self.remove_tree(&from)
@@ -697,103 +720,12 @@ impl CacheInner {
         }
     }
 
-    pub(crate) fn proceed_event(&self, evt: DebouncedEvent) {
-        let snd = |a| {
-            self.update_sender
-                .send(Some(a))
-                .map_err(|e| error!("Error sending update {}", e))
-                .ok()
-                .unwrap_or(())
-        };
-        match evt {
-            DebouncedEvent::Create(p) => {
-                let col_path = self.strip_base(&p);
-                if self.is_dir(&p).is_dir() {
-                    snd(UpdateAction::RefreshFolderRecursive(col_path.into()));
-                }
-                snd(UpdateAction::RefreshFolder(
-                    self.get_true_parent(col_path, &p),
-                ));
-            }
-            DebouncedEvent::Write(p) => {
-                let col_path = self.strip_base(&p);
-                // AFAIK you cannot get write on directory
-                if self.is_dir(&p).is_dir() {
-                    // should be single file folder
-                    snd(UpdateAction::RefreshFolder(col_path.into()));
-                } else {
-                    snd(UpdateAction::RefreshFolder(
-                        self.get_true_parent(col_path, &p),
-                    ));
-                }
-            }
-            DebouncedEvent::Remove(p) => {
-                let col_path = self.strip_base(&p);
-                if self.is_dir(&p).is_dir() {
-                    snd(UpdateAction::RemoveFolder(col_path.into()));
-                    snd(UpdateAction::RefreshFolder(parent_path(col_path)));
-                } else {
-                    snd(UpdateAction::RefreshFolder(
-                        self.get_true_parent(col_path, &p),
-                    ))
-                }
-            }
-            DebouncedEvent::Rename(p1, p2) => {
-                let col_path = self.strip_base(&p1);
-                match (p2.starts_with(&self.base_dir), self.is_dir(&p1).is_dir()) {
-                    (true, true) => {
-                        if self.lister.is_collapsable_folder(&p2) {
-                            snd(UpdateAction::RemoveFolder(col_path.into()));
-                        } else {
-                            let dest_path = self.strip_base(&p2).into();
-                            snd(UpdateAction::RenameFolder {
-                                from: col_path.into(),
-                                to: dest_path,
-                            });
-                        }
-                        let orig_parent = parent_path(col_path);
-                        let new_parent = parent_path(self.strip_base(&p2));
-                        let diff = new_parent != orig_parent;
-                        snd(UpdateAction::RefreshFolder(orig_parent));
-                        if diff {
-                            snd(UpdateAction::RefreshFolder(new_parent));
-                        }
-                    }
-                    (true, false) => {
-                        snd(UpdateAction::RefreshFolder(
-                            self.get_true_parent(col_path, &p1),
-                        ));
-                        let dest_path = self.strip_base(&p2);
-                        if self.is_dir(&p2).is_dir() {
-                            snd(UpdateAction::RefreshFolder(parent_path(dest_path)));
-                            snd(UpdateAction::RefreshFolderRecursive(dest_path.into()))
-                        } else {
-                            snd(UpdateAction::RefreshFolder(
-                                self.get_true_parent(dest_path, &p2),
-                            ))
-                        }
-                    }
-                    (false, true) => {
-                        snd(UpdateAction::RemoveFolder(col_path.into()));
-                        snd(UpdateAction::RefreshFolder(parent_path(col_path)));
-                    }
-                    (false, false) => snd(UpdateAction::RefreshFolder(
-                        self.get_true_parent(col_path, &p1),
-                    )),
-                }
-            }
-            other => {
-                error!("This event {:?} should not get here", other);
-            }
-        };
-    }
-
-    fn get_true_parent(&self, rel_path: &Path, full_path: &Path) -> PathBuf {
+    pub(crate) fn get_true_parent(&self, rel_path: &Path, full_path: &Path) -> PathBuf {
         let parent = parent_path(rel_path);
         if self.lister.collapse_cd_enabled()
             && full_path
                 .parent()
-                .map(|p| self.is_dir(p).is_collapsed())
+                .map(|p| self.path_type(p).is_collapsed())
                 .unwrap_or(false)
         {
             parent_path(parent)
@@ -803,7 +735,7 @@ impl CacheInner {
     }
 
     /// must be used only on paths with this collection
-    fn strip_base<'a, P>(&self, full_path: &'a P) -> &'a Path
+    pub(crate) fn strip_base<'a, P>(&self, full_path: &'a P) -> &'a Path
     where
         P: AsRef<Path>,
     {
@@ -811,7 +743,7 @@ impl CacheInner {
     }
 
     /// only for absolute paths
-    fn is_dir<P: AsRef<Path>>(&self, full_path: P) -> FolderType {
+    pub(crate) fn path_type<P: AsRef<Path>>(&self, full_path: P) -> FolderType {
         let full_path: &Path = full_path.as_ref();
         assert!(full_path.is_absolute(), "path {:?}", full_path);
         let col_path = self.strip_base(&full_path);
@@ -845,9 +777,13 @@ impl CacheInner {
             }
         }
     }
+
+    pub(crate) fn is_collapsable_folder(&self, p: impl AsRef<Path>) -> bool {
+        self.lister.is_collapsable_folder(p)
+    }
 }
 
-enum FolderType {
+pub enum FolderType {
     RegularDir,
     DeletedDir,
     FileDir,
@@ -859,12 +795,12 @@ enum FolderType {
 }
 
 impl FolderType {
-    fn is_dir(&self) -> bool {
+    pub fn is_dir(&self) -> bool {
         use FolderType::*;
         !matches!(self, RegularFile | Unknown | CollapsedDir)
     }
 
-    fn is_collapsed(&self) -> bool {
+    pub fn is_collapsed(&self) -> bool {
         matches!(self, FolderType::CollapsedDir)
     }
 }

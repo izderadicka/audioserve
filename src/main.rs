@@ -95,6 +95,8 @@ fn create_collections_options() -> anyhow::Result<CollectionOptionsMap> {
     fo.natural_files_ordering = c.natural_files_ordering;
     fo.time_to_end_of_folder = c.time_to_folder_end;
     fo.read_playlists = c.read_playlist;
+    fo.changes_debounce_interval = c.collections_options.changes_debounce_interval;
+    fo.watch_for_changes = !c.collections_options.dont_watch_for_changes;
 
     #[cfg(feature = "tags-encoding")]
     {

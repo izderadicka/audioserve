@@ -1,8 +1,8 @@
 use std::ffi::OsStr;
 use std::fs::{DirEntry, Metadata};
-use std::io;
 use std::path::Path;
 use std::time::SystemTime;
+use std::{io, thread};
 
 use mime_guess::Mime;
 
@@ -80,4 +80,13 @@ pub fn get_real_file_type<P: AsRef<Path>>(
     _allow_symlinks: bool,
 ) -> Result<::std::fs::FileType, io::Error> {
     dir_entry.file_type()
+}
+
+pub fn spawn_named_thread<F, T>(name: impl Into<String>, f: F) -> thread::JoinHandle<T>
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+{
+    let builder = thread::Builder::new().name(name.into()); //TODO: consider setting stack size 1M
+    builder.spawn(f).expect("Invalid thread name")
 }

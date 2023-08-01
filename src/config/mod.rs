@@ -319,6 +319,38 @@ impl Default for ThreadPoolConfig {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+#[serde(deny_unknown_fields)]
+pub struct CollectionConfig {
+    pub dont_watch_for_changes: bool,
+    pub changes_debounce_interval: u32,
+}
+
+impl Default for CollectionConfig {
+    fn default() -> Self {
+        Self {
+            dont_watch_for_changes: false,
+            changes_debounce_interval: 10,
+        }
+    }
+}
+
+impl CollectionConfig {
+    fn check(&self) -> Result<()> {
+        if self.changes_debounce_interval < 1 {
+            return value_error!("changes_debounce_interval", "Must be bigger then 0");
+        } else if self.changes_debounce_interval > 1800 {
+            return value_error!(
+                "changes_debounce_interval",
+                "Interval is too big, this cause performance problems"
+            );
+        }
+
+        Ok(())
+    }
+}
+
 impl ThreadPoolConfig {
     pub fn check(&self) -> Result<()> {
         if self.num_threads < 1 {
@@ -538,6 +570,7 @@ pub struct Config {
     pub icons: IconsConfig,
     pub time_to_folder_end: u32,
     pub read_playlist: bool,
+    pub collections_options: CollectionConfig,
 }
 
 impl Config {
@@ -648,6 +681,7 @@ impl Config {
         self.chapters.check()?;
         #[cfg(feature = "shared-positions")]
         self.positions.check()?;
+        self.collections_options.check()?;
 
         if self.base_dirs.is_empty() {
             return value_error!(
@@ -755,6 +789,7 @@ impl Default for Config {
             icons: IconsConfig::default(),
             time_to_folder_end: 10,
             read_playlist: false,
+            collections_options: CollectionConfig::default(),
         }
     }
 }
