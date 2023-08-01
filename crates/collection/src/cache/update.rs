@@ -359,6 +359,7 @@ impl OngoingUpdater {
                 }
                 Ok(None) => {
                     self.send_update_actions(true);
+                    self.update_sender.send(None).ok(); // TODO: consider do we want to finish update actions or rather finish quickly
                     return;
                 }
                 Err(RecvTimeoutError::Disconnected) => {

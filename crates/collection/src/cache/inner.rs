@@ -39,7 +39,7 @@ pub(crate) struct CacheInner {
     lister: FolderLister,
     base_dir: PathBuf,
     time_to_folder_end: u32,
-    update_receiver: Receiver<Option<UpdateAction>>,
+    update_receiver: Option<Receiver<Option<UpdateAction>>>,
 }
 
 impl CacheInner {
@@ -49,7 +49,7 @@ impl CacheInner {
         lister: FolderLister,
         base_dir: PathBuf,
         time_to_folder_end: u32,
-        update_receiver: Receiver<Option<UpdateAction>>,
+        update_receiver: Option<Receiver<Option<UpdateAction>>>,
     ) -> Result<Self> {
         let pos_latest = db.open_tree("pos_latest")?;
         let pos_folder = db.open_tree("pos_folder")?;
@@ -65,13 +65,15 @@ impl CacheInner {
     }
 
     pub(crate) fn run_update_loop(self: Arc<Self>) {
-        loop {
-            match self.update_receiver.recv() {
-                Ok(Some(action)) => self.proceed_update(action),
-                Ok(None) => break,
-                Err(_) => {
-                    error!("Update channel disconnected");
-                    break;
+        if let Some(ref receiver) = self.update_receiver {
+            loop {
+                match receiver.recv() {
+                    Ok(Some(action)) => self.proceed_update(action),
+                    Ok(None) => break,
+                    Err(_) => {
+                        error!("Update channel disconnected");
+                        break;
+                    }
                 }
             }
         }

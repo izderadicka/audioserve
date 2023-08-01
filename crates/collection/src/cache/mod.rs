@@ -35,9 +35,8 @@ pub struct CollectionCache {
     thread_updates: Option<thread::JoinHandle<()>>,
     cond: Arc<(Condvar, Mutex<bool>)>,
     pub(crate) inner: Arc<CacheInner>,
-    event_sender: Sender<Option<Event>>,
-    event_receiver: Option<Receiver<Option<Event>>>,
-    update_sender: Sender<Option<UpdateAction>>,
+    event_sender: Option<Sender<Option<Event>>>,
+    update_sender: Option<Sender<Option<UpdateAction>>>,
     pub full_initial_update_required: bool,
     pub is_initialized: bool,
     notify_watcher: Arc<Mutex<Option<notify::RecommendedWatcher>>>,
@@ -94,8 +93,12 @@ impl CollectionCache {
             .flush_every_ms(Some(10_000))
             .cache_capacity(100 * 1024 * 1024)
             .open()?;
-        let (event_sender, event_receiver) = channel::<Option<Event>>();
-        let (update_sender, update_receiver) = channel::<Option<UpdateAction>>();
+        let (update_sender, update_receiver) = if opt.watch_for_changes {
+            let (s, r) = channel();
+            (Some(s), Some(r))
+        } else {
+            (None, None)
+        };
 
         let time_to_end_of_folder = opt.time_to_end_of_folder;
         Ok(CollectionCache {
@@ -117,8 +120,7 @@ impl CollectionCache {
                 // Not sure why clippy warns, as this is taken from example cor condition in std doc
                 Mutex::new(false),
             )),
-            event_sender,
-            event_receiver: Some(event_receiver),
+            event_sender: None,
             update_sender,
             full_initial_update_required: force_update,
             is_initialized: false,
@@ -219,8 +221,9 @@ impl CollectionCache {
         thread
     }
 
-    pub(crate) fn start_notify_watcher(&self) {
-        let event_sender = self.event_sender.clone();
+    pub(crate) fn start_notify_watcher(&mut self) -> Receiver<Option<Event>> {
+        let (event_sender, event_receiver) = channel::<Option<Event>>();
+        self.event_sender = Some(event_sender.clone());
         let root_path = self.inner.base_dir().to_owned();
         let event_passing_fn = move |event: std::result::Result<Event, notify::Error>| {
             trace!("Change in collection {:?} => {:?}", root_path, event);
@@ -253,14 +256,15 @@ impl CollectionCache {
                 .ok();
             *self.notify_watcher.lock().unwrap() = Some(watcher);
         }
+        event_receiver
     }
 
     /// can run only once!
     pub(crate) fn start_update_threads(&mut self) {
-        let event_receiver = self.event_receiver.take().expect("run multiple times");
+        let event_receiver = self.start_notify_watcher();
         let ongoing_updater = OngoingUpdater::new(
             event_receiver,
-            self.update_sender.clone(),
+            self.update_sender.take().unwrap(),
             self.inner.clone(),
             self.changes_debounce_interval,
         );
@@ -271,8 +275,6 @@ impl CollectionCache {
         self.thread_updates = Some(spawn_named_thread("collection_updates", || {
             inner.run_update_loop()
         }));
-
-        self.start_notify_watcher();
     }
 
     #[allow(dead_code)]
@@ -436,8 +438,7 @@ impl CollectionTrait for CollectionCache {
 
 impl Drop for CollectionCache {
     fn drop(&mut self) {
-        self.event_sender.send(None).ok();
-        self.update_sender.send(None).ok();
+        self.event_sender.as_ref().and_then(|s| s.send(None).ok());
         // Drop watcher early - just to be sure
         self.notify_watcher.lock().unwrap().take();
         if let Some(t) = self.thread_events.take() {
