@@ -444,13 +444,13 @@ impl Drop for CollectionCache {
         if let Some(t) = self.thread_events.take() {
             t.join().ok();
             debug!("Events thread joined");
-        } else {
-            warn!("Join handle is missing for events thread");
+        } else if self.watch_for_changes {
+            warn!("Join handle is missing for events thread")
         }
         if let Some(t) = self.thread_updates.take() {
             t.join().ok();
             debug!("Update thread joined");
-        } else {
+        } else if self.watch_for_changes {
             warn!("Join handle is missing for update thread");
         }
         self.inner

@@ -70,6 +70,8 @@ const AUDIOSERVE_T_CACHE_SAVE_OFTEN: &str = "t-cache-save-often";
 const AUDIOSERVE_NO_NATURAL_FILES_ORDERING: &str = "no-natural-files-ordering";
 const AUDIOSERVE_TIME_TO_FOLDER_END: &str = "time-to-folder-end";
 const AUDIOSERVE_READ_PLAYLIST: &str = "read-playlist";
+const AUDIOSERVE_DONT_WATCH_FOR_CHANGES: &str = "dont-watch-for-changes";
+const AUDIOSERVE_CHANGES_DEBOUNCE_INTERVAL: &str = "changes-debounce-interval";
 
 macro_rules! long_arg_no_env {
     ($name: ident) => {
@@ -312,6 +314,21 @@ fn create_parser() -> Command {
     parser = parser.arg(long_arg!(AUDIOSERVE_SEARCH_CACHE)
                 .help("Deprecated: does nothing. For caching config use :<options> on individual collections dirs params",
     ));
+
+    // prepared for collection changes watch to be features
+    {
+        parser = parser
+            .arg(
+                long_arg_flag!(AUDIOSERVE_DONT_WATCH_FOR_CHANGES)
+                    .help("Do not watch for changes in collections"),
+            )
+            .arg(
+                long_arg!(AUDIOSERVE_CHANGES_DEBOUNCE_INTERVAL)
+                    .value_parser(value_parser!(u32))
+                    .conflicts_with(AUDIOSERVE_DONT_WATCH_FOR_CHANGES)
+                    .help("Internal in seconds to debounce raw notification about file changes"),
+            )
+    }
 
     if cfg!(feature = "behind-proxy") {
         parser = parser.arg(long_arg_flag!(AUDIOSERVE_BEHIND_PROXY)
@@ -698,6 +715,20 @@ where
         AUDIOSERVE_TIME_TO_FOLDER_END
     );
     set_config_flag!(args, config.read_playlist, AUDIOSERVE_READ_PLAYLIST);
+
+    // prepared for collection changes watch to be features
+    {
+        set_config_flag!(
+            args,
+            config.collections_options.dont_watch_for_changes,
+            AUDIOSERVE_DONT_WATCH_FOR_CHANGES
+        );
+        set_config!(
+            args,
+            config.collections_options.changes_debounce_interval,
+            AUDIOSERVE_CHANGES_DEBOUNCE_INTERVAL
+        );
+    }
 
     // Arguments for optional features
 
