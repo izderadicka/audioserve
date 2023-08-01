@@ -691,6 +691,12 @@ impl CacheInner {
                     .ok();
             }
             UpdateActionKind::RenameFolder { to } => {
+                //if destination exists in cache let's delete it
+                if self.has_key(&to) {
+                    self.remove_tree(&to)
+                        .map_err(|e| warn!("Error removing folder from cache: {}", e))
+                        .ok();
+                }
                 let from = folder;
                 if let Err(e) = self.update_recursive_after_rename(&from, &to) {
                     error!("Failed to do recursive rename, error: {}, we will have to do rescan of {:?}", e, &to);
