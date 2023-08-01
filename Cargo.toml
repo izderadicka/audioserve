@@ -26,7 +26,7 @@ thiserror = "1.0"
 anyhow = "1.0"
 url = "2.4"
 percent-encoding = "2.3"
-num_cpus = "1.15"
+num_cpus = "1.16"
 ring = "0.16"
 data-encoding = "2.4"
 regex = "1.8"
@@ -38,8 +38,7 @@ csv = "1.2"
 image="0.24"
 
 # for tls
-rustls ={version="0.20", optional=true}
-tokio-rustls = { version="0.23", optional=true, default-features = false}
+tokio-rustls = { version="0.24", optional=true, default-features = false}
 futures-util = { version = "0.3", default-features = false, optional=true }
 rustls-pemfile = { version = "1", optional=true}
 
@@ -63,7 +62,7 @@ nix = "0.26"
 [features]
 default = ["tls", "symlinks", "folder-download", "shared-positions", "behind-proxy"]
 # default
-tls=["rustls", "tokio-rustls", "futures-util", "rustls-pemfile"]
+tls=["tokio-rustls", "futures-util", "rustls-pemfile"]
 symlinks=["collection/symlinks"]
 
 folder-download = ["async-tar", "async-zip"]
