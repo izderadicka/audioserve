@@ -1,9 +1,11 @@
 use std::{
     ops::Deref,
     path::{Path, PathBuf},
+    sync::Arc,
     time::SystemTime,
 };
 
+use crossbeam_channel::Receiver;
 use serde_json::Value;
 use sled::{
     transaction::{self, TransactionError, Transactional},
@@ -37,6 +39,7 @@ pub(crate) struct CacheInner {
     lister: FolderLister,
     base_dir: PathBuf,
     time_to_folder_end: u32,
+    update_receiver: Receiver<Option<UpdateAction>>,
 }
 
 impl CacheInner {
@@ -46,6 +49,7 @@ impl CacheInner {
         lister: FolderLister,
         base_dir: PathBuf,
         time_to_folder_end: u32,
+        update_receiver: Receiver<Option<UpdateAction>>,
     ) -> Result<Self> {
         let pos_latest = db.open_tree("pos_latest")?;
         let pos_folder = db.open_tree("pos_folder")?;
@@ -56,7 +60,21 @@ impl CacheInner {
             lister,
             base_dir,
             time_to_folder_end,
+            update_receiver,
         })
+    }
+
+    pub(crate) fn run_update_loop(self: Arc<Self>) {
+        loop {
+            match self.update_receiver.recv() {
+                Ok(Some(action)) => self.proceed_update(action),
+                Ok(None) => break,
+                Err(_) => {
+                    error!("Update channel disconnected");
+                    break;
+                }
+            }
+        }
     }
 }
 

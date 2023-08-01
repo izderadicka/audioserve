@@ -1,4 +1,8 @@
-use self::{inner::CacheInner, update::OngoingUpdater, util::kv_to_audiofolder};
+use self::{
+    inner::CacheInner,
+    update::{OngoingUpdater, UpdateAction},
+    util::kv_to_audiofolder,
+};
 use crate::{
     audio_folder::FolderLister,
     audio_meta::{AudioFolder, FolderByModification, TimeStamp},
@@ -6,7 +10,7 @@ use crate::{
     common::{CollectionOptions, CollectionTrait, PositionsData, PositionsTrait},
     error::{Error, Result},
     position::{Position, PositionShort, PositionsCollector},
-    util::get_modified,
+    util::{get_modified, spawn_named_thread},
     AudioFolderShort, FoldersOrdering,
 };
 use crossbeam_channel::{unbounded as channel, Receiver, Sender};
@@ -30,13 +34,14 @@ const TERMINATE_INFO: &str = "_TERMINATE_";
 
 pub struct CollectionCache {
     thread_loop: Option<thread::JoinHandle<()>>,
-    watcher_sender:
-        Arc<Mutex<Option<std::sync::mpsc::Sender<std::result::Result<Event, notify::Error>>>>>,
-    thread_updater: Option<thread::JoinHandle<()>>,
+    watcher_sender: Arc<Mutex<Option<Sender<std::result::Result<Event, notify::Error>>>>>,
+    thread_events: Option<thread::JoinHandle<()>>,
+    thread_updates: Option<thread::JoinHandle<()>>,
     cond: Arc<(Condvar, Mutex<bool>)>,
     pub(crate) inner: Arc<CacheInner>,
     event_sender: Sender<Option<Event>>,
     event_receiver: Option<Receiver<Option<Event>>>,
+    update_sender: Sender<Option<UpdateAction>>,
     force_update: bool,
 }
 
@@ -89,7 +94,8 @@ impl CollectionCache {
             .flush_every_ms(Some(10_000))
             .cache_capacity(100 * 1024 * 1024)
             .open()?;
-        let (update_sender, update_receiver) = channel::<Option<Event>>();
+        let (event_sender, event_receiver) = channel::<Option<Event>>();
+        let (update_sender, update_receiver) = channel::<Option<UpdateAction>>();
 
         let time_to_end_of_folder = opt.time_to_end_of_folder;
         Ok(CollectionCache {
@@ -98,19 +104,21 @@ impl CollectionCache {
                 FolderLister::new_with_options(opt.into()),
                 root_path,
                 time_to_end_of_folder,
+                update_receiver,
             )?),
             thread_loop: None,
             watcher_sender: Arc::new(Mutex::new(None)),
-            thread_updater: None,
-
+            thread_events: None,
+            thread_updates: None,
             cond: Arc::new((
                 Condvar::new(),
                 #[allow(clippy::mutex_atomic)]
                 // Not sure why clippy warns, as this is taken from example cor condition in std doc
                 Mutex::new(false),
             )),
-            event_sender: update_sender,
-            event_receiver: Some(update_receiver),
+            event_sender,
+            event_receiver: Some(event_receiver),
+            update_sender,
             force_update,
         })
     }
@@ -158,17 +166,27 @@ impl CollectionCache {
         Ok(thread)
     }
 
-    pub(crate) fn run_update_loop(&mut self) {
+    /// can run only once!
+    pub(crate) fn start_update_threads(&mut self) {
         let event_receiver = self.event_receiver.take().expect("run multiple times");
         let event_sender = self.event_sender.clone();
+        let ongoing_updater = OngoingUpdater::new(
+            event_receiver,
+            self.update_sender.clone(),
+            self.inner.clone(),
+        );
+        self.thread_events = Some(spawn_named_thread("collection-events", || {
+            ongoing_updater.run_event_loop()
+        }));
         let inner = self.inner.clone();
-        let ongoing_updater = OngoingUpdater::new(event_receiver, inner.clone());
-        self.thread_updater = Some(thread::spawn(move || ongoing_updater.run()));
+        self.thread_updates = Some(spawn_named_thread("collection_updates", || {
+            inner.run_update_loop()
+        }));
         let cond = self.cond.clone();
         let mut force_update = self.force_update;
         let watcher_sender = self.watcher_sender.clone();
-
-        let thread = thread::spawn(move || {
+        let inner = self.inner.clone();
+        let thread = spawn_named_thread("collection-main", move || {
             let root_path = inner.base_dir();
             loop {
                 let (cond_var, cond_mtx) = &*cond;
@@ -181,7 +199,7 @@ impl CollectionCache {
                     let mut ws = watcher_sender.lock().unwrap();
                     *ws = None;
                 }
-                let (tx, rx) = std::sync::mpsc::channel();
+                let (tx, rx) = channel();
 
                 let mut watcher = recommended_watcher(tx.clone())
                     .map_err(|e| error!("Failed to create fs watcher: {}", e));
@@ -240,12 +258,15 @@ impl CollectionCache {
                                 }
                             };
                             if let Err(e) = event_sender.send(Some(interesting_event)) {
-                                error!("Channel to updater is broken ({}), will stop thread", e);
+                                error!(
+                                    "Channel to event debouncer is broken ({}), will stop thread",
+                                    e
+                                );
                                 return;
                             }
                         }
                         Err(e) => {
-                            error!("Error in collection watcher channel: {}", e);
+                            error!("Error in collection watcher channel, will rescan and restart watcher: {}", e);
                             thread::sleep(Duration::from_secs(10));
                             break;
                         }
@@ -426,12 +447,19 @@ impl CollectionTrait for CollectionCache {
 impl Drop for CollectionCache {
     fn drop(&mut self) {
         self.event_sender.send(None).ok();
+        self.update_sender.send(None).ok();
         self.signal_end();
-        if let Some(t) = self.thread_updater.take() {
+        if let Some(t) = self.thread_events.take() {
+            t.join().ok();
+            debug!("Events thread joined");
+        } else {
+            warn!("Join handle is missing for events thread");
+        }
+        if let Some(t) = self.thread_updates.take() {
             t.join().ok();
             debug!("Update thread joined");
         } else {
-            warn!("Join handle is missing");
+            warn!("Join handle is missing for update thread");
         }
         self.inner
             .flush()
@@ -593,7 +621,7 @@ mod tests {
         fs::create_dir(&db_path).ok();
         let mut col = CollectionCache::new(test_data_dir, db_path, CollectionOptions::default())
             .expect("Cannot create CollectionCache");
-        col.run_update_loop();
+        col.start_update_threads();
         col.wait_until_inital_scan_is_done();
         (col, tmp_dir)
     }

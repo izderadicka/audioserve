@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crossbeam_channel::{Receiver, RecvTimeoutError};
+use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use indexmap::IndexMap;
 use notify::{
     event::{ModifyKind, RemoveKind, RenameMode},
@@ -105,15 +105,21 @@ pub(super) struct OngoingUpdater {
     inner: Arc<CacheInner>,
     pending: HashMap<PathBuf, PendingEvent>,
     interval: Duration,
+    update_sender: Sender<Option<UpdateAction>>,
 }
 
 impl OngoingUpdater {
-    pub(super) fn new(channel: Receiver<Option<Event>>, inner: Arc<CacheInner>) -> Self {
+    pub(super) fn new(
+        channel: Receiver<Option<Event>>,
+        update_sender: Sender<Option<UpdateAction>>,
+        inner: Arc<CacheInner>,
+    ) -> Self {
         OngoingUpdater {
             input_channel: channel,
             inner,
             pending: HashMap::new(),
             interval: Duration::from_secs(10),
+            update_sender,
         }
     }
 
@@ -149,7 +155,7 @@ impl OngoingUpdater {
             let mut actions: IndexMap<PathBuf, UpdateActionKind> = IndexMap::new();
 
             for (path, evt) in done.into_iter() {
-                debug!("Notify debounced event: {:?} {:?}", path, evt);
+                trace!("Notify debounced event: {:?} {:?}", path, evt);
                 let event_actions = self.list_actions_for_event(&path, evt);
                 for action in event_actions.into_iter() {
                     let parent = action.path.parent();
@@ -173,6 +179,9 @@ impl OngoingUpdater {
             for (path, kind) in actions.into_iter() {
                 let action = UpdateAction::new(path, kind);
                 debug!("Identified following update action: {:?}", action);
+                self.update_sender
+                    .send(Some(action))
+                    .unwrap_or_else(|_| error!("Update receiver removed early"));
             }
         }
     }
@@ -337,7 +346,7 @@ impl OngoingUpdater {
         }
     }
 
-    pub(super) fn run(mut self) {
+    pub(super) fn run_event_loop(mut self) {
         loop {
             match self.input_channel.recv_timeout(self.interval) {
                 Ok(Some(action)) => {
