@@ -869,6 +869,11 @@ read-playlist               <=true|false> will use .m3u playlist in folder to re
                             (only files in playlist are available and in its order)
 collapse-cd-folder-regex    =regex regex used to identify and collapse CD folders
                             (folders like CD1, CD2 will be merged to parent folder)
+dont-watch or no-watch      <=true|false> will not watch for changes in this collection
+changes-debounce or 
+changes-debounce-interval, 
+debounce-interval           =n number of seconds to debounce raw events from inotify. Basically limits updates while
+                            still collection directories changes. 
 ";
     #[cfg(feature = "tags-encoding")]
     let help = help.to_string()
@@ -885,7 +890,7 @@ Tags that will be same for all audiofiles in folder will be available on folder 
 will be present on file level. 
 You need to opt in for tags to be included, either use --tags argument to include preferred preselected tags or --tags-custom,
 where you can select tags you want separated by comma.
-BE AWARE: if you use or change tags arguments all collection cache has to be rescaned! 
+BE AWARE: if you use or change tags arguments all collection cache has to be rescanned! 
 
 Preferred tags are: 
 ");

@@ -189,6 +189,11 @@ impl CollectionOptions {
                         }
                     }
 
+                    "dont-watch" | "no-watch" => self.watch_for_changes = !bool_val()?,
+                    "changes-debounce" | "changes-debounce-interval" | "debounce-interval" => {
+                        self.changes_debounce_interval = u32_val()?
+                    }
+
                     opt => invalid_option!("Unknown option: {}", opt),
                 }
             }
