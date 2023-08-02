@@ -29,6 +29,7 @@ Like audioserve and want to start quickly and easily and securely? Try [this sim
     - [Merge/collapsing of CD subfolders](#mergecollapsing-of-cd-subfolders)
     - [Audio files metadata tags](#audio-files-metadata-tags)
     - [Collation](#collation)
+    - [Playlists](#playlists)
   - [Sharing playback positions between clients](#sharing-playback-positions-between-clients)
   - [Security](#security)
     - [TLS/SSL](#tlsssl)
@@ -61,7 +62,7 @@ Audioserve is intended to serve files from directories in exactly same structure
     Author Last Name, First Name/Audio Book Name
     Author Last Name, First Name/Series Name/Audio Book Name
 
-Files should be named so they are in right alphabetical order - ideally prefixed with padded number:
+Files should be named so they are in right order - ideally prefixed with padded number, recently audioserve supports (by default, can be switched off by `no-natural-files-ordering` argument) natural ordering so padding of numbers is not necessary:
 
     001 - First Chapter Name.opus
     002 - Second Chapter Name.opus
@@ -92,8 +93,9 @@ So I implemented caching of collection data into embedded key-value database (us
 However it brings bit more complexity into the program. Here are main things to consider:
 
 - On start audioserve scans and caches collection directories. If it is first scan it can take quite some time (depending on size of collection, can be tens of minutes for larger collections). Until scan is complete search might not work reliably. Also on running audioserve you can enforce full collections rescan by sending signal `sigusr1` to the program.
-- Content of the cache is influenced by several program arguments, namely `--tags`, `--tags-custom`, `--ignore-chapters-meta`, `--no-dir-collaps`, `--allow-sym-link`, `-chapters-duration`, `--chapters-from-duration`.   If audioserve is restarted and some of these arguments is changed, it may not be reflected in the cache (as cache is updated only when mtime of some file/directory changes and updates are local to directory changed).  In this case you'll need to force full reload of cache manually - either by sending `sigusr1` signal to program, or starting with `--force-cache-update` argument, which enforces full cache reload on start.
-- audioserve is watching for collection directories changes (using inotify on linux) so if you change something in collection - add, change, rename, delete folders/files - changes will propagate to running audioserve automatically - you will just need to wait a small amount of time - like 15 secs, before changes are visible in the program. For large collections you should increase the limit of inotify watchers in linux:
+- Content of the cache is influenced by several program arguments, namely `--tags`, `--tags-custom`, `tags-encoding`, `--ignore-chapters-meta`, `--no-dir-collaps`, `--allow-sym-link`, `-chapters-duration`, `--chapters-from-duration`, `read-playlist`, `--collapse-cd-folders`, `cd-folders-regexp`, `no-natural-files-ordering`.   If audioserve is restarted and some of these arguments is changed, it should start full collection cache reload.
+- In some cases it may happen that cache will become incosistent with file structrure in collection. Then you'll need to force full reload of cache manually - either by sending `sigusr1` signal to program, or starting it with `--force-cache-update` argument, which enforces initial full cache reload.
+- by default audioserve is watching for collection directories changes (using inotify on linux) so if you change something in collection - add, change, rename, delete folders/files - changes will propagate to running audioserve automatically - you will just need to wait a small amount of time (app.10 seconds you can modify this by argument `changes-debounce-interval`, however too small value may lead to inefficient handling of changes ), before changes are visible in the program. For large collections you should increase the limit of inotify watchers in linux:
 
 ```shell
 cat /proc/sys/fs/inotify/max_user_watches
@@ -101,8 +103,9 @@ cat /proc/sys/fs/inotify/max_user_watches
 echo fs.inotify.max_user_watches=1048576 | sudo tee -a /etc/sysctl.conf
 sudo sysctl -p
 ```
+- these contiunous updates do require some resources, firstly above mentioned kernel watches and also 3 threads per collection. You can disable watching for changes by program argument `dont-watch-for-changes`. Then changes will be updated only if you browse the folder (and audioserve will notice modified mtime of the folder) or assure updates manually (as metioned above like sending `sigusr1` signal to program after changes or in regular interval, this will force full cache reload/rescan). Changes not updated into cache will not be available for search.
 
-- cache is indeed bound with collection directory (hash of absolute normalized path is used as an identification for related cache) - so if you change collection directory path cache will also change (and old cache will still hang there - so some manual clean up might be needed).
+- cache is indeed bound with collection directory path (hash of absolute normalized path is used as an identification for related cache) - so if you change collection directory path cache will also change (and old cache will still hang there - so some manual clean up might be needed).
 - if you do not want to cache particular collection you can add `:no-cache` option after collection directory argument. However then position sharing and metadata tags will also not work for that collection and search will be slow.
 
 ### Single file audiobooks and their chapters
@@ -139,6 +142,13 @@ It assumed that tags are in UTF-8 encoding, if not incorrect character is replac
 ### Collation
 
 By default audioserve alphabetic order of audio files and subfolders is case insensitive "C like" collation, meaning national characters like "č" are sorted after all ASCII characters and not after "c". For more advanced collation respecting local collation additional unicode support is needed. Unfortunately Rust does not have native support for this and only working library is binding to ICU C libraries, which makes compilation bit complicated. To support local/national collation audioserve has to be compiled with optional feature `collation`. Such version of audioserve will then use following env.variables to determine locale for collation (in order of precedence): `AUDIOSERVE_COLLATE`, `LC_ALL`, `LC_COLLATE`, `LANG`. If nothing is found it falls back to `en_US`, which still handles somehow national characters ("č" is equal to "c" in sorting).
+
+### Playlists
+With program argument `read-playlist` audioserve will search for file with extension `m3u` or `m3u8` and use it to define files and their order in given folder. Content of these files in basically new line separated list of relative file paths, lines starting with # are ignored. There are these additional limitation on using playlists:
+- maximum relative path length is 4 segments
+- file must exist and be and audio file to be used
+- subdirectories that are used in playlist are not displayed, it's assumed they are fully managed by playlist
+- thoroughly tested are only playlists with items in same folder -  if playlist is spanning subfolder it may have problems in some special cases like watching for directory changes, tracking playback position. 
 
 ## Sharing playback positions between clients
 
