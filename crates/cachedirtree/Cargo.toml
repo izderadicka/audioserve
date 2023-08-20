@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 ego-tree="0.6"
 bit-vec = "0.6"
-notify = "6.0"
+notify = "6.1"
 derive_builder = "0.12"
 
 
