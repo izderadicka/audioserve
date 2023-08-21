@@ -10,7 +10,7 @@ futures="0.3"
 tokio={version="1.29", features=["fs"]}
 
 [dev-dependencies]
-tempfile="3.7"
+tempfile="3.8"
 bytes = "1.4"
 tokio-util = {version="0.7", features=["codec"]}
 tokio={version="1.29", features=["macros", "rt"]}
