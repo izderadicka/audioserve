@@ -57,7 +57,7 @@ async-zip = {path="crates/async-zip", optional=true}
 websock = {path="crates/websock", optional = true}
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.26"
+nix = "0.27"
 
 [features]
 default = ["tls", "symlinks", "folder-download", "shared-positions", "behind-proxy"]
