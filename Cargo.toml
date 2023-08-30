@@ -57,7 +57,7 @@ async-zip = {path="crates/async-zip", optional=true}
 websock = {path="crates/websock", optional = true}
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.27"
+nix = {version="0.27.1", features=["user"]}
 
 [features]
 default = ["tls", "symlinks", "folder-download", "shared-positions", "behind-proxy"]
@@ -88,3 +88,6 @@ codegen-units = 1
 reqwest = {version="0.11", features=['blocking', 'json'], default-features = false}
 escargot = "0.5" 
 tempdir = "0.3"
+
+[target.'cfg(unix)'.dev-dependencies]
+nix = {version="0.27.1", features=["process", "signal"]}

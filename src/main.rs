@@ -298,7 +298,7 @@ async fn watch_for_positions_backup_signal(cols: Arc<Collections>) {
 fn main() -> anyhow::Result<()> {
     #[cfg(unix)]
     {
-        if nix::unistd::getuid().is_root() {
+        if nix::unistd::geteuid().is_root() {
             warn!("Audioserve is running as root! Not recommended.")
         }
     }
