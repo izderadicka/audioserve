@@ -88,7 +88,7 @@ dependencies = [
 
 [[package]]
 name = "audioserve"
-version = "0.26.0"
+version = "0.26.1"
 dependencies = [
  "anyhow",
  "async-tar",
@@ -1554,7 +1554,7 @@ dependencies = [
 
 [[package]]
 name = "media_info"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "clap 4.0.32",
  "encoding",

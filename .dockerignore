@@ -7,3 +7,4 @@ Dockerfile*
 README.md
 _static_build
 .travis.yml
+crates/media_info/ffmpeg*

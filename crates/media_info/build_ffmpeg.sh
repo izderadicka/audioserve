@@ -23,7 +23,6 @@ cd $FFMPEG_VERSION/
   --disable-dct  \
   --disable-dwt \
   --disable-lsp \
-  --disable-lzo \
   --disable-mdct \
   --disable-rdft \
   --disable-fft  \

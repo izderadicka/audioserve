@@ -7,22 +7,22 @@ fi
 
 bindgen \
 --no-doc-comments \
---whitelist-type AVFormatContext \
---whitelist-type AVDictionary \
---whitelist-type AVChapter \
---whitelist-type AVRational \
---whitelist-function av_dict_get \
---whitelist-function av_dict_count \
---whitelist-function av_log_set_level \
---whitelist-function av_register_all \
---whitelist-function avformat_version \
---whitelist-function avformat_alloc_context \
---whitelist-function avformat_open_input \
---whitelist-function avformat_find_stream_info \
---whitelist-function avformat_close_input \
---whitelist-function av_dump_format \
---whitelist-var AV_LOG_QUIET \
---whitelist-var AV_DICT_IGNORE_SUFFIX \
---whitelist-var AV_TIME_BASE \
+--allowlist-type AVFormatContext \
+--allowlist-type AVDictionary \
+--allowlist-type AVChapter \
+--allowlist-type AVRational \
+--allowlist-function av_dict_get \
+--allowlist-function av_dict_count \
+--allowlist-function av_log_set_level \
+--allowlist-function av_register_all \
+--allowlist-function avformat_version \
+--allowlist-function avformat_alloc_context \
+--allowlist-function avformat_open_input \
+--allowlist-function avformat_find_stream_info \
+--allowlist-function avformat_close_input \
+--allowlist-function av_dump_format \
+--allowlist-var AV_LOG_QUIET \
+--allowlist-var AV_DICT_IGNORE_SUFFIX \
+--allowlist-var AV_TIME_BASE \
 wrapper.h -- -I $FFMPEG_VERSION \
 > src/ffi_$FFMPEG_VERSION.rs
