@@ -5,11 +5,9 @@
 
 [ [**DEMO AVAILABLE** - shared secret: mypass] ](https://audioserve.zderadicka.eu)
 
-**[New web client](https://github.com/izderadicka/audioserve-web) is now default. If you do not like it let me know (old client is available, but you'll need to enable it yourself, [see below](#web-client))**
-
 Simple personal server to serve audio files from directories. Intended primarily for audio books, but anything with decent directories structure will do. Focus here is on simplicity and minimalist design.
 
-Server is written in Rust, new web PWA client (Typescript and Svelte) is focused on modern browsers and is using rather recent functionality (Service Worker), older, less demanding web client is still around - check [Web client chapter](#web-client) for details. There is also [Android client](https://github.com/izderadicka/audioserve-android) and [simple API](docs/api.md) for custom clients.
+Server is written in Rust, new web PWA client (Typescript and Svelte) is focused on modern browsers and is using rather recent functionality (Service Worker), older, less demanding web client is still around - check [Web client chapter](#web-client) for details. There is also old [Android client](https://github.com/izderadicka/audioserve-android), and [simple API](docs/api.md) for custom clients.
 
 For some (now bit outdated) background and video demo check this article(bit old but gives main motivation behind it) [Audioserve Audiobooks Server - Stupidly Simple or Simply Stupid?](http://zderadicka.eu/audioserve-audiobooks-server-stupidly-simple-or-simply-stupid)
 
@@ -343,19 +341,14 @@ All audioserve parameters can be also provided in configuration file via `--conf
 
 ## Web client
 
-Finally I think **new web client**  is ready for prime time, so it's default client - it resides in it's [own project](https://github.com/izderadicka/audioserve-web) and it's integrated into Docker image build, so it's part of the image. New web client uses latest and greatest web technologies and it's intended to replace Android client (can be installed as PWA app). 
+Web client resides in it's [own project](https://github.com/izderadicka/audioserve-web) and it's integrated into Docker image build, so it's part of the image. New web client uses latest and greatest web technologies and it's intended to replace old Android client (can be installed as PWA app), supports tracks caching and offline mode. 
 
-However if you do not like new client for any reason (please let me know what's wrong with new client), you can still use old client (residing still in this repo, it's just HTML5 and javascript, so less demanding, but also code is bit clumsy), which will be around for some time. You can easily enable in Docker build with `OLD_CLIENT` build argument, or just build it separately with npm and direct use resulting `dist` directory with `--client-dir` argument.
-
-I'm testing web clients on recent Firefox and Chrome/Chromium (on Linux and Android platforms, occasionally on Win and Edge, assuming that Edge is now basically Chrome, so it should work). For Apple platforms, new client should work for Safari after some additional configuration - check [this chapter](#alternative-transcodings-and-transcoding-configuration-for-apple-users).
-
-
-Also there is third party client, still very much in progress (and not much progressing lately), but quite interesting [third party client](https://github.com/KodeStar/audiosilo).
+I'm testing web client on recent Firefox and Chrome/Chromium (on Linux and Android platforms, occasionally on Win and Edge, assuming that Edge is now basically Chrome, so it should work). For Apple platforms, new client should work for Safari after some additional configuration - check [this chapter](#alternative-transcodings-and-transcoding-configuration-for-apple-users).
 
 
 ## Android client
 
-Android client code is [available on github](https://github.com/izderadicka/audioserve-android).
+Android client code is [available on github](https://github.com/izderadicka/audioserve-android), but is not maintained any more, it should still work, but I do not test it any more. I believe web client can fully replace it (with few minor things that really require platform integration).
 
 ## API
 

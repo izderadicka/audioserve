@@ -1,6 +1,5 @@
 ARG CARGO_ARGS
 ARG CARGO_RELEASE="release"
-ARG OLD_CLIENT
 
 FROM alpine:3.18 AS build
 LABEL maintainer="Ivan <ivan@zderadicka.eu>"
@@ -23,26 +22,13 @@ RUN if [[ -n "$CARGO_RELEASE" ]]; then CARGO_RELEASE="--$CARGO_RELEASE"; fi && \
 
 FROM node:20-alpine as client
 
-ARG OLD_CLIENT
-
-COPY ./client /audioserve_client
-
-RUN if [[ -n "$OLD_CLIENT" ]]; then \
-    echo "Old client" &&\
-    cd audioserve_client &&\
-    npm install &&\
-    npm run build ;\
-    else \
-    echo "New client $NEW_CLIENT" && \
-    rm -r  /audioserve_client/* &&\
-    apk add git &&\
+RUN apk add git &&\
     git clone https://github.com/izderadicka/audioserve-web.git /audioserve_client &&\
     cd /audioserve_client &&\
     npm install &&\
     npm run build &&\
     npm run build-sw &&\
-    mv public dist ;\
-    fi
+    mv public dist
 
 FROM alpine:3.18
 
