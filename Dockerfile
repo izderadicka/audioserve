@@ -21,7 +21,7 @@ RUN if [[ -n "$CARGO_RELEASE" ]]; then CARGO_RELEASE="--$CARGO_RELEASE"; fi && \
     cargo build ${CARGO_RELEASE} ${CARGO_ARGS} &&\
     cargo test ${CARGO_RELEASE} --all ${CARGO_ARGS}
 
-FROM node:16-alpine as client
+FROM node:20-alpine as client
 
 ARG OLD_CLIENT
 
