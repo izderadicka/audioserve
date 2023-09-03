@@ -955,7 +955,7 @@ mod test {
             "3 3 * * *",
             "--tags",
             "test_data",
-            "client",
+            "tests",
         ])
         .unwrap();
         assert_eq!(2, c.base_dirs.len());

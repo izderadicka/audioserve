@@ -764,6 +764,9 @@ impl Default for Config {
             limit_rate: None,
             transcoding: TranscodingConfig::default(),
             token_validity_hours: 365 * 24,
+            #[cfg(test)]
+            client_dir: "test_data".into(),
+            #[cfg(not(test))]
             client_dir: "client/dist".into(),
             secret_file: data_base_dir.join("audioserve.secret"),
             cors: None,
