@@ -20,7 +20,7 @@ jobs:
         if: ${{ github.event_name == 'schedule' }}
         run: test -z $(git rev-list  --after="24 hours"  ${{ github.sha }}) && echo "::set-output name=should_run::false"
   audioserve-build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: check_date
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     steps:
