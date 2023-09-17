@@ -1,5 +1,5 @@
-FROM alpine:3.15 AS build
-MAINTAINER Ivan <ivan@zderadicka.eu>
+FROM alpine:3.18 AS build
+LABEL maintainer="Ivan <ivan@zderadicka.eu>"
 ENV CARGO_ARGS=""
 ENV FEATURES=""
 
@@ -11,10 +11,8 @@ RUN apk update &&\
     chmod -R 0777 /root &&\
     mkdir /src &&\
     mkdir /.cargo &&\
-    chmod a+rw /.cargo &&\
-    mkdir /.npm &&\
-    chmod a+rw /.npm
- 
+    chmod a+rw /.cargo
+
 WORKDIR /src
 ENV RUSTFLAGS="-C target-feature=+crt-static -C link-self-contained=yes"
 ENV PATH=/root/.cargo/bin:$PATH
