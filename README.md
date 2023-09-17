@@ -37,6 +37,7 @@ Like audioserve and want to start quickly and easily and securely? Try [this sim
     - [Security Best Practices](#security-best-practices)
   - [Performance](#performance)
     - [Transcoding Cache](#transcoding-cache)
+    - [HTTP/2 support](#http2-support)
   - [Transcoding](#transcoding)
     - [Alternative transcodings and transcoding configuration for Apple users](#alternative-transcodings-and-transcoding-configuration-for-apple-users)
   - [Command line](#command-line)
@@ -250,6 +251,16 @@ If transcoding is used it is another significant limiting factor - as it's quite
 
 Optionally you can enable transcoding cache (by compiling audioserve with `transcoding-cache` feature). Contribution of this cache to overall performance depends very much on usage scenarios. If there is only one user, which basically listens to audiobooks in linear order (chapter after chapter, not jumping back and forth), benefit will be minimal. If there are more users, listening to same audiobook (with same transcoding levels) and/or jumping often back and forth between chapters, then benefits of this cache can be significant. You should test to see the difference (when transcoding cache is compiled in it can be still disabled by `--t-cache-disable` option).
 
+### HTTP/2 support
+
+Audioserve supports HTTP/2 protocol.  It may have some positive impact on page load times in the browser. All current browsers require that connection is encrypted (https) in order to use HTTPS/2 protocol. If you are connecting directly to audioserve and you set it to use TLS (with `--ssl-key` and `--ssl-cert` arguments) then HTTP/2 protocol will be used automatically (for any modern browser).
+
+If you have audioserve behind reverse proxy, then it's up to the proxy to use HTTP/2 (for in current demo https://audioserve.zderadicka.eu nginx supports HTTP/2).  In this case it depends how proxy will forward requests to audioserve. audioserve (via hyper library, using magic initial line in HTTP/2 requests) can automatically distinguish between HTTP/2 and HTTP/1.1 requests. So "HTTP/2 with previous knowledge" profile will work - so if you configure your proxy to forward request using HTTP/2 protocol, audioserve should be able to handle it.  However biggest advantage of HTTP/2 consists in optimizing connections from browser to remote site, I think advantage of using it also for connections between reverse proxy and audioserve will be minimal.
+
+Audioserve does not support deprecated h2c profile (switching to HTTP/2 via HTTP/1.1 Upgrade). 
+
+audioserve also uses websocket, which is not yet supported in HTTP/2 so on reverse proxy for websocket endpoint you must ensure appropriate configuration.
+ 
 ## Transcoding
 
 Audioserve offers possibility to transcode audio files to opus format (opus codec, ogg or webm container) or few other formats to save bandwidth and volume of transferred data. For transcoding to work `ffmpeg` program must be installed and available on system's PATH.
