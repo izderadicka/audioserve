@@ -10,20 +10,25 @@ use tokio::task::spawn_blocking as blocking;
 use crate::Error;
 use crate::{config::get_config, util::ResponseBuilderExt};
 
+use super::compress::compressed_response;
 use super::search::{Search, SearchTrait};
 use super::types::Transcodings;
 use super::{response, response::ResponseFuture, types::CollectionsInfo};
 
 type Response = HyperResponse<Body>;
 
-fn json_response<T: serde::Serialize>(data: &T) -> Response {
+fn json_response<T: serde::Serialize>(data: &T, compress: bool) -> Response {
     let json = serde_json::to_string(data).expect("Serialization error");
 
-    HyperResponse::builder()
-        .typed_header(ContentType::json())
-        .typed_header(ContentLength(json.len() as u64))
-        .body(json.into())
-        .unwrap()
+    let builder = HyperResponse::builder().typed_header(ContentType::json());
+    if compress && json.len() > 512 {
+        compressed_response(builder, json.into_bytes())
+    } else {
+        builder
+            .typed_header(ContentLength(json.len() as u64))
+            .body(json.into())
+            .unwrap()
+    }
 }
 
 pub fn get_folder(
@@ -32,11 +37,12 @@ pub fn get_folder(
     collections: Arc<collection::Collections>,
     ordering: FoldersOrdering,
     group: Option<String>,
+    compress: bool,
 ) -> ResponseFuture {
     Box::pin(
         blocking(move || collections.list_dir(collection, &folder_path, ordering, group))
-            .map_ok(|res| match res {
-                Ok(folder) => json_response(&folder),
+            .map_ok(move |res| match res {
+                Ok(folder) => json_response(&folder, compress),
                 Err(_) => response::not_found(),
             })
             .map_err(Error::new),
@@ -61,7 +67,7 @@ pub fn collections_list() -> ResponseFuture {
             })
             .collect(),
     };
-    Box::pin(future::ok(json_response(&collections)))
+    Box::pin(future::ok(json_response(&collections, false)))
 }
 
 #[cfg(feature = "shared-positions")]
@@ -110,7 +116,7 @@ pub fn last_position(collections: Arc<collection::Collections>, group: String) -
     Box::pin(
         collections
             .get_last_position_async(group)
-            .map(|pos| Ok(json_response(&pos))),
+            .map(|pos| Ok(json_response(&pos, false))),
     )
 }
 
@@ -127,13 +133,13 @@ pub fn folder_position(
         Box::pin(
             collections
                 .get_positions_recursive_async(collection, group, path, filter)
-                .map(|pos| Ok(json_response(&pos))),
+                .map(|pos| Ok(json_response(&pos, false))),
         )
     } else {
         Box::pin(
             collections
                 .get_position_async(collection, group, path)
-                .map(|pos| Ok(json_response(&pos))),
+                .map(|pos| Ok(json_response(&pos, false))),
         )
     }
 }
@@ -147,7 +153,7 @@ pub fn all_positions(
     Box::pin(
         collections
             .get_all_positions_for_group_async(group, filter)
-            .map(|pos| Ok(json_response(&pos))),
+            .map(|pos| Ok(json_response(&pos, false))),
     )
 }
 
@@ -155,7 +161,7 @@ pub fn transcodings_list(user_agent: Option<&str>) -> ResponseFuture {
     let transcodings = user_agent
         .map(Transcodings::for_user_agent)
         .unwrap_or_default();
-    Box::pin(future::ok(json_response(&transcodings)))
+    Box::pin(future::ok(json_response(&transcodings, false)))
 }
 
 pub fn search(
@@ -168,7 +174,7 @@ pub fn search(
     Box::pin(
         blocking(move || {
             let res = searcher.search(collection, query, ordering, group);
-            json_response(&res)
+            json_response(&res, false)
         })
         .map_err(Error::new),
     )
@@ -182,7 +188,7 @@ pub fn recent(
     Box::pin(
         blocking(move || {
             let res = searcher.recent(collection, group);
-            json_response(&res)
+            json_response(&res, false)
         })
         .map_err(Error::new),
     )

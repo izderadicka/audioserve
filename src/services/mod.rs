@@ -34,6 +34,7 @@ use std::{
 
 pub mod api;
 pub mod auth;
+pub mod compress;
 mod files;
 pub mod icon;
 #[cfg(feature = "shared-positions")]
@@ -366,6 +367,7 @@ impl<C: 'static> MainService<C> {
                             collections,
                             ord,
                             group,
+                            req.can_br_compress(),
                         )
                     } else if !get_config().disable_folder_download && path.starts_with("/download")
                     {

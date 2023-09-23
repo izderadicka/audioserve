@@ -157,7 +157,7 @@ dependencies = [
 
 [[package]]
 name = "audioserve"
-version = "0.26.2"
+version = "0.27.0"
 dependencies = [
  "anyhow",
  "async-tar",
