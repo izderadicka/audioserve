@@ -1,7 +1,7 @@
-use std::{borrow::Cow, collections::HashMap, fmt::Display, net::IpAddr};
+use std::{borrow::Cow, collections::HashMap, fmt::Display, iter::once, net::IpAddr};
 
 use bytes::{Bytes, BytesMut};
-use headers::HeaderMapExt;
+use headers::{Header, HeaderMapExt, HeaderName, HeaderValue};
 use hyper::{body::HttpBody, Body, Request};
 use percent_encoding::percent_decode;
 use url::form_urlencoded;
@@ -10,6 +10,44 @@ use crate::{
     config::{get_config, Cors},
     error,
 };
+
+pub struct AcceptEncoding(HeaderValue);
+
+impl Header for AcceptEncoding {
+    fn name() -> &'static HeaderName {
+        &http::header::ACCEPT_ENCODING
+    }
+
+    fn decode<'i, I>(values: &mut I) -> Result<Self, headers::Error>
+    where
+        Self: Sized,
+        I: Iterator<Item = &'i HeaderValue>,
+    {
+        let val = values
+            .next()
+            .cloned()
+            .ok_or_else(|| headers::Error::invalid())?;
+        Ok(AcceptEncoding(val))
+    }
+
+    fn encode<E: Extend<HeaderValue>>(&self, values: &mut E) {
+        values.extend(once(self.0.clone()))
+    }
+}
+
+impl AcceptEncoding {
+    pub fn accepts(&self, encoding: &str) -> bool {
+        self.0
+            .to_str()
+            .ok()
+            .and_then(|s| {
+                s.split(',')
+                    .find(|token| token.trim().to_ascii_lowercase() == encoding)
+            })
+            .map(|_| true)
+            .unwrap_or(false)
+    }
+}
 
 pub struct QueryParams<'a> {
     params: Option<HashMap<Cow<'a, str>, Cow<'a, str>>>,
@@ -62,6 +100,7 @@ pub struct RequestWrapper {
     is_ssl: bool,
     #[allow(dead_code)]
     is_behind_proxy: bool,
+    can_br_compress: bool,
 }
 
 impl RequestWrapper {
@@ -108,12 +147,17 @@ impl RequestWrapper {
             None => path,
         };
         let is_behind_proxy = get_config().behind_proxy;
+        let can_br_compress = match request.headers().typed_get::<AcceptEncoding>() {
+            Some(h) => h.accepts("br"),
+            None => false,
+        };
         Ok(RequestWrapper {
             request,
             path,
             remote_addr,
             is_ssl,
             is_behind_proxy,
+            can_br_compress,
         })
     }
 
@@ -240,5 +284,22 @@ impl RequestWrapper {
         } else {
             false
         }
+    }
+
+    pub fn can_br_compress(&self) -> bool {
+        self.can_br_compress
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_accept_encoding() {
+        let header = AcceptEncoding(HeaderValue::from_static("gzip, deflate, br"));
+        assert!(header.accepts("br"));
+        let header = AcceptEncoding(HeaderValue::from_static("gzip, deflate"));
+        assert!(!header.accepts("br"));
     }
 }

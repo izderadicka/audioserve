@@ -224,6 +224,11 @@ impl<C: 'static> MainService<C> {
                 return resp::fut(resp::bad_request);
             }
         };
+        debug!(
+            "Can use br compression {} on {}",
+            req.can_br_compress(),
+            req.path()
+        );
         //static files
         if req.method() == Method::GET {
             if req.path() == "/" || req.path() == "/index.html" {
