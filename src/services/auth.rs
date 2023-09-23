@@ -22,7 +22,7 @@ use thiserror::Error;
 use tokio::time::sleep;
 use url::form_urlencoded;
 
-use super::resp;
+use super::response;
 
 pub enum AuthResult<T> {
     Authenticated {
@@ -67,7 +67,7 @@ const COOKIE_NAME: &str = "audioserve_token";
 const COOKIE_DELETE_DATE: &str = "Thu, 01 Jan 1970 00:00:00 GMT";
 
 fn deny(req: &RequestWrapper) -> Result<AuthResult<()>> {
-    let mut resp = resp::deny();
+    let mut resp = response::deny();
 
     // delete cookie, if it was send in request
 

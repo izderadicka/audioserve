@@ -14,7 +14,7 @@ use crate::{config::get_config, util::ResponseBuilderExt};
 
 use self::cache::{cache_icon, cached_icon};
 
-use super::subs::add_cache_headers;
+use super::response::add_cache_headers;
 
 pub mod cache;
 

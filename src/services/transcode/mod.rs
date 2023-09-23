@@ -1,5 +1,5 @@
 use self::codecs::*;
-use super::subs::ChunkStream;
+use super::response::ChunkStream;
 use crate::config::get_config;
 use crate::error::{bail, Result};
 use collection::TimeSpan;

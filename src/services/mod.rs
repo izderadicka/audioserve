@@ -1,10 +1,7 @@
 use self::auth::{AuthResult, Authenticator};
 use self::request::{QueryParams, RequestWrapper};
+use self::response::ResponseFuture;
 use self::search::Search;
-use self::subs::{
-    collections_list, get_folder, recent, search, send_cover, send_description, send_file,
-    send_file_simple, send_folder_icon, transcodings_list, ResponseFuture,
-};
 use self::transcode::QualityLevel;
 use crate::config::get_config;
 use crate::services::transcode::ChosenTranscoding;
@@ -35,14 +32,15 @@ use std::{
     task::Poll,
 };
 
+pub mod api;
 pub mod auth;
+mod files;
 pub mod icon;
 #[cfg(feature = "shared-positions")]
 pub mod position;
 pub mod request;
-pub mod resp;
+pub mod response;
 pub mod search;
-mod subs;
 pub mod transcode;
 mod types;
 
@@ -187,7 +185,7 @@ impl<C: 'static> Service<Request<Body>> for MainService<C> {
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         Box::pin(self.process_request(req).or_else(|e| {
             error!("Request processing error: {}", e);
-            future::ok(resp::internal_error())
+            future::ok(response::internal_error())
         }))
     }
 }
@@ -198,7 +196,7 @@ impl<C: 'static> MainService<C> {
         if let Some(limiter) = self.rate_limitter.as_ref() {
             if limiter.start_one().is_err() {
                 debug!("Rejecting request due to rate limit");
-                return resp::fut(resp::too_many_requests);
+                return response::fut(response::too_many_requests);
             }
         }
 
@@ -209,7 +207,7 @@ impl<C: 'static> MainService<C> {
                 req.uri(),
                 req.headers()
             );
-            return resp::fut(|| preflight_cors_response(&req));
+            return response::fut(|| preflight_cors_response(&req));
         }
 
         let req = match RequestWrapper::new(
@@ -221,7 +219,7 @@ impl<C: 'static> MainService<C> {
             Ok(r) => r,
             Err(e) => {
                 error!("Request URL error: {}", e);
-                return resp::fut(resp::bad_request);
+                return response::fut(response::bad_request);
             }
         };
         debug!(
@@ -232,13 +230,13 @@ impl<C: 'static> MainService<C> {
         //static files
         if req.method() == Method::GET {
             if req.path() == "/" || req.path() == "/index.html" {
-                return send_file_simple(
+                return files::send_file_simple(
                     &get_config().client_dir,
                     "index.html",
                     get_config().static_resource_cache_age,
                 );
             } else if is_static_file(req.path()) {
-                return send_file_simple(
+                return files::send_file_simple(
                     &get_config().client_dir,
                     &req.path()[1..],
                     get_config().static_resource_cache_age,
@@ -287,23 +285,23 @@ impl<C: 'static> MainService<C> {
         match *req.method() {
             Method::GET => {
                 if path.starts_with("/collections") {
-                    collections_list()
+                    api::collections_list()
                 } else if path.starts_with("/transcodings") {
                     let user_agent = req.headers().typed_get::<UserAgent>();
-                    transcodings_list(user_agent.as_ref().map(|h| h.as_str()))
+                    api::transcodings_list(user_agent.as_ref().map(|h| h.as_str()))
                 } else if cfg!(feature = "shared-positions") && path.starts_with("/positions") {
                     // positions API
                     #[cfg(feature = "shared-positions")]
                     match extract_group(path) {
                         PositionGroup::Group(group) => match position_params(&params) {
-                            Ok(p) => subs::all_positions(collections, group, Some(p)),
+                            Ok(p) => api::all_positions(collections, group, Some(p)),
 
                             Err(e) => {
                                 error!("Invalid timestamp param: {}", e);
-                                resp::fut(resp::bad_request)
+                                response::fut(response::bad_request)
                             }
                         },
-                        PositionGroup::Last(group) => subs::last_position(collections, group),
+                        PositionGroup::Last(group) => api::last_position(collections, group),
                         PositionGroup::Path {
                             collection,
                             group,
@@ -315,10 +313,10 @@ impl<C: 'static> MainService<C> {
 
                                 Err(e) => {
                                     error!("Invalid timestamp param: {}", e);
-                                    return resp::fut(resp::bad_request);
+                                    return response::fut(response::bad_request);
                                 }
                             };
-                            subs::folder_position(
+                            api::folder_position(
                                 collections,
                                 group,
                                 collection,
@@ -327,7 +325,7 @@ impl<C: 'static> MainService<C> {
                                 Some(filter),
                             )
                         }
-                        PositionGroup::Malformed => resp::fut(resp::bad_request),
+                        PositionGroup::Malformed => response::fut(response::bad_request),
                     }
                     #[cfg(not(feature = "shared-positions"))]
                     unimplemented!();
@@ -341,7 +339,7 @@ impl<C: 'static> MainService<C> {
                         Ok(r) => r,
                         Err(_) => {
                             error!("Invalid collection number");
-                            return resp::fut(resp::not_found);
+                            return response::fut(response::not_found);
                         }
                     };
 
@@ -362,7 +360,7 @@ impl<C: 'static> MainService<C> {
                         )
                     } else if path.starts_with("/folder/") {
                         let group = params.get_string("group");
-                        get_folder(
+                        api::get_folder(
                             colllection_index,
                             get_subpath(path, "/folder/"),
                             collections,
@@ -382,7 +380,7 @@ impl<C: 'static> MainService<C> {
                                 .and_then(|_| get_config().collapse_cd_folders.as_ref())
                                 .and_then(|c| c.regex.as_ref())
                                 .and_then(|re| Regex::new(re).ok());
-                            subs::download_folder(
+                            files::download_folder(
                                 base_dir,
                                 get_subpath(path, "/download/"),
                                 format,
@@ -392,40 +390,40 @@ impl<C: 'static> MainService<C> {
                         #[cfg(not(feature = "folder-download"))]
                         {
                             error!("folder download not ");
-                            resp::fut(resp::not_found)
+                            response::fut(response::not_found)
                         }
                     } else if path == "/search" {
                         if let Some(search_string) = params.get_string("q") {
                             let group = params.get_string("group");
-                            search(colllection_index, searcher, search_string, ord, group)
+                            api::search(colllection_index, searcher, search_string, ord, group)
                         } else {
                             error!("q parameter is missing in search");
-                            resp::fut(resp::not_found)
+                            response::fut(response::not_found)
                         }
                     } else if path.starts_with("/recent") {
                         let group = params.get_string("group");
-                        recent(colllection_index, searcher, group)
+                        api::recent(colllection_index, searcher, group)
                     } else if path.starts_with("/cover/") {
-                        send_cover(
+                        files::send_cover(
                             base_dir,
                             get_subpath(path, "/cover"),
                             get_config().folder_file_cache_age,
                         )
                     } else if path.starts_with("/icon/") {
-                        send_folder_icon(
+                        files::send_folder_icon(
                             colllection_index,
                             get_subpath(path, "/icon/"),
                             collections,
                         )
                     } else if path.starts_with("/desc/") {
-                        send_description(
+                        files::send_description(
                             base_dir,
                             get_subpath(path, "/desc"),
                             get_config().folder_file_cache_age,
                         )
                     } else {
                         error!("Invalid path requested {}", path);
-                        resp::fut(resp::not_found)
+                        response::fut(response::not_found)
                     }
                 }
             }
@@ -448,30 +446,30 @@ impl<C: 'static> MainService<C> {
                                 Box::pin(async move {
                                     match req.body_bytes().await {
                                         Ok(bytes) => {
-                                            subs::insert_position(collections, group, bytes).await
+                                            api::insert_position(collections, group, bytes).await
                                         }
                                         Err(e) => {
                                             error!("Error reading POST body: {}", e);
-                                            Ok(resp::bad_request())
+                                            Ok(response::bad_request())
                                         }
                                     }
                                 })
                             } else {
                                 error!("Not JSON content type");
-                                resp::fut(resp::bad_request)
+                                response::fut(response::bad_request)
                             }
                         }
-                        _ => resp::fut(resp::bad_request),
+                        _ => response::fut(response::bad_request),
                     }
                 } else {
-                    resp::fut(resp::not_found)
+                    response::fut(response::not_found)
                 }
 
                 #[cfg(not(feature = "shared-positions"))]
-                resp::fut(resp::method_not_supported)
+                response::fut(response::method_not_supported)
             }
 
-            _ => resp::fut(resp::method_not_supported),
+            _ => response::fut(response::method_not_supported),
         }
     }
 
@@ -494,10 +492,10 @@ impl<C: 'static> MainService<C> {
             Some(bytes_ranges) => {
                 if bytes_ranges.is_empty() {
                     error!("Range header without range bytes");
-                    return resp::fut(resp::bad_request);
+                    return response::fut(response::bad_request);
                 } else if bytes_ranges.len() > 1 {
                     error!("Range with multiple ranges is not supported");
-                    return resp::fut(resp::not_implemented);
+                    return response::fut(response::not_implemented);
                 } else {
                     Some(bytes_ranges[0])
                 }
@@ -511,7 +509,7 @@ impl<C: 'static> MainService<C> {
             .and_then(|t| QualityLevel::from_letter(&t))
             .map(|level| ChosenTranscoding::for_level_and_user_agent(level, user_agent));
 
-        send_file(
+        files::send_file(
             base_dir,
             get_subpath(path, "/audio/"),
             bytes_range,
