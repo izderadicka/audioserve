@@ -617,7 +617,7 @@ where
     if has_flag!(args, AUDIOSERVE_CORS) {
         config.cors = match args.remove_one(AUDIOSERVE_CORS_REGEX) {
             Some(o) => Some(CorsConfig {
-                inner: Cors::default(),
+                allow: Cors::default(),
                 regex: Some(o),
             }),
             None => Some(CorsConfig::default()),
@@ -972,7 +972,7 @@ mod test {
         assert_eq!(99, c.chapters.from_duration);
         assert_eq!(99, c.chapters.duration);
         assert!(matches!(
-            c.cors.unwrap().inner,
+            c.cors.unwrap().allow,
             Cors::AllowMatchingOrigins(_)
         ));
         assert_eq!("/user/audioserve", c.url_path_prefix.unwrap())
@@ -1073,6 +1073,6 @@ mod test {
         );
         assert_eq!(Some("asecret".into()), c.shared_secret);
         assert_eq!(Some("/user/audioserve".into()), c.url_path_prefix);
-        assert!(matches!(c.cors.unwrap().inner, Cors::AllowAllOrigins));
+        assert!(matches!(c.cors.unwrap().allow, Cors::AllowAllOrigins));
     }
 }

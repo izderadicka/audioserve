@@ -1,5 +1,4 @@
 use collection::MINIMUM_CHAPTER_DURATION;
-use hyper::{Body, Request};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -498,7 +497,7 @@ pub struct CorsConfig {
     #[serde(default)]
     pub regex: Option<String>,
     #[serde(skip)]
-    inner: Cors,
+    pub allow: Cors,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -625,7 +624,7 @@ impl Config {
 
         if let Some(ref mut cors) = self.cors {
             if let Some(ref re) = cors.regex {
-                cors.inner = re.parse()?;
+                cors.allow = re.parse()?;
             }
         }
 
@@ -721,32 +720,6 @@ impl Config {
             None
         } else {
             Some(self.tags.clone())
-        }
-    }
-
-    pub fn is_cors_enabled(&self, req: &Request<Body>) -> bool {
-        if let Some(cors) = self.cors.as_ref() {
-            match &cors.inner {
-                Cors::AllowAllOrigins => true,
-                Cors::AllowMatchingOrigins(re) => req
-                    .headers()
-                    .get("origin")
-                    .and_then(|v| {
-                        v.to_str()
-                            .map_err(|e| error!("Invalid origin header: {}", e))
-                            .ok()
-                    })
-                    .map(|s| {
-                        if s.to_ascii_lowercase() == "null" {
-                            false
-                        } else {
-                            re.is_match(s)
-                        }
-                    })
-                    .unwrap_or(false),
-            }
-        } else {
-            false
         }
     }
 }

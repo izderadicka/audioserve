@@ -93,7 +93,7 @@ fn deny(req: &RequestWrapper) -> Result<AuthResult<()>> {
 }
 
 fn cookie_params(req: &RequestWrapper) -> &'static str {
-    if req.is_https() && get_config().is_cors_enabled(&req.request) {
+    if req.is_https() && req.is_cors_enabled() {
         "SameSite=None; Secure"
     } else {
         "SameSite=Lax"
