@@ -46,7 +46,8 @@ leaky-cauldron = {path="crates/leaky-cauldron"}
 tokio-util = {version="0.7", optional=true, features=["codec"]}
 cron = {version="0.12", optional=true}
 chrono = {version="0.4", optional=true}
-
+http = "0.2.9"
+flate2 = "1.0.27"
 
 # this repo dependencies
 collection = {path="crates/collection", features=["async"]}
@@ -55,9 +56,6 @@ simple-file-cache = {path="crates/file-cache", features=["asynch"]}
 async-tar = {path="crates/async-tar", optional=true}
 async-zip = {path="crates/async-zip", optional=true}
 websock = {path="crates/websock", optional = true}
-brotli = "3.3.4"
-http = "0.2.9"
-flate2 = "1.0.27"
 
 [target.'cfg(unix)'.dependencies]
 nix = {version="0.27.1", features=["user"]}
