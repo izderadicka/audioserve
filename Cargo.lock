@@ -173,6 +173,7 @@ dependencies = [
  "dirs",
  "env_logger 0.10.0",
  "escargot",
+ "flate2",
  "futures",
  "futures-util",
  "headers",

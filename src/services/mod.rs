@@ -223,11 +223,6 @@ impl<C: 'static> MainService<C> {
                 return response::fut(response::bad_request);
             }
         };
-        debug!(
-            "Can use br compression {} on {}",
-            req.can_br_compress(),
-            req.path()
-        );
         //static files
         if req.method() == Method::GET {
             if req.path() == "/" || req.path() == "/index.html" {
@@ -286,23 +281,30 @@ impl<C: 'static> MainService<C> {
         match *req.method() {
             Method::GET => {
                 if path.starts_with("/collections") {
-                    api::collections_list()
+                    api::collections_list(req.can_compress())
                 } else if path.starts_with("/transcodings") {
                     let user_agent = req.headers().typed_get::<UserAgent>();
-                    api::transcodings_list(user_agent.as_ref().map(|h| h.as_str()))
+                    api::transcodings_list(
+                        user_agent.as_ref().map(|h| h.as_str()),
+                        req.can_compress(),
+                    )
                 } else if cfg!(feature = "shared-positions") && path.starts_with("/positions") {
                     // positions API
                     #[cfg(feature = "shared-positions")]
                     match extract_group(path) {
                         PositionGroup::Group(group) => match position_params(&params) {
-                            Ok(p) => api::all_positions(collections, group, Some(p)),
+                            Ok(p) => {
+                                api::all_positions(collections, group, Some(p), req.can_compress())
+                            }
 
                             Err(e) => {
                                 error!("Invalid timestamp param: {}", e);
                                 response::fut(response::bad_request)
                             }
                         },
-                        PositionGroup::Last(group) => api::last_position(collections, group),
+                        PositionGroup::Last(group) => {
+                            api::last_position(collections, group, req.can_compress())
+                        }
                         PositionGroup::Path {
                             collection,
                             group,
@@ -324,6 +326,7 @@ impl<C: 'static> MainService<C> {
                                 path,
                                 recursive,
                                 Some(filter),
+                                req.can_compress(),
                             )
                         }
                         PositionGroup::Malformed => response::fut(response::bad_request),
@@ -367,7 +370,7 @@ impl<C: 'static> MainService<C> {
                             collections,
                             ord,
                             group,
-                            req.can_br_compress(),
+                            req.can_compress(),
                         )
                     } else if !get_config().disable_folder_download && path.starts_with("/download")
                     {
@@ -397,14 +400,21 @@ impl<C: 'static> MainService<C> {
                     } else if path == "/search" {
                         if let Some(search_string) = params.get_string("q") {
                             let group = params.get_string("group");
-                            api::search(colllection_index, searcher, search_string, ord, group)
+                            api::search(
+                                colllection_index,
+                                searcher,
+                                search_string,
+                                ord,
+                                group,
+                                req.can_compress(),
+                            )
                         } else {
                             error!("q parameter is missing in search");
                             response::fut(response::not_found)
                         }
                     } else if path.starts_with("/recent") {
                         let group = params.get_string("group");
-                        api::recent(colllection_index, searcher, group)
+                        api::recent(colllection_index, searcher, group, req.can_compress())
                     } else if path.starts_with("/cover/") {
                         files::send_cover(
                             base_dir,

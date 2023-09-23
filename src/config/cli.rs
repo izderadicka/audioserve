@@ -72,6 +72,7 @@ const AUDIOSERVE_TIME_TO_FOLDER_END: &str = "time-to-folder-end";
 const AUDIOSERVE_READ_PLAYLIST: &str = "read-playlist";
 const AUDIOSERVE_DONT_WATCH_FOR_CHANGES: &str = "dont-watch-for-changes";
 const AUDIOSERVE_CHANGES_DEBOUNCE_INTERVAL: &str = "changes-debounce-interval";
+const AUDIOSERVE_COMPRESS_RESPONSES: &str = "compress-responses";
 
 macro_rules! long_arg_no_env {
     ($name: ident) => {
@@ -308,6 +309,10 @@ fn create_parser() -> Command {
         .arg(
             long_arg_flag!(AUDIOSERVE_READ_PLAYLIST)
             .help("Read .m3u playlist in the folder, if present, and present it as folder content")
+        )
+        .arg(
+            long_arg_flag!(AUDIOSERVE_COMPRESS_RESPONSES)
+            .help("Compress content of HTTP responses with gzip")
         );
 
     // deprecated
@@ -715,6 +720,11 @@ where
         AUDIOSERVE_TIME_TO_FOLDER_END
     );
     set_config_flag!(args, config.read_playlist, AUDIOSERVE_READ_PLAYLIST);
+    set_config_flag!(
+        args,
+        config.compress_responses,
+        AUDIOSERVE_COMPRESS_RESPONSES
+    );
 
     // prepared for collection changes watch to be features
     {

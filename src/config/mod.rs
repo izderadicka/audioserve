@@ -570,6 +570,7 @@ pub struct Config {
     pub time_to_folder_end: u32,
     pub read_playlist: bool,
     pub collections_options: CollectionConfig,
+    pub compress_responses: bool,
 }
 
 impl Config {
@@ -766,6 +767,7 @@ impl Default for Config {
             time_to_folder_end: 10,
             read_playlist: false,
             collections_options: CollectionConfig::default(),
+            compress_responses: false,
         }
     }
 }

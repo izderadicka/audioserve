@@ -147,9 +147,13 @@ impl RequestWrapper {
             None => path,
         };
         let is_behind_proxy = get_config().behind_proxy;
-        let can_br_compress = match request.headers().typed_get::<AcceptEncoding>() {
-            Some(h) => h.accepts("br"),
-            None => false,
+        let can_compress = if get_config().compress_responses {
+            match request.headers().typed_get::<AcceptEncoding>() {
+                Some(h) => h.accepts("gzip"),
+                None => false,
+            }
+        } else {
+            false
         };
         Ok(RequestWrapper {
             request,
@@ -157,7 +161,7 @@ impl RequestWrapper {
             remote_addr,
             is_ssl,
             is_behind_proxy,
-            can_br_compress,
+            can_br_compress: can_compress,
         })
     }
 
@@ -286,7 +290,7 @@ impl RequestWrapper {
         }
     }
 
-    pub fn can_br_compress(&self) -> bool {
+    pub fn can_compress(&self) -> bool {
         self.can_br_compress
     }
 }
