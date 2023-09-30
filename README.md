@@ -165,7 +165,7 @@ Shared positions also serve for marking finished / listened folders - if last fi
 
 ## Security
 
-Audioserve is not writing anything to your media library, so read only access is enough. However you should assume that any file in published media directories can be accessible via audioserve API (names starting with . (hidden files/directories) are blocked in API) to anybody who can obtain shared secret (or in case you use `--no-authentication` then to anybody).
+Audioserve is not writing anything to your media library, so read only access is enough. However you should assume that any file in published media directories can be accessible via audioserve API (names starting with . (hidden files/directories) are blocked in API) to anybody who can obtain shared secret (or in case you use `--no-authentication` then to everybody).
 
 Read and **write** access is needed to data directory (`~/.audioserve` by default, but can be changed with `--data-dir` argument). This directory contains:
 
