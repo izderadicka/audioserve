@@ -47,7 +47,7 @@ tokio-util = {version="0.7", optional=true, features=["codec"]}
 cron = {version="0.12", optional=true}
 chrono = {version="0.4", optional=true}
 http = "0.2.9"
-flate2 = "1.0.27"
+flate2 = "1.0.28"
 
 # this repo dependencies
 collection = {path="crates/collection", features=["async"]}
