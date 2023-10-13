@@ -70,6 +70,7 @@ enum State<T> {
     Reading {
         src: T,
         buf_in: Vec<u8>,
+        offset_in: usize,
     },
     Dumping,
     Crc {
@@ -158,8 +159,10 @@ impl<T: AsyncRead + Unpin> Stream for CompressStream<T> {
                 State::Reading {
                     mut src,
                     mut buf_in,
+                    mut offset_in,
                 } => {
                     let mut buf = ReadBuf::new(&mut buf_in[..]);
+                    buf.set_filled(offset_in);
                     match {
                         let pinned_stream = Pin::new(&mut src);
                         pinned_stream.poll_read(ctx, &mut buf)
@@ -174,11 +177,19 @@ impl<T: AsyncRead + Unpin> Stream for CompressStream<T> {
                                 match myself.compress(buf.filled()) {
                                     Ok((used, _produced)) => {
                                         if used < buf.filled().len() {
-                                            //TODO
-                                            todo!("we need to return unused bytes to begining of input buffer")
+                                            let sz = buf.filled().len();
+                                            offset_in = sz - used;
+                                            let buf_orig = buf.filled_mut();
+                                            buf_orig.copy_within(used..sz, 0);
+                                        } else {
+                                            offset_in = 0;
                                         }
 
-                                        myself.state = State::Reading { src, buf_in };
+                                        myself.state = State::Reading {
+                                            src,
+                                            buf_in,
+                                            offset_in,
+                                        };
                                         if myself.offset_out >= myself.buf_out.len()
                                             || (used == 0 && myself.offset_out > 0)
                                         {
@@ -201,7 +212,11 @@ impl<T: AsyncRead + Unpin> Stream for CompressStream<T> {
                             return Poll::Ready(Some(Err(e)));
                         }
                         Poll::Pending => {
-                            myself.state = State::Reading { src, buf_in };
+                            myself.state = State::Reading {
+                                src,
+                                buf_in,
+                                offset_in,
+                            };
                             return Poll::Pending;
                         }
                     }
@@ -274,6 +289,7 @@ impl<T: AsyncRead> CompressStream<T> {
         let state = State::Reading {
             src,
             buf_in: vec![0u8; chunk_size],
+            offset_in: 0,
         };
 
         CompressStream {
@@ -310,6 +326,21 @@ mod tests {
         let rng = SystemRandom::new();
         let mut data = vec![0u8; 10_000_000];
         rng.fill(&mut data).unwrap();
+        let mut chunk_stream = CompressStream::new_with_chunk_size(&data[..], 16 * 1024);
+        let mut compressed: Vec<u8> = Vec::with_capacity(data.len());
+        while let Some(Ok(chunk)) = chunk_stream.next().await {
+            compressed.extend(&chunk);
+        }
+        let buf: Vec<u8> = Vec::with_capacity(data.len());
+        let uncompressed = {
+            let mut decoder = GzDecoder::new(buf);
+            decoder.write_all(&compressed)?;
+            decoder.finish()?
+        };
+
+        assert_eq!(data.len(), uncompressed.len(), "Size differs");
+        assert_eq!(data, uncompressed, "Content differs");
+
         Ok(())
     }
 
