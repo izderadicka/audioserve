@@ -15,12 +15,7 @@ use hyper::Body;
 use tokio::io::{AsyncRead, ReadBuf};
 
 pub fn compressed_response(response_builder: Builder, data: Vec<u8>) -> Response<Body> {
-    let output = {
-        let mut writer =
-            GzEncoder::new(Vec::with_capacity(data.len() / 10), Compression::default());
-        writer.write_all(&data).unwrap();
-        writer.finish().unwrap()
-    };
+    let output = compress_buf(&data);
     let size = output.len() as u64;
 
     response_builder
@@ -28,6 +23,12 @@ pub fn compressed_response(response_builder: Builder, data: Vec<u8>) -> Response
         .typed_header(ContentEncoding::gzip())
         .body(output.into())
         .unwrap()
+}
+
+pub fn compress_buf(data: &[u8]) -> Vec<u8> {
+    let mut writer = GzEncoder::new(Vec::with_capacity(data.len() / 10), Compression::default());
+    writer.write_all(&data).unwrap();
+    writer.finish().unwrap()
 }
 
 #[inline]

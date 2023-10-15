@@ -230,12 +230,14 @@ impl<C: 'static> MainService<C> {
                     &get_config().client_dir,
                     "index.html",
                     get_config().static_resource_cache_age,
+                    req.can_compress(),
                 );
             } else if is_static_file(req.path()) {
                 return files::send_file_simple(
                     &get_config().client_dir,
                     &req.path()[1..],
                     get_config().static_resource_cache_age,
+                    req.can_compress(),
                 );
             }
         }
@@ -432,6 +434,7 @@ impl<C: 'static> MainService<C> {
                             base_dir,
                             get_subpath(path, "/desc"),
                             get_config().folder_file_cache_age,
+                            req.can_compress(),
                         )
                     } else {
                         error!("Invalid path requested {}", path);
