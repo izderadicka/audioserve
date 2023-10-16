@@ -1,6 +1,6 @@
 //#[cfg(feature = "folder-download")]
 use super::{
-    compress::{compress_buf, CompressStream},
+    compress::{compress_buf, make_sense_to_compress, CompressStream},
     icon::icon_response,
     response::{
         self, add_cache_headers, fut, not_found, not_found_cached, ChunkStream, ResponseFuture,
@@ -215,12 +215,22 @@ async fn serve_compressed_file(
 ) -> Result<Response, io::Error> {
     let meta = file.metadata().await?;
     let last_modified = meta.modified().ok();
+    let file_size = meta.len();
+
     let mut resp = HyperResponse::builder().typed_header(ContentType::from(mime));
-    resp = resp.typed_header(ContentEncoding::gzip());
     resp = add_cache_headers(resp, caching, last_modified);
     resp = resp.status(StatusCode::OK);
-    let stream = CompressStream::new(file);
-    let resp = resp.body(Body::wrap_stream(stream)).unwrap();
+
+    let body = if make_sense_to_compress(file_size) {
+        resp = resp.typed_header(ContentEncoding::gzip());
+        let stream = CompressStream::new(file);
+        Body::wrap_stream(stream)
+    } else {
+        resp = resp.typed_header(ContentLength(file_size));
+        let stream = ChunkStream::new(file);
+        Body::wrap_stream(stream)
+    };
+    let resp = resp.body(body).unwrap();
 
     Ok(resp)
 }
@@ -353,7 +363,8 @@ async fn send_buffer(
     compressed: bool,
 ) -> Result<Response, Error> {
     let mut resp = HyperResponse::builder().typed_header(ContentType::from(mime));
-    if compressed {
+    debug!("BUF LEN {}", buf.len());
+    if compressed && make_sense_to_compress(buf.len()) {
         buf = compress_buf(&buf);
         resp = resp.typed_header(ContentEncoding::gzip());
     }
@@ -371,7 +382,7 @@ pub fn send_description(
     cache: Option<u32>,
     can_compress: bool,
 ) -> ResponseFuture {
-    send_data(
+    send_folder_metadata(
         base_path,
         file_path,
         "text/plain",
@@ -386,7 +397,7 @@ pub fn send_cover(
     file_path: impl AsRef<Path>,
     cache: Option<u32>,
 ) -> ResponseFuture {
-    send_data(
+    send_folder_metadata(
         base_path,
         file_path,
         "image/jpeg",
@@ -396,7 +407,7 @@ pub fn send_cover(
     )
 }
 
-pub fn send_data(
+pub fn send_folder_metadata(
     base_path: &'static Path,
     file_path: impl AsRef<Path>,
     mime: impl AsRef<str> + Send + 'static,
@@ -416,16 +427,13 @@ pub fn send_data(
         .map_err(Error::from)
         .and_then(move |(data, last_modified)| match data {
             None => fut(not_found),
-            Some(data) => {
-                if compressed {}
-                Box::pin(send_buffer(
-                    data,
-                    mime.as_ref().parse().unwrap(),
-                    cache,
-                    last_modified,
-                    compressed,
-                ))
-            }
+            Some(data) => Box::pin(send_buffer(
+                data,
+                mime.as_ref().parse().unwrap(),
+                cache,
+                last_modified,
+                compressed,
+            )),
         });
 
         Box::pin(fut)

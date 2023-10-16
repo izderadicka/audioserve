@@ -14,6 +14,16 @@ use http::{response::Builder, Response};
 use hyper::Body;
 use tokio::io::{AsyncRead, ReadBuf};
 
+const COMPRESSION_LIMIT: u64 = 512;
+
+#[inline]
+pub fn make_sense_to_compress<T: TryInto<u64>>(size: T) -> bool {
+    match size.try_into() {
+        Ok(size) => size >= COMPRESSION_LIMIT,
+        Err(_) => false,
+    }
+}
+
 pub fn compressed_response(response_builder: Builder, data: Vec<u8>) -> Response<Body> {
     let output = compress_buf(&data);
     let size = output.len() as u64;
@@ -27,7 +37,7 @@ pub fn compressed_response(response_builder: Builder, data: Vec<u8>) -> Response
 
 pub fn compress_buf(data: &[u8]) -> Vec<u8> {
     let mut writer = GzEncoder::new(Vec::with_capacity(data.len() / 10), Compression::default());
-    writer.write_all(&data).unwrap();
+    writer.write_all(&data).expect("Compression error");
     writer.finish().unwrap()
 }
 
