@@ -226,18 +226,16 @@ impl<C: 'static> MainService<C> {
         //static files
         if req.method() == Method::GET {
             if req.path() == "/" || req.path() == "/index.html" {
-                return files::send_file_simple(
+                return files::send_static_file(
                     &get_config().client_dir,
                     "index.html",
                     get_config().static_resource_cache_age,
-                    req.can_compress(),
                 );
             } else if is_static_file(req.path()) {
-                return files::send_file_simple(
+                return files::send_static_file(
                     &get_config().client_dir,
                     &req.path()[1..],
                     get_config().static_resource_cache_age,
-                    req.can_compress(),
                 );
             }
         }
