@@ -28,6 +28,7 @@ RUN apk add git &&\
     npm install &&\
     npm run build &&\
     npm run build-sw &&\
+    ./compress_dist.sh &&\
     mv public dist
 
 FROM alpine:3.18

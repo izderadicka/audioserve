@@ -10,7 +10,7 @@ use tokio::task::spawn_blocking as blocking;
 use crate::Error;
 use crate::{config::get_config, util::ResponseBuilderExt};
 
-use super::compress::compressed_response;
+use super::compress::{compressed_response, make_sense_to_compress};
 use super::search::{Search, SearchTrait};
 use super::types::Transcodings;
 use super::{response, response::ResponseFuture, types::CollectionsInfo};
@@ -21,7 +21,7 @@ fn json_response<T: serde::Serialize>(data: &T, compress: bool) -> Response {
     let json = serde_json::to_string(data).expect("Serialization error");
 
     let builder = HyperResponse::builder().typed_header(ContentType::json());
-    if compress && json.len() > 512 {
+    if compress && make_sense_to_compress(json.len()) {
         compressed_response(builder, json.into_bytes())
     } else {
         builder

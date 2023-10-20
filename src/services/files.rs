@@ -1,9 +1,8 @@
 //#[cfg(feature = "folder-download")]
 use super::{
+    compress::{compress_buf, make_sense_to_compress, CompressStream},
     icon::icon_response,
-    response::{
-        self, add_cache_headers, fut, not_found, not_found_cached, ChunkStream, ResponseFuture,
-    },
+    response::{self, add_cache_headers, not_found, not_found_cached, ChunkStream, ResponseFuture},
     transcode::{guess_format, AudioFilePath, ChosenTranscoding, QualityLevel, Transcoder},
     types::*,
     Counter,
@@ -18,17 +17,18 @@ use collection::{
     TimeSpan,
 };
 use futures::prelude::*;
-use headers::{AcceptRanges, ContentLength, ContentRange, ContentType};
+use headers::{AcceptRanges, ContentEncoding, ContentLength, ContentRange, ContentType};
+use http::header::CONTENT_ENCODING;
 use hyper::{Body, Response as HyperResponse, StatusCode};
 use std::{
     collections::Bound,
-    ffi::OsStr,
+    ffi::{OsStr, OsString},
     io::{self, SeekFrom},
     path::{Path, PathBuf},
     sync::{atomic::Ordering, Arc},
     time::SystemTime,
 };
-use tokio::{io::AsyncSeekExt, task::spawn_blocking as blocking};
+use tokio::{fs, io::AsyncSeekExt, task::spawn_blocking as blocking};
 
 pub type ByteRange = (Bound<u64>, Bound<u64>);
 type Response = HyperResponse<Body>;
@@ -207,6 +207,33 @@ async fn serve_file_transcoded(
         })
 }
 
+async fn serve_compressed_file(
+    file: tokio::fs::File,
+    caching: Option<u32>,
+    mime: mime::Mime,
+) -> Result<Response, io::Error> {
+    let meta = file.metadata().await?;
+    let last_modified = meta.modified().ok();
+    let file_size = meta.len();
+
+    let mut resp = HyperResponse::builder().typed_header(ContentType::from(mime));
+    resp = add_cache_headers(resp, caching, last_modified);
+    resp = resp.status(StatusCode::OK);
+
+    let body = if make_sense_to_compress(file_size) {
+        resp = resp.typed_header(ContentEncoding::gzip());
+        let stream = CompressStream::new(file);
+        Body::wrap_stream(stream)
+    } else {
+        resp = resp.typed_header(ContentLength(file_size));
+        let stream = ChunkStream::new(file);
+        Body::wrap_stream(stream)
+    };
+    let resp = resp.body(body).unwrap();
+
+    Ok(resp)
+}
+
 async fn serve_opened_file(
     mut file: tokio::fs::File,
     range: Option<ByteRange>,
@@ -256,15 +283,19 @@ fn serve_file_from_fs(
     full_path: &Path,
     range: Option<ByteRange>,
     caching: Option<u32>,
+    compressed: bool,
 ) -> ResponseFuture {
     let filename: PathBuf = full_path.into();
     let fut = async move {
-        match tokio::fs::File::open(&filename).await {
+        match fs::File::open(&filename).await {
             Ok(file) => {
                 let mime = guess_mime_type(&filename);
-                serve_opened_file(file, range, caching, mime)
-                    .await
-                    .map_err(Error::new)
+                if compressed {
+                    serve_compressed_file(file, caching, mime).await
+                } else {
+                    serve_opened_file(file, range, caching, mime).await
+                }
+                .map_err(Error::new)
             }
             Err(e) => {
                 error!("Error when sending file {:?} : {}", filename, e);
@@ -275,13 +306,40 @@ fn serve_file_from_fs(
     Box::pin(fut)
 }
 
-pub fn send_file_simple<P: AsRef<Path>>(
+pub async fn send_file_simple<P: AsRef<Path>>(
+    base_path: &'static Path,
+    file_path: P,
+    cache: Option<u32>,
+    compressed: bool,
+) -> Result<Response, Error> {
+    let full_path = base_path.join(&file_path);
+    serve_file_from_fs(&full_path, None, cache, compressed).await
+}
+
+pub fn send_static_file<P: AsRef<Path> + Send>(
     base_path: &'static Path,
     file_path: P,
     cache: Option<u32>,
 ) -> ResponseFuture {
     let full_path = base_path.join(&file_path);
-    serve_file_from_fs(&full_path, None, cache)
+    fn append_ext(ext: impl AsRef<OsStr>, path: &PathBuf) -> PathBuf {
+        let mut os_string: OsString = path.into();
+        os_string.push(ext.as_ref());
+        os_string.into()
+    }
+    Box::pin(async move {
+        let compressed_name = append_ext(".gz", &full_path);
+        if let Ok(true) = fs::try_exists(&compressed_name).await {
+            let mime = guess_mime_type(&full_path);
+            let file = fs::File::open(compressed_name).await?;
+            let mut resp = serve_opened_file(file, None, cache, mime).await?;
+            resp.headers_mut()
+                .insert(CONTENT_ENCODING, "gzip".parse().unwrap());
+            Ok(resp)
+        } else {
+            serve_file_from_fs(&full_path, None, cache, false).await
+        }
+    })
 }
 
 pub fn send_file<P: AsRef<Path>>(
@@ -318,18 +376,23 @@ pub fn send_file<P: AsRef<Path>>(
         )
     } else {
         debug!("Sending file directly from fs");
-        serve_file_from_fs(&full_path, range, None)
+        serve_file_from_fs(&full_path, range, None, false)
     }
 }
 
 async fn send_buffer(
-    buf: Vec<u8>,
+    mut buf: Vec<u8>,
     mime: mime::Mime,
     cache: Option<u32>,
     last_modified: Option<SystemTime>,
+    compressed: bool,
 ) -> Result<Response, Error> {
-    let mut resp = HyperResponse::builder()
-        .typed_header(ContentType::from(mime))
+    let mut resp = HyperResponse::builder().typed_header(ContentType::from(mime));
+    if compressed && make_sense_to_compress(buf.len()) {
+        buf = compress_buf(&buf);
+        resp = resp.typed_header(ContentEncoding::gzip());
+    }
+    resp = resp
         .typed_header(ContentLength(buf.len() as u64))
         .status(StatusCode::OK);
     resp = add_cache_headers(resp, cache, last_modified);
@@ -339,31 +402,43 @@ async fn send_buffer(
 
 pub fn send_description(
     base_path: &'static Path,
-    file_path: impl AsRef<Path>,
+    file_path: impl AsRef<Path> + Send + 'static,
     cache: Option<u32>,
+    can_compress: bool,
 ) -> ResponseFuture {
-    send_data(base_path, file_path, "text/plain", cache, |p| {
-        extract_description(p).map(|s| s.into())
-    })
+    Box::pin(send_folder_metadata(
+        base_path,
+        file_path,
+        "text/plain",
+        cache,
+        |p| extract_description(p).map(|s| s.into()),
+        can_compress,
+    ))
 }
 
 pub fn send_cover(
     base_path: &'static Path,
-    file_path: impl AsRef<Path>,
+    file_path: impl AsRef<Path> + Send + 'static,
     cache: Option<u32>,
 ) -> ResponseFuture {
-    send_data(base_path, file_path, "image/jpeg", cache, |p| {
-        extract_cover(p)
-    })
+    Box::pin(send_folder_metadata(
+        base_path,
+        file_path,
+        "image/jpeg",
+        cache,
+        |p| extract_cover(p),
+        false,
+    ))
 }
 
-pub fn send_data(
+pub async fn send_folder_metadata(
     base_path: &'static Path,
     file_path: impl AsRef<Path>,
     mime: impl AsRef<str> + Send + 'static,
     cache: Option<u32>,
     extractor: impl FnOnce(PathBuf) -> Option<Vec<u8>> + Send + 'static,
-) -> ResponseFuture {
+    compressed: bool,
+) -> Result<Response> {
     if is_audio(&file_path) {
         // extract description from audio file
         let full_path = base_path.join(file_path);
@@ -374,19 +449,25 @@ pub fn send_data(
             (extractor(full_path), m)
         })
         .map_err(Error::from)
-        .and_then(move |(data, last_modified)| match data {
-            None => fut(not_found),
-            Some(data) => Box::pin(send_buffer(
-                data,
-                mime.as_ref().parse().unwrap(),
-                cache,
-                last_modified,
-            )),
+        .and_then(move |(data, last_modified)| async move {
+            match data {
+                None => Ok(not_found()),
+                Some(data) => {
+                    send_buffer(
+                        data,
+                        mime.as_ref().parse().unwrap(),
+                        cache,
+                        last_modified,
+                        compressed,
+                    )
+                    .await
+                }
+            }
         });
 
-        Box::pin(fut)
+        fut.await
     } else {
-        send_file_simple(base_path, file_path, cache)
+        send_file_simple(base_path, file_path, cache, compressed).await
     }
 }
 
@@ -439,7 +520,7 @@ pub fn download_folder(
             }
         };
         if meta.is_file() {
-            serve_file_from_fs(&full_path, None, None).await
+            serve_file_from_fs(&full_path, None, None, false).await
         } else {
             let mut download_name = folder_path
                 .file_name()

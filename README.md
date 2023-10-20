@@ -37,6 +37,7 @@ Like audioserve and want to start quickly and easily and securely? Try [this sim
     - [Security Best Practices](#security-best-practices)
   - [Performance](#performance)
     - [Transcoding Cache](#transcoding-cache)
+    - [Responses compression](#responses-compression)
     - [HTTP/2 support](#http2-support)
   - [Transcoding](#transcoding)
     - [Alternative transcodings and transcoding configuration for Apple users](#alternative-transcodings-and-transcoding-configuration-for-apple-users)
@@ -250,6 +251,11 @@ If transcoding is used it is another significant limiting factor - as it's quite
 ### Transcoding Cache
 
 Optionally you can enable transcoding cache (by compiling audioserve with `transcoding-cache` feature). Contribution of this cache to overall performance depends very much on usage scenarios. If there is only one user, which basically listens to audiobooks in linear order (chapter after chapter, not jumping back and forth), benefit will be minimal. If there are more users, listening to same audiobook (with same transcoding levels) and/or jumping often back and forth between chapters, then benefits of this cache can be significant. You should test to see the difference (when transcoding cache is compiled in it can be still disabled by `--t-cache-disable` option).
+
+### Responses compression
+
+Especially when network connection is slow compression of responses can help a bit. If `--compress-responses` argument is used, then API responses and folder descriptions will be sent compressed with gzip compression (I've tried brotli, but it makes some difference for only bigger files (>64 kB) and this is not common case in audioserve and even there it's advantage is marginal). Compression works only for non-tiny files, anything smaller then 512 bytes is left uncompressed, because it does not make any advantage to compress, on contrary it can be contra-productive.
+Also for static files of web client, if they already pre-compress with gzip (so they have additional extension .gz), they will be served compressed.
 
 ### HTTP/2 support
 
