@@ -20,7 +20,8 @@ const NOT_IMPLEMENTED_MSG: &str = "Not Implemented";
 const INTERNAL_SERVER_ERROR: &str = "Internal server error";
 const UNPROCESSABLE_ENTITY: &str = "Ignored";
 
-pub type ResponseFuture = Pin<Box<dyn Future<Output = Result<Response<Body>, Error>> + Send>>;
+pub type ResponseResult = Result<Response<Body>, Error>;
+pub type ResponseFuture = Pin<Box<dyn Future<Output = ResponseResult> + Send>>;
 
 fn short_response(status: StatusCode, msg: &'static str) -> Response<Body> {
     Response::builder()
