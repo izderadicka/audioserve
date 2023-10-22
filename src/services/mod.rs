@@ -182,7 +182,7 @@ fn is_static_file(path: &str) -> bool {
 }
 
 #[allow(clippy::type_complexity)]
-impl<C: 'static> Service<Request<Body>> for MainService<C> {
+impl<C: Send + 'static> Service<Request<Body>> for MainService<C> {
     type Response = Response<Body>;
     type Error = error::Error;
     type Future = ResponseFuture;
@@ -236,7 +236,7 @@ impl<C: 'static> Service<Request<Body>> for MainService<C> {
     }
 }
 
-impl<C: 'static> MainService<C> {
+impl<C: Send + 'static> MainService<C> {
     async fn process_request(
         subservices: ServiceComponents,
         authenticator: OptionalAuthenticatorType<C>,
@@ -266,25 +266,25 @@ impl<C: 'static> MainService<C> {
 
         let resp = match authenticator {
             Some(ref auth) => {
-                Box::pin(auth.authenticate(req).and_then(move |result| match result {
-                    AuthResult::Authenticated { request, .. } => {
-                        MainService::<C>::process_authenticated(request, subservices)
+                let auth_result = auth.authenticate(req).await;
+
+                match auth_result {
+                    Ok(AuthResult::Authenticated { request, .. }) => {
+                        MainService::<C>::process_authenticated(request, subservices).await
                     }
-                    AuthResult::LoggedIn(resp) | AuthResult::Rejected(resp) => {
-                        Box::pin(future::ok(resp))
-                    }
-                }))
+                    Ok(AuthResult::LoggedIn(resp)) | Ok(AuthResult::Rejected(resp)) => Ok(resp),
+                    Err(e) => Err(e),
+                }
             }
-            None => MainService::<C>::process_authenticated(req, subservices),
+            None => MainService::<C>::process_authenticated(req, subservices).await,
         };
-        resp.map_ok(move |r| add_cors_headers(r, origin, cors))
-            .await
+        resp.map(move |r| add_cors_headers(r, origin, cors))
     }
 
-    fn process_authenticated(
+    async fn process_authenticated(
         mut req: RequestWrapper,
         subservices: ServiceComponents,
-    ) -> ResponseFuture {
+    ) -> ResponseResult {
         let params = req.params();
         let path = req.path();
         let ServiceComponents {
@@ -295,13 +295,14 @@ impl<C: 'static> MainService<C> {
         match *req.method() {
             Method::GET => {
                 if path.starts_with("/collections") {
-                    api::collections_list(req.can_compress())
+                    api::collections_list(req.can_compress()).await
                 } else if path.starts_with("/transcodings") {
                     let user_agent = req.headers().typed_get::<UserAgent>();
                     api::transcodings_list(
                         user_agent.as_ref().map(|h| h.as_str()),
                         req.can_compress(),
                     )
+                    .await
                 } else if cfg!(feature = "shared-positions") && path.starts_with("/positions") {
                     // positions API
                     #[cfg(feature = "shared-positions")]
@@ -309,15 +310,16 @@ impl<C: 'static> MainService<C> {
                         PositionGroup::Group(group) => match position_params(&params) {
                             Ok(p) => {
                                 api::all_positions(collections, group, Some(p), req.can_compress())
+                                    .await
                             }
 
                             Err(e) => {
                                 error!("Invalid timestamp param: {}", e);
-                                response::fut(response::bad_request)
+                                response::fut(response::bad_request).await
                             }
                         },
                         PositionGroup::Last(group) => {
-                            api::last_position(collections, group, req.can_compress())
+                            api::last_position(collections, group, req.can_compress()).await
                         }
                         PositionGroup::Path {
                             collection,
@@ -330,7 +332,7 @@ impl<C: 'static> MainService<C> {
 
                                 Err(e) => {
                                     error!("Invalid timestamp param: {}", e);
-                                    return response::fut(response::bad_request);
+                                    return Ok(response::bad_request());
                                 }
                             };
                             api::folder_position(
@@ -342,8 +344,9 @@ impl<C: 'static> MainService<C> {
                                 Some(filter),
                                 req.can_compress(),
                             )
+                            .await
                         }
-                        PositionGroup::Malformed => response::fut(response::bad_request),
+                        PositionGroup::Malformed => Ok(response::bad_request()),
                     }
                     #[cfg(not(feature = "shared-positions"))]
                     unimplemented!();
@@ -351,13 +354,13 @@ impl<C: 'static> MainService<C> {
                     #[cfg(not(feature = "shared-positions"))]
                     unimplemented!();
                     #[cfg(feature = "shared-positions")]
-                    self::position::position_service(req, collections)
+                    self::position::position_service(req, collections).await
                 } else {
                     let (path, colllection_index) = match extract_collection_number(path) {
                         Ok(r) => r,
                         Err(_) => {
                             error!("Invalid collection number");
-                            return response::fut(response::not_found);
+                            return Ok(response::not_found());
                         }
                     };
 
@@ -376,6 +379,7 @@ impl<C: 'static> MainService<C> {
                             params,
                             user_agent.as_ref().map(|ua| ua.as_str()),
                         )
+                        .await
                     } else if path.starts_with("/folder/") {
                         let group = params.get_string("group");
                         api::get_folder(
@@ -386,6 +390,7 @@ impl<C: 'static> MainService<C> {
                             group,
                             req.can_compress(),
                         )
+                        .await
                     } else if !get_config().disable_folder_download && path.starts_with("/download")
                     {
                         #[cfg(feature = "folder-download")]
@@ -405,6 +410,7 @@ impl<C: 'static> MainService<C> {
                                 format,
                                 recursive,
                             )
+                            .await
                         }
                         #[cfg(not(feature = "folder-download"))]
                         {
@@ -422,25 +428,28 @@ impl<C: 'static> MainService<C> {
                                 group,
                                 req.can_compress(),
                             )
+                            .await
                         } else {
                             error!("q parameter is missing in search");
-                            response::fut(response::not_found)
+                            Ok(response::bad_request())
                         }
                     } else if path.starts_with("/recent") {
                         let group = params.get_string("group");
-                        api::recent(colllection_index, search, group, req.can_compress())
+                        api::recent(colllection_index, search, group, req.can_compress()).await
                     } else if path.starts_with("/cover/") {
                         files::send_cover(
                             base_dir,
                             get_subpath(path, "/cover"),
                             get_config().folder_file_cache_age,
                         )
+                        .await
                     } else if path.starts_with("/icon/") {
                         files::send_folder_icon(
                             colllection_index,
                             get_subpath(path, "/icon/"),
                             collections,
                         )
+                        .await
                     } else if path.starts_with("/desc/") {
                         files::send_description(
                             base_dir,
@@ -448,9 +457,10 @@ impl<C: 'static> MainService<C> {
                             get_config().folder_file_cache_age,
                             req.can_compress(),
                         )
+                        .await
                     } else {
                         error!("Invalid path requested {}", path);
-                        response::fut(response::not_found)
+                        Ok(response::not_found())
                     }
                 }
             }
@@ -470,33 +480,31 @@ impl<C: 'static> MainService<C> {
                                 })
                                 .unwrap_or(false);
                             if is_json {
-                                Box::pin(async move {
-                                    match req.body_bytes().await {
-                                        Ok(bytes) => {
-                                            api::insert_position(collections, group, bytes).await
-                                        }
-                                        Err(e) => {
-                                            error!("Error reading POST body: {}", e);
-                                            Ok(response::bad_request())
-                                        }
+                                match req.body_bytes().await {
+                                    Ok(bytes) => {
+                                        api::insert_position(collections, group, bytes).await
                                     }
-                                })
+                                    Err(e) => {
+                                        error!("Error reading POST body: {}", e);
+                                        Ok(response::bad_request())
+                                    }
+                                }
                             } else {
                                 error!("Not JSON content type");
-                                response::fut(response::bad_request)
+                                Ok(response::bad_request())
                             }
                         }
-                        _ => response::fut(response::bad_request),
+                        _ => Ok(response::bad_request()),
                     }
                 } else {
-                    response::fut(response::not_found)
+                    Ok(response::not_found())
                 }
 
                 #[cfg(not(feature = "shared-positions"))]
                 response::fut(response::method_not_supported)
             }
 
-            _ => response::fut(response::method_not_supported),
+            _ => Ok(response::method_not_supported()),
         }
     }
 
