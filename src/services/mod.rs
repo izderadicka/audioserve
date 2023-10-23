@@ -370,16 +370,7 @@ impl<C: Send + 'static> MainService<C> {
                         .map(|l| FoldersOrdering::from_letter(l))
                         .unwrap_or(FoldersOrdering::Alphabetical);
                     if path.starts_with("/audio/") {
-                        let user_agent = req.headers().typed_get::<UserAgent>();
-                        MainService::<C>::serve_audio(
-                            &req,
-                            base_dir,
-                            path,
-                            transcoding,
-                            params,
-                            user_agent.as_ref().map(|ua| ua.as_str()),
-                        )
-                        .await
+                        MainService::<C>::serve_audio(&req, base_dir, path, transcoding).await
                     } else if path.starts_with("/folder/") {
                         let group = params.get_string("group");
                         api::get_folder(
@@ -508,14 +499,15 @@ impl<C: Send + 'static> MainService<C> {
         }
     }
 
-    fn serve_audio(
+    async fn serve_audio(
         req: &RequestWrapper,
         base_dir: &'static Path,
         path: &str,
         transcoding: TranscodingDetails,
-        params: QueryParams,
-        user_agent: Option<&str>,
-    ) -> ResponseFuture {
+    ) -> ResponseResult {
+        let params = req.params();
+        let user_agent = req.headers().typed_get::<UserAgent>();
+        let user_agent = user_agent.as_ref().map(|ua| ua.as_str());
         debug!(
             "Received request with following headers {:?}",
             req.headers()
@@ -527,10 +519,10 @@ impl<C: Send + 'static> MainService<C> {
             Some(bytes_ranges) => {
                 if bytes_ranges.is_empty() {
                     error!("Range header without range bytes");
-                    return response::fut(response::bad_request);
+                    return Ok(response::bad_request());
                 } else if bytes_ranges.len() > 1 {
                     error!("Range with multiple ranges is not supported");
-                    return response::fut(response::not_implemented);
+                    return Ok(response::not_implemented());
                 } else {
                     Some(bytes_ranges[0])
                 }
@@ -552,6 +544,7 @@ impl<C: Send + 'static> MainService<C> {
             transcoding,
             transcoding_quality,
         )
+        .await
     }
 }
 
