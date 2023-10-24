@@ -496,7 +496,6 @@ impl Collections {
 
     pub async fn insert_position_if_newer_async<S>(
         self: Arc<Self>,
-        collection: usize,
         group: S,
         position: Position,
     ) -> Result<()>
@@ -509,6 +508,7 @@ impl Collections {
             folder_finished,
             file,
             folder,
+            collection,
             ..
         } = position;
         let path = if !folder.is_empty() {

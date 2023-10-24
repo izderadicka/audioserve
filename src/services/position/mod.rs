@@ -144,15 +144,16 @@ async fn process_message(m: Message, ctx: &mut Ctx) -> MessageResult {
                 Some(file_loc) => {
                     ctx.loc = file_loc.clone();
                     if let Some(ts) = timestamp {
-                        col.insert_position_if_newer_async(
-                            file_loc.collection,
-                            file_loc.group,
-                            file_loc.path,
+                        let position = Position {
+                            timestamp: (ts * 1000).into(), // timestamp in WS message is in seconds!
+                            collection: file_loc.collection,
+                            folder: String::new(),
+                            file: file_loc.path,
+                            folder_finished: false,
                             position,
-                            false,
-                            (ts * 1000).into(), // timestamp in WS message is in seconds!
-                        )
-                        .await
+                        };
+                        col.insert_position_if_newer_async(file_loc.group, position)
+                            .await
                     } else {
                         col.insert_position_async(
                             file_loc.collection,

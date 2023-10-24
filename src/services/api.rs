@@ -77,18 +77,13 @@ pub async fn insert_position(
     bytes: bytes::Bytes,
 ) -> ResponseResult {
     match serde_json::from_slice::<collection::Position>(&bytes) {
-        Ok(pos) => {
-            match collections
-                .insert_position_if_newer_async(pos.collection, group, pos)
-                .await
-            {
-                Ok(_) => Ok(response::created()),
-                Err(e) => match e {
-                    collection::error::Error::IgnoredPosition => Ok(response::ignored()),
-                    _ => Err(Error::new(e)),
-                },
-            }
-        }
+        Ok(pos) => match collections.insert_position_if_newer_async(group, pos).await {
+            Ok(_) => Ok(response::created()),
+            Err(e) => match e {
+                collection::error::Error::IgnoredPosition => Ok(response::ignored()),
+                _ => Err(Error::new(e)),
+            },
+        },
         Err(e) => {
             error!("Error in position JSON: {}", e);
             Ok(response::bad_request())
