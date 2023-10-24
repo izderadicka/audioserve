@@ -2,7 +2,7 @@
 use super::{
     compress::{compress_buf, make_sense_to_compress, CompressStream},
     icon::icon_response,
-    response::{self, add_cache_headers, not_found, not_found_cached, ChunkStream, ResponseFuture},
+    response::{self, add_cache_headers, not_found, not_found_cached, ChunkStream, ResponseResult},
     transcode::{guess_format, AudioFilePath, ChosenTranscoding, QualityLevel, Transcoder},
     types::*,
     Counter,
@@ -34,14 +34,14 @@ pub type ByteRange = (Bound<u64>, Bound<u64>);
 type Response = HyperResponse<Body>;
 
 #[cfg(not(feature = "transcoding-cache"))]
-fn serve_file_cached_or_transcoded(
+async fn serve_file_cached_or_transcoded(
     full_path: PathBuf,
     seek: Option<f32>,
     span: Option<TimeSpan>,
     _range: Option<ByteRange>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: ChosenTranscoding,
-) -> ResponseFuture {
+) -> ResponseResult {
     serve_file_transcoded_checked(
         AudioFilePath::Original(full_path),
         seek,
@@ -49,6 +49,7 @@ fn serve_file_cached_or_transcoded(
         transcoding,
         transcoding_quality,
     )
+    .await
 }
 
 #[cfg(feature = "transcoding-cache")]
@@ -59,7 +60,7 @@ async fn serve_file_cached_or_transcoded(
     range: Option<ByteRange>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: ChosenTranscoding,
-) -> Result<Response> {
+) -> ResponseResult {
     if get_config().transcoding.cache.disabled {
         return serve_file_transcoded_checked(
             AudioFilePath::Original(full_path),
@@ -118,13 +119,13 @@ async fn serve_file_cached_or_transcoded(
     }
 }
 
-fn serve_file_transcoded_checked(
+async fn serve_file_transcoded_checked(
     full_path: AudioFilePath<PathBuf>,
     seek: Option<f32>,
     span: Option<TimeSpan>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: ChosenTranscoding,
-) -> ResponseFuture {
+) -> ResponseResult {
     let counter = transcoding.transcodings;
     let mut running_transcodings = counter.load(Ordering::SeqCst);
     loop {
@@ -133,7 +134,7 @@ fn serve_file_transcoded_checked(
                 "Max transcodings reached {}/{}",
                 running_transcodings, transcoding.max_transcodings
             );
-            return response::fut(response::too_many_requests);
+            return Ok(response::too_many_requests());
         }
 
         match counter.compare_exchange(
@@ -156,13 +157,7 @@ fn serve_file_transcoded_checked(
         transcoding.max_transcodings - running_transcodings,
         transcoding.max_transcodings
     );
-    Box::pin(serve_file_transcoded(
-        full_path,
-        seek,
-        span,
-        transcoding_quality,
-        counter,
-    ))
+    serve_file_transcoded(full_path, seek, span, transcoding_quality, counter).await
 }
 
 async fn serve_file_transcoded(
@@ -171,7 +166,7 @@ async fn serve_file_transcoded(
     span: Option<TimeSpan>,
     transcoding_quality: ChosenTranscoding,
     counter: Counter,
-) -> Result<Response> {
+) -> ResponseResult {
     let mime = if let QualityLevel::Passthrough = transcoding_quality.level {
         guess_format(full_path.as_ref()).mime
     } else {
@@ -279,31 +274,28 @@ async fn serve_opened_file(
     Ok(resp)
 }
 
-fn serve_file_from_fs(
+async fn serve_file_from_fs(
     full_path: &Path,
     range: Option<ByteRange>,
     caching: Option<u32>,
     compressed: bool,
-) -> ResponseFuture {
+) -> ResponseResult {
     let filename: PathBuf = full_path.into();
-    let fut = async move {
-        match fs::File::open(&filename).await {
-            Ok(file) => {
-                let mime = guess_mime_type(&filename);
-                if compressed {
-                    serve_compressed_file(file, caching, mime).await
-                } else {
-                    serve_opened_file(file, range, caching, mime).await
-                }
-                .map_err(Error::new)
+    match fs::File::open(&filename).await {
+        Ok(file) => {
+            let mime = guess_mime_type(&filename);
+            if compressed {
+                serve_compressed_file(file, caching, mime).await
+            } else {
+                serve_opened_file(file, range, caching, mime).await
             }
-            Err(e) => {
-                error!("Error when sending file {:?} : {}", filename, e);
-                Ok(response::not_found())
-            }
+            .map_err(Error::new)
         }
-    };
-    Box::pin(fut)
+        Err(e) => {
+            error!("Error when sending file {:?} : {}", filename, e);
+            Ok(response::not_found())
+        }
+    }
 }
 
 pub async fn send_file_simple<P: AsRef<Path>>(
@@ -311,45 +303,44 @@ pub async fn send_file_simple<P: AsRef<Path>>(
     file_path: P,
     cache: Option<u32>,
     compressed: bool,
-) -> Result<Response, Error> {
+) -> ResponseResult {
     let full_path = base_path.join(&file_path);
     serve_file_from_fs(&full_path, None, cache, compressed).await
 }
 
-pub fn send_static_file<P: AsRef<Path> + Send>(
+pub async fn send_static_file<P: AsRef<Path> + Send>(
     base_path: &'static Path,
     file_path: P,
     cache: Option<u32>,
-) -> ResponseFuture {
+) -> ResponseResult {
     let full_path = base_path.join(&file_path);
     fn append_ext(ext: impl AsRef<OsStr>, path: &PathBuf) -> PathBuf {
         let mut os_string: OsString = path.into();
         os_string.push(ext.as_ref());
         os_string.into()
     }
-    Box::pin(async move {
-        let compressed_name = append_ext(".gz", &full_path);
-        if let Ok(true) = fs::try_exists(&compressed_name).await {
-            let mime = guess_mime_type(&full_path);
-            let file = fs::File::open(compressed_name).await?;
-            let mut resp = serve_opened_file(file, None, cache, mime).await?;
-            resp.headers_mut()
-                .insert(CONTENT_ENCODING, "gzip".parse().unwrap());
-            Ok(resp)
-        } else {
-            serve_file_from_fs(&full_path, None, cache, false).await
-        }
-    })
+
+    let compressed_name = append_ext(".gz", &full_path);
+    if let Ok(true) = fs::try_exists(&compressed_name).await {
+        let mime = guess_mime_type(&full_path);
+        let file = fs::File::open(compressed_name).await?;
+        let mut resp = serve_opened_file(file, None, cache, mime).await?;
+        resp.headers_mut()
+            .insert(CONTENT_ENCODING, "gzip".parse().unwrap());
+        Ok(resp)
+    } else {
+        serve_file_from_fs(&full_path, None, cache, false).await
+    }
 }
 
-pub fn send_file<P: AsRef<Path>>(
+pub async fn send_file<P: AsRef<Path>>(
     base_path: &'static Path,
     file_path: P,
     range: Option<ByteRange>,
     seek: Option<f32>,
     transcoding: super::TranscodingDetails,
     transcoding_quality: Option<ChosenTranscoding>,
-) -> ResponseFuture {
+) -> ResponseResult {
     let (real_path, span) = parse_chapter_path(file_path.as_ref());
     let full_path = base_path.join(real_path);
     if let Some(transcoding_quality) = transcoding_quality {
@@ -357,14 +348,15 @@ pub fn send_file<P: AsRef<Path>>(
             "Sending file transcoded in quality {:?}",
             transcoding_quality.level
         );
-        Box::pin(serve_file_cached_or_transcoded(
+        serve_file_cached_or_transcoded(
             full_path,
             seek,
             span,
             range,
             transcoding,
             transcoding_quality,
-        ))
+        )
+        .await
     } else if span.is_some() {
         debug!("Sending part of file remuxed");
         serve_file_transcoded_checked(
@@ -374,9 +366,10 @@ pub fn send_file<P: AsRef<Path>>(
             transcoding,
             ChosenTranscoding::passthough(),
         )
+        .await
     } else {
         debug!("Sending file directly from fs");
-        serve_file_from_fs(&full_path, range, None, false)
+        serve_file_from_fs(&full_path, range, None, false).await
     }
 }
 
@@ -386,7 +379,7 @@ async fn send_buffer(
     cache: Option<u32>,
     last_modified: Option<SystemTime>,
     compressed: bool,
-) -> Result<Response, Error> {
+) -> ResponseResult {
     let mut resp = HyperResponse::builder().typed_header(ContentType::from(mime));
     if compressed && make_sense_to_compress(buf.len()) {
         buf = compress_buf(&buf);
@@ -400,35 +393,37 @@ async fn send_buffer(
     resp.body(Body::from(buf)).map_err(Error::from)
 }
 
-pub fn send_description(
+pub async fn send_description(
     base_path: &'static Path,
     file_path: impl AsRef<Path> + Send + 'static,
     cache: Option<u32>,
     can_compress: bool,
-) -> ResponseFuture {
-    Box::pin(send_folder_metadata(
+) -> ResponseResult {
+    send_folder_metadata(
         base_path,
         file_path,
         "text/plain",
         cache,
         |p| extract_description(p).map(|s| s.into()),
         can_compress,
-    ))
+    )
+    .await
 }
 
-pub fn send_cover(
+pub async fn send_cover(
     base_path: &'static Path,
     file_path: impl AsRef<Path> + Send + 'static,
     cache: Option<u32>,
-) -> ResponseFuture {
-    Box::pin(send_folder_metadata(
+) -> ResponseResult {
+    send_folder_metadata(
         base_path,
         file_path,
         "image/jpeg",
         cache,
         |p| extract_cover(p),
         false,
-    ))
+    )
+    .await
 }
 
 pub async fn send_folder_metadata(
@@ -438,7 +433,7 @@ pub async fn send_folder_metadata(
     cache: Option<u32>,
     extractor: impl FnOnce(PathBuf) -> Option<Vec<u8>> + Send + 'static,
     compressed: bool,
-) -> Result<Response> {
+) -> ResponseResult {
     if is_audio(&file_path) {
         // extract description from audio file
         let full_path = base_path.join(file_path);
@@ -471,12 +466,12 @@ pub async fn send_folder_metadata(
     }
 }
 
-pub fn send_folder_icon(
+pub async fn send_folder_icon(
     collection: usize,
     folder_path: PathBuf,
     collections: Arc<collection::Collections>,
-) -> ResponseFuture {
-    let r = blocking(
+) -> ResponseResult {
+    blocking(
         move || match collections.get_folder_cover_path(collection, folder_path) {
             Ok(Some((p, meta))) => icon_response(p, meta.into()),
             Ok(None) => Ok(not_found_cached(get_config().folder_file_cache_age)),
@@ -486,105 +481,98 @@ pub fn send_folder_icon(
             }
         },
     )
+    .await
     .map_err(Error::new)
-    .then(|f| {
-        future::ready(match f {
-            Ok(x) => x,
-            Err(e) => Err(e),
-        })
-    });
-
-    Box::pin(r)
+    .and_then(|res| match res {
+        Ok(x) => Ok(x),
+        Err(e) => Err(e),
+    })
 }
 
 #[cfg(feature = "folder-download")]
-pub fn download_folder(
+pub async fn download_folder(
     base_path: &'static Path,
     folder_path: PathBuf,
     format: DownloadFormat,
     include_subfolders: Option<regex::Regex>,
-) -> ResponseFuture {
+) -> ResponseResult {
     use anyhow::Context;
     use hyper::header::CONTENT_DISPOSITION;
     let full_path = base_path.join(&folder_path);
-    let f = async move {
-        let meta_result = tokio::fs::metadata(&full_path).await;
-        let meta = match meta_result {
-            Ok(meta) => meta,
-            Err(err) => {
-                if matches!(err.kind(), std::io::ErrorKind::NotFound) {
-                    return Ok(response::not_found());
-                } else {
-                    return Err(Error::new(err)).context("metadata for folder download");
-                }
-            }
-        };
-        if meta.is_file() {
-            serve_file_from_fs(&full_path, None, None, false).await
-        } else {
-            let mut download_name = folder_path
-                .file_name()
-                .and_then(OsStr::to_str)
-                .map(std::borrow::ToOwned::to_owned)
-                .unwrap_or_else(|| "audio".into());
-
-            download_name.push_str(format.extension());
-
-            match blocking(move || {
-                let allow_symlinks = get_config().allow_symlinks;
-                if let Some(folder_re) = include_subfolders {
-                    collection::list_dir_files_with_subdirs(
-                        base_path,
-                        &folder_path,
-                        allow_symlinks,
-                        folder_re,
-                    )
-                } else {
-                    collection::list_dir_files_only(base_path, &folder_path, allow_symlinks)
-                }
-            })
-            .await
-            {
-                Ok(Ok(folder)) => {
-                    let total_len: u64 = match format {
-                        DownloadFormat::Tar => {
-                            let lens_iter = folder.iter().map(|i| i.2);
-                            async_tar::calc_size(lens_iter)
-                        }
-                        DownloadFormat::Zip => {
-                            let iter = folder
-                                .iter()
-                                .map(|&(ref path, ref name, len)| (path, name.as_str(), len));
-                            async_zip::calc_size(iter).context("calc zip size")?
-                        }
-                    };
-
-                    debug!("Total len of folder is {:?}", total_len);
-
-                    let stream: Box<dyn Stream<Item = _> + Unpin + Send> = match format {
-                        DownloadFormat::Tar => {
-                            let files = folder.into_iter().map(|i| i.0);
-                            Box::new(async_tar::TarStream::tar_iter(files))
-                        }
-                        DownloadFormat::Zip => {
-                            let files = folder.into_iter().map(|i| (i.0, i.1));
-                            let zipper = async_zip::Zipper::from_iter(files);
-                            Box::new(zipper.zipped_stream())
-                        }
-                    };
-
-                    let disposition = format!("attachment; filename=\"{}\"", download_name);
-                    let builder = HyperResponse::builder()
-                        .typed_header(ContentType::from(format.mime()))
-                        .header(CONTENT_DISPOSITION, disposition.as_bytes())
-                        .typed_header(ContentLength(total_len));
-                    Ok(builder.body(Body::wrap_stream(stream)).unwrap())
-                }
-                Ok(Err(e)) => Err(Error::new(e).context("listing directory")),
-                Err(e) => Err(Error::new(e).context("spawn blocking directory")),
+    let meta_result = tokio::fs::metadata(&full_path).await;
+    let meta = match meta_result {
+        Ok(meta) => meta,
+        Err(err) => {
+            if matches!(err.kind(), std::io::ErrorKind::NotFound) {
+                return Ok(response::not_found());
+            } else {
+                return Err(Error::new(err)).context("metadata for folder download");
             }
         }
     };
+    if meta.is_file() {
+        serve_file_from_fs(&full_path, None, None, false).await
+    } else {
+        let mut download_name = folder_path
+            .file_name()
+            .and_then(OsStr::to_str)
+            .map(std::borrow::ToOwned::to_owned)
+            .unwrap_or_else(|| "audio".into());
 
-    Box::pin(f)
+        download_name.push_str(format.extension());
+
+        match blocking(move || {
+            let allow_symlinks = get_config().allow_symlinks;
+            if let Some(folder_re) = include_subfolders {
+                collection::list_dir_files_with_subdirs(
+                    base_path,
+                    &folder_path,
+                    allow_symlinks,
+                    folder_re,
+                )
+            } else {
+                collection::list_dir_files_only(base_path, &folder_path, allow_symlinks)
+            }
+        })
+        .await
+        {
+            Ok(Ok(folder)) => {
+                let total_len: u64 = match format {
+                    DownloadFormat::Tar => {
+                        let lens_iter = folder.iter().map(|i| i.2);
+                        async_tar::calc_size(lens_iter)
+                    }
+                    DownloadFormat::Zip => {
+                        let iter = folder
+                            .iter()
+                            .map(|&(ref path, ref name, len)| (path, name.as_str(), len));
+                        async_zip::calc_size(iter).context("calc zip size")?
+                    }
+                };
+
+                debug!("Total len of folder is {:?}", total_len);
+
+                let stream: Box<dyn Stream<Item = _> + Unpin + Send> = match format {
+                    DownloadFormat::Tar => {
+                        let files = folder.into_iter().map(|i| i.0);
+                        Box::new(async_tar::TarStream::tar_iter(files))
+                    }
+                    DownloadFormat::Zip => {
+                        let files = folder.into_iter().map(|i| (i.0, i.1));
+                        let zipper = async_zip::Zipper::from_iter(files);
+                        Box::new(zipper.zipped_stream())
+                    }
+                };
+
+                let disposition = format!("attachment; filename=\"{}\"", download_name);
+                let builder = HyperResponse::builder()
+                    .typed_header(ContentType::from(format.mime()))
+                    .header(CONTENT_DISPOSITION, disposition.as_bytes())
+                    .typed_header(ContentLength(total_len));
+                Ok(builder.body(Body::wrap_stream(stream)).unwrap())
+            }
+            Ok(Err(e)) => Err(Error::new(e).context("listing directory")),
+            Err(e) => Err(Error::new(e).context("spawn blocking directory")),
+        }
+    }
 }

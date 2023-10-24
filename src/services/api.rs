@@ -14,7 +14,7 @@ use super::compress::{compressed_response, make_sense_to_compress};
 use super::response::ResponseResult;
 use super::search::{Search, SearchTrait};
 use super::types::Transcodings;
-use super::{response, response::ResponseFuture, types::CollectionsInfo};
+use super::{response, types::CollectionsInfo};
 
 type Response = HyperResponse<Body>;
 
@@ -92,20 +92,17 @@ pub async fn insert_position(
 }
 
 #[cfg(feature = "shared-positions")]
-pub fn last_position(
+pub async fn last_position(
     collections: Arc<collection::Collections>,
     group: String,
     compress: bool,
-) -> ResponseFuture {
-    Box::pin(
-        collections
-            .get_last_position_async(group)
-            .map(move |pos| Ok(json_response(&pos, compress))),
-    )
+) -> ResponseResult {
+    let pos = collections.get_last_position_async(group).await;
+    Ok(json_response(&pos, compress))
 }
 
 #[cfg(feature = "shared-positions")]
-pub fn folder_position(
+pub async fn folder_position(
     collections: Arc<collection::Collections>,
     group: String,
     collection: usize,
@@ -113,71 +110,66 @@ pub fn folder_position(
     recursive: bool,
     filter: Option<collection::PositionFilter>,
     compress: bool,
-) -> ResponseFuture {
+) -> ResponseResult {
     if recursive {
-        Box::pin(
-            collections
-                .get_positions_recursive_async(collection, group, path, filter)
-                .map(move |pos| Ok(json_response(&pos, compress))),
-        )
+        let pos = collections
+            .get_positions_recursive_async(collection, group, path, filter)
+            .await;
+        Ok(json_response(&pos, compress))
     } else {
-        Box::pin(
-            collections
-                .get_position_async(collection, group, path)
-                .map(move |pos| Ok(json_response(&pos, compress))),
-        )
+        let pos = collections
+            .get_position_async(collection, group, path)
+            .await;
+        Ok(json_response(&pos, compress))
     }
 }
 
 #[cfg(feature = "shared-positions")]
-pub fn all_positions(
+pub async fn all_positions(
     collections: Arc<collection::Collections>,
     group: String,
     filter: Option<collection::PositionFilter>,
     compress: bool,
-) -> ResponseFuture {
-    Box::pin(
-        collections
-            .get_all_positions_for_group_async(group, filter)
-            .map(move |pos| Ok(json_response(&pos, compress))),
-    )
+) -> ResponseResult {
+    let pos = collections
+        .get_all_positions_for_group_async(group, filter)
+        .await;
+    Ok(json_response(&pos, compress))
 }
 
-pub fn transcodings_list(user_agent: Option<&str>, compress: bool) -> ResponseFuture {
+pub fn transcodings_list(user_agent: Option<&str>, compress: bool) -> ResponseResult {
     let transcodings = user_agent
         .map(Transcodings::for_user_agent)
         .unwrap_or_default();
-    Box::pin(future::ok(json_response(&transcodings, compress)))
+    Ok(json_response(&transcodings, compress))
 }
 
-pub fn search(
+pub async fn search(
     collection: usize,
     searcher: Search<String>,
     query: String,
     ordering: FoldersOrdering,
     group: Option<String>,
     compress: bool,
-) -> ResponseFuture {
-    Box::pin(
-        blocking(move || {
-            let res = searcher.search(collection, query, ordering, group);
-            json_response(&res, compress)
-        })
-        .map_err(Error::new),
-    )
+) -> ResponseResult {
+    blocking(move || {
+        let res = searcher.search(collection, query, ordering, group);
+        json_response(&res, compress)
+    })
+    .await
+    .map_err(Error::new)
 }
 
-pub fn recent(
+pub async fn recent(
     collection: usize,
     searcher: Search<String>,
     group: Option<String>,
     compress: bool,
-) -> ResponseFuture {
-    Box::pin(
-        blocking(move || {
-            let res = searcher.recent(collection, group);
-            json_response(&res, compress)
-        })
-        .map_err(Error::new),
-    )
+) -> ResponseResult {
+    blocking(move || {
+        let res = searcher.recent(collection, group);
+        json_response(&res, compress)
+    })
+    .await
+    .map_err(Error::new)
 }

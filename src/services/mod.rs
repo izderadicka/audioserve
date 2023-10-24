@@ -302,7 +302,6 @@ impl<C: Send + 'static> MainService<C> {
                         user_agent.as_ref().map(|h| h.as_str()),
                         req.can_compress(),
                     )
-                    .await
                 } else if cfg!(feature = "shared-positions") && path.starts_with("/positions") {
                     // positions API
                     #[cfg(feature = "shared-positions")]
@@ -354,7 +353,7 @@ impl<C: Send + 'static> MainService<C> {
                     #[cfg(not(feature = "shared-positions"))]
                     unimplemented!();
                     #[cfg(feature = "shared-positions")]
-                    self::position::position_service(req, collections).await
+                    self::position::position_service(req, collections)
                 } else {
                     let (path, colllection_index) = match extract_collection_number(path) {
                         Ok(r) => r,

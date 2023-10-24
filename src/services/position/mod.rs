@@ -1,9 +1,10 @@
-use super::{RequestWrapper, ResponseFuture};
+use super::response::ResponseResult;
+use super::RequestWrapper;
 use crate::config::get_config;
 use crate::error::{bail, Context, Error};
 use collection::audio_meta::TimeStamp;
 use collection::{Collections, Position};
-use futures::future;
+
 use serde::Serialize;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -229,7 +230,7 @@ async fn process_message(m: Message, ctx: &mut Ctx) -> MessageResult {
     }
 }
 
-pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseFuture {
+pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseResult {
     debug!("We got these headers on websocket: {:?}", req.headers());
     let res = spawn_websocket(
         req.into_request(),
@@ -241,7 +242,7 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseF
         Some(get_config().positions.ws_timeout),
     );
 
-    Box::pin(future::ok(res))
+    Ok(res)
 }
 
 #[cfg(test)]
