@@ -295,7 +295,7 @@ impl<C: Send + 'static> MainService<C> {
         match *req.method() {
             Method::GET => {
                 if path.starts_with("/collections") {
-                    api::collections_list(req.can_compress()).await
+                    api::collections_list(req.can_compress())
                 } else if path.starts_with("/transcodings") {
                     let user_agent = req.headers().typed_get::<UserAgent>();
                     api::transcodings_list(

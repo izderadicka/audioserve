@@ -11,6 +11,7 @@ use crate::Error;
 use crate::{config::get_config, util::ResponseBuilderExt};
 
 use super::compress::{compressed_response, make_sense_to_compress};
+use super::response::ResponseResult;
 use super::search::{Search, SearchTrait};
 use super::types::Transcodings;
 use super::{response, response::ResponseFuture, types::CollectionsInfo};
@@ -31,27 +32,26 @@ fn json_response<T: serde::Serialize>(data: &T, compress: bool) -> Response {
     }
 }
 
-pub fn get_folder(
+pub async fn get_folder(
     collection: usize,
     folder_path: PathBuf,
     collections: Arc<collection::Collections>,
     ordering: FoldersOrdering,
     group: Option<String>,
     compress: bool,
-) -> ResponseFuture {
-    Box::pin(
-        blocking(move || collections.list_dir(collection, &folder_path, ordering, group))
-            .map_ok(move |res| match res {
-                Ok(folder) => json_response(&folder, compress),
-                Err(_) => response::not_found(),
-            })
-            .map_err(Error::new),
-    )
+) -> ResponseResult {
+    blocking(move || collections.list_dir(collection, &folder_path, ordering, group))
+        .map_ok(move |res| match res {
+            Ok(folder) => json_response(&folder, compress),
+            Err(_) => response::not_found(),
+        })
+        .map_err(Error::new)
+        .await
 }
 
 const UNKNOWN_NAME: &str = "unknown";
 
-pub fn collections_list(compress: bool) -> ResponseFuture {
+pub fn collections_list(compress: bool) -> ResponseResult {
     let collections = CollectionsInfo {
         version: env!("CARGO_PKG_VERSION"),
         folder_download: !get_config().disable_folder_download,
@@ -67,46 +67,31 @@ pub fn collections_list(compress: bool) -> ResponseFuture {
             })
             .collect(),
     };
-    Box::pin(future::ok(json_response(&collections, compress)))
+    Ok(json_response(&collections, compress))
 }
 
 #[cfg(feature = "shared-positions")]
-pub fn insert_position(
+pub async fn insert_position(
     collections: Arc<collection::Collections>,
     group: String,
     bytes: bytes::Bytes,
-) -> ResponseFuture {
+) -> ResponseResult {
     match serde_json::from_slice::<collection::Position>(&bytes) {
         Ok(pos) => {
-            let path = if !pos.folder.is_empty() {
-                pos.folder + "/" + &pos.file
-            } else {
-                pos.file
-            };
-            Box::pin(
-                collections
-                    .insert_position_if_newer_async(
-                        pos.collection,
-                        group,
-                        path,
-                        pos.position,
-                        pos.folder_finished,
-                        pos.timestamp,
-                    )
-                    .then(|res| match res {
-                        Ok(_) => response::fut(response::created),
-                        Err(e) => match e {
-                            collection::error::Error::IgnoredPosition => {
-                                response::fut(response::ignored)
-                            }
-                            _ => Box::pin(future::err(Error::new(e))),
-                        },
-                    }),
-            )
+            match collections
+                .insert_position_if_newer_async(pos.collection, group, pos)
+                .await
+            {
+                Ok(_) => Ok(response::created()),
+                Err(e) => match e {
+                    collection::error::Error::IgnoredPosition => Ok(response::ignored()),
+                    _ => Err(Error::new(e)),
+                },
+            }
         }
         Err(e) => {
             error!("Error in position JSON: {}", e);
-            response::fut(response::bad_request)
+            Ok(response::bad_request())
         }
     }
 }

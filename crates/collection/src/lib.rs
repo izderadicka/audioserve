@@ -494,26 +494,35 @@ impl Collections {
         .unwrap_or_else(|e| Err(Error::from(e)))
     }
 
-    pub async fn insert_position_if_newer_async<S, P>(
+    pub async fn insert_position_if_newer_async<S>(
         self: Arc<Self>,
         collection: usize,
         group: S,
-        path: P,
-        position: f32,
-        folder_finished: bool,
-        ts: TimeStamp,
+        position: Position,
     ) -> Result<()>
     where
         S: AsRef<str> + Send + 'static,
-        P: AsRef<str> + Send + 'static,
     {
+        let Position {
+            position,
+            timestamp,
+            folder_finished,
+            file,
+            folder,
+            ..
+        } = position;
+        let path = if !folder.is_empty() {
+            folder + "/" + &file
+        } else {
+            file
+        };
         spawn_blocking!({
             self.get_cache(collection)?.insert_position(
                 group,
                 path,
                 position,
                 folder_finished,
-                Some(ts),
+                Some(timestamp),
             )
         })
         .unwrap_or_else(|e| Err(Error::from(e)))
