@@ -9,4 +9,4 @@ edition = "2021"
 [dependencies]
 
 [dev-dependencies]
-tokio={version="1.33", features=["macros", "test-util", "rt-multi-thread"]}
+tokio={version="1.34", features=["macros", "test-util", "rt-multi-thread"]}
