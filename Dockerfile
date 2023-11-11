@@ -26,10 +26,9 @@ RUN apk add git &&\
     git clone https://github.com/izderadicka/audioserve-web.git /audioserve_client &&\
     cd /audioserve_client &&\
     npm install &&\
-    npm run build &&\
     npm run build-sw &&\
-    ./compress_dist.sh &&\
-    mv public dist
+    npm run build &&\
+    ./compress_dist.sh
 
 FROM alpine:3.18
 
