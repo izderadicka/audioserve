@@ -9,7 +9,7 @@ edition = "2021"
 [dependencies]
 nom = "7"
 headers = "0.3"
-http = "0.2"
+http = "1.0"
 lazy_static = "1.4"
 log = "0.4"
 
