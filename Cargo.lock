@@ -1160,13 +1160,12 @@ checksum = "7dfda62a12f55daeae5015f81b0baea145391cb4520f86c248fc615d72640d12"
 [[package]]
 name = "headers"
 version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06683b93020a07e3dbcf5f8c0f6d40080d725bea7936fc01ad345c01b97dc270"
+source = "git+https://github.com/hyperium/headers#4400aa90c47a78a41be5f394bc19f420e2c0244a"
 dependencies = [
  "base64",
  "bytes",
  "headers-core",
- "http 0.2.11",
+ "http 1.0.0",
  "httpdate",
  "mime",
  "sha1",
@@ -1175,10 +1174,9 @@ dependencies = [
 [[package]]
 name = "headers-core"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7f66481bfee273957b1f20485a4ff3362987f85b2c236580d81b4eb7a326429"
+source = "git+https://github.com/hyperium/headers#4400aa90c47a78a41be5f394bc19f420e2c0244a"
 dependencies = [
- "http 0.2.11",
+ "http 1.0.0",
 ]
 
 [[package]]

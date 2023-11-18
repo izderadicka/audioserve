@@ -8,7 +8,7 @@ edition = "2021"
 
 [dependencies]
 nom = "7"
-headers = "0.3"
+headers = {git = "https://github.com/hyperium/headers"}
 http = "1.0"
 lazy_static = "1.4"
 log = "0.4"

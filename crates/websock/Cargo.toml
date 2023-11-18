@@ -12,7 +12,7 @@ futures = "0.3"
 log = "0.4"
 tokio-tungstenite = "0.20"
 thiserror = "1.0"
-headers = "0.3"
+headers = {git = "https://github.com/hyperium/headers"}
 
 [dev-dependencies]
 env_logger = "0.10"
