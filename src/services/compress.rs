@@ -11,8 +11,9 @@ use flate2::{write::GzEncoder, Compress, Compression, Crc, FlushCompress};
 use futures::Stream;
 use headers::{ContentEncoding, ContentLength};
 use http::{response::Builder, Response};
-use hyper::Body;
 use tokio::io::{AsyncRead, ReadBuf};
+
+use super::response::HttpResponse;
 
 const COMPRESSION_LIMIT: u64 = 512;
 
@@ -24,7 +25,7 @@ pub fn make_sense_to_compress<T: TryInto<u64>>(size: T) -> bool {
     }
 }
 
-pub fn compressed_response(response_builder: Builder, data: Vec<u8>) -> Response<Body> {
+pub fn compressed_response(response_builder: Builder, data: Vec<u8>) -> HttpResponse {
     let output = compress_buf(&data);
     let size = output.len() as u64;
 

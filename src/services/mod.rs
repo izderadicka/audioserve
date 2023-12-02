@@ -1,9 +1,10 @@
 use self::auth::{AuthResult, Authenticator};
-use self::request::{QueryParams, RequestWrapper};
-use self::response::{ResponseFuture, ResponseResult};
+use self::request::{HttpRequest, QueryParams, RequestWrapper};
+use self::response::{HttpResponse, ResponseFuture, ResponseResult};
 use self::search::Search;
 use self::transcode::QualityLevel;
 use crate::config::get_config;
+use crate::services::response::body::empty_body;
 use crate::services::transcode::ChosenTranscoding;
 use crate::util::ResponseBuilderExt;
 use crate::{error, util::header2header};
@@ -17,7 +18,7 @@ use headers::{
     Origin, Range, UserAgent,
 };
 use hyper::StatusCode;
-use hyper::{service::Service, Body, Method, Request, Response};
+use hyper::{service::Service, Method, Request, Response};
 use leaky_cauldron::Leaky;
 
 use regex::Regex;
@@ -122,11 +123,7 @@ fn get_subpath(path: &str, prefix: &str) -> PathBuf {
     Path::new(&path).strip_prefix(prefix).unwrap().to_path_buf()
 }
 
-fn add_cors_headers(
-    mut resp: Response<Body>,
-    origin: Option<Origin>,
-    enabled: bool,
-) -> Response<Body> {
+fn add_cors_headers(mut resp: HttpResponse, origin: Option<Origin>, enabled: bool) -> HttpResponse {
     if !enabled {
         return resp;
     }
@@ -143,7 +140,7 @@ fn add_cors_headers(
     }
 }
 
-fn preflight_cors_response(req: &Request<Body>) -> Response<Body> {
+fn preflight_cors_response(req: &HttpRequest) -> HttpResponse {
     let origin = req.headers().typed_get::<Origin>();
     const ALLOWED_METHODS: &[Method] = &[Method::GET, Method::POST, Method::OPTIONS];
 
@@ -161,7 +158,7 @@ fn preflight_cors_response(req: &Request<Body>) -> Response<Body> {
         ));
     }
 
-    let resp = resp_builder.body(Body::empty()).unwrap();
+    let resp = resp_builder.body(empty_body()).unwrap();
 
     add_cors_headers(resp, origin, true)
 }
@@ -182,8 +179,8 @@ fn is_static_file(path: &str) -> bool {
 }
 
 #[allow(clippy::type_complexity)]
-impl<C: Send + 'static> Service<Request<Body>> for MainService<C> {
-    type Response = Response<Body>;
+impl<C: Send + 'static> Service<HttpRequest> for MainService<C> {
+    type Response = HttpResponse;
     type Error = error::Error;
     type Future = ResponseFuture;
 
@@ -191,7 +188,7 @@ impl<C: Send + 'static> Service<Request<Body>> for MainService<C> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: Request<Body>) -> Self::Future {
+    fn call(&mut self, req: HttpRequest) -> Self::Future {
         let state = self.state.clone();
 
         //Limit rate of requests if configured

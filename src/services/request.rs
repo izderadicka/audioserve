@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap, fmt::Display, iter::once, net::IpAd
 
 use bytes::{Bytes, BytesMut};
 use headers::{Header, HeaderMapExt, HeaderName, HeaderValue};
-use hyper::{body::HttpBody, Body, Request};
+use hyper::{body::Incoming, Request};
 use percent_encoding::percent_decode;
 use url::form_urlencoded;
 
@@ -12,6 +12,8 @@ use crate::{
 };
 
 pub struct AcceptEncoding(HeaderValue);
+
+pub type HttpRequest = Request<Incoming>;
 
 impl Header for AcceptEncoding {
     fn name() -> &'static HeaderName {
@@ -93,7 +95,7 @@ impl Display for RemoteIpAddr {
 }
 
 pub struct RequestWrapper {
-    request: Request<Body>,
+    request: HttpRequest,
     path: String,
     remote_addr: IpAddr,
     #[allow(dead_code)]
@@ -105,7 +107,7 @@ pub struct RequestWrapper {
 
 impl RequestWrapper {
     pub fn new(
-        request: Request<Body>,
+        request: HttpRequest,
         path_prefix: Option<&str>,
         remote_addr: IpAddr,
         is_ssl: bool,
@@ -197,7 +199,7 @@ impl RequestWrapper {
     }
 
     #[allow(dead_code)]
-    pub fn into_body(self) -> Body {
+    pub fn into_body(self) -> Incoming {
         self.request.into_body()
     }
 
@@ -218,7 +220,7 @@ impl RequestWrapper {
     }
 
     #[allow(dead_code)]
-    pub fn into_request(self) -> Request<Body> {
+    pub fn into_request(self) -> HttpRequest {
         self.request
     }
 
@@ -264,7 +266,7 @@ impl RequestWrapper {
         RequestWrapper::is_cors_enabled_for_request(&self.request)
     }
 
-    pub fn is_cors_enabled_for_request(req: &Request<Body>) -> bool {
+    pub fn is_cors_enabled_for_request(req: &HttpRequest) -> bool {
         if let Some(cors) = get_config().cors.as_ref() {
             match &cors.allow {
                 Cors::AllowAllOrigins => true,

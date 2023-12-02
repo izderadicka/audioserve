@@ -1,7 +1,7 @@
 use anyhow::Result;
 use collection::{audio_meta::is_audio, extract_cover};
 use headers::{ContentLength, ContentType};
-use hyper::{Body, Response};
+use hyper::Response;
 use image::io::Reader as ImageReader;
 use image::ImageOutputFormat;
 use simple_file_cache::FileModTime;
@@ -14,14 +14,14 @@ use crate::{config::get_config, util::ResponseBuilderExt};
 
 use self::cache::{cache_icon, cached_icon};
 
-use super::response::add_cache_headers;
+use super::response::{add_cache_headers, HttpResponse};
 
 pub mod cache;
 
 pub fn icon_response(
     path: impl AsRef<Path> + std::fmt::Debug,
     mtime: FileModTime,
-) -> Result<Response<Body>> {
+) -> Result<HttpResponse> {
     let cache_enabled = !get_config().icons.cache_disabled;
     let data = match if cache_enabled {
         cached_icon(&path, mtime)

@@ -7,7 +7,7 @@ use futures::{future, prelude::*};
 use headers::authorization::Bearer;
 use headers::{Authorization, ContentLength, ContentType, Cookie, HeaderMapExt, HeaderValue};
 use hyper::header::SET_COOKIE;
-use hyper::{Body, Method, Response};
+use hyper::{Method, Response};
 use ring::rand::{SecureRandom, SystemRandom};
 use ring::{
     digest::{digest, SHA256},
@@ -22,15 +22,15 @@ use thiserror::Error;
 use tokio::time::sleep;
 use url::form_urlencoded;
 
-use super::response;
+use super::response::{self, HttpResponse};
 
 pub enum AuthResult<T> {
     Authenticated {
         credentials: T,
         request: RequestWrapper,
     },
-    Rejected(Response<Body>),
-    LoggedIn(Response<Body>),
+    Rejected(HttpResponse),
+    LoggedIn(HttpResponse),
 }
 type AuthFuture<T> = Pin<Box<dyn Future<Output = Result<AuthResult<T>>> + Send>>;
 
@@ -366,7 +366,7 @@ impl ::std::str::FromStr for Token {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::init::init_default_config;
+    use crate::{config::init::init_default_config, services::response::body::HttpBody};
     use borrow::Cow;
     use hyper::{Request, StatusCode};
 
@@ -384,7 +384,7 @@ mod tests {
         assert!(new_token.validity() - now() <= 24 * 3600);
     }
 
-    fn build_request(body: impl Into<Body>, json: bool) -> RequestWrapper {
+    fn build_request(body: impl Into<HttpBody>, json: bool) -> RequestWrapper {
         let b = body.into();
         let req = Request::builder()
             .method(Method::POST)
@@ -408,7 +408,7 @@ mod tests {
             .method(Method::GET)
             .uri("/neco")
             .header("Authorization", format!("Bearer {}", token))
-            .body(Body::from("Hey"))
+            .body(HttpBody::from("Hey"))
             .unwrap();
 
         RequestWrapper::new(req, None, [192, 168, 1, 2].into(), false).unwrap()

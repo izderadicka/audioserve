@@ -2,7 +2,10 @@
 use super::{
     compress::{compress_buf, make_sense_to_compress, CompressStream},
     icon::icon_response,
-    response::{self, add_cache_headers, not_found, not_found_cached, ChunkStream, ResponseResult},
+    response::{
+        self, add_cache_headers, not_found, not_found_cached, ChunkStream, HttpResponse,
+        ResponseResult,
+    },
     transcode::{guess_format, AudioFilePath, ChosenTranscoding, QualityLevel, Transcoder},
     types::*,
     Counter,
@@ -18,8 +21,8 @@ use collection::{
 };
 use futures::prelude::*;
 use headers::{AcceptRanges, ContentEncoding, ContentLength, ContentRange, ContentType};
-use http::header::CONTENT_ENCODING;
-use hyper::{Body, Response as HyperResponse, StatusCode};
+use http::{header::CONTENT_ENCODING, Response};
+use hyper::StatusCode;
 use std::{
     collections::Bound,
     ffi::{OsStr, OsString},
@@ -31,7 +34,6 @@ use std::{
 use tokio::{fs, io::AsyncSeekExt, task::spawn_blocking as blocking};
 
 pub type ByteRange = (Bound<u64>, Bound<u64>);
-type Response = HyperResponse<Body>;
 
 #[cfg(not(feature = "transcoding-cache"))]
 async fn serve_file_cached_or_transcoded(
@@ -194,10 +196,10 @@ async fn serve_file_transcoded(
         .transcode(full_path, seek, span, counter.clone())
         .await
         .map(move |stream| {
-            HyperResponse::builder()
+            Response::builder()
                 .typed_header(ContentType::from(mime))
                 .header("X-Transcode", params.as_bytes())
-                .body(Body::wrap_stream(stream))
+                .body(stream.into())
                 .unwrap()
         })
 }
@@ -206,23 +208,23 @@ async fn serve_compressed_file(
     file: tokio::fs::File,
     caching: Option<u32>,
     mime: mime::Mime,
-) -> Result<Response, io::Error> {
+) -> Result<HttpResponse, io::Error> {
     let meta = file.metadata().await?;
     let last_modified = meta.modified().ok();
     let file_size = meta.len();
 
-    let mut resp = HyperResponse::builder().typed_header(ContentType::from(mime));
+    let mut resp = Response::builder().typed_header(ContentType::from(mime));
     resp = add_cache_headers(resp, caching, last_modified);
     resp = resp.status(StatusCode::OK);
 
     let body = if make_sense_to_compress(file_size) {
         resp = resp.typed_header(ContentEncoding::gzip());
         let stream = CompressStream::new(file);
-        Body::wrap_stream(stream)
+        stream.into()
     } else {
         resp = resp.typed_header(ContentLength(file_size));
         let stream = ChunkStream::new(file);
-        Body::wrap_stream(stream)
+        stream.into()
     };
     let resp = resp.body(body).unwrap();
 
@@ -234,14 +236,14 @@ async fn serve_opened_file(
     range: Option<ByteRange>,
     caching: Option<u32>,
     mime: mime::Mime,
-) -> Result<Response, io::Error> {
+) -> Result<HttpResponse, io::Error> {
     let meta = file.metadata().await?;
     let file_len = meta.len();
     if file_len == 0 {
         warn!("File has zero size ")
     }
     let last_modified = meta.modified().ok();
-    let mut resp = HyperResponse::builder().typed_header(ContentType::from(mime));
+    let mut resp = Response::builder().typed_header(ContentType::from(mime));
     resp = add_cache_headers(resp, caching, last_modified);
 
     let (start, end) = match range {
@@ -269,7 +271,7 @@ async fn serve_opened_file(
     let stream = ChunkStream::new_with_limit(file, sz);
     let resp = resp
         .typed_header(ContentLength(sz))
-        .body(Body::wrap_stream(stream))
+        .body(stream.into())
         .unwrap();
     Ok(resp)
 }
@@ -380,7 +382,7 @@ async fn send_buffer(
     last_modified: Option<SystemTime>,
     compressed: bool,
 ) -> ResponseResult {
-    let mut resp = HyperResponse::builder().typed_header(ContentType::from(mime));
+    let mut resp = Response::builder().typed_header(ContentType::from(mime));
     if compressed && make_sense_to_compress(buf.len()) {
         buf = compress_buf(&buf);
         resp = resp.typed_header(ContentEncoding::gzip());
@@ -390,7 +392,7 @@ async fn send_buffer(
         .status(StatusCode::OK);
     resp = add_cache_headers(resp, cache, last_modified);
 
-    resp.body(Body::from(buf)).map_err(Error::from)
+    resp.body(buf.into()).map_err(Error::from)
 }
 
 pub async fn send_description(
@@ -565,11 +567,11 @@ pub async fn download_folder(
                 };
 
                 let disposition = format!("attachment; filename=\"{}\"", download_name);
-                let builder = HyperResponse::builder()
+                let builder = Response::builder()
                     .typed_header(ContentType::from(format.mime()))
                     .header(CONTENT_DISPOSITION, disposition.as_bytes())
                     .typed_header(ContentLength(total_len));
-                Ok(builder.body(Body::wrap_stream(stream)).unwrap())
+                Ok(builder.body(stream.into())).unwrap()
             }
             Ok(Err(e)) => Err(Error::new(e).context("listing directory")),
             Err(e) => Err(Error::new(e).context("spawn blocking directory")),

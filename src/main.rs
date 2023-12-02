@@ -3,13 +3,12 @@ extern crate log;
 #[macro_use]
 extern crate lazy_static;
 
-#[cfg(feature = "tls")]
-use crate::tls::TlsStream;
+// #[cfg(feature = "tls")]
+// use crate::tls::TlsStream;
 use collection::{CollectionOptions, CollectionOptionsMap, Collections};
 use config::{get_config, init_config};
 use error::{bail, Context, Error};
 use futures::prelude::*;
-use hyper::{service::make_service_fn, Server as HttpServer};
 use ring::rand::{SecureRandom, SystemRandom};
 use services::{
     auth::SharedSecretAuthenticator, search::Search, ServiceFactory, TranscodingDetails,
@@ -28,8 +27,8 @@ use tokio::sync::oneshot;
 mod config;
 mod error;
 mod services;
-#[cfg(feature = "tls")]
-mod tls;
+// #[cfg(feature = "tls")]
+// mod tls;
 mod util;
 
 fn generate_server_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, Error> {
@@ -175,22 +174,23 @@ fn start_server(
                 }
                 Some(ssl) => {
                     #[cfg(feature = "tls")]
-                    {
-                        info!("Server listening on {}{} with TLS", &addr, get_url_path!());
-                        let create_server = async move {
-                            let incoming = tls::tls_acceptor(addr, ssl)?;
-                            let server = HttpServer::builder(incoming)
-                                .serve(make_service_fn(move |conn: &TlsStream| {
-                                    let remote_addr = conn.remote_addr();
-                                    svc_factory.create(remote_addr, true)
-                                }))
-                                .await;
+                    todo!("Implement TLS server");
+                    // {
+                    //     info!("Server listening on {}{} with TLS", &addr, get_url_path!());
+                    //     let create_server = async move {
+                    //         let incoming = tls::tls_acceptor(addr, ssl)?;
+                    //         let server = HttpServer::builder(incoming)
+                    //             .serve(make_service_fn(move |conn: &TlsStream| {
+                    //                 let remote_addr = conn.remote_addr();
+                    //                 svc_factory.create(remote_addr, true)
+                    //             }))
+                    //             .await;
 
-                            server.map_err(|e| e.into())
-                        };
+                    //         server.map_err(|e| e.into())
+                    //     };
 
-                        Box::pin(create_server)
-                    }
+                    //     Box::pin(create_server)
+                    // }
 
                     #[cfg(not(feature = "tls"))]
                     {

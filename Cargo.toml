@@ -14,7 +14,9 @@ bytes = "1.5"
 env_logger = "0.10"
 log = {version="0.4", features = ["release_max_level_info", "max_level_trace"]}
 hyper = {version="1.0", features = ["full"]}
-headers = "0.3"
+http-body-util = "0.1.0"
+hyper-util = { version = "0.1.1", features = ["tokio", "server", "server-auto"] }
+headers = "0.4.0"
 futures = "0.3"
 mime = "0.3"
 serde_json = "1.0"
@@ -46,7 +48,7 @@ leaky-cauldron = {path="crates/leaky-cauldron"}
 tokio-util = {version="0.7", optional=true, features=["codec"]}
 cron = {version="0.12", optional=true}
 chrono = {version="0.4", optional=true}
-http = "0.2.11"
+http = "1.0.0"
 flate2 = "1.0.28"
 
 # this repo dependencies

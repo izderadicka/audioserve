@@ -1,8 +1,6 @@
 use anyhow::Context as _;
 use core::task::{Context, Poll};
 use futures_util::ready;
-use hyper::server::accept::Accept;
-use hyper::server::conn::{AddrIncoming, AddrStream};
 use std::future::Future;
 use std::net::SocketAddr;
 use std::path::Path;

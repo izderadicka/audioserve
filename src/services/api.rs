@@ -4,24 +4,22 @@ use std::{path::PathBuf, sync::Arc};
 use collection::FoldersOrdering;
 use futures::prelude::*;
 use headers::{ContentLength, ContentType};
-use hyper::{Body, Response as HyperResponse};
+use http::Response;
 use tokio::task::spawn_blocking as blocking;
 
 use crate::Error;
 use crate::{config::get_config, util::ResponseBuilderExt};
 
 use super::compress::{compressed_response, make_sense_to_compress};
-use super::response::ResponseResult;
+use super::response::{HttpResponse, ResponseResult};
 use super::search::{Search, SearchTrait};
 use super::types::Transcodings;
 use super::{response, types::CollectionsInfo};
 
-type Response = HyperResponse<Body>;
-
-fn json_response<T: serde::Serialize>(data: &T, compress: bool) -> Response {
+fn json_response<T: serde::Serialize>(data: &T, compress: bool) -> HttpResponse {
     let json = serde_json::to_string(data).expect("Serialization error");
 
-    let builder = HyperResponse::builder().typed_header(ContentType::json());
+    let builder = Response::builder().typed_header(ContentType::json());
     if compress && make_sense_to_compress(json.len()) {
         compressed_response(builder, json.into_bytes())
     } else {

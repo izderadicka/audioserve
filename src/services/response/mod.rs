@@ -1,15 +1,21 @@
+use std::convert::Infallible;
 use std::io;
 use std::task::{Context, Poll};
 use std::{future::Future, pin::Pin, time::SystemTime};
 
+use bytes::Bytes;
 use futures::prelude::*;
 use headers::{CacheControl, ContentLength, ContentType, LastModified};
 use http::response::Builder;
-use hyper::{Body, Response, StatusCode};
+use hyper::{Response, StatusCode};
 use tokio::io::{AsyncRead, ReadBuf};
 
 use crate::error::Error;
 use crate::util::ResponseBuilderExt;
+
+use self::body::HttpBody;
+
+pub mod body;
 
 const NOT_FOUND_MESSAGE: &str = "Not Found";
 const TOO_MANY_REQUESTS_MSG: &str = "Too many requests";
@@ -20,10 +26,11 @@ const NOT_IMPLEMENTED_MSG: &str = "Not Implemented";
 const INTERNAL_SERVER_ERROR: &str = "Internal server error";
 const UNPROCESSABLE_ENTITY: &str = "Ignored";
 
-pub type ResponseResult = Result<Response<Body>, Error>;
+pub type HttpResponse = Response<HttpBody>;
+pub type ResponseResult = Result<HttpResponse, Error>;
 pub type ResponseFuture = Pin<Box<dyn Future<Output = ResponseResult> + Send>>;
 
-fn short_response(status: StatusCode, msg: &'static str) -> Response<Body> {
+fn short_response(status: StatusCode, msg: &'static str) -> HttpResponse {
     Response::builder()
         .status(status)
         .typed_header(ContentLength(msg.len() as u64))
@@ -32,7 +39,7 @@ fn short_response(status: StatusCode, msg: &'static str) -> Response<Body> {
         .unwrap()
 }
 
-pub fn not_found_cached(caching: Option<u32>) -> Response<Body> {
+pub fn not_found_cached(caching: Option<u32>) -> HttpResponse {
     let mut builder = Response::builder()
         .status(StatusCode::NOT_FOUND)
         .typed_header(ContentLength(NOT_FOUND_MESSAGE.len() as u64))
@@ -46,7 +53,7 @@ pub fn not_found_cached(caching: Option<u32>) -> Response<Body> {
 #[inline]
 pub fn fut<F>(f: F) -> ResponseFuture
 where
-    F: FnOnce() -> Response<Body>,
+    F: FnOnce() -> HttpResponse,
 {
     Box::pin(future::ok(f()))
 }
@@ -55,7 +62,7 @@ macro_rules! def_resp {
     ($($name:ident ( $code:expr, $msg:expr ));+) => {
         $(
         #[allow(dead_code)]
-        pub fn $name() -> Response<Body> {
+        pub fn $name() -> HttpResponse {
             short_response($code, $msg)
         }
     )+
