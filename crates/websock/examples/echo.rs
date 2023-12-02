@@ -1,15 +1,22 @@
 #[macro_use]
 extern crate log;
 extern crate websock as ws;
-use hyper::server::Server;
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{self, Body, Method, Request, Response, StatusCode};
+use http_body_util::{BodyExt, Empty, Full};
+use hyper::body::{Body as BodyTrait, Bytes, Incoming};
+use hyper::server::conn::http1;
+use hyper::service::service_fn;
+use hyper::{self, Method, Request, Response, StatusCode};
+use hyper_util::rt::TokioIo;
 use std::io;
+use std::net::SocketAddr;
 use std::{convert::Infallible, time::Duration};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
+use tokio::net::TcpListener;
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
+type Body = Full<Bytes>;
+type BoxedBody<T> = http_body_util::combinators::BoxBody<T, Infallible>;
 
 static INDEX_PATH: &str = "examples/index.html";
 
@@ -34,13 +41,22 @@ fn not_found() -> Response<Body> {
         .unwrap()
 }
 
-async fn route(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+fn box_body<T, D>(response: Response<T>) -> Response<BoxedBody<D>>
+where
+    T: BodyTrait<Error = Infallible, Data = D> + Send + Sync + 'static,
+{
+    let (parts, body) = response.into_parts();
+    let body = body.boxed();
+    Response::from_parts(parts, body)
+}
+
+async fn route(req: Request<Incoming>) -> Result<Response<BoxedBody<Bytes>>, Infallible> {
     match (req.method(), req.uri().path()) {
-        (&Method::GET, "/") => send_file(INDEX_PATH).await,
-        (&Method::GET, "/socket") => server_upgrade(req).await,
-        _ => Ok(not_found()),
+        (&Method::GET, "/") => send_file(INDEX_PATH).await.map(box_body),
+        (&Method::GET, "/socket") => server_upgrade(req).await.map(box_body),
+        _ => Ok(box_body(not_found())),
     }
-    .or_else(|e| Ok(error_response(e.to_string())))
+    .or_else(|e| Ok(box_body(error_response(e.to_string()))))
 }
 
 async fn process_message(m: ws::Message, ctx: &mut u32) -> ws::MessageResult {
@@ -51,7 +67,7 @@ async fn process_message(m: ws::Message, ctx: &mut u32) -> ws::MessageResult {
 }
 
 /// Our server HTTP handler to initiate HTTP upgrades.
-async fn server_upgrade(req: Request<Body>) -> Result<Response<Body>, io::Error> {
+async fn server_upgrade(req: Request<Incoming>) -> Result<Response<Empty<Bytes>>, io::Error> {
     debug!("We got these headers: {:?}", req.headers());
 
     Ok(ws::spawn_websocket(
@@ -61,14 +77,26 @@ async fn server_upgrade(req: Request<Body>) -> Result<Response<Body>, io::Error>
         Some(Duration::from_secs(5 * 60)),
     ))
 }
+
+async fn serve_http(listener: TcpListener) {
+    loop {
+        let (socket, _) = listener.accept().await.expect("Error accepting connection");
+        let stream = TokioIo::new(socket);
+        tokio::spawn(async move {
+            let conn = http1::Builder::new().serve_connection(stream, service_fn(route));
+            let conn = conn.with_upgrades();
+            if let Err(e) = conn.await {
+                error!("Error in connection: {}", e);
+            }
+        });
+    }
+}
 #[tokio::main]
 async fn main() -> Result<(), GenericError> {
     env_logger::init();
-    let addr = ([127, 0, 0, 1], 5000).into();
-    let service = make_service_fn(|_| async { Ok::<_, Infallible>(service_fn(route)) });
-    let server = Server::bind(&addr).serve(service);
+    let addr: SocketAddr = ([127, 0, 0, 1], 5000).into();
+    let listener = TcpListener::bind(addr).await.expect("failed to bind");
     info!("Serving on {}", addr);
-    server.await?;
-
+    serve_http(listener).await;
     Ok(())
 }

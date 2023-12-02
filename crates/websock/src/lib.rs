@@ -3,9 +3,14 @@ extern crate log;
 
 use futures::prelude::*;
 use headers::{self, HeaderMapExt};
+use http_body_util::Empty;
 use hyper::header::{self, AsHeaderName, HeaderMap, HeaderValue};
-use hyper::upgrade;
-use hyper::{Body, Request, Response, StatusCode};
+use hyper::upgrade::{self, Upgraded};
+use hyper::{
+    body::{Bytes, Incoming},
+    Request, Response, StatusCode,
+};
+use hyper_util::rt::TokioIo;
 use std::io;
 use std::{fmt, time::Duration};
 use thiserror::Error;
@@ -72,11 +77,11 @@ fn header_matches<S: AsHeaderName>(headers: &HeaderMap<HeaderValue>, name: S, va
 ///
 
 pub fn spawn_websocket<T, P>(
-    req: Request<Body>,
+    req: Request<Incoming>,
     mut f: P,
     initial_context: T,
     timeout: Option<Duration>,
-) -> Response<Body>
+) -> Response<Empty<Bytes>>
 where
     T: Send + Sync + 'static,
     P: for<'a> MessageProcessor<'a, T> + Send + 'static,
@@ -164,16 +169,16 @@ where
 /// Websocket can have context of type T, which is then shared with all
 /// messages in this websocket.
 pub fn upgrade_connection<T: Send>(
-    mut req: Request<Body>,
+    mut req: Request<Incoming>,
     ctx: T,
 ) -> Result<
     (
-        Response<Body>,
+        Response<Empty<Bytes>>,
         impl Future<Output = Result<WebSocket<T>, ()>> + Send,
     ),
-    Response<Body>,
+    Response<Empty<Bytes>>,
 > {
-    let mut res = Response::new(Body::empty());
+    let mut res = Response::new(Empty::new());
     let mut header_error = false;
     debug!("We got these headers: {:?}", req.headers());
 
@@ -228,14 +233,15 @@ pub fn upgrade_connection<T: Send>(
 /// A websocket `Stream` and `Sink`
 /// This struct can hold a context for this particular connection
 pub struct WebSocket<T> {
-    inner: WebSocketStream<::hyper::upgrade::Upgraded>,
+    inner: WebSocketStream<TokioIo<Upgraded>>,
     context: T,
 }
 
 impl<T: Default> WebSocket<T> {
     /// Creates new WebSocket from an upgraded connection with default context
     #[allow(dead_code)]
-    pub(crate) async fn new(upgraded: hyper::upgrade::Upgraded) -> Self {
+    pub(crate) async fn new(upgraded: Upgraded) -> Self {
+        let upgraded = TokioIo::new(upgraded);
         let inner = WebSocketStream::from_raw_socket(upgraded, protocol::Role::Server, None).await;
         WebSocket {
             inner,
@@ -246,7 +252,8 @@ impl<T: Default> WebSocket<T> {
 
 impl<T> WebSocket<T> {
     /// Creates new WebSocket from an upgraded connection with default context
-    pub(crate) async fn new_with_context(upgraded: hyper::upgrade::Upgraded, context: T) -> Self {
+    pub(crate) async fn new_with_context(upgraded: Upgraded, context: T) -> Self {
+        let upgraded = TokioIo::new(upgraded);
         let inner = WebSocketStream::from_raw_socket(upgraded, protocol::Role::Server, None).await;
         WebSocket { inner, context }
     }
