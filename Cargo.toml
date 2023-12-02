@@ -13,7 +13,7 @@ members = ["crates/*"]
 bytes = "1.5"
 env_logger = "0.10"
 log = {version="0.4", features = ["release_max_level_info", "max_level_trace"]}
-hyper = {version="0.14", features = ["full"]}
+hyper = {version="1.0", features = ["full"]}
 headers = "0.3"
 futures = "0.3"
 mime = "0.3"

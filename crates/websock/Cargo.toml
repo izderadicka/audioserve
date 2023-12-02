@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 
-hyper = "0.14"
+hyper = {version="0.14", features=["deprecated"]}
 tokio = {version="1.34", features=["rt-multi-thread", "time"]}
 futures = "0.3"
 log = "0.4"
