@@ -11,6 +11,7 @@ use crate::Error;
 use crate::{config::get_config, util::ResponseBuilderExt};
 
 use super::compress::{compressed_response, make_sense_to_compress};
+use super::response::body::full_body;
 use super::response::{HttpResponse, ResponseResult};
 use super::search::{Search, SearchTrait};
 use super::types::Transcodings;
@@ -25,7 +26,7 @@ fn json_response<T: serde::Serialize>(data: &T, compress: bool) -> HttpResponse 
     } else {
         builder
             .typed_header(ContentLength(json.len() as u64))
-            .body(json.into())
+            .body(full_body(json))
             .unwrap()
     }
 }

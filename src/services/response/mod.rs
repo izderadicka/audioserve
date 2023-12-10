@@ -7,13 +7,14 @@ use bytes::Bytes;
 use futures::prelude::*;
 use headers::{CacheControl, ContentLength, ContentType, LastModified};
 use http::response::Builder;
+use http_body_util::Full;
 use hyper::{Response, StatusCode};
 use tokio::io::{AsyncRead, ReadBuf};
 
 use crate::error::Error;
 use crate::util::ResponseBuilderExt;
 
-use self::body::HttpBody;
+use self::body::{full_body, HttpBody};
 
 pub mod body;
 
@@ -35,7 +36,7 @@ fn short_response(status: StatusCode, msg: &'static str) -> HttpResponse {
         .status(status)
         .typed_header(ContentLength(msg.len() as u64))
         .typed_header(ContentType::text())
-        .body(msg.into())
+        .body(full_body(msg))
         .unwrap()
 }
 
@@ -47,7 +48,7 @@ pub fn not_found_cached(caching: Option<u32>) -> HttpResponse {
 
     builder = add_cache_headers(builder, caching, None);
 
-    builder.body(NOT_FOUND_MESSAGE.into()).unwrap()
+    builder.body(full_body(NOT_FOUND_MESSAGE)).unwrap()
 }
 
 #[inline]

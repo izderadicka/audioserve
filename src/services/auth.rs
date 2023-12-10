@@ -1,5 +1,6 @@
 use crate::config::get_config;
 use crate::error::{bail, Result};
+use crate::services::response::body::full_body;
 use crate::services::RequestWrapper;
 use crate::util::ResponseBuilderExt;
 use data_encoding::BASE64;
@@ -158,7 +159,7 @@ impl Authenticator for SharedSecretAuthenticator {
                                         .as_str(),
                                     );
 
-                                Ok(AuthResult::LoggedIn(resp.body(token.into()).unwrap()))
+                                Ok(AuthResult::LoggedIn(resp.body(full_body(token)).unwrap()))
                             } else {
                                 error!(
                                     "Invalid authentication: invalid shared secret, client: {:?}",
@@ -368,7 +369,7 @@ mod tests {
     use super::*;
     use crate::{config::init::init_default_config, services::response::body::HttpBody};
     use borrow::Cow;
-    use hyper::{Request, StatusCode};
+    use hyper::{body::Incoming, Request, StatusCode};
 
     #[test]
     fn test_token() {
@@ -408,7 +409,7 @@ mod tests {
             .method(Method::GET)
             .uri("/neco")
             .header("Authorization", format!("Bearer {}", token))
-            .body(HttpBody::from("Hey"))
+            .body(Incoming::from("Hey"))
             .unwrap();
 
         RequestWrapper::new(req, None, [192, 168, 1, 2].into(), false).unwrap()
