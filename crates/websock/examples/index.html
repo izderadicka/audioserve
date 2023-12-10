@@ -19,9 +19,9 @@
         }
 
         .timestamp {
-            background-color:lightgray;
+            background-color: lightgray;
             margin-right: 1em;
-            color:gray;
+            color: gray;
         }
     </style>
 </head>
@@ -41,7 +41,7 @@
 
 
     <script>
-        
+
         const socketUrl = `ws://${window.location.host}/socket`;
 
         const socket = new WebSocket(socketUrl);
@@ -71,12 +71,20 @@
         const btn = document.getElementById("btn-send");
         const responces = document.getElementById("responces");
         const input = document.getElementById("input-msg")
-        btn.addEventListener("click", (e) => {
+        function send_message() {
             if (socket.readyState == WebSocket.OPEN) {
-            const msg =input.value;
-            socket.send(msg);
+                const msg = input.value;
+                socket.send(msg);
             } else {
                 console.error("Socket not ready to send message")
+            }
+        }
+        btn.addEventListener("click", (e) => {
+            send_message()
+        })
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                send_message();
             }
         })
     </script>

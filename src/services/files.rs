@@ -3,8 +3,9 @@ use super::{
     compress::{compress_buf, make_sense_to_compress, CompressStream},
     icon::icon_response,
     response::{
-        self, add_cache_headers, not_found, not_found_cached, ChunkStream, HttpResponse,
-        ResponseResult,
+        self, add_cache_headers,
+        body::{full_body, wrap_stream},
+        not_found, not_found_cached, ChunkStream, HttpResponse, ResponseResult,
     },
     transcode::{guess_format, AudioFilePath, ChosenTranscoding, QualityLevel, Transcoder},
     types::*,
@@ -199,7 +200,7 @@ async fn serve_file_transcoded(
             Response::builder()
                 .typed_header(ContentType::from(mime))
                 .header("X-Transcode", params.as_bytes())
-                .body(stream.into())
+                .body(wrap_stream(stream))
                 .unwrap()
         })
 }
@@ -220,11 +221,11 @@ async fn serve_compressed_file(
     let body = if make_sense_to_compress(file_size) {
         resp = resp.typed_header(ContentEncoding::gzip());
         let stream = CompressStream::new(file);
-        stream.into()
+        wrap_stream(stream)
     } else {
         resp = resp.typed_header(ContentLength(file_size));
         let stream = ChunkStream::new(file);
-        stream.into()
+        wrap_stream(stream)
     };
     let resp = resp.body(body).unwrap();
 
@@ -271,7 +272,7 @@ async fn serve_opened_file(
     let stream = ChunkStream::new_with_limit(file, sz);
     let resp = resp
         .typed_header(ContentLength(sz))
-        .body(stream.into())
+        .body(wrap_stream(stream))
         .unwrap();
     Ok(resp)
 }
@@ -392,7 +393,7 @@ async fn send_buffer(
         .status(StatusCode::OK);
     resp = add_cache_headers(resp, cache, last_modified);
 
-    resp.body(buf.into()).map_err(Error::from)
+    resp.body(full_body(buf)).map_err(Error::from)
 }
 
 pub async fn send_description(
@@ -554,7 +555,7 @@ pub async fn download_folder(
 
                 debug!("Total len of folder is {:?}", total_len);
 
-                let stream: Box<dyn Stream<Item = _> + Unpin + Send> = match format {
+                let stream: Box<dyn Stream<Item = _> + Unpin + Send + Sync> = match format {
                     DownloadFormat::Tar => {
                         let files = folder.into_iter().map(|i| i.0);
                         Box::new(async_tar::TarStream::tar_iter(files))
@@ -571,7 +572,7 @@ pub async fn download_folder(
                     .typed_header(ContentType::from(format.mime()))
                     .header(CONTENT_DISPOSITION, disposition.as_bytes())
                     .typed_header(ContentLength(total_len));
-                Ok(builder.body(stream.into())).unwrap()
+                Ok(builder.body(wrap_stream(stream)).unwrap())
             }
             Ok(Err(e)) => Err(Error::new(e).context("listing directory")),
             Err(e) => Err(Error::new(e).context("spawn blocking directory")),

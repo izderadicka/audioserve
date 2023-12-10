@@ -15,10 +15,12 @@ pub fn empty_body() -> HttpBody {
     Empty::new().boxed()
 }
 
-pub fn wrap_stream<S>(stream: S) -> HttpBody
+// TODO: handle errors !!!!
+pub fn wrap_stream<S, T>(stream: S) -> HttpBody
 where
-    S: Stream<Item = Result<Bytes, std::io::Error>> + Send + Sync + 'static,
+    T: Into<Bytes>,
+    S: Stream<Item = Result<T, std::io::Error>> + Send + Sync + 'static,
 {
-    let body = StreamBody::new(stream.map(|b| Ok::<_, Infallible>(Frame::data(b.unwrap()))));
+    let body = StreamBody::new(stream.map(|b| Ok::<_, Infallible>(Frame::data(b.unwrap().into()))));
     BodyExt::boxed(body)
 }

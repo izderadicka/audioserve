@@ -14,7 +14,7 @@ use crate::{config::get_config, util::ResponseBuilderExt};
 
 use self::cache::{cache_icon, cached_icon};
 
-use super::response::{add_cache_headers, HttpResponse};
+use super::response::{add_cache_headers, body::full_body, HttpResponse};
 
 pub mod cache;
 
@@ -50,7 +50,7 @@ pub fn icon_response(
 
     builder = add_cache_headers(builder, get_config().folder_file_cache_age, None);
 
-    builder.body(data.into()).map_err(anyhow::Error::from)
+    builder.body(full_body(data)).map_err(anyhow::Error::from)
 }
 
 pub fn scale_cover(path: impl AsRef<Path> + std::fmt::Debug) -> Result<Vec<u8>> {

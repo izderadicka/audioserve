@@ -1,7 +1,8 @@
 use std::{borrow::Cow, collections::HashMap, fmt::Display, iter::once, net::IpAddr};
 
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use headers::{Header, HeaderMapExt, HeaderName, HeaderValue};
+use http_body_util::BodyExt;
 use hyper::{body::Incoming, Request};
 use percent_encoding::percent_decode;
 use url::form_urlencoded;
@@ -204,19 +205,8 @@ impl RequestWrapper {
     }
 
     pub async fn body_bytes(&mut self) -> Result<Bytes, hyper::Error> {
-        let first = self.request.body_mut().data().await;
-        match first {
-            Some(Ok(data)) => {
-                let mut buf = BytesMut::from(&data[..]);
-                while let Some(res) = self.request.body_mut().data().await {
-                    let next = res?;
-                    buf.extend_from_slice(&next);
-                }
-                Ok(buf.into())
-            }
-            Some(Err(e)) => Err(e),
-            None => Ok(Bytes::new()),
-        }
+        let body = self.request.body_mut();
+        body.collect().await.map(|collected| collected.to_bytes())
     }
 
     #[allow(dead_code)]

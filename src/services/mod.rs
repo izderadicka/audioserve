@@ -10,7 +10,6 @@ use crate::util::ResponseBuilderExt;
 use crate::{error, util::header2header};
 
 use collection::{Collections, FoldersOrdering};
-use futures::prelude::*;
 use futures::{future, TryFutureExt};
 use headers::{
     AccessControlAllowCredentials, AccessControlAllowHeaders, AccessControlAllowMethods,
@@ -18,18 +17,16 @@ use headers::{
     Origin, Range, UserAgent,
 };
 use hyper::StatusCode;
-use hyper::{service::Service, Method, Request, Response};
+use hyper::{service::Service, Method, Response};
 use leaky_cauldron::Leaky;
 
 use regex::Regex;
 use std::iter::FromIterator;
 use std::time::Duration;
 use std::{
-    convert::Infallible,
     net::SocketAddr,
     path::{Path, PathBuf},
     sync::{atomic::AtomicUsize, Arc},
-    task::Poll,
 };
 
 pub mod api;
@@ -81,12 +78,8 @@ impl<T> ServiceFactory<T> {
         }
     }
 
-    pub fn create(
-        &self,
-        remote_addr: SocketAddr,
-        is_ssl: bool,
-    ) -> impl Future<Output = Result<MainService<T>, Infallible>> {
-        future::ok(MainService {
+    pub fn create(&self, remote_addr: SocketAddr, is_ssl: bool) -> MainService<T> {
+        MainService {
             state: ServiceComponents {
                 search: self.search.clone(),
                 transcoding: self.transcoding.clone(),
@@ -96,7 +89,7 @@ impl<T> ServiceFactory<T> {
             rate_limitter: self.rate_limitter.clone(),
             remote_addr,
             is_ssl,
-        })
+        }
     }
 }
 
@@ -184,11 +177,7 @@ impl<C: Send + 'static> Service<HttpRequest> for MainService<C> {
     type Error = error::Error;
     type Future = ResponseFuture;
 
-    fn poll_ready(&mut self, _cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, req: HttpRequest) -> Self::Future {
+    fn call(&self, req: HttpRequest) -> Self::Future {
         let state = self.state.clone();
 
         //Limit rate of requests if configured
@@ -511,7 +500,7 @@ impl<C: Send + 'static> MainService<C> {
 
         let range = req.headers().typed_get::<Range>();
 
-        let bytes_range = match range.map(|r| r.iter().collect::<Vec<_>>()) {
+        let bytes_range = match range.map(|r| r.satisfiable_ranges(u64::MAX).collect::<Vec<_>>()) {
             Some(bytes_ranges) => {
                 if bytes_ranges.is_empty() {
                     error!("Range header without range bytes");

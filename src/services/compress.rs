@@ -10,10 +10,10 @@ use crate::util::ResponseBuilderExt;
 use flate2::{write::GzEncoder, Compress, Compression, Crc, FlushCompress};
 use futures::Stream;
 use headers::{ContentEncoding, ContentLength};
-use http::{response::Builder, Response};
+use http::response::Builder;
 use tokio::io::{AsyncRead, ReadBuf};
 
-use super::response::HttpResponse;
+use super::response::{body::full_body, HttpResponse};
 
 const COMPRESSION_LIMIT: u64 = 512;
 
@@ -32,7 +32,7 @@ pub fn compressed_response(response_builder: Builder, data: Vec<u8>) -> HttpResp
     response_builder
         .typed_header(ContentLength(size))
         .typed_header(ContentEncoding::gzip())
-        .body(output.into())
+        .body(full_body(output))
         .unwrap()
 }
 

@@ -2,6 +2,7 @@ use super::response::ResponseResult;
 use super::RequestWrapper;
 use crate::config::get_config;
 use crate::error::{bail, Context, Error};
+use crate::services::response::box_response_body;
 use collection::audio_meta::TimeStamp;
 use collection::{Collections, Position};
 
@@ -242,7 +243,7 @@ pub fn position_service(req: RequestWrapper, col: Arc<Collections>) -> ResponseR
         Some(get_config().positions.ws_timeout),
     );
 
-    Ok(res)
+    Ok(box_response_body(res))
 }
 
 #[cfg(test)]

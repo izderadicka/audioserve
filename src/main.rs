@@ -24,8 +24,11 @@ use std::thread;
 use std::time::Duration;
 use tokio::sync::oneshot;
 
+use crate::server::HttpServer;
+
 mod config;
 mod error;
+mod server;
 mod services;
 // #[cfg(feature = "tls")]
 // mod tls;
@@ -163,16 +166,11 @@ fn start_server(
         let server: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> =
             match get_config().ssl.as_ref() {
                 None => {
-                    let server = HttpServer::bind(&addr).serve(make_service_fn(
-                        move |conn: &hyper::server::conn::AddrStream| {
-                            let remote_addr = conn.remote_addr();
-                            svc_factory.create(remote_addr, false)
-                        },
-                    ));
-                    info!("Server listening on {}{}", &addr, get_url_path!());
+                    let server = HttpServer::bind(addr).serve(svc_factory);
+                    info!("Server listening on {}{}", addr, get_url_path!());
                     Box::pin(server.map_err(|e| e.into()))
                 }
-                Some(ssl) => {
+                Some(_ssl) => {
                     #[cfg(feature = "tls")]
                     todo!("Implement TLS server");
                     // {
