@@ -3,7 +3,10 @@ use std::{borrow::Cow, collections::HashMap, fmt::Display, iter::once, net::IpAd
 use bytes::Bytes;
 use headers::{Header, HeaderMapExt, HeaderName, HeaderValue};
 use http_body_util::BodyExt;
-use hyper::{body::Incoming, Request};
+use hyper::{
+    body::{Body, Incoming},
+    Request,
+};
 use percent_encoding::percent_decode;
 use url::form_urlencoded;
 
@@ -14,7 +17,9 @@ use crate::{
 
 pub struct AcceptEncoding(HeaderValue);
 
-pub type HttpRequest = Request<Incoming>;
+type GenericRequest<T> = Request<T>;
+pub type HttpRequest = GenericRequest<Incoming>;
+pub type RequestWrapper = GenericRequestWrapper<Incoming>;
 
 impl Header for AcceptEncoding {
     fn name() -> &'static HeaderName {
@@ -95,8 +100,8 @@ impl Display for RemoteIpAddr {
     }
 }
 
-pub struct RequestWrapper {
-    request: HttpRequest,
+pub struct GenericRequestWrapper<T> {
+    request: GenericRequest<T>,
     path: String,
     remote_addr: IpAddr,
     #[allow(dead_code)]
@@ -106,9 +111,12 @@ pub struct RequestWrapper {
     can_br_compress: bool,
 }
 
-impl RequestWrapper {
+impl<T> GenericRequestWrapper<T>
+where
+    T: Body + Send + Sync + 'static + Unpin,
+{
     pub fn new(
-        request: HttpRequest,
+        request: GenericRequest<T>,
         path_prefix: Option<&str>,
         remote_addr: IpAddr,
         is_ssl: bool,
@@ -158,7 +166,7 @@ impl RequestWrapper {
         } else {
             false
         };
-        Ok(RequestWrapper {
+        Ok(GenericRequestWrapper {
             request,
             path,
             remote_addr,
@@ -200,17 +208,12 @@ impl RequestWrapper {
     }
 
     #[allow(dead_code)]
-    pub fn into_body(self) -> Incoming {
+    pub fn into_body(self) -> T {
         self.request.into_body()
     }
 
-    pub async fn body_bytes(&mut self) -> Result<Bytes, hyper::Error> {
-        let body = self.request.body_mut();
-        body.collect().await.map(|collected| collected.to_bytes())
-    }
-
     #[allow(dead_code)]
-    pub fn into_request(self) -> HttpRequest {
+    pub fn into_request(self) -> GenericRequest<T> {
         self.request
     }
 
@@ -252,6 +255,17 @@ impl RequestWrapper {
         false
     }
 
+    pub fn can_compress(&self) -> bool {
+        self.can_br_compress
+    }
+
+    pub async fn body_bytes(&mut self) -> Result<Bytes, T::Error> {
+        let body = self.request.body_mut();
+        body.collect().await.map(|collected| collected.to_bytes())
+    }
+}
+
+impl GenericRequestWrapper<Incoming> {
     pub fn is_cors_enabled(&self) -> bool {
         RequestWrapper::is_cors_enabled_for_request(&self.request)
     }
@@ -280,10 +294,6 @@ impl RequestWrapper {
         } else {
             false
         }
-    }
-
-    pub fn can_compress(&self) -> bool {
-        self.can_br_compress
     }
 }
 

@@ -364,13 +364,15 @@ impl ::std::str::FromStr for Token {
     }
 }
 
-// TODO: fix tests
-#[cfg(test_ignored)]
+//TODO - fix test
+#[cfg(test_)]
 mod tests {
     use super::*;
-    use crate::{config::init::init_default_config, services::response::body::HttpBody};
+    use crate::{config::init::init_default_config, services::request::GenericRequestWrapper};
     use borrow::Cow;
-    use hyper::{body::Incoming, Request, StatusCode};
+    use bytes::Bytes;
+    use http_body_util::{BodyExt, Full};
+    use hyper::{Request, StatusCode};
 
     #[test]
     fn test_token() {
@@ -386,8 +388,8 @@ mod tests {
         assert!(new_token.validity() - now() <= 24 * 3600);
     }
 
-    fn build_request(body: impl Into<HttpBody>, json: bool) -> RequestWrapper {
-        let b = body.into();
+    fn build_request(body: impl Into<Bytes>, json: bool) -> GenericRequestWrapper<Full<Bytes>> {
+        let b = Full::new(body.into());
         let req = Request::builder()
             .method(Method::POST)
             .header(
@@ -402,18 +404,18 @@ mod tests {
             .body(b)
             .unwrap();
 
-        RequestWrapper::new(req, None, [192, 168, 1, 2].into(), false).unwrap()
+        GenericRequestWrapper::new(req, None, [192, 168, 1, 2].into(), false).unwrap()
     }
 
-    fn build_authenticated_request(token: &str) -> RequestWrapper {
+    fn build_authenticated_request(token: &str) -> GenericRequestWrapper<Full<Bytes>> {
         let req = Request::builder()
             .method(Method::GET)
             .uri("/neco")
             .header("Authorization", format!("Bearer {}", token))
-            .body(Incoming::from("Hey"))
+            .body(Full::new("Hey".into()))
             .unwrap();
 
-        RequestWrapper::new(req, None, [192, 168, 1, 2].into(), false).unwrap()
+        GenericRequestWrapper::new(req, None, [192, 168, 1, 2].into(), false).unwrap()
     }
 
     fn shared_secret(sec: &str) -> String {
@@ -480,12 +482,11 @@ mod tests {
 
         if let AuthResult::LoggedIn(res) = res {
             assert_eq!(res.status(), StatusCode::OK);
-            let token = res
-                .into_body()
-                .filter_map(|x| future::ready(x.ok()))
-                .map(|x| x.to_vec())
-                .concat()
-                .await;
+            let token = BodyExt::collect(res.into_body())
+                .await
+                .unwrap()
+                .to_bytes()
+                .to_vec();
             let token = String::from_utf8(token).expect("token is string");
             assert!(token.len() > 64);
             let req = build_authenticated_request(&token);
