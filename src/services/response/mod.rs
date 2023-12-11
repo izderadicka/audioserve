@@ -32,12 +32,12 @@ pub type HttpResponse = Response<HttpBody>;
 pub type ResponseResult = Result<HttpResponse, Error>;
 pub type ResponseFuture = Pin<Box<dyn Future<Output = ResponseResult> + Send>>;
 
-pub fn box_response_body<B>(response: Response<B>) -> HttpResponse
+pub fn box_websocket_response<B>(response: Response<B>) -> HttpResponse
 where
     B: Body<Data = Bytes, Error = Infallible> + Send + Sync + 'static,
 {
     let (parts, body) = response.into_parts();
-    let body = BodyExt::boxed(body);
+    let body = BodyExt::boxed(body.map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "")));
     let response = Response::from_parts(parts, body);
     response
 }
