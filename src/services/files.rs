@@ -1,30 +1,31 @@
 //#[cfg(feature = "folder-download")]
 use super::{
     icon::icon_response,
-    response::compress::{compress_buf, make_sense_to_compress},
     response::{
-        self, add_cache_headers,
-        body::{full_body, wrap_stream},
-        file::{send_file_simple, serve_file_from_fs, serve_opened_file, ByteRange},
-        not_found, not_found_cached, ResponseResult,
+        body::wrap_stream,
+        file::{send_file_simple, serve_file_from_fs, ByteRange},
+        not_found, not_found_cached, send_buffer, ResponseResult,
     },
     transcode::{guess_format, AudioFilePath, ChosenTranscoding, QualityLevel, Transcoder},
     types::*,
     Counter,
 };
-use crate::{config::get_config, error::Error, services::response::ResponseBuilderExt};
+use crate::{
+    config::get_config,
+    error::Error,
+    services::response::{self, ResponseBuilderExt},
+};
 use collection::{
     audio_meta::is_audio, extract_cover, extract_description, parse_chapter_path, TimeSpan,
 };
 use futures::prelude::*;
-use headers::{ContentEncoding, ContentLength, ContentType};
+use headers::{ContentLength, ContentType};
 use http::Response;
-use http::StatusCode;
+
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},
     sync::{atomic::Ordering, Arc},
-    time::SystemTime,
 };
 use tokio::task::spawn_blocking as blocking;
 
@@ -68,6 +69,8 @@ async fn serve_file_cached_or_transcoded(
     }
 
     use super::transcode::cache::{cache_key_async, get_cache};
+    use crate::services::response::file::serve_opened_file;
+
     let cache = get_cache();
     let (cache_key, meta) = cache_key_async(&full_path, &transcoding_quality, span).await?;
     let maybe_file = cache
@@ -237,26 +240,6 @@ pub async fn send_file<P: AsRef<Path>>(
     }
 }
 
-async fn send_buffer(
-    mut buf: Vec<u8>,
-    mime: mime::Mime,
-    cache: Option<u32>,
-    last_modified: Option<SystemTime>,
-    compressed: bool,
-) -> ResponseResult {
-    let mut resp = Response::builder().typed_header(ContentType::from(mime));
-    if compressed && make_sense_to_compress(buf.len()) {
-        buf = compress_buf(&buf);
-        resp = resp.typed_header(ContentEncoding::gzip());
-    }
-    resp = resp
-        .typed_header(ContentLength(buf.len() as u64))
-        .status(StatusCode::OK);
-    resp = add_cache_headers(resp, cache, last_modified);
-
-    resp.body(full_body(buf)).map_err(Error::from)
-}
-
 pub async fn send_description(
     base_path: &'static Path,
     file_path: impl AsRef<Path> + Send + 'static,
@@ -302,28 +285,22 @@ pub async fn send_folder_metadata(
         // extract description from audio file
         let full_path = base_path.join(file_path);
         let fut = blocking(move || {
-            let m = std::fs::metadata(&full_path)
+            let last_modified = std::fs::metadata(&full_path)
                 .and_then(|meta| meta.modified())
                 .ok();
-            (extractor(full_path), m)
-        })
-        .map_err(Error::from)
-        .and_then(move |(data, last_modified)| async move {
+            let data = extractor(full_path);
             match data {
-                None => Ok(not_found()),
-                Some(data) => {
-                    send_buffer(
-                        data,
-                        mime.as_ref().parse().unwrap(),
-                        cache,
-                        last_modified,
-                        compressed,
-                    )
-                    .await
-                }
+                None => not_found(),
+                Some(data) => send_buffer(
+                    data,
+                    mime.as_ref().parse().unwrap(),
+                    cache,
+                    last_modified,
+                    compressed,
+                ),
             }
-        });
-
+        })
+        .map_err(Error::from);
         fut.await
     } else {
         send_file_simple(base_path, file_path, cache, compressed).await

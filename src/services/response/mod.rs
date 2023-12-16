@@ -5,7 +5,9 @@ use std::{future::Future, pin::Pin, time::SystemTime};
 
 use bytes::Bytes;
 use futures::prelude::*;
-use headers::{CacheControl, ContentLength, ContentType, Header, HeaderMapExt, LastModified};
+use headers::{
+    CacheControl, ContentEncoding, ContentLength, ContentType, Header, HeaderMapExt, LastModified,
+};
 use http::response::Builder;
 use http::{Response, StatusCode};
 use http_body_util::BodyExt;
@@ -14,7 +16,7 @@ use mime::Mime;
 use tokio::io::{AsyncRead, ReadBuf};
 
 use self::body::{full_body, HttpBody};
-use self::compress::{compressed_response, make_sense_to_compress};
+use self::compress::{compress_buf, compressed_response, make_sense_to_compress};
 use crate::error::Error;
 
 pub mod body;
@@ -149,6 +151,26 @@ where
     builder = add_cache_headers(builder, cache_age, last_modified);
 
     builder.body(full_body(data)).unwrap()
+}
+
+pub fn send_buffer(
+    mut buf: Vec<u8>,
+    mime: mime::Mime,
+    cache: Option<u32>,
+    last_modified: Option<SystemTime>,
+    compressed: bool,
+) -> HttpResponse {
+    let mut resp = Response::builder().typed_header(ContentType::from(mime));
+    if compressed && make_sense_to_compress(buf.len()) {
+        buf = compress_buf(&buf);
+        resp = resp.typed_header(ContentEncoding::gzip());
+    }
+    resp = resp
+        .typed_header(ContentLength(buf.len() as u64))
+        .status(StatusCode::OK);
+    resp = add_cache_headers(resp, cache, last_modified);
+
+    resp.body(full_body(buf)).map_err(Error::from).unwrap()
 }
 
 pub fn json_response<T: serde::Serialize>(data: &T, compress: bool) -> HttpResponse {
