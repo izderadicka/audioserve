@@ -1,12 +1,12 @@
 use crate::config::get_config;
 use crate::error::{bail, Result};
 use crate::services::response::body::full_body;
-use crate::services::RequestWrapper;
 use crate::util::ResponseBuilderExt;
 use data_encoding::BASE64;
 use futures::{future, prelude::*};
 use headers::authorization::Bearer;
 use headers::{Authorization, ContentLength, ContentType, Cookie, HeaderMapExt, HeaderValue};
+use hyper::body::Body;
 use hyper::header::SET_COOKIE;
 use hyper::{Method, Response};
 use ring::rand::{SecureRandom, SystemRandom};
@@ -23,21 +23,22 @@ use thiserror::Error;
 use tokio::time::sleep;
 use url::form_urlencoded;
 
+use super::request::GenericRequestWrapper;
 use super::response::{self, HttpResponse};
 
-pub enum AuthResult<T> {
+pub enum AuthResult<T, B> {
     Authenticated {
         credentials: T,
-        request: RequestWrapper,
+        request: GenericRequestWrapper<B>,
     },
     Rejected(HttpResponse),
     LoggedIn(HttpResponse),
 }
-type AuthFuture<T> = Pin<Box<dyn Future<Output = Result<AuthResult<T>>> + Send>>;
+type AuthFuture<T, B> = Pin<Box<dyn Future<Output = Result<AuthResult<T, B>>> + Send>>;
 
-pub trait Authenticator: Send + Sync {
+pub trait Authenticator<B>: Send + Sync {
     type Credentials;
-    fn authenticate(&self, req: RequestWrapper) -> AuthFuture<Self::Credentials>;
+    fn authenticate(&self, req: GenericRequestWrapper<B>) -> AuthFuture<Self::Credentials, B>;
 }
 
 #[derive(Clone, Debug)]
@@ -67,7 +68,10 @@ impl SharedSecretAuthenticator {
 const COOKIE_NAME: &str = "audioserve_token";
 const COOKIE_DELETE_DATE: &str = "Thu, 01 Jan 1970 00:00:00 GMT";
 
-fn deny(req: &RequestWrapper) -> Result<AuthResult<()>> {
+fn deny<B>(req: &GenericRequestWrapper<B>) -> Result<AuthResult<(), B>>
+where
+    B: Body + Send + Sync + 'static + Unpin,
+{
     let mut resp = response::deny();
 
     // delete cookie, if it was send in request
@@ -93,7 +97,10 @@ fn deny(req: &RequestWrapper) -> Result<AuthResult<()>> {
     Ok(AuthResult::Rejected(resp))
 }
 
-fn cookie_params(req: &RequestWrapper) -> &'static str {
+fn cookie_params<B>(req: &GenericRequestWrapper<B>) -> &'static str
+where
+    B: Body + Send + Sync + 'static + Unpin,
+{
     if req.is_https() && req.is_cors_enabled() {
         "SameSite=None; Secure"
     } else {
@@ -101,9 +108,14 @@ fn cookie_params(req: &RequestWrapper) -> &'static str {
     }
 }
 
-impl Authenticator for SharedSecretAuthenticator {
+impl<B> Authenticator<B> for SharedSecretAuthenticator
+where
+    B: Body + Send + Sync + 'static + Unpin,
+    B::Error: Into<crate::error::Error> + Send + Sync + 'static,
+    B::Data: Send,
+{
     type Credentials = ();
-    fn authenticate(&self, mut req: RequestWrapper) -> AuthFuture<()> {
+    fn authenticate(&self, mut req: GenericRequestWrapper<B>) -> AuthFuture<(), B> {
         // this is part where client can authenticate itself and get token
         if req.method() == Method::POST && req.path() == "/authenticate" {
             debug!("Authentication request");
@@ -364,8 +376,7 @@ impl ::std::str::FromStr for Token {
     }
 }
 
-//TODO - fix test
-#[cfg(test_)]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{config::init::init_default_config, services::request::GenericRequestWrapper};

@@ -263,37 +263,38 @@ where
         let body = self.request.body_mut();
         body.collect().await.map(|collected| collected.to_bytes())
     }
+
+    pub fn is_cors_enabled(&self) -> bool {
+        is_cors_enabled_for_request(&self.request)
+    }
 }
 
-impl GenericRequestWrapper<Incoming> {
-    pub fn is_cors_enabled(&self) -> bool {
-        RequestWrapper::is_cors_enabled_for_request(&self.request)
-    }
-
-    pub fn is_cors_enabled_for_request(req: &HttpRequest) -> bool {
-        if let Some(cors) = get_config().cors.as_ref() {
-            match &cors.allow {
-                Cors::AllowAllOrigins => true,
-                Cors::AllowMatchingOrigins(re) => req
-                    .headers()
-                    .get("origin")
-                    .and_then(|v| {
-                        v.to_str()
-                            .map_err(|e| error!("Invalid origin header: {}", e))
-                            .ok()
-                    })
-                    .map(|s| {
-                        if s.to_ascii_lowercase() == "null" {
-                            false
-                        } else {
-                            re.is_match(s)
-                        }
-                    })
-                    .unwrap_or(false),
-            }
-        } else {
-            false
+pub fn is_cors_enabled_for_request<B>(req: &GenericRequest<B>) -> bool
+where
+    B: Body,
+{
+    if let Some(cors) = get_config().cors.as_ref() {
+        match &cors.allow {
+            Cors::AllowAllOrigins => true,
+            Cors::AllowMatchingOrigins(re) => req
+                .headers()
+                .get("origin")
+                .and_then(|v| {
+                    v.to_str()
+                        .map_err(|e| error!("Invalid origin header: {}", e))
+                        .ok()
+                })
+                .map(|s| {
+                    if s.to_ascii_lowercase() == "null" {
+                        false
+                    } else {
+                        re.is_match(s)
+                    }
+                })
+                .unwrap_or(false),
         }
+    } else {
+        false
     }
 }
 

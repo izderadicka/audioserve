@@ -1,5 +1,5 @@
 use self::auth::{AuthResult, Authenticator};
-use self::request::{HttpRequest, QueryParams, RequestWrapper};
+use self::request::{is_cors_enabled_for_request, HttpRequest, QueryParams, RequestWrapper};
 use self::response::{HttpResponse, ResponseFuture, ResponseResult};
 use self::search::Search;
 use self::transcode::QualityLevel;
@@ -16,6 +16,7 @@ use headers::{
     AccessControlAllowOrigin, AccessControlMaxAge, AccessControlRequestHeaders, HeaderMapExt,
     Origin, Range, UserAgent,
 };
+use hyper::body::Incoming;
 use hyper::StatusCode;
 use hyper::{service::Service, Method, Response};
 use leaky_cauldron::Leaky;
@@ -51,7 +52,7 @@ pub struct TranscodingDetails {
 }
 
 pub struct ServiceFactory<T> {
-    authenticator: Option<Arc<dyn Authenticator<Credentials = T>>>,
+    authenticator: Option<Arc<dyn Authenticator<Incoming, Credentials = T>>>,
     rate_limitter: Option<Arc<Leaky>>,
     search: Search<String>,
     transcoding: TranscodingDetails,
@@ -67,10 +68,11 @@ impl<T> ServiceFactory<T> {
         rate_limit: Option<f32>,
     ) -> Self
     where
-        A: Authenticator<Credentials = T> + 'static,
+        A: Authenticator<Incoming, Credentials = T> + 'static,
     {
         ServiceFactory {
-            authenticator: auth.map(|a| Arc::new(a) as Arc<dyn Authenticator<Credentials = T>>),
+            authenticator: auth
+                .map(|a| Arc::new(a) as Arc<dyn Authenticator<Incoming, Credentials = T>>),
             rate_limitter: rate_limit.map(|l| Arc::new(Leaky::new(l))),
             search,
             transcoding,
@@ -100,7 +102,7 @@ pub struct ServiceComponents {
     pub collections: Arc<Collections>,
 }
 
-type OptionalAuthenticatorType<T> = Option<Arc<dyn Authenticator<Credentials = T>>>;
+type OptionalAuthenticatorType<T> = Option<Arc<dyn Authenticator<Incoming, Credentials = T>>>;
 
 #[derive(Clone)]
 pub struct MainService<T> {
@@ -189,7 +191,7 @@ impl<C: Send + 'static> Service<HttpRequest> for MainService<C> {
         }
 
         // handle OPTIONS method for CORS preflight
-        if req.method() == Method::OPTIONS && RequestWrapper::is_cors_enabled_for_request(&req) {
+        if req.method() == Method::OPTIONS && is_cors_enabled_for_request(&req) {
             debug!(
                 "Got OPTIONS request in CORS mode : {} {:?}",
                 req.uri(),
