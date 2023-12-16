@@ -39,19 +39,12 @@ pub fn icon_response(
         }
     };
 
-    // let mut builder = Response::builder()
-    //     .status(200)
-    //     .typed_header(ContentLength(data.len() as u64))
-    //     .typed_header(ContentType::png());
-
-    // builder = add_cache_headers(builder, get_config().folder_file_cache_age, None);
-
-    // builder.body(full_body(data)).map_err(anyhow::Error::from)
     Ok(data_response(
         data,
         mime::IMAGE_PNG,
         get_config().folder_file_cache_age,
         None,
+        false,
     ))
 }
 

@@ -138,37 +138,21 @@ pub fn data_response<T>(
     content_type: Mime,
     cache_age: Option<u32>,
     last_modified: Option<SystemTime>,
+    should_compress: bool,
 ) -> HttpResponse
 where
     T: Into<Bytes>,
 {
-    let data: Bytes = data.into();
-    let mut builder = Response::builder()
-        .status(200)
-        .typed_header(ContentLength(data.len() as u64))
-        .typed_header(ContentType::from(content_type));
-
-    builder = add_cache_headers(builder, cache_age, last_modified);
-
-    builder.body(full_body(data)).unwrap()
-}
-
-pub fn send_buffer(
-    mut buf: Vec<u8>,
-    mime: mime::Mime,
-    cache: Option<u32>,
-    last_modified: Option<SystemTime>,
-    compressed: bool,
-) -> HttpResponse {
-    let mut resp = Response::builder().typed_header(ContentType::from(mime));
-    if compressed && make_sense_to_compress(buf.len()) {
-        buf = compress_buf(&buf);
+    let mut buf: Bytes = data.into();
+    let mut resp = Response::builder().typed_header(ContentType::from(content_type));
+    if should_compress && make_sense_to_compress(buf.len()) {
+        buf = compress_buf(&buf).into();
         resp = resp.typed_header(ContentEncoding::gzip());
     }
     resp = resp
         .typed_header(ContentLength(buf.len() as u64))
         .status(StatusCode::OK);
-    resp = add_cache_headers(resp, cache, last_modified);
+    resp = add_cache_headers(resp, cache_age, last_modified);
 
     resp.body(full_body(buf)).map_err(Error::from).unwrap()
 }

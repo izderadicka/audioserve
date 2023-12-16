@@ -255,7 +255,7 @@ async fn terminate_server(
             SIGQUIT => "SIGQUIT",
             _ => "Other",
         };
-        info!("Terminated on {:?}", signal_name);
+        info!("Terminated on {}", signal_name);
         stop_service_sender.send(()).ok();
     };
 

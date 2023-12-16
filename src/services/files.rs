@@ -3,8 +3,9 @@ use super::{
     icon::icon_response,
     response::{
         body::wrap_stream,
+        data_response,
         file::{send_file_simple, serve_file_from_fs, ByteRange},
-        not_found, not_found_cached, send_buffer, ResponseResult,
+        not_found, not_found_cached, ResponseResult,
     },
     transcode::{guess_format, AudioFilePath, ChosenTranscoding, QualityLevel, Transcoder},
     types::*,
@@ -291,7 +292,7 @@ pub async fn send_folder_metadata(
             let data = extractor(full_path);
             match data {
                 None => not_found(),
-                Some(data) => send_buffer(
+                Some(data) => data_response(
                     data,
                     mime.as_ref().parse().unwrap(),
                     cache,
