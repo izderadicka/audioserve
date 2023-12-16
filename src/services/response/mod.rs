@@ -20,6 +20,7 @@ use crate::error::Error;
 pub mod body;
 pub mod compress;
 pub mod cors;
+pub mod file;
 
 const NOT_FOUND_MESSAGE: &str = "Not Found";
 const TOO_MANY_REQUESTS_MSG: &str = "Too many requests";

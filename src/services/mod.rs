@@ -1,6 +1,7 @@
 use self::auth::{AuthResult, Authenticator};
 use self::request::{is_cors_enabled_for_request, HttpRequest, QueryParams, RequestWrapper};
 use self::response::cors::add_cors_headers;
+use self::response::file::send_static_file;
 use self::response::{HttpResponse, ResponseFuture, ResponseResult};
 use self::search::Search;
 use self::transcode::QualityLevel;
@@ -194,14 +195,14 @@ impl<C: Send + 'static> MainService<C> {
         //static files
         if req.method() == Method::GET {
             if req.path() == "/" || req.path() == "/index.html" {
-                return files::send_static_file(
+                return send_static_file(
                     &get_config().client_dir,
                     "index.html",
                     get_config().static_resource_cache_age,
                 )
                 .await;
             } else if is_static_file(req.path()) {
-                return files::send_static_file(
+                return send_static_file(
                     &get_config().client_dir,
                     &req.path()[1..],
                     get_config().static_resource_cache_age,
