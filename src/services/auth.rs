@@ -1,14 +1,14 @@
 use crate::config::get_config;
 use crate::error::{bail, Result};
 use crate::services::response::body::full_body;
-use crate::util::ResponseBuilderExt;
+use crate::services::response::ResponseBuilderExt;
 use data_encoding::BASE64;
 use futures::{future, prelude::*};
 use headers::authorization::Bearer;
 use headers::{Authorization, ContentLength, ContentType, Cookie, HeaderMapExt, HeaderValue};
+use http::header::SET_COOKIE;
+use http::{Method, Response};
 use hyper::body::Body;
-use hyper::header::SET_COOKIE;
-use hyper::{Method, Response};
 use ring::rand::{SecureRandom, SystemRandom};
 use ring::{
     digest::{digest, SHA256},
@@ -382,8 +382,8 @@ mod tests {
     use crate::{config::init::init_default_config, services::request::GenericRequestWrapper};
     use borrow::Cow;
     use bytes::Bytes;
+    use http::{Request, StatusCode};
     use http_body_util::{BodyExt, Full};
-    use hyper::{Request, StatusCode};
 
     #[test]
     fn test_token() {

@@ -1,29 +1,23 @@
 use self::auth::{AuthResult, Authenticator};
 use self::request::{is_cors_enabled_for_request, HttpRequest, QueryParams, RequestWrapper};
+use self::response::cors::add_cors_headers;
 use self::response::{HttpResponse, ResponseFuture, ResponseResult};
 use self::search::Search;
 use self::transcode::QualityLevel;
 use crate::config::get_config;
-use crate::services::response::body::empty_body;
+use crate::error;
+use crate::services::response::cors::preflight_cors_response;
 use crate::services::transcode::ChosenTranscoding;
-use crate::util::ResponseBuilderExt;
-use crate::{error, util::header2header};
 
 use collection::{Collections, FoldersOrdering};
 use futures::{future, TryFutureExt};
-use headers::{
-    AccessControlAllowCredentials, AccessControlAllowHeaders, AccessControlAllowMethods,
-    AccessControlAllowOrigin, AccessControlMaxAge, AccessControlRequestHeaders, HeaderMapExt,
-    Origin, Range, UserAgent,
-};
+use headers::{HeaderMapExt, Origin, Range, UserAgent};
+use http::Method;
 use hyper::body::Incoming;
-use hyper::StatusCode;
-use hyper::{service::Service, Method, Response};
+use hyper::service::Service;
 use leaky_cauldron::Leaky;
 
 use regex::Regex;
-use std::iter::FromIterator;
-use std::time::Duration;
 use std::{
     net::SocketAddr,
     path::{Path, PathBuf},
@@ -33,7 +27,6 @@ use tokio::sync::watch;
 
 pub mod api;
 pub mod auth;
-pub mod compress;
 mod files;
 pub mod icon;
 #[cfg(feature = "shared-positions")]
@@ -124,46 +117,6 @@ pub struct MainService<T> {
 // use only on checked prefixes
 fn get_subpath(path: &str, prefix: &str) -> PathBuf {
     Path::new(&path).strip_prefix(prefix).unwrap().to_path_buf()
-}
-
-fn add_cors_headers(mut resp: HttpResponse, origin: Option<Origin>, enabled: bool) -> HttpResponse {
-    if !enabled {
-        return resp;
-    }
-    match origin {
-        Some(o) => {
-            if let Ok(allowed_origin) = header2header::<_, AccessControlAllowOrigin>(o) {
-                let headers = resp.headers_mut();
-                headers.typed_insert(allowed_origin);
-                headers.typed_insert(AccessControlAllowCredentials);
-            }
-            resp
-        }
-        None => resp,
-    }
-}
-
-fn preflight_cors_response(req: &HttpRequest) -> HttpResponse {
-    let origin = req.headers().typed_get::<Origin>();
-    const ALLOWED_METHODS: &[Method] = &[Method::GET, Method::POST, Method::OPTIONS];
-
-    let mut resp_builder = Response::builder()
-        .status(StatusCode::NO_CONTENT)
-        // Allow all requested headers
-        .typed_header(AccessControlAllowMethods::from_iter(
-            ALLOWED_METHODS.iter().cloned(),
-        ))
-        .typed_header(AccessControlMaxAge::from(Duration::from_secs(24 * 3600)));
-
-    if let Some(requested_headers) = req.headers().typed_get::<AccessControlRequestHeaders>() {
-        resp_builder = resp_builder.typed_header(AccessControlAllowHeaders::from_iter(
-            requested_headers.iter(),
-        ));
-    }
-
-    let resp = resp_builder.body(empty_body()).unwrap();
-
-    add_cors_headers(resp, origin, true)
 }
 
 const STATIC_FILE_NAMES: &[&str] = &[
@@ -274,7 +227,7 @@ impl<C: Send + 'static> MainService<C> {
             }
             None => MainService::<C>::process_authenticated(req, subservices).await,
         };
-        resp.map(move |r| add_cors_headers(r, origin, cors))
+        resp.map(move |r| if cors { add_cors_headers(r, origin) } else { r })
     }
 
     async fn process_authenticated(

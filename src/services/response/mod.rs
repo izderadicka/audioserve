@@ -5,19 +5,21 @@ use std::{future::Future, pin::Pin, time::SystemTime};
 
 use bytes::Bytes;
 use futures::prelude::*;
-use headers::{CacheControl, ContentLength, ContentType, LastModified};
+use headers::{CacheControl, ContentLength, ContentType, Header, HeaderMapExt, LastModified};
 use http::response::Builder;
+use http::{Response, StatusCode};
 use http_body_util::BodyExt;
 use hyper::body::Body;
-use hyper::{Response, StatusCode};
+use mime::Mime;
 use tokio::io::{AsyncRead, ReadBuf};
 
-use crate::error::Error;
-use crate::util::ResponseBuilderExt;
-
 use self::body::{full_body, HttpBody};
+use self::compress::{compressed_response, make_sense_to_compress};
+use crate::error::Error;
 
 pub mod body;
+pub mod compress;
+pub mod cors;
 
 const NOT_FOUND_MESSAGE: &str = "Not Found";
 const TOO_MANY_REQUESTS_MSG: &str = "Too many requests";
@@ -32,6 +34,19 @@ pub type HttpResponse = Response<HttpBody>;
 pub type ResponseResult = Result<HttpResponse, Error>;
 pub type ResponseFuture = Pin<Box<dyn Future<Output = ResponseResult> + Send>>;
 
+pub trait ResponseBuilderExt {
+    fn typed_header<H: Header>(self, header: H) -> Self;
+}
+
+impl ResponseBuilderExt for Builder {
+    fn typed_header<H: Header>(mut self, header: H) -> Builder {
+        if let Some(h) = self.headers_mut() {
+            h.typed_insert(header)
+        };
+        self
+    }
+}
+
 pub fn box_websocket_response<B>(response: Response<B>) -> HttpResponse
 where
     B: Body<Data = Bytes, Error = Infallible> + Send + Sync + 'static,
@@ -41,6 +56,7 @@ where
     let response = Response::from_parts(parts, body);
     response
 }
+
 fn short_response(status: StatusCode, msg: &'static str) -> HttpResponse {
     Response::builder()
         .status(status)
@@ -112,6 +128,40 @@ pub fn add_cache_headers(
     }
 
     resp
+}
+
+pub fn data_response<T>(
+    data: T,
+    content_type: Mime,
+    cache_age: Option<u32>,
+    last_modified: Option<SystemTime>,
+) -> HttpResponse
+where
+    T: Into<Bytes>,
+{
+    let data: Bytes = data.into();
+    let mut builder = Response::builder()
+        .status(200)
+        .typed_header(ContentLength(data.len() as u64))
+        .typed_header(ContentType::from(content_type));
+
+    builder = add_cache_headers(builder, cache_age, last_modified);
+
+    builder.body(full_body(data)).unwrap()
+}
+
+pub fn json_response<T: serde::Serialize>(data: &T, compress: bool) -> HttpResponse {
+    let json = serde_json::to_string(data).expect("Serialization error");
+
+    let builder = Response::builder().typed_header(ContentType::json());
+    if compress && make_sense_to_compress(json.len()) {
+        compressed_response(builder, json.into_bytes())
+    } else {
+        builder
+            .typed_header(ContentLength(json.len() as u64))
+            .body(full_body(json))
+            .unwrap()
+    }
 }
 
 pub struct ChunkStream<T> {

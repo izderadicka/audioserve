@@ -1,7 +1,5 @@
 use anyhow::Result;
 use collection::{audio_meta::is_audio, extract_cover};
-use headers::{ContentLength, ContentType};
-use hyper::Response;
 use image::io::Reader as ImageReader;
 use image::ImageOutputFormat;
 use simple_file_cache::FileModTime;
@@ -10,11 +8,9 @@ use std::{
     path::Path,
 };
 
-use crate::{config::get_config, util::ResponseBuilderExt};
-
 use self::cache::{cache_icon, cached_icon};
-
-use super::response::{add_cache_headers, body::full_body, HttpResponse};
+use super::response::{data_response, HttpResponse};
+use crate::config::get_config;
 
 pub mod cache;
 
@@ -43,14 +39,20 @@ pub fn icon_response(
         }
     };
 
-    let mut builder = Response::builder()
-        .status(200)
-        .typed_header(ContentLength(data.len() as u64))
-        .typed_header(ContentType::png());
+    // let mut builder = Response::builder()
+    //     .status(200)
+    //     .typed_header(ContentLength(data.len() as u64))
+    //     .typed_header(ContentType::png());
 
-    builder = add_cache_headers(builder, get_config().folder_file_cache_age, None);
+    // builder = add_cache_headers(builder, get_config().folder_file_cache_age, None);
 
-    builder.body(full_body(data)).map_err(anyhow::Error::from)
+    // builder.body(full_body(data)).map_err(anyhow::Error::from)
+    Ok(data_response(
+        data,
+        mime::IMAGE_PNG,
+        get_config().folder_file_cache_age,
+        None,
+    ))
 }
 
 pub fn scale_cover(path: impl AsRef<Path> + std::fmt::Debug) -> Result<Vec<u8>> {

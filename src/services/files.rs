@@ -1,7 +1,7 @@
 //#[cfg(feature = "folder-download")]
 use super::{
-    compress::{compress_buf, make_sense_to_compress, CompressStream},
     icon::icon_response,
+    response::compress::{compress_buf, make_sense_to_compress, CompressStream},
     response::{
         self, add_cache_headers,
         body::{full_body, wrap_stream},
@@ -14,7 +14,7 @@ use super::{
 use crate::{
     config::get_config,
     error::{Error, Result},
-    util::{checked_dec, into_range_bounds, to_satisfiable_range, ResponseBuilderExt},
+    services::response::ResponseBuilderExt,
 };
 use collection::{
     audio_meta::is_audio, extract_cover, extract_description, guess_mime_type, parse_chapter_path,
@@ -22,12 +22,14 @@ use collection::{
 };
 use futures::prelude::*;
 use headers::{AcceptRanges, ContentEncoding, ContentLength, ContentRange, ContentType};
+use http::StatusCode;
 use http::{header::CONTENT_ENCODING, Response};
-use hyper::StatusCode;
 use std::{
+    cmp::{max, min},
     collections::Bound,
     ffi::{OsStr, OsString},
     io::{self, SeekFrom},
+    ops::RangeBounds,
     path::{Path, PathBuf},
     sync::{atomic::Ordering, Arc},
     time::SystemTime,
@@ -53,6 +55,39 @@ async fn serve_file_cached_or_transcoded(
         transcoding_quality,
     )
     .await
+}
+
+fn to_satisfiable_range<T: RangeBounds<u64>>(r: T, len: u64) -> Option<(u64, u64)> {
+    match (r.start_bound(), r.end_bound()) {
+        (Bound::Included(&start), Bound::Included(&end)) => {
+            if start <= end && start < len {
+                Some((start, min(end, len - 1)))
+            } else {
+                None
+            }
+        }
+
+        (Bound::Included(&start), Bound::Unbounded) => {
+            if start < len {
+                Some((start, len - 1))
+            } else {
+                None
+            }
+        }
+
+        (Bound::Unbounded, Bound::Included(&offset)) => {
+            if offset > 0 {
+                Some((max(len - offset, 0), len - 1))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn into_range_bounds(i: (u64, u64)) -> (Bound<u64>, Bound<u64>) {
+    (Bound::Included(i.0), Bound::Included(i.1))
 }
 
 #[cfg(feature = "transcoding-cache")]
@@ -247,6 +282,8 @@ async fn serve_opened_file(
     let mut resp = Response::builder().typed_header(ContentType::from(mime));
     resp = add_cache_headers(resp, caching, last_modified);
 
+    let full_range = || (0, file_len.saturating_sub(1));
+
     let (start, end) = match range {
         Some(range) => match to_satisfiable_range(range, file_len) {
             Some(l) => {
@@ -257,14 +294,14 @@ async fn serve_opened_file(
             }
             None => {
                 error!("Wrong range {:?}", range);
-                (0, checked_dec(file_len))
+                full_range()
             }
         },
         None => {
             resp = resp
                 .status(StatusCode::OK)
                 .typed_header(AcceptRanges::bytes());
-            (0, checked_dec(file_len))
+            full_range()
         }
     };
     let _pos = file.seek(SeekFrom::Start(start)).await;
@@ -500,7 +537,7 @@ pub async fn download_folder(
     include_subfolders: Option<regex::Regex>,
 ) -> ResponseResult {
     use anyhow::Context;
-    use hyper::header::CONTENT_DISPOSITION;
+    use http::header::CONTENT_DISPOSITION;
     let full_path = base_path.join(&folder_path);
     let meta_result = tokio::fs::metadata(&full_path).await;
     let meta = match meta_result {

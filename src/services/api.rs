@@ -3,33 +3,14 @@ use std::{path::PathBuf, sync::Arc};
 
 use collection::FoldersOrdering;
 use futures::prelude::*;
-use headers::{ContentLength, ContentType};
-use http::Response;
 use tokio::task::spawn_blocking as blocking;
 
-use crate::Error;
-use crate::{config::get_config, util::ResponseBuilderExt};
-
-use super::compress::{compressed_response, make_sense_to_compress};
-use super::response::body::full_body;
-use super::response::{HttpResponse, ResponseResult};
+use super::response::{json_response, ResponseResult};
 use super::search::{Search, SearchTrait};
 use super::types::Transcodings;
 use super::{response, types::CollectionsInfo};
-
-fn json_response<T: serde::Serialize>(data: &T, compress: bool) -> HttpResponse {
-    let json = serde_json::to_string(data).expect("Serialization error");
-
-    let builder = Response::builder().typed_header(ContentType::json());
-    if compress && make_sense_to_compress(json.len()) {
-        compressed_response(builder, json.into_bytes())
-    } else {
-        builder
-            .typed_header(ContentLength(json.len() as u64))
-            .body(full_body(json))
-            .unwrap()
-    }
-}
+use crate::config::get_config;
+use crate::Error;
 
 pub async fn get_folder(
     collection: usize,

@@ -2,11 +2,9 @@ use std::{borrow::Cow, collections::HashMap, fmt::Display, iter::once, net::IpAd
 
 use bytes::Bytes;
 use headers::{Header, HeaderMapExt, HeaderName, HeaderValue};
+use http::Request;
 use http_body_util::BodyExt;
-use hyper::{
-    body::{Body, Incoming},
-    Request,
-};
+use hyper::body::{Body, Incoming};
 use percent_encoding::percent_decode;
 use url::form_urlencoded;
 
@@ -199,11 +197,11 @@ where
         Some(RemoteIpAddr::Direct(self.remote_addr))
     }
 
-    pub fn headers(&self) -> &hyper::HeaderMap {
+    pub fn headers(&self) -> &http::HeaderMap {
         self.request.headers()
     }
 
-    pub fn method(&self) -> &hyper::Method {
+    pub fn method(&self) -> &http::Method {
         self.request.method()
     }
 
@@ -269,6 +267,7 @@ where
     }
 }
 
+// TODO: This needs to be independent on get_config()
 pub fn is_cors_enabled_for_request<B>(req: &GenericRequest<B>) -> bool
 where
     B: Body,
