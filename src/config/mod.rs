@@ -72,13 +72,6 @@ impl Default for IconsConfig {
 }
 
 impl IconsConfig {
-    //TODO delete
-    // pub fn new_for_name(name: impl AsRef<str>) -> Self {
-    //     let mut me = Self::default();
-    //     me.root_dir = me.root_dir.join(name.as_ref());
-    //     me
-    // }
-
     pub fn check(&self) -> Result<()> {
         if !util::parent_dir_exists(&self.cache_dir) {
             return value_error!(
@@ -135,13 +128,6 @@ impl Default for TranscodingCacheConfig {
 
 #[cfg(feature = "transcoding-cache")]
 impl TranscodingCacheConfig {
-    //TODO delete
-    // pub fn new_for_name(name: impl AsRef<str>) -> Self {
-    //     let mut me = Self::default();
-    //     me.root_dir = me.root_dir.join(name.as_ref());
-    //     me
-    // }
-
     pub fn check(&self) -> Result<()> {
         if !util::parent_dir_exists(&self.root_dir) {
             return value_error!(
@@ -420,8 +406,6 @@ impl ChaptersSize {
 pub struct SslConfig {
     pub key_file: PathBuf,
     pub cert_file: PathBuf,
-    #[serde(default)]
-    pub key_password: String, // TODO: kept for now for config arguments compatibility
 }
 
 impl SslConfig {

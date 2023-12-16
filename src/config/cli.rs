@@ -54,7 +54,6 @@ const AUDIOSERVE_BEHIND_PROXY: &str = "behind-proxy";
 const AUDIOSERVE_DISABLE_FOLDER_DOWNLOAD: &str = "disable-folder-download";
 const AUDIOSERVE_SSL_KEY: &str = "ssl-key";
 const AUDIOSERVE_SSL_CERT: &str = "ssl-cert";
-const AUDIOSERVE_SSL_KEY_PASSWORD: &str = "ssl-key-password";
 const AUDIOSERVE_POSITIONS_BACKUP_FILE: &str = "positions-backup-file";
 const AUDIOSERVE_POSITIONS_WS_TIMEOUT: &str = "positions-ws-timeout";
 const AUDIOSERVE_POSITIONS_RESTORE: &str = "positions-restore";
@@ -349,20 +348,19 @@ fn create_parser() -> Command {
     }
 
     if cfg!(feature = "tls") {
-        parser = parser.arg(long_arg!(AUDIOSERVE_SSL_KEY)
-            .num_args(1)
-            .requires(AUDIOSERVE_SSL_CERT)
-            .value_parser(is_existing_file)
-            .help("TLS/SSL private key in PEM format, https is used")
+        parser = parser
+            .arg(
+                long_arg!(AUDIOSERVE_SSL_KEY)
+                    .num_args(1)
+                    .requires(AUDIOSERVE_SSL_CERT)
+                    .value_parser(is_existing_file)
+                    .help("TLS/SSL private key in PEM format, https is used"),
             )
-            .arg(long_arg!(AUDIOSERVE_SSL_CERT)
-            .requires(AUDIOSERVE_SSL_KEY)
-            .value_parser(is_existing_file)
+            .arg(
+                long_arg!(AUDIOSERVE_SSL_CERT)
+                    .requires(AUDIOSERVE_SSL_KEY)
+                    .value_parser(is_existing_file),
             )
-            .arg(long_arg!(AUDIOSERVE_SSL_KEY_PASSWORD)
-                .num_args(1)
-                .help("Deprecated - for PEM key password is not needed, so it should not be encrypted - default from rustls")
-            );
     }
 
     if cfg!(feature = "shared-positions") {
@@ -754,7 +752,6 @@ where
             config.ssl = Some(SslConfig {
                 key_file,
                 cert_file,
-                key_password: "".into(),
             });
         }
     }
