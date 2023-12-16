@@ -1,7 +1,9 @@
 use std::net::SocketAddr;
 
-use hyper::server::conn::http1;
-use hyper_util::rt::TokioIo;
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo},
+    server::conn::auto,
+};
 use tokio::net::TcpListener;
 
 use crate::{error::Result, services::ServiceFactory};
@@ -50,11 +52,10 @@ impl HttpServer {
                 let io = TokioIo::new(stream);
                 let is_ssl = false;
                 let service = service_factory.create(remote_addr, is_ssl);
+                let rt = TokioExecutor::new();
                 tokio::task::spawn(async move {
-                    // TODO: support both http1 & http2
-                    let conn = http1::Builder::new()
-                        .serve_connection(io, service)
-                        .with_upgrades();
+                    let builder = auto::Builder::new(rt);
+                    let conn = builder.serve_connection_with_upgrades(io, service);
                     if let Err(err) = conn.await {
                         println!("Failed to serve connection: {:?}", err);
                     }
