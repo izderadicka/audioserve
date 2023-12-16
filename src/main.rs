@@ -22,7 +22,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, watch};
 
 use crate::server::HttpServer;
 
@@ -143,10 +143,15 @@ fn restore_positions<P: AsRef<Path>>(backup_file: collection::BackupFile<P>) -> 
 fn start_server(
     server_secret: Vec<u8>,
     collections: Arc<Collections>,
-) -> (tokio::runtime::Runtime, oneshot::Receiver<()>) {
+) -> (
+    tokio::runtime::Runtime,
+    oneshot::Receiver<()>,
+    watch::Sender<()>,
+) {
     let cfg = get_config();
 
     let addr = cfg.listen;
+    let (stop_service_sender, stop_service_receiver) = watch::channel(());
     let start_server = async move {
         let authenticator = get_config().shared_secret.as_ref().map(|secret| {
             SharedSecretAuthenticator::new(secret.clone(), server_secret, cfg.token_validity_hours)
@@ -161,6 +166,7 @@ fn start_server(
             transcoding,
             collections,
             cfg.limit_rate,
+            stop_service_receiver,
         );
 
         let server: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> =
@@ -219,7 +225,7 @@ fn start_server(
                 futures::future::ready(())
             }),
     );
-    (rt, term_receiver)
+    (rt, term_receiver, stop_service_sender)
 }
 
 #[cfg(not(unix))]
@@ -229,16 +235,34 @@ async fn terminate_server() {
 }
 
 #[cfg(unix)]
-async fn terminate_server(term_receiver: oneshot::Receiver<()>) {
+async fn terminate_server(
+    term_receiver: oneshot::Receiver<()>,
+    stop_service_sender: watch::Sender<()>,
+) {
     use tokio::signal::unix::{signal, SignalKind};
-    let mut sigint = signal(SignalKind::interrupt()).expect("Cannot create SIGINT handler");
-    let mut sigterm = signal(SignalKind::terminate()).expect("Cannot create SIGTERM handler");
-    let mut sigquit = signal(SignalKind::quit()).expect("Cannot create SIGQUIT handler");
+    const SIGINT: SignalKind = SignalKind::interrupt();
+    const SIGTERM: SignalKind = SignalKind::terminate();
+    const SIGQUIT: SignalKind = SignalKind::quit();
+
+    let mut sigint = signal(SIGINT).expect("Cannot create SIGINT handler");
+    let mut sigterm = signal(SIGTERM).expect("Cannot create SIGTERM handler");
+    let mut sigquit = signal(SIGQUIT).expect("Cannot create SIGQUIT handler");
+
+    let terminate_on_signal = move |signal: SignalKind| {
+        let signal_name = match signal {
+            SIGINT => "SIGINT",
+            SIGTERM => "SIGTERM",
+            SIGQUIT => "SIGQUIT",
+            _ => "Other",
+        };
+        info!("Terminated on {:?}", signal_name);
+        stop_service_sender.send(()).ok();
+    };
 
     tokio::select!(
-        _ = sigint.recv() => {info!("Terminated on SIGINT")},
-        _ = sigterm.recv() => {info!("Terminated on SIGTERM")},
-        _ = sigquit.recv() => {info!("Terminated on SIGQUIT")}
+        _ = sigint.recv() => terminate_on_signal(SIGINT),
+        _ = sigterm.recv() => terminate_on_signal(SIGTERM),
+        _ = sigquit.recv() => terminate_on_signal(SIGQUIT),
         _ = term_receiver => {warn!("Terminated because HTTP server finished unexpectedly")}
     )
 }
@@ -366,7 +390,8 @@ fn main() -> anyhow::Result<()> {
 
     let collections = create_collections()?;
 
-    let (runtime, term_receiver) = start_server(server_secret, collections.clone());
+    let (runtime, term_receiver, stop_service_sender) =
+        start_server(server_secret, collections.clone());
 
     #[cfg(unix)]
     {
@@ -375,7 +400,7 @@ fn main() -> anyhow::Result<()> {
         runtime.spawn(watch_for_positions_backup_signal(collections.clone()));
     }
 
-    runtime.block_on(terminate_server(term_receiver));
+    runtime.block_on(terminate_server(term_receiver, stop_service_sender));
 
     //graceful shutdown of server will wait till transcoding ends, so rather shut it down hard
     runtime.shutdown_timeout(std::time::Duration::from_millis(300));

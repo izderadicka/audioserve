@@ -29,6 +29,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{atomic::AtomicUsize, Arc},
 };
+use tokio::sync::watch;
 
 pub mod api;
 pub mod auth;
@@ -57,6 +58,7 @@ pub struct ServiceFactory<T> {
     search: Search<String>,
     transcoding: TranscodingDetails,
     collections: Arc<Collections>,
+    stop_service_receiver: watch::Receiver<()>,
 }
 
 impl<T> ServiceFactory<T> {
@@ -66,6 +68,7 @@ impl<T> ServiceFactory<T> {
         transcoding: TranscodingDetails,
         collections: Arc<Collections>,
         rate_limit: Option<f32>,
+        stop_service_receiver: watch::Receiver<()>,
     ) -> Self
     where
         A: Authenticator<Incoming, Credentials = T> + 'static,
@@ -77,6 +80,7 @@ impl<T> ServiceFactory<T> {
             search,
             transcoding,
             collections,
+            stop_service_receiver,
         }
     }
 
@@ -92,6 +96,10 @@ impl<T> ServiceFactory<T> {
             remote_addr,
             is_ssl,
         }
+    }
+
+    pub fn stop_service_receiver(&self) -> watch::Receiver<()> {
+        self.stop_service_receiver.clone()
     }
 }
 

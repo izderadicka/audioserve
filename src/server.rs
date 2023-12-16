@@ -23,16 +23,30 @@ impl HttpServer {
     }
 
     pub async fn serve(self, service_factory: ServiceFactory<()>) -> Result<()> {
+        let mut stop_receiver = service_factory.stop_service_receiver();
         let listener = TcpListener::bind(self.addr).await?;
         let handle = tokio::task::spawn(async move {
             loop {
-                let (stream, remote_addr) = match listener.accept().await {
-                    Ok((stream, remote_addr)) => (stream, remote_addr),
-                    Err(e) => {
-                        error!("failed to accept connection: {}", e);
-                        continue;
+                let stream;
+                let remote_addr;
+                tokio::select! {
+                    _ = stop_receiver.changed() => {
+                        debug!("Stopping server listening loop");
+                        break;
+                    }
+
+                    res = listener.accept() => {
+                        match res {
+                            Ok((s, r)) => (stream, remote_addr) = (s, r),
+                            Err(e) => {
+                                error!("failed to accept connection: {}", e);
+                                continue;
+                            }
+                        };
+
                     }
                 };
+
                 let io = TokioIo::new(stream);
                 let is_ssl = false;
                 let service = service_factory.create(remote_addr, is_ssl);
