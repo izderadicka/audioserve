@@ -24,11 +24,10 @@ use std::thread;
 use std::time::Duration;
 use tokio::sync::{oneshot, watch};
 
-use crate::server::HttpServer;
+use crate::myhy::server::HttpServer;
 
 mod config;
 mod error;
-mod server;
 mod services;
 // #[cfg(feature = "tls")]
 // mod tls;
