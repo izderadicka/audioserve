@@ -1,0 +1,32 @@
+[package]
+name = "myhy"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+description = "Convenience wrapper around hyper and http libs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hyper = {version="1.0", features = ["full"]}
+http-body-util = "0.1.0"
+hyper-util = { version = "0.1.1", features = ["tokio", "server", "server-auto"] }
+headers = "0.4.0"
+http = "1.0.0"
+tokio = {version="1.34", features=["full"]}
+log = {version="0.4", features = ["release_max_level_info", "max_level_trace"]}
+anyhow = "1.0.75"
+bytes = "1.5.0"
+percent-encoding = "2.3.1"
+regex = "1.10.2"
+url = "2.5.0"
+futures = "0.3.29"
+mime = "0.3.17"
+serde = "1.0.193"
+serde_json = "1.0.108"
+mime_guess = "2.0"
+flate2 = "1.0.28"
+futures-util = "0.3.29"
+
+[dev-dependencies]
+ring = "0.17.7"
