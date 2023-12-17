@@ -357,7 +357,7 @@ mod tests {
     }
 
     async fn test_stream_with_chunk_size(chunk_size: usize) -> anyhow::Result<()> {
-        let file_name = "src/main.rs";
+        let file_name = "src/response/compress.rs";
         let mut content = String::new();
         {
             let mut f = File::open(file_name).await?;
