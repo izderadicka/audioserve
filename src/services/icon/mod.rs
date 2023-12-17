@@ -10,7 +10,7 @@ use std::{
 
 use self::cache::{cache_icon, cached_icon};
 use crate::config::get_config;
-use crate::myhy::response::{data_response, HttpResponse};
+use myhy::response::{data_response, HttpResponse};
 
 pub mod cache;
 

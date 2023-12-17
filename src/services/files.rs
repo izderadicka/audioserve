@@ -5,20 +5,20 @@ use super::{
     types::*,
     Counter,
 };
-use crate::myhy::headers::{ContentLength, ContentType};
-use crate::myhy::response::{
+use crate::{config::get_config, error::Error};
+use collection::{
+    audio_meta::is_audio, extract_cover, extract_description, parse_chapter_path, TimeSpan,
+};
+use futures::prelude::*;
+use myhy::headers::{ContentLength, ContentType};
+use myhy::response::{
     self,
     body::wrap_stream,
     data_response,
     file::{send_file_simple, serve_file_from_fs, ByteRange},
     not_found, not_found_cached, ResponseBuilderExt, ResponseResult,
 };
-use crate::myhy::Response;
-use crate::{config::get_config, error::Error};
-use collection::{
-    audio_meta::is_audio, extract_cover, extract_description, parse_chapter_path, TimeSpan,
-};
-use futures::prelude::*;
+use myhy::Response;
 
 use std::{
     ffi::OsStr,
@@ -67,7 +67,7 @@ async fn serve_file_cached_or_transcoded(
     }
 
     use super::transcode::cache::{cache_key_async, get_cache};
-    use crate::myhy::response::file::serve_opened_file;
+    use myhy::response::file::serve_opened_file;
 
     let cache = get_cache();
     let (cache_key, meta) = cache_key_async(&full_path, &transcoding_quality, span).await?;
@@ -335,8 +335,8 @@ pub async fn download_folder(
     format: DownloadFormat,
     include_subfolders: Option<regex::Regex>,
 ) -> ResponseResult {
-    use crate::myhy::header::CONTENT_DISPOSITION;
     use anyhow::Context;
+    use myhy::header::CONTENT_DISPOSITION;
     let full_path = base_path.join(&folder_path);
     let meta_result = tokio::fs::metadata(&full_path).await;
     let meta = match meta_result {

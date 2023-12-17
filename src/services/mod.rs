@@ -3,22 +3,23 @@ use self::search::Search;
 use self::transcode::QualityLevel;
 use crate::config::{get_config, Cors};
 use crate::error;
-use crate::myhy::request::{is_cors_matching_origin, HttpRequest, QueryParams, RequestWrapper};
-use crate::myhy::response::{
+use crate::services::transcode::ChosenTranscoding;
+use myhy::request::{is_cors_matching_origin, HttpRequest, QueryParams, RequestWrapper};
+use myhy::response::body::HttpBody;
+use myhy::response::{
     self,
     cors::{add_cors_headers, preflight_cors_response},
     file::send_static_file,
     HttpResponse, ResponseFuture, ResponseResult,
 };
-use crate::services::transcode::ChosenTranscoding;
 
-use crate::myhy::headers::{HeaderMapExt, Origin, Range, UserAgent};
-use crate::myhy::Incoming;
-use crate::myhy::Method;
-use crate::myhy::Service;
 use collection::{Collections, FoldersOrdering};
 use futures::{future, TryFutureExt};
 use leaky_cauldron::Leaky;
+use myhy::headers::{HeaderMapExt, Origin, Range, UserAgent};
+use myhy::Incoming;
+use myhy::Method;
+use myhy::Service;
 
 use regex::Regex;
 use std::{
@@ -77,8 +78,18 @@ impl<T> ServiceFactory<T> {
             stop_service_receiver,
         }
     }
+}
 
-    pub fn create(&self, remote_addr: SocketAddr, is_ssl: bool) -> MainService<T> {
+impl<T> myhy::server::ServiceFactory for ServiceFactory<T>
+where
+    T: Send + 'static,
+{
+    type Body = HttpBody;
+    type Error = error::Error;
+    type Future = ResponseFuture;
+    type Service = MainService<T>;
+
+    fn create(&self, remote_addr: SocketAddr, is_ssl: bool) -> MainService<T> {
         MainService {
             state: ServiceComponents {
                 search: self.search.clone(),
@@ -92,7 +103,7 @@ impl<T> ServiceFactory<T> {
         }
     }
 
-    pub fn stop_service_receiver(&self) -> watch::Receiver<()> {
+    fn stop_service_receiver(&self) -> watch::Receiver<()> {
         self.stop_service_receiver.clone()
     }
 }

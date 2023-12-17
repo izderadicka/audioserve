@@ -24,14 +24,13 @@ use std::thread;
 use std::time::Duration;
 use tokio::sync::{oneshot, watch};
 
-use crate::myhy::server::HttpServer;
+use myhy::server::HttpServer;
 
 mod config;
 mod error;
 mod services;
 // #[cfg(feature = "tls")]
 // mod tls;
-mod myhy;
 mod util;
 
 fn generate_server_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, Error> {

@@ -13,10 +13,6 @@ members = ["crates/*"]
 bytes = "1.5"
 env_logger = "0.10"
 log = {version="0.4", features = ["release_max_level_info", "max_level_trace"]}
-hyper = {version="1.0", features = ["full"]}
-http-body-util = "0.1.0"
-hyper-util = { version = "0.1.1", features = ["tokio", "server", "server-auto"] }
-headers = "0.4.0"
 futures = "0.3"
 mime = "0.3"
 serde_json = "1.0"
@@ -48,8 +44,6 @@ leaky-cauldron = {path="crates/leaky-cauldron"}
 tokio-util = {version="0.7", optional=true, features=["codec"]}
 cron = {version="0.12", optional=true}
 chrono = {version="0.4", optional=true}
-http = "1.0.0"
-flate2 = "1.0.28"
 
 # this repo dependencies
 collection = {path="crates/collection", features=["async"]}
@@ -58,6 +52,7 @@ simple-file-cache = {path="crates/file-cache", features=["asynch"]}
 async-tar = {path="crates/async-tar", optional=true}
 async-zip = {path="crates/async-zip", optional=true}
 websock = {path="crates/websock", optional = true}
+myhy = {path="crates/myhy"}
 
 [target.'cfg(unix)'.dependencies]
 nix = {version="0.27.1", features=["user"]}
@@ -91,6 +86,7 @@ codegen-units = 1
 reqwest = {version="0.11", features=['blocking', 'json'], default-features = false}
 escargot = "0.5" 
 tempdir = "0.3"
+http-body-util = "0.1.0"
 
 [target.'cfg(unix)'.dev-dependencies]
 nix = {version="0.27.1", features=["process", "signal"]}

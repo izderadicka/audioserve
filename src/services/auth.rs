@@ -1,16 +1,14 @@
 use crate::config::get_config;
 use crate::error::{bail, Result};
-use crate::myhy::header::SET_COOKIE;
-use crate::myhy::headers::authorization::Bearer;
-use crate::myhy::headers::{
-    Authorization, ContentLength, ContentType, Cookie, HeaderMapExt, HeaderValue,
-};
-use crate::myhy::response::body::full_body;
-use crate::myhy::response::ResponseBuilderExt;
-use crate::myhy::Body;
-use crate::myhy::{Method, Response};
 use data_encoding::BASE64;
 use futures::{future, prelude::*};
+use myhy::header::SET_COOKIE;
+use myhy::headers::authorization::Bearer;
+use myhy::headers::{Authorization, ContentLength, ContentType, Cookie, HeaderMapExt, HeaderValue};
+use myhy::response::body::full_body;
+use myhy::response::ResponseBuilderExt;
+use myhy::Body;
+use myhy::{Method, Response};
 use ring::rand::{SecureRandom, SystemRandom};
 use ring::{
     digest::{digest, SHA256},
@@ -25,8 +23,8 @@ use thiserror::Error;
 use tokio::time::sleep;
 use url::form_urlencoded;
 
-use crate::myhy::request::GenericRequestWrapper;
-use crate::myhy::response::{self, HttpResponse};
+use myhy::request::GenericRequestWrapper;
+use myhy::response::{self, HttpResponse};
 
 pub enum AuthResult<T, B> {
     Authenticated {
@@ -382,11 +380,11 @@ impl ::std::str::FromStr for Token {
 mod tests {
     use super::*;
     use crate::config::init::init_default_config;
-    use crate::myhy::request::GenericRequestWrapper;
-    use crate::myhy::{Request, StatusCode};
     use borrow::Cow;
     use bytes::Bytes;
     use http_body_util::{BodyExt, Full};
+    use myhy::request::GenericRequestWrapper;
+    use myhy::{Request, StatusCode};
 
     #[test]
     fn test_token() {
