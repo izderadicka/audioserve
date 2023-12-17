@@ -9,6 +9,7 @@ use collection::{CollectionOptions, CollectionOptionsMap, Collections};
 use config::{get_config, init_config};
 use error::{bail, Context, Error};
 use futures::prelude::*;
+use myhy::server::tls::TlsConfig;
 use ring::rand::{SecureRandom, SystemRandom};
 use services::{
     auth::SharedSecretAuthenticator, search::Search, ServiceFactory, TranscodingDetails,
@@ -167,43 +168,20 @@ fn start_server(
             cfg.limit_rate,
             stop_service_receiver,
         );
+        // TODO : handle file UTF8 errors
+        #[cfg(feature = "tls")]
+        let tls_config = get_config().ssl.as_ref().map(|ssl| TlsConfig {
+            cert_file: ssl.cert_file.to_str().unwrap().to_string(),
+            key_file: ssl.key_file.to_str().unwrap().to_string(),
+        });
+        #[cfg(not(feature = "tls"))]
+        let tls_config = None;
 
-        let server: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> =
-            match get_config().ssl.as_ref() {
-                None => {
-                    let server = HttpServer::bind(addr).serve(svc_factory);
-                    info!("Server listening on {}{}", addr, get_url_path!());
-                    Box::pin(server.map_err(|e| e.into()))
-                }
-                Some(_ssl) => {
-                    #[cfg(feature = "tls")]
-                    todo!("Implement TLS server");
-                    // {
-                    //     info!("Server listening on {}{} with TLS", &addr, get_url_path!());
-                    //     let create_server = async move {
-                    //         let incoming = tls::tls_acceptor(addr, ssl)?;
-                    //         let server = HttpServer::builder(incoming)
-                    //             .serve(make_service_fn(move |conn: &TlsStream| {
-                    //                 let remote_addr = conn.remote_addr();
-                    //                 svc_factory.create(remote_addr, true)
-                    //             }))
-                    //             .await;
-
-                    //         server.map_err(|e| e.into())
-                    //     };
-
-                    //     Box::pin(create_server)
-                    // }
-
-                    #[cfg(not(feature = "tls"))]
-                    {
-                        panic!(
-                            "TLS is not compiled - build with default features {:?}",
-                            ssl
-                        )
-                    }
-                }
-            };
+        let server: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> = {
+            let server = HttpServer::bind(addr).serve(svc_factory, tls_config);
+            info!("Server listening on {}{}", addr, get_url_path!());
+            Box::pin(server.map_err(|e| e.into()))
+        };
 
         server.await
     };

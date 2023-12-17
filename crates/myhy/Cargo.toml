@@ -28,5 +28,14 @@ mime_guess = "2.0"
 flate2 = "1.0.28"
 futures-util = "0.3.29"
 
+# for tls
+tokio-rustls = { version="0.25", optional=true}
+rustls-pemfile = { version = "2", optional=true}
+rustls-pki-types = {version="1", optional=true}
+
+[features]
+tls=["tokio-rustls", "rustls-pemfile", "rustls-pki-types"]
+
+
 [dev-dependencies]
 ring = "0.17.7"
