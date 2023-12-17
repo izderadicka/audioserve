@@ -1,11 +1,11 @@
 use self::auth::{AuthResult, Authenticator};
-use self::request::{is_cors_enabled_for_request, HttpRequest, QueryParams, RequestWrapper};
+use self::request::{is_cors_matching_origin, HttpRequest, QueryParams, RequestWrapper};
 use self::response::cors::add_cors_headers;
 use self::response::file::send_static_file;
 use self::response::{HttpResponse, ResponseFuture, ResponseResult};
 use self::search::Search;
 use self::transcode::QualityLevel;
-use crate::config::get_config;
+use crate::config::{get_config, Cors};
 use crate::error;
 use crate::services::response::cors::preflight_cors_response;
 use crate::services::transcode::ChosenTranscoding;
@@ -135,6 +135,17 @@ fn is_static_file(path: &str) -> bool {
     STATIC_FILE_NAMES.contains(&path) || path.starts_with(STATIC_DIR)
 }
 
+fn is_cors_enabled_for_request(req: &HttpRequest) -> bool {
+    if let Some(cors) = get_config().cors.as_ref() {
+        match &cors.allow {
+            Cors::AllowAllOrigins => true,
+            Cors::AllowMatchingOrigins(re) => is_cors_matching_origin(req, re),
+        }
+    } else {
+        false
+    }
+}
+
 #[allow(clippy::type_complexity)]
 impl<C: Send + 'static> Service<HttpRequest> for MainService<C> {
     type Response = HttpResponse;
@@ -152,8 +163,10 @@ impl<C: Send + 'static> Service<HttpRequest> for MainService<C> {
             }
         }
 
+        let cors = is_cors_enabled_for_request(&req);
+
         // handle OPTIONS method for CORS preflight
-        if req.method() == Method::OPTIONS && is_cors_enabled_for_request(&req) {
+        if req.method() == Method::OPTIONS && cors {
             debug!(
                 "Got OPTIONS request in CORS mode : {} {:?}",
                 req.uri(),
@@ -162,12 +175,15 @@ impl<C: Send + 'static> Service<HttpRequest> for MainService<C> {
             return response::fut(|| preflight_cors_response(&req));
         }
 
-        let req = match RequestWrapper::new(
-            req,
-            get_config().url_path_prefix.as_deref(),
-            self.remote_addr.ip(),
-            self.is_ssl,
-        ) {
+        let req = match RequestWrapper::new(req)
+            .and_then(|req| req.set_path_prefix(get_config().url_path_prefix.as_deref()))
+            .map(|req| {
+                req.set_remote_addr(Some(self.remote_addr.ip()))
+                    .set_is_ssl(self.is_ssl)
+                    .set_is_cors(cors)
+                    .set_is_behind_proxy(get_config().behind_proxy)
+                    .set_can_compress(get_config().compress_responses)
+            }) {
             Ok(r) => r,
             Err(e) => {
                 error!("Request URL error: {}", e);

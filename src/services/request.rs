@@ -6,12 +6,10 @@ use http::Request;
 use http_body_util::BodyExt;
 use hyper::body::{Body, Incoming};
 use percent_encoding::percent_decode;
+use regex::Regex;
 use url::form_urlencoded;
 
-use crate::{
-    config::{get_config, Cors},
-    error,
-};
+use crate::error;
 
 pub struct AcceptEncoding(HeaderValue);
 
@@ -101,24 +99,74 @@ impl Display for RemoteIpAddr {
 pub struct GenericRequestWrapper<T> {
     request: GenericRequest<T>,
     path: String,
-    remote_addr: IpAddr,
+    remote_addr: Option<IpAddr>,
     #[allow(dead_code)]
     is_ssl: bool,
     #[allow(dead_code)]
     is_behind_proxy: bool,
-    can_br_compress: bool,
+    can_compress: bool,
+    is_cors: bool,
+}
+
+//Builder pattern for options
+impl<T> GenericRequestWrapper<T> {
+    pub fn set_remote_addr(mut self, remote_addr: Option<IpAddr>) -> Self {
+        self.remote_addr = remote_addr;
+        self
+    }
+    pub fn set_is_ssl(mut self, is_ssl: bool) -> Self {
+        self.is_ssl = is_ssl;
+        self
+    }
+    pub fn set_is_behind_proxy(mut self, is_behind_proxy: bool) -> Self {
+        self.is_behind_proxy = is_behind_proxy;
+        self
+    }
+    pub fn set_can_compress(mut self, can_compress: bool) -> Self {
+        self.can_compress = if can_compress {
+            match self.request.headers().typed_get::<AcceptEncoding>() {
+                Some(h) => h.accepts("gzip"),
+                None => false,
+            }
+        } else {
+            false
+        };
+        self
+    }
+    pub fn set_is_cors(mut self, is_cors: bool) -> Self {
+        self.is_cors = is_cors;
+        self
+    }
+
+    pub fn set_path_prefix(mut self, path_prefix: Option<&str>) -> error::Result<Self> {
+        self.path = match path_prefix {
+            Some(p) => match self.path.strip_prefix(p) {
+                Some(s) => {
+                    if s.is_empty() {
+                        "/".to_string()
+                    } else {
+                        s.to_string()
+                    }
+                }
+                None => {
+                    error!("URL path is missing prefix {}", p);
+                    return Err(error::Error::msg(format!(
+                        "URL path is missing prefix {}",
+                        p
+                    )));
+                }
+            },
+            None => self.path,
+        };
+        Ok(self)
+    }
 }
 
 impl<T> GenericRequestWrapper<T>
 where
     T: Body + Send + Sync + 'static + Unpin,
 {
-    pub fn new(
-        request: GenericRequest<T>,
-        path_prefix: Option<&str>,
-        remote_addr: IpAddr,
-        is_ssl: bool,
-    ) -> error::Result<Self> {
+    pub fn new(request: GenericRequest<T>) -> error::Result<Self> {
         let path = match percent_decode(request.uri().path().as_bytes()).decode_utf8() {
             Ok(s) => s.into_owned(),
             Err(e) => {
@@ -136,41 +184,14 @@ where
             ));
         }
 
-        let path = match path_prefix {
-            Some(p) => match path.strip_prefix(p) {
-                Some(s) => {
-                    if s.is_empty() {
-                        "/".to_string()
-                    } else {
-                        s.to_string()
-                    }
-                }
-                None => {
-                    error!("URL path is missing prefix {}", p);
-                    return Err(error::Error::msg(format!(
-                        "URL path is missing prefix {}",
-                        p
-                    )));
-                }
-            },
-            None => path,
-        };
-        let is_behind_proxy = get_config().behind_proxy;
-        let can_compress = if get_config().compress_responses {
-            match request.headers().typed_get::<AcceptEncoding>() {
-                Some(h) => h.accepts("gzip"),
-                None => false,
-            }
-        } else {
-            false
-        };
         Ok(GenericRequestWrapper {
             request,
             path,
-            remote_addr,
-            is_ssl,
-            is_behind_proxy,
-            can_br_compress: can_compress,
+            remote_addr: None,
+            is_ssl: false,
+            is_behind_proxy: false,
+            can_compress: false,
+            is_cors: false,
         })
     }
 
@@ -194,7 +215,7 @@ where
                         .map(|xfwd| RemoteIpAddr::Proxied(*xfwd.client()))
                 });
         }
-        Some(RemoteIpAddr::Direct(self.remote_addr))
+        self.remote_addr.map(RemoteIpAddr::Direct)
     }
 
     pub fn headers(&self) -> &http::HeaderMap {
@@ -254,7 +275,7 @@ where
     }
 
     pub fn can_compress(&self) -> bool {
-        self.can_br_compress
+        self.can_compress
     }
 
     pub async fn body_bytes(&mut self) -> Result<Bytes, T::Error> {
@@ -263,38 +284,29 @@ where
     }
 
     pub fn is_cors_enabled(&self) -> bool {
-        is_cors_enabled_for_request(&self.request)
+        self.is_cors
     }
 }
 
-// TODO: This needs to be independent on get_config()
-pub fn is_cors_enabled_for_request<B>(req: &GenericRequest<B>) -> bool
+pub fn is_cors_matching_origin<B>(req: &GenericRequest<B>, matching_regex: &Regex) -> bool
 where
     B: Body,
 {
-    if let Some(cors) = get_config().cors.as_ref() {
-        match &cors.allow {
-            Cors::AllowAllOrigins => true,
-            Cors::AllowMatchingOrigins(re) => req
-                .headers()
-                .get("origin")
-                .and_then(|v| {
-                    v.to_str()
-                        .map_err(|e| error!("Invalid origin header: {}", e))
-                        .ok()
-                })
-                .map(|s| {
-                    if s.to_ascii_lowercase() == "null" {
-                        false
-                    } else {
-                        re.is_match(s)
-                    }
-                })
-                .unwrap_or(false),
-        }
-    } else {
-        false
-    }
+    req.headers()
+        .get("origin")
+        .and_then(|v| {
+            v.to_str()
+                .map_err(|e| error!("Invalid origin header: {}", e))
+                .ok()
+        })
+        .map(|s| {
+            if s.to_ascii_lowercase() == "null" {
+                false
+            } else {
+                matching_regex.is_match(s)
+            }
+        })
+        .unwrap_or(false)
 }
 
 #[cfg(test)]

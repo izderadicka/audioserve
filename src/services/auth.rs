@@ -415,7 +415,7 @@ mod tests {
             .body(b)
             .unwrap();
 
-        GenericRequestWrapper::new(req, None, [192, 168, 1, 2].into(), false).unwrap()
+        GenericRequestWrapper::new(req).unwrap()
     }
 
     fn build_authenticated_request(token: &str) -> GenericRequestWrapper<Full<Bytes>> {
@@ -426,7 +426,7 @@ mod tests {
             .body(Full::new("Hey".into()))
             .unwrap();
 
-        GenericRequestWrapper::new(req, None, [192, 168, 1, 2].into(), false).unwrap()
+        GenericRequestWrapper::new(req).unwrap()
     }
 
     fn shared_secret(sec: &str) -> String {
