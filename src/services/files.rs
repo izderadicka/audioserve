@@ -5,6 +5,7 @@ use super::{
     types::*,
     Counter,
 };
+use crate::myhy::headers::{ContentLength, ContentType};
 use crate::myhy::response::{
     self,
     body::wrap_stream,
@@ -12,13 +13,12 @@ use crate::myhy::response::{
     file::{send_file_simple, serve_file_from_fs, ByteRange},
     not_found, not_found_cached, ResponseBuilderExt, ResponseResult,
 };
+use crate::myhy::Response;
 use crate::{config::get_config, error::Error};
 use collection::{
     audio_meta::is_audio, extract_cover, extract_description, parse_chapter_path, TimeSpan,
 };
 use futures::prelude::*;
-use headers::{ContentLength, ContentType};
-use http::Response;
 
 use std::{
     ffi::OsStr,
@@ -335,8 +335,8 @@ pub async fn download_folder(
     format: DownloadFormat,
     include_subfolders: Option<regex::Regex>,
 ) -> ResponseResult {
+    use crate::myhy::header::CONTENT_DISPOSITION;
     use anyhow::Context;
-    use http::header::CONTENT_DISPOSITION;
     let full_path = base_path.join(&folder_path);
     let meta_result = tokio::fs::metadata(&full_path).await;
     let meta = match meta_result {

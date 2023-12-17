@@ -12,12 +12,12 @@ use crate::myhy::response::{
 };
 use crate::services::transcode::ChosenTranscoding;
 
+use crate::myhy::headers::{HeaderMapExt, Origin, Range, UserAgent};
+use crate::myhy::Incoming;
+use crate::myhy::Method;
+use crate::myhy::Service;
 use collection::{Collections, FoldersOrdering};
 use futures::{future, TryFutureExt};
-use headers::{HeaderMapExt, Origin, Range, UserAgent};
-use http::Method;
-use hyper::body::Incoming;
-use hyper::service::Service;
 use leaky_cauldron::Leaky;
 
 use regex::Regex;

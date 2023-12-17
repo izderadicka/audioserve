@@ -1,14 +1,16 @@
 use crate::config::get_config;
 use crate::error::{bail, Result};
+use crate::myhy::header::SET_COOKIE;
+use crate::myhy::headers::authorization::Bearer;
+use crate::myhy::headers::{
+    Authorization, ContentLength, ContentType, Cookie, HeaderMapExt, HeaderValue,
+};
 use crate::myhy::response::body::full_body;
 use crate::myhy::response::ResponseBuilderExt;
+use crate::myhy::Body;
+use crate::myhy::{Method, Response};
 use data_encoding::BASE64;
 use futures::{future, prelude::*};
-use headers::authorization::Bearer;
-use headers::{Authorization, ContentLength, ContentType, Cookie, HeaderMapExt, HeaderValue};
-use http::header::SET_COOKIE;
-use http::{Method, Response};
-use hyper::body::Body;
 use ring::rand::{SecureRandom, SystemRandom};
 use ring::{
     digest::{digest, SHA256},
@@ -381,9 +383,9 @@ mod tests {
     use super::*;
     use crate::config::init::init_default_config;
     use crate::myhy::request::GenericRequestWrapper;
+    use crate::myhy::{Request, StatusCode};
     use borrow::Cow;
     use bytes::Bytes;
-    use http::{Request, StatusCode};
     use http_body_util::{BodyExt, Full};
 
     #[test]
