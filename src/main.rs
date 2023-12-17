@@ -32,6 +32,7 @@ mod server;
 mod services;
 // #[cfg(feature = "tls")]
 // mod tls;
+mod myhy;
 mod util;
 
 fn generate_server_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, Error> {

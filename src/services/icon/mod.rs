@@ -9,8 +9,8 @@ use std::{
 };
 
 use self::cache::{cache_icon, cached_icon};
-use super::response::{data_response, HttpResponse};
 use crate::config::get_config;
+use crate::myhy::response::{data_response, HttpResponse};
 
 pub mod cache;
 

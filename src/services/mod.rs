@@ -1,13 +1,15 @@
 use self::auth::{AuthResult, Authenticator};
-use self::request::{is_cors_matching_origin, HttpRequest, QueryParams, RequestWrapper};
-use self::response::cors::add_cors_headers;
-use self::response::file::send_static_file;
-use self::response::{HttpResponse, ResponseFuture, ResponseResult};
 use self::search::Search;
 use self::transcode::QualityLevel;
 use crate::config::{get_config, Cors};
 use crate::error;
-use crate::services::response::cors::preflight_cors_response;
+use crate::myhy::request::{is_cors_matching_origin, HttpRequest, QueryParams, RequestWrapper};
+use crate::myhy::response::{
+    self,
+    cors::{add_cors_headers, preflight_cors_response},
+    file::send_static_file,
+    HttpResponse, ResponseFuture, ResponseResult,
+};
 use crate::services::transcode::ChosenTranscoding;
 
 use collection::{Collections, FoldersOrdering};
@@ -32,8 +34,6 @@ mod files;
 pub mod icon;
 #[cfg(feature = "shared-positions")]
 pub mod position;
-pub mod request;
-pub mod response;
 pub mod search;
 pub mod transcode;
 mod types;

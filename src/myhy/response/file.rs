@@ -14,10 +14,9 @@ use super::{
     add_cache_headers,
     body::wrap_stream,
     compress::{make_sense_to_compress, CompressStream},
-    ChunkStream, HttpResponse, ResponseBuilderExt, ResponseResult,
+    not_found, ChunkStream, HttpResponse, ResponseBuilderExt, ResponseResult,
 };
 use crate::error::Error;
-use crate::services::response;
 
 pub type ByteRange = (Bound<u64>, Bound<u64>);
 
@@ -120,7 +119,7 @@ pub async fn serve_file_from_fs(
         }
         Err(e) => {
             error!("Error when sending file {:?} : {}", filename, e);
-            Ok(response::not_found())
+            Ok(not_found())
         }
     }
 }

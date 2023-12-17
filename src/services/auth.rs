@@ -1,7 +1,7 @@
 use crate::config::get_config;
 use crate::error::{bail, Result};
-use crate::services::response::body::full_body;
-use crate::services::response::ResponseBuilderExt;
+use crate::myhy::response::body::full_body;
+use crate::myhy::response::ResponseBuilderExt;
 use data_encoding::BASE64;
 use futures::{future, prelude::*};
 use headers::authorization::Bearer;
@@ -23,8 +23,8 @@ use thiserror::Error;
 use tokio::time::sleep;
 use url::form_urlencoded;
 
-use super::request::GenericRequestWrapper;
-use super::response::{self, HttpResponse};
+use crate::myhy::request::GenericRequestWrapper;
+use crate::myhy::response::{self, HttpResponse};
 
 pub enum AuthResult<T, B> {
     Authenticated {
@@ -379,7 +379,8 @@ impl ::std::str::FromStr for Token {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::init::init_default_config, services::request::GenericRequestWrapper};
+    use crate::config::init::init_default_config;
+    use crate::myhy::request::GenericRequestWrapper;
     use borrow::Cow;
     use bytes::Bytes;
     use http::{Request, StatusCode};

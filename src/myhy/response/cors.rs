@@ -6,11 +6,9 @@ use headers::{
 use http::{Method, Response, StatusCode};
 use std::time::Duration;
 
+use super::super::request::HttpRequest;
 use super::HttpResponse;
-use crate::services::{
-    request::HttpRequest,
-    response::{body::empty_body, ResponseBuilderExt},
-};
+use super::{body::empty_body, ResponseBuilderExt};
 
 fn header2header<H1: Header, H2: Header>(i: H1) -> Result<impl Header, headers::Error> {
     let mut v = vec![];

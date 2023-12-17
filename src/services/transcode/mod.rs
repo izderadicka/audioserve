@@ -1,7 +1,7 @@
 use self::codecs::*;
-use super::response::ChunkStream;
 use crate::config::get_config;
 use crate::error::{bail, Result};
+use crate::myhy::response::ChunkStream;
 use collection::TimeSpan;
 use futures::prelude::*;
 use mime::Mime;
