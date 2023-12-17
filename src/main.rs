@@ -178,8 +178,14 @@ fn start_server(
         let tls_config = None;
 
         let server: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> = {
+            let is_tls = tls_config.is_some();
             let server = HttpServer::bind(addr).serve(svc_factory, tls_config);
-            info!("Server listening on {}{}", addr, get_url_path!());
+            info!(
+                "Server listening on {}{}{}",
+                addr,
+                get_url_path!(),
+                if is_tls { " with TLS" } else { "" }
+            );
             Box::pin(server.map_err(|e| e.into()))
         };
 

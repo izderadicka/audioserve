@@ -1,5 +1,5 @@
 use anyhow::Context as _;
-use rustls_pemfile::rsa_private_keys;
+use rustls_pemfile::private_key;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use std::path::Path;
 use std::sync::Arc;
@@ -48,11 +48,8 @@ fn load_private_key(
     let keyfile = fs::File::open(filename.as_ref()).context("open private key file")?;
     let mut reader = io::BufReader::new(keyfile);
 
-    let res = rsa_private_keys(&mut reader)
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("no private key found in {:?}", filename))?
-        .map_err(|e| anyhow::anyhow!(e))
-        .map(Into::into);
+    let res = private_key(&mut reader)?
+        .ok_or_else(|| anyhow::anyhow!("no private key found in {:?}", filename));
 
     res
 }
