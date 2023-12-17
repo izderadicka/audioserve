@@ -13,14 +13,15 @@ use tokio::net::TcpListener;
 
 use crate::error::Result;
 
-pub trait ServiceFactory<Body> {
+pub trait ServiceFactory {
+    type Body: Body + Send;
     type Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>>;
-    type Future: futures::Future<Output = std::result::Result<http::Response<Body>, Self::Error>>
+    type Future: futures::Future<Output = std::result::Result<http::Response<Self::Body>, Self::Error>>
         + Send;
 
     type Service: Service<
             Request<Incoming>,
-            Response = http::Response<Body>,
+            Response = http::Response<Self::Body>,
             Error = Self::Error,
             Future = Self::Future,
         > + Send;
@@ -44,12 +45,12 @@ impl HttpServer {
         self.addr
     }
 
-    pub async fn serve<B, S>(self, service_factory: S) -> Result<()>
+    pub async fn serve<S>(self, service_factory: S) -> Result<()>
     where
-        S: ServiceFactory<B> + Send + 'static,
-        B: Body + Send + 'static,
-        B::Data: Send,
-        B::Error: std::error::Error + Send + Sync + 'static,
+        S: ServiceFactory + Send + 'static,
+        S::Body: Body + Send + 'static,
+        <<S as ServiceFactory>::Body as Body>::Data: Send,
+        <<S as ServiceFactory>::Body as Body>::Error: std::error::Error + Send + Sync + 'static,
     {
         let mut stop_receiver = service_factory.stop_service_receiver();
         let listener = TcpListener::bind(self.addr).await?;
