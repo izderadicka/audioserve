@@ -1,8 +1,9 @@
 use headers::{
     AccessControlAllowCredentials, AccessControlAllowHeaders, AccessControlAllowMethods,
-    AccessControlAllowOrigin, AccessControlMaxAge, AccessControlRequestHeaders, Header,
-    HeaderMapExt, Origin,
+    AccessControlAllowOrigin, AccessControlExposeHeaders, AccessControlMaxAge,
+    AccessControlRequestHeaders, Header, HeaderMapExt, Origin,
 };
+use http::header::DATE;
 use http::{Method, Response, StatusCode};
 use std::time::Duration;
 
@@ -23,6 +24,11 @@ pub fn add_cors_headers(mut resp: HttpResponse, origin: Option<Origin>) -> HttpR
                 let headers = resp.headers_mut();
                 headers.typed_insert(allowed_origin);
                 headers.typed_insert(AccessControlAllowCredentials);
+                headers.typed_insert(
+                    vec![DATE]
+                        .into_iter()
+                        .collect::<AccessControlExposeHeaders>(),
+                );
             }
             resp
         }
