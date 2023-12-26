@@ -95,7 +95,7 @@ impl HttpServer {
                                 let builder = auto::Builder::new(rt);
                                 let conn = builder.serve_connection_with_upgrades(io, service);
                                 if let Err(err) = conn.await {
-                                    println!("Failed to serve connection: {:?}", err);
+                                    error!("Failed to serve connection: {:?}", err);
                                 }
                             });
                         }
@@ -113,7 +113,7 @@ impl HttpServer {
                         let builder = auto::Builder::new(rt);
                         let conn = builder.serve_connection_with_upgrades(io, service);
                         if let Err(err) = conn.await {
-                            println!("Failed to serve connection: {:?}", err);
+                            error!("Failed to serve connection: {:?}", err);
                         }
                     });
                 }
