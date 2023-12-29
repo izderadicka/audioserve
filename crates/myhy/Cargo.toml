@@ -20,13 +20,13 @@ bytes = "1.5.0"
 percent-encoding = "2.3.1"
 regex = "1.10.2"
 url = "2.5.0"
-futures = "0.3.29"
+futures = "0.3.30"
 mime = "0.3.17"
 serde = "1.0.193"
 serde_json = "1.0.108"
 mime_guess = "2.0"
 flate2 = "1.0.28"
-futures-util = "0.3.29"
+futures-util = "0.3.30"
 
 # for tls
 tokio-rustls = { version="0.25", optional=true}
