@@ -1,15 +1,18 @@
-use std::{sync::Mutex, time::Instant};
+use std::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Instant,
+};
 
 struct State {
-    counter: usize,
-    last_tick: Instant,
+    counter: AtomicU64,
+    last_tick: AtomicU64,
 }
 
 pub struct Leaky {
-    state: Mutex<State>,
-    capacity: usize,
+    state: State,
+    capacity: u64,
     rate: f32,
-    sample_rate_ns: u128,
+    start: Instant,
 }
 
 impl Leaky {
@@ -19,7 +22,7 @@ impl Leaky {
     /// Parameter `rate` (units/sec) is used to calculate all other parameters.
     /// Capacity is 110 % of rate, minimum is 1.
     pub fn new(rate: f32) -> Self {
-        let capacity = (rate * 1.1).ceil() as usize;
+        let capacity = rate.ceil() as u64;
         Leaky::new_with_params(rate, capacity)
     }
 
@@ -28,52 +31,65 @@ impl Leaky {
     /// Parameters:
     /// rate - units/sec
     /// capacity -  capacity of the bucket
-    pub fn new_with_params(rate: f32, capacity: usize) -> Self {
+    pub fn new_with_params(rate: f32, capacity: u64) -> Self {
         assert!(capacity > 0);
         assert!(rate > 0.0);
+        let start = Instant::now();
         let state = State {
-            counter: 0,
-            last_tick: Instant::now(),
+            counter: AtomicU64::new(0),
+            last_tick: AtomicU64::new(0),
         };
-        let state = Mutex::new(state);
 
         Leaky {
             state,
             capacity,
             rate,
-            sample_rate_ns: 10_000_000,
+            start,
         }
     }
 
     /// Indicates that new unit has arrived and returns Result, if this one is still with rate/capacity
 
     /// Return results - Ok(x) if still within capacity (x is capacity now taken), Err otherwise.
-    pub fn start_one(&self) -> Result<usize, usize> {
-        let mut state = self.state.lock().expect("Poisoned lock");
-        let tick = Instant::now();
-        let nanosecs_from_last_leak = tick.duration_since(state.last_tick).as_nanos();
-        if nanosecs_from_last_leak >= self.sample_rate_ns {
-            let to_leak =
-                ((nanosecs_from_last_leak / 1_000_000_000) as f32 * self.rate).floor() as usize;
-            if to_leak > 0 {
-                state.counter = state.counter.saturating_sub(to_leak);
-                state.last_tick = tick;
-            }
-        }
+    pub fn start_one(&self) -> Result<u64, u64> {
+        let mut last_tick = self.state.last_tick.load(Ordering::Relaxed);
+        let mut new_counter = loop {
+            let tick = Instant::now();
+            let msecs_from_start = tick.duration_since(self.start).as_millis() as u64;
 
-        if state.counter < self.capacity {
-            state.counter += 1;
-            return Ok(state.counter);
+            let msecs_from_last_tick = msecs_from_start - last_tick;
+            let to_leak = ((msecs_from_last_tick as f32 / 1000.0) * self.rate).floor() as u64;
+            let mut counter = self.state.counter.load(Ordering::Relaxed);
+            if to_leak > 0 {
+                counter = counter.saturating_sub(to_leak);
+                match self.state.last_tick.compare_exchange_weak(
+                    last_tick,
+                    msecs_from_start,
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => break counter,
+                    Err(t) => last_tick = t,
+                }
+            } else {
+                break counter;
+            }
+        };
+
+        let res = if new_counter < self.capacity as u64 {
+            new_counter += 1;
+            Ok(new_counter)
         } else {
-            return Err(state.counter);
-        }
+            Err(new_counter)
+        };
+        self.state.counter.store(new_counter, Ordering::Relaxed);
+        return res;
     }
 
     #[cfg(test)]
     /// Returns remaining capacity at use
-    fn immediate_capacity(&self) -> usize {
-        let state = self.state.lock().expect("Poisoned lock");
-        self.capacity - state.counter
+    fn immediate_capacity(&self) -> u64 {
+        self.capacity - self.state.counter.load(Ordering::Relaxed)
     }
 }
 
@@ -89,7 +105,7 @@ mod tests {
         let leaky = Leaky::new_with_params(50.0, 50);
         for i in 1..=50 {
             let res = leaky.start_one();
-            assert!(res.is_ok());
+            assert!(res.is_ok(), "should be ok for {}", i);
             let n = res.unwrap();
             assert_eq!(n, i)
         }

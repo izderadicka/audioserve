@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use leaky_cauldron::Leaky;
 
 fn bench_leaky(b: &mut Criterion) {
