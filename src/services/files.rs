@@ -123,34 +123,21 @@ async fn serve_file_transcoded_checked(
     transcoding_quality: ChosenTranscoding,
 ) -> ResponseResult {
     let counter = transcoding.transcodings;
-    let mut running_transcodings = counter.load(Ordering::SeqCst);
-    loop {
-        if running_transcodings >= transcoding.max_transcodings {
-            warn!(
-                "Max transcodings reached {}/{}",
-                running_transcodings, transcoding.max_transcodings
-            );
-            return Ok(response::too_many_requests());
-        }
-
-        match counter.compare_exchange(
-            running_transcodings,
-            running_transcodings + 1,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        ) {
-            Ok(_) => {
-                running_transcodings += 1;
-                break;
-            }
-            Err(curr) => running_transcodings = curr,
-        }
+    let running_transcodings = counter.load(Ordering::Acquire);
+    if running_transcodings >= transcoding.max_transcodings {
+        warn!(
+            "Max transcodings reached {}/{}",
+            running_transcodings, transcoding.max_transcodings
+        );
+        return Ok(response::too_many_requests());
     }
+
+    counter.fetch_add(1, Ordering::Release);
 
     debug!(
         "Sendig file {:?} transcoded - remaining slots {}/{}",
         &full_path,
-        transcoding.max_transcodings - running_transcodings,
+        transcoding.max_transcodings - running_transcodings - 1,
         transcoding.max_transcodings
     );
     serve_file_transcoded(full_path, seek, span, transcoding_quality, counter).await
@@ -187,7 +174,7 @@ async fn serve_file_transcoded(
     }
 
     transcoder
-        .transcode(full_path, seek, span, counter.clone())
+        .transcode(full_path, seek, span, counter)
         .await
         .map(move |stream| {
             Response::builder()

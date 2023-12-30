@@ -437,7 +437,7 @@ impl Transcoder {
                         )
                         .await;
 
-                        counter.fetch_sub(1, Ordering::SeqCst);
+                        counter.fetch_sub(1, Ordering::Release);
                         match res {
                             Ok(res) => match res {
                                 Ok(res) => {
@@ -478,13 +478,13 @@ impl Transcoder {
                     };
                     Ok((stream, fut))
                 } else {
-                    counter.fetch_sub(1, Ordering::SeqCst);
+                    counter.fetch_sub(1, Ordering::Release);
                     error!("Cannot get child process stdout");
                     bail!("Cannot get child process stdout");
                 }
             }
             Err(e) => {
-                counter.fetch_sub(1, Ordering::SeqCst);
+                counter.fetch_sub(1, Ordering::Release);
                 error!("Cannot spawn child process: {:?}", e);
                 bail!("Cannot spawn child");
             }
