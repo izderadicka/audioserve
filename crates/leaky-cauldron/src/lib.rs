@@ -9,6 +9,7 @@ pub struct Leaky {
     state: Mutex<State>,
     capacity: usize,
     rate: f32,
+    sample_rate_ns: u128,
 }
 
 impl Leaky {
@@ -40,6 +41,7 @@ impl Leaky {
             state,
             capacity,
             rate,
+            sample_rate_ns: 10_000_000,
         }
     }
 
@@ -49,11 +51,14 @@ impl Leaky {
     pub fn start_one(&self) -> Result<usize, usize> {
         let mut state = self.state.lock().expect("Poisoned lock");
         let tick = Instant::now();
-        let secs_from_last_leak = tick.duration_since(state.last_tick).as_secs_f32();
-        let to_leak = (secs_from_last_leak * self.rate).round() as usize;
-        if to_leak > 0 {
-            state.counter = state.counter.saturating_sub(to_leak);
-            state.last_tick = tick;
+        let nanosecs_from_last_leak = tick.duration_since(state.last_tick).as_nanos();
+        if nanosecs_from_last_leak >= self.sample_rate_ns {
+            let to_leak =
+                ((nanosecs_from_last_leak / 1_000_000_000) as f32 * self.rate).floor() as usize;
+            if to_leak > 0 {
+                state.counter = state.counter.saturating_sub(to_leak);
+                state.last_tick = tick;
+            }
         }
 
         if state.counter < self.capacity {
