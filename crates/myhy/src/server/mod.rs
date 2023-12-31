@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 
+use futures_util::pin_mut;
 use http::Request;
 use hyper::{
     body::{Body, Incoming},
@@ -89,15 +90,7 @@ impl HttpServer {
                         Ok(stream) => {
                             let io = TokioIo::new(stream);
                             let is_ssl = true;
-                            let service = service_factory.create(remote_addr, is_ssl);
-                            let rt = TokioExecutor::new();
-                            tokio::task::spawn(async move {
-                                let builder = auto::Builder::new(rt);
-                                let conn = builder.serve_connection_with_upgrades(io, service);
-                                if let Err(err) = conn.await {
-                                    error!("Failed to serve connection: {:?}", err);
-                                }
-                            });
+                            serve_connection(io, &service_factory, remote_addr, is_ssl);
                         }
                         Err(e) => {
                             error!("Failed TLS handshake: {}", e);
@@ -107,19 +100,44 @@ impl HttpServer {
                 } else {
                     let io = TokioIo::new(stream);
                     let is_ssl = false;
-                    let service = service_factory.create(remote_addr, is_ssl);
-                    let rt = TokioExecutor::new();
-                    tokio::task::spawn(async move {
-                        let builder = auto::Builder::new(rt);
-                        let conn = builder.serve_connection_with_upgrades(io, service);
-                        if let Err(err) = conn.await {
-                            error!("Failed to serve connection: {:?}", err);
-                        }
-                    });
+                    serve_connection(io, &service_factory, remote_addr, is_ssl);
                 }
             }
         });
         handle.await?;
         Ok(())
     }
+}
+
+fn serve_connection<T, S>(io: T, service_factory: &S, remote_addr: SocketAddr, is_ssl: bool)
+where
+    S: ServiceFactory + Send + 'static,
+    S::Body: Body + Send + 'static,
+    <<S as ServiceFactory>::Body as Body>::Data: Send,
+    <<S as ServiceFactory>::Body as Body>::Error: std::error::Error + Send + Sync + 'static,
+    T: hyper::rt::Read + hyper::rt::Write + Send + Unpin + 'static,
+{
+    let service = service_factory.create(remote_addr, is_ssl);
+    let mut stop_signal = service_factory.stop_service_receiver();
+    let rt = TokioExecutor::new();
+    tokio::task::spawn(async move {
+        let builder = auto::Builder::new(rt);
+        let conn = builder.serve_connection_with_upgrades(io, service);
+        pin_mut!(conn);
+        loop {
+            tokio::select! {
+                _ = stop_signal.changed() => {
+                    debug!("Stopping opened connection for {} ", remote_addr);
+                    conn.as_mut().graceful_shutdown();
+
+                }
+                res = conn.as_mut() => {
+                    if let Err(err) = res {
+                        error!("Failed to serve connection: {:?}", err);
+                    }
+                    break;
+                }
+            }
+        }
+    });
 }
