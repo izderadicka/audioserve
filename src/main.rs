@@ -140,14 +140,21 @@ fn restore_positions<P: AsRef<Path>>(backup_file: collection::BackupFile<P>) -> 
     .map_err(Error::new)
 }
 
+fn build_runtime() -> tokio::runtime::Runtime {
+    let cfg = get_config();
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(cfg.thread_pool.num_threads as usize)
+        .max_blocking_threads(cfg.thread_pool.queue_size as usize)
+        .build()
+        .unwrap()
+}
+
 fn start_server(
+    rt: &tokio::runtime::Runtime,
     server_secret: Vec<u8>,
     collections: Arc<Collections>,
-) -> (
-    tokio::runtime::Runtime,
-    oneshot::Receiver<()>,
-    watch::Sender<()>,
-) {
+) -> (oneshot::Receiver<()>, watch::Sender<()>) {
     let cfg = get_config();
 
     let addr = cfg.listen;
@@ -192,13 +199,6 @@ fn start_server(
         server.await
     };
 
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .worker_threads(cfg.thread_pool.num_threads as usize)
-        .max_blocking_threads(cfg.thread_pool.queue_size as usize)
-        .build()
-        .unwrap();
-
     let (term_sender, term_receiver) = oneshot::channel();
     rt.spawn(
         start_server
@@ -208,7 +208,7 @@ fn start_server(
                 futures::future::ready(())
             }),
     );
-    (rt, term_receiver, stop_service_sender)
+    (term_receiver, stop_service_sender)
 }
 
 #[cfg(not(unix))]
@@ -372,9 +372,9 @@ fn main() -> anyhow::Result<()> {
     };
 
     let collections = create_collections()?;
-
-    let (runtime, term_receiver, stop_service_sender) =
-        start_server(server_secret, collections.clone());
+    let runtime = build_runtime();
+    let (term_receiver, stop_service_sender) =
+        start_server(&runtime, server_secret, collections.clone());
 
     #[cfg(unix)]
     {
@@ -385,7 +385,7 @@ fn main() -> anyhow::Result<()> {
 
     runtime.block_on(terminate_server(term_receiver, stop_service_sender));
 
-    //graceful shutdown of server will wait till transcoding ends, so rather shut it down hard
+    //graceful shutdown of server will wait till immediate tasks ends, so rather shut it down hard
     runtime.shutdown_timeout(std::time::Duration::from_millis(300));
 
     thread::spawn(|| {
