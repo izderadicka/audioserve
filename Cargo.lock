@@ -65,16 +65,30 @@ dependencies = [
  "anstyle",
  "anstyle-parse",
  "anstyle-query",
- "anstyle-wincon",
+ "anstyle-wincon 2.1.0",
+ "colorchoice",
+ "utf8parse",
+]
+
+[[package]]
+name = "anstream"
+version = "0.6.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e2e1ebcb11de5c03c67de28a7df593d32191b44939c482e97702baaaa6ab6a5"
+dependencies = [
+ "anstyle",
+ "anstyle-parse",
+ "anstyle-query",
+ "anstyle-wincon 3.0.2",
  "colorchoice",
  "utf8parse",
 ]
 
 [[package]]
 name = "anstyle"
-version = "1.0.3"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b84bf0a05bbb2a83e5eb6fa36bb6e87baa08193c35ff52bbf6b38d8af2890e46"
+checksum = "7079075b41f533b8c61d2a4d073c4676e1f8b249ff94a393b0595db304e0dd87"
 
 [[package]]
 name = "anstyle-parse"
@@ -102,6 +116,16 @@ checksum = "58f54d10c6dfa51283a066ceab3ec1ab78d13fae00aa49243a45e4571fb79dfd"
 dependencies = [
  "anstyle",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "anstyle-wincon"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cd54b81ec8d6180e24654d0b371ad22fc3dd083b6ff8ba325b72e00c87660a7"
+dependencies = [
+ "anstyle",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -161,7 +185,7 @@ dependencies = [
  "csv",
  "data-encoding",
  "dirs",
- "env_logger 0.10.0",
+ "env_logger 0.11.0",
  "escargot",
  "futures",
  "http-body-util",
@@ -314,7 +338,7 @@ dependencies = [
  "bit-vec",
  "derive_builder",
  "ego-tree",
- "env_logger 0.10.0",
+ "env_logger 0.11.0",
  "log",
  "notify",
 ]
@@ -439,7 +463,7 @@ version = "4.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bb9faaa7c2ef94b2743a21f5a29e6f0010dff4caa69ac8e9d6cf8b6fa74da08"
 dependencies = [
- "anstream",
+ "anstream 0.5.0",
  "anstyle",
  "clap_lex",
  "strsim 0.10.0",
@@ -470,7 +494,7 @@ dependencies = [
  "anyhow",
  "clap 4.4.3",
  "collection",
- "env_logger 0.10.0",
+ "env_logger 0.11.0",
  "libc",
 ]
 
@@ -483,7 +507,7 @@ dependencies = [
  "crossbeam-channel",
  "csv",
  "enum_dispatch",
- "env_logger 0.10.0",
+ "env_logger 0.11.0",
  "fs_extra",
  "indexmap 2.1.0",
  "lazy_static",
@@ -868,6 +892,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_filter"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a009aa4810eb158359dda09d0c87378e4bbb89b5a801f016885a4707ba24f7ea"
+dependencies = [
+ "log",
+ "regex",
+]
+
+[[package]]
 name = "env_logger"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -882,15 +916,15 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85cdab6a89accf66733ad5a1693a4dcced6aeff64602b634530dd73c1f3ee9f0"
+checksum = "9eeb342678d785662fd2514be38c459bb925f02b68dd2a3e0f21d7ef82d979dd"
 dependencies = [
+ "anstream 0.6.11",
+ "anstyle",
+ "env_filter",
  "humantime 2.1.0",
- "is-terminal",
  "log",
- "regex",
- "termcolor",
 ]
 
 [[package]]
@@ -2075,7 +2109,7 @@ dependencies = [
 name = "proxy-headers"
 version = "0.1.0"
 dependencies = [
- "env_logger 0.10.0",
+ "env_logger 0.11.0",
  "headers",
  "http 1.0.0",
  "lazy_static",
@@ -2563,7 +2597,7 @@ version = "0.2.2"
 dependencies = [
  "byteorder",
  "data-encoding",
- "env_logger 0.10.0",
+ "env_logger 0.11.0",
  "linked-hash-map",
  "log",
  "rand 0.8.5",
@@ -3103,7 +3137,7 @@ dependencies = [
 name = "websock"
 version = "0.4.0"
 dependencies = [
- "env_logger 0.10.0",
+ "env_logger 0.11.0",
  "futures",
  "headers",
  "http-body-util",
