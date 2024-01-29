@@ -509,7 +509,7 @@ dependencies = [
  "enum_dispatch",
  "env_logger 0.11.0",
  "fs_extra",
- "indexmap 2.1.0",
+ "indexmap 2.2.1",
  "lazy_static",
  "log",
  "media_info",
@@ -1241,7 +1241,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "http 1.0.0",
- "indexmap 2.1.0",
+ "indexmap 2.2.1",
  "slab",
  "tokio",
  "tokio-util",
@@ -1535,9 +1535,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.1.0"
+version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d530e1a18b1cb4c484e6e34556a0d948706958449fca0cab753d649f2bce3d1f"
+checksum = "433de089bd45971eecf4668ee0ee8f4cec17db4f8bd8f7bc3197a6ce37aa7d9b"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.1",
@@ -2552,7 +2552,7 @@ version = "0.9.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a49e178e4452f45cb61d0cd8cebc1b0fafd3e41929e996cef79aa3aca91f574"
 dependencies = [
- "indexmap 2.1.0",
+ "indexmap 2.2.1",
  "itoa",
  "ryu",
  "serde",
