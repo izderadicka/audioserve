@@ -9,7 +9,7 @@ edition = "2021"
 [dependencies]
 
 [dev-dependencies]
-tokio={version="1.35", features=["macros", "test-util", "rt-multi-thread"]}
+tokio={version="1.36", features=["macros", "test-util", "rt-multi-thread"]}
 criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]
