@@ -38,4 +38,4 @@ tls=["tokio-rustls", "rustls-pemfile", "rustls-pki-types"]
 
 
 [dev-dependencies]
-ring = "0.17.7"
+ring = "0.17.8"
