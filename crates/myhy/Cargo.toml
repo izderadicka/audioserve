@@ -12,7 +12,7 @@ hyper = {version="1.2", features = ["full"]}
 http-body-util = "0.1.0"
 hyper-util = { version = "0.1.3", features = ["tokio", "server", "server-auto"] }
 headers = "0.4.0"
-http = "1.0.0"
+http = "1.1.0"
 tokio = {version="1.36", features=["full"]}
 log = {version="0.4", features = ["release_max_level_info", "max_level_trace"]}
 anyhow = "1.0.80"
