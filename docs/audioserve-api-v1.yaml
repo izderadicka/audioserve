@@ -10,21 +10,20 @@ servers:
     description: Your local test server
 
 tags:
-- name: "Authentication"
-  description: Authentication endpoint
-- name: "Collections"
-  description: Audio collections browsing and playing
-- name: Positions
-  description: Playback position
-
+  - name: "Authentication"
+    description: Authentication endpoint
+  - name: "Collections"
+    description: Audio collections browsing and playing
+  - name: Positions
+    description: Playback position
 
 paths:
-# authentication endpoint
+  # authentication endpoint
   /authenticate:
     post:
       tags:
         - "Authentication"
-      description: |- 
+      description: |-
         Authentication to server via salted shared secret
 
         Salted shared secret is calculated as:
@@ -60,9 +59,9 @@ paths:
               schema:
                 type: string
                 maxLength: 250
-                pattern: '^[a-zA-Z0-9+/]+=*$'
+                pattern: "^[a-zA-Z0-9+/]+=*$"
               examples:
-                '0':
+                "0":
                   value: >-
                     E114Vfv45RowIr0bFMNiJFRsPweZfINmhfTUFFy1Er8AAAAAY2drA/2XKsZSMnsc3a+yRIKjQIFaAEOcROCaTYR1jUjo6ow1
         "401":
@@ -84,11 +83,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/CollectionsInfo"
               example:
-                {"version":"0.16.3","folder_download":true,"shared_positions":true,"count":1,"names":["audiobooks"]}
+                {
+                  "version": "0.16.3",
+                  commit:"a6e9a3f",
+                  "folder_download": true,
+                  "shared_positions": true,
+                  "count": 1,
+                  "names": ["audiobooks"],
+                }
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-# transcodings endpoint
+  # transcodings endpoint
   /transcodings/:
     get:
       tags:
@@ -101,31 +107,36 @@ paths:
         Normally should be called after `collections` call, unless client is not interested in transcoding capabilities at all.
 
       responses:
-        '200':
+        "200":
           description: Success - returns transcodings settings
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/TranscodingsInfo"
               example:
-                {"max_transcodings":24,"low":{"bitrate":32,"name":"opus-in-ogg"},"medium":{"bitrate":48,"name":"opus-in-ogg"},"high":{"bitrate":64,"name":"opus-in-ogg"}}
+                {
+                  "max_transcodings": 24,
+                  "low": { "bitrate": 32, "name": "opus-in-ogg" },
+                  "medium": { "bitrate": 48, "name": "opus-in-ogg" },
+                  "high": { "bitrate": 64, "name": "opus-in-ogg" },
+                }
         "401":
-          $ref:  "#/components/responses/Unauthorized"
-  
+          $ref: "#/components/responses/Unauthorized"
+
   # Cover endpoint
   /{col_id}/cover/{path}:
     get:
       tags:
         - "Collections"
-      description: | 
+      description: |
         Returns cover image for indicated `path` (if exists)
         Path for cover should be taken from object returend by `folder` endpoint.
       parameters:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Path"
-          
+
       responses:
-        '200':
+        "200":
           description: Success - returns image binary - jpeg or png
           content:
             "image/*":
@@ -142,16 +153,16 @@ paths:
     get:
       tags:
         - "Collections"
-      description: | 
+      description: |
         Returns folder icon (icon is scaled down normalize cover image) 
         for indicated path `path` (if cover exists).
         Path is folder path.
       parameters:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Path"
-          
+
       responses:
-        '200':
+        "200":
           description: Success - returns image binary - png
           content:
             "image/png":
@@ -161,8 +172,8 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
-          $ref: "#/components/responses/NotFound"    
-      
+          $ref: "#/components/responses/NotFound"
+
   /{col_id}/desc/{path}:
     get:
       tags:
@@ -174,7 +185,7 @@ paths:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Path"
       responses:
-        '200':
+        "200":
           description: Success - returns description text - plain, html or markdown
           content:
             "text/*":
@@ -185,12 +196,11 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-
   /{col_id}/folder/:
     get:
       tags:
         - "Collections"
-      description: | 
+      description: |
         List contents of  root folder of the collection.
         See `/{col_id}/folder/{path}` for more detailed description.
       parameters:
@@ -198,7 +208,7 @@ paths:
         - $ref: "#/components/parameters/Ordering"
         - $ref: "#/components/parameters/Group"
       responses:
-        '200':
+        "200":
           description: Success -  returns JSON object describing audio folder
           content:
             application/json:
@@ -211,47 +221,45 @@ paths:
                   "modified": 1613948393506,
                   "total_time": 0,
                   "files": [],
-                  "subfolders": [
-                    {
-                      "name": "Austene Jane",
-                      "modified": 1613941742570,
-                      "path": "Austene Jane",
-                      "is_file": false,
-                      "finished": false
-                    },
-                    {
-                      "name": "Chesterton Gilbert Keith",
-                      "modified": 1613824355322,
-                      "path": "Chesterton Gilbert Keith",
-                      "is_file": false,
-                      "finished": false
-                    },
-                    {
-                      "name": "Doyle Arthur Conan",
-                      "modified": 1613825015324,
-                      "path": "Doyle Arthur Conan",
-                      "is_file": false,
-                      "finished": false
-                    },
-                    {
-                      "name": "Wells H G",
-                      "modified": 1613902871789,
-                      "path": "Wells H G",
-                      "is_file": false,
-                      "finished": false
-                    }
-                  ],
+                  "subfolders":
+                    [
+                      {
+                        "name": "Austene Jane",
+                        "modified": 1613941742570,
+                        "path": "Austene Jane",
+                        "is_file": false,
+                        "finished": false,
+                      },
+                      {
+                        "name": "Chesterton Gilbert Keith",
+                        "modified": 1613824355322,
+                        "path": "Chesterton Gilbert Keith",
+                        "is_file": false,
+                        "finished": false,
+                      },
+                      {
+                        "name": "Doyle Arthur Conan",
+                        "modified": 1613825015324,
+                        "path": "Doyle Arthur Conan",
+                        "is_file": false,
+                        "finished": false,
+                      },
+                      {
+                        "name": "Wells H G",
+                        "modified": 1613902871789,
+                        "path": "Wells H G",
+                        "is_file": false,
+                        "finished": false,
+                      },
+                    ],
                   "cover": null,
-                  "description": {
-                    "path": "welcome.md",
-                    "mime": "text/markdown"
-                  },
-                  "tags": null
+                  "description":
+                    { "path": "welcome.md", "mime": "text/markdown" },
+                  "tags": null,
                 }
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-              
   /{col_id}/folder/{path}:
     get:
       tags:
@@ -267,7 +275,7 @@ paths:
         - $ref: "#/components/parameters/Ordering"
         - $ref: "#/components/parameters/Group"
       responses:
-        '200':
+        "200":
           description: Success -  returns JSON object describing audio folder
           content:
             application/json:
@@ -276,153 +284,150 @@ paths:
               examples:
                 "Author folder":
                   value:
-                      {
-                        "is_file": false,
-                        "is_collapsed": false,
-                        "modified": 1613902871789,
-                        "total_time": 0,
-                        "files": [],
-                        "subfolders": [
+                    {
+                      "is_file": false,
+                      "is_collapsed": false,
+                      "modified": 1613902871789,
+                      "total_time": 0,
+                      "files": [],
+                      "subfolders":
+                        [
                           {
                             "name": "Invisible Man",
                             "modified": 1613902936821,
                             "path": "Wells H G/Invisible Man",
                             "is_file": false,
-                            "finished": false
-                          }
+                            "finished": false,
+                          },
                         ],
-                        "cover": {
+                      "cover":
+                        {
                           "path": "Wells H G/H.G._Wells_by_Beresford.jpg",
-                          "mime": "image/jpeg"
+                          "mime": "image/jpeg",
                         },
-                        "description": {
-                          "path": "Wells H G/info.txt",
-                          "mime": "text/plain"
-                        },
-                        "tags": null
-                      }
+                      "description":
+                        { "path": "Wells H G/info.txt", "mime": "text/plain" },
+                      "tags": null,
+                    }
                 "Audiobook folder":
-                  value: 
+                  value:
                     {
                       "is_file": false,
                       "modified": 1613902936821,
                       "total_time": 18079,
-                      "files": [
-                        {
-                          "name": "invisibleman_01_wells_64kb.mp3",
-                          "path": "Wells H G/Invisible Man/invisibleman_01_wells_64kb.mp3",
-                          "meta": {
-                            "duration": 1362,
-                            "bitrate": 64,
-                            "tags": {
-                              "title": "01 - Chapters I and II"
-                            }
+                      "files":
+                        [
+                          {
+                            "name": "invisibleman_01_wells_64kb.mp3",
+                            "path": "Wells H G/Invisible Man/invisibleman_01_wells_64kb.mp3",
+                            "meta":
+                              {
+                                "duration": 1362,
+                                "bitrate": 64,
+                                "tags": { "title": "01 - Chapters I and II" },
+                              },
+                            "mime": "audio/mpeg",
+                            "section": null,
                           },
-                          "mime": "audio/mpeg",
-                          "section": null
-                        },
-                        {
-                          "name": "invisibleman_02_wells_64kb.mp3",
-                          "path": "Wells H G/Invisible Man/invisibleman_02_wells_64kb.mp3",
-                          "meta": {
-                            "duration": 1482,
-                            "bitrate": 64,
-                            "tags": {
-                              "title": "02 - Chapters III and IV"
-                            }
+                          {
+                            "name": "invisibleman_02_wells_64kb.mp3",
+                            "path": "Wells H G/Invisible Man/invisibleman_02_wells_64kb.mp3",
+                            "meta":
+                              {
+                                "duration": 1482,
+                                "bitrate": 64,
+                                "tags": { "title": "02 - Chapters III and IV" },
+                              },
+                            "mime": "audio/mpeg",
+                            "section": null,
                           },
-                          "mime": "audio/mpeg",
-                          "section": null
-                        }
-                      ],
+                        ],
                       "subfolders": [],
-                      "cover": {
-                        "path": "Wells H G/Invisible Man/220px-Wells_-_The_Invisible_Man_-_Pearson_cover_1897.jpg",
-                        "mime": "image/jpeg"
-                      },
-                      "description": {
-                        "path": "Wells H G/Invisible Man/info.html",
-                        "mime": "text/html"
-                      },
-                      "position": {
-                        "path": "Wells H G/Invisible Man/invisibleman_09_wells_64kb.mp3",
-                        "timestamp": 1635427462226,
-                        "position": 1324.175
-                      },
-                      "tags": {
-                        "genre": "speech",
-                        "artist": "H. G. Wells",
-                        "album": "The Invisible Man"
-                      }
+                      "cover":
+                        {
+                          "path": "Wells H G/Invisible Man/220px-Wells_-_The_Invisible_Man_-_Pearson_cover_1897.jpg",
+                          "mime": "image/jpeg",
+                        },
+                      "description":
+                        {
+                          "path": "Wells H G/Invisible Man/info.html",
+                          "mime": "text/html",
+                        },
+                      "position":
+                        {
+                          "path": "Wells H G/Invisible Man/invisibleman_09_wells_64kb.mp3",
+                          "timestamp": 1635427462226,
+                          "position": 1324.175,
+                        },
+                      "tags":
+                        {
+                          "genre": "speech",
+                          "artist": "H. G. Wells",
+                          "album": "The Invisible Man",
+                        },
                     }
-                "m4b folder": 
+                "m4b folder":
                   value:
                     {
                       "is_file": true,
                       "modified": 1615456636344,
                       "total_time": 63547,
-                      "files": [
+                      "files":
+                        [
                           {
-                              "name": "000 - Chapter_1",
-                              "path": "Stoker Bram/Dracula/Dracula.m4b$$000 - Chapter_1$$0-1020288$$.m4b",
-                              "meta": {
-                                  "duration": 1020,
-                                  "bitrate": 54,
-                                  "tags": null
-                              },
-                              "mime": "audio/m4b",
-                              "section": {
-                                  "start": 0,
-                                  "duration": 1020288
-                              }
+                            "name": "000 - Chapter_1",
+                            "path": "Stoker Bram/Dracula/Dracula.m4b$$000 - Chapter_1$$0-1020288$$.m4b",
+                            "meta":
+                              { "duration": 1020, "bitrate": 54, "tags": null },
+                            "mime": "audio/m4b",
+                            "section": { "start": 0, "duration": 1020288 },
                           },
                           {
-                              "name": "001 - Chapter_2",
-                              "path": "Stoker Bram/Dracula/Dracula.m4b$$001 - Chapter_2$$1020288-2029004$$.m4b",
-                              "meta": {
-                                  "duration": 1008,
-                                  "bitrate": 54,
-                                  "tags": null
-                              },
-                              "mime": "audio/m4b",
-                              "section": {
-                                  "start": 1020288,
-                                  "duration": 1008716
-                              }
-                          }
-                      ],
+                            "name": "001 - Chapter_2",
+                            "path": "Stoker Bram/Dracula/Dracula.m4b$$001 - Chapter_2$$1020288-2029004$$.m4b",
+                            "meta":
+                              { "duration": 1008, "bitrate": 54, "tags": null },
+                            "mime": "audio/m4b",
+                            "section":
+                              { "start": 1020288, "duration": 1008716 },
+                          },
+                        ],
                       "subfolders": [],
-                      "cover": {
+                      "cover":
+                        {
                           "path": "Stoker Bram/Dracula/800px-Dracula-First-Edition-1897_(cropped).jpg",
-                          "mime": "image/jpeg"
-                      },
-                      "description": {
+                          "mime": "image/jpeg",
+                        },
+                      "description":
+                        {
                           "path": "Stoker Bram/Dracula/info.txt",
-                          "mime": "text/plain"
-                      },
-                      "position": {
+                          "mime": "text/plain",
+                        },
+                      "position":
+                        {
                           "path": "Stoker Bram/Dracula/Dracula.m4b$$004 - Chapter_5$$3452020-4080784$$.m4b",
                           "timestamp": 1635963253408,
-                          "position": 111.82
-                      },
-                      "tags": {
+                          "position": 111.82,
+                        },
+                      "tags":
+                        {
                           "title": "Dracula",
                           "album": "Dracula",
                           "genre": "Audio Book",
                           "date": "2014",
-                          "artist": "Bram Stoker"
-                      }
+                          "artist": "Bram Stoker",
+                        },
                     }
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
-      
+
   /{col_id}/audio/{path}:
     get:
       tags:
         - "Collections"
-      description: | 
+      description: |
         Streams (possibly transcoded) audio file
 
         File is sent either directly  (in this case [http bytes range](https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests) 
@@ -472,13 +477,13 @@ paths:
           description: |-
             Optionally client can request range of bytes from file, will only work if
             file is not actually transcoded.
-            Range is standard HTTP header as per [RFC 7233](https://datatracker.ietf.org/doc/html/rfc7233) 
+            Range is standard HTTP header as per [RFC 7233](https://datatracker.ietf.org/doc/html/rfc7233)
           schema:
             type: string
           example: bytes=14286848-
-          
+
       responses:
-        '200':
+        "200":
           description: Success - audio is sent in response body
           content:
             "audio:*":
@@ -495,7 +500,7 @@ paths:
               schema:
                 type: string
               example: codec=opus-in-ogg; bitrate=48
-        '206':
+        "206":
           description: "Success - part of audio file, if Range: bytes were requested"
           content:
             "audio/*":
@@ -515,7 +520,7 @@ paths:
           $ref: "#/components/responses/NotFound"
         "503":
           description: Number of transcodings over limit
-                             
+
   /{col_id}/search:
     get:
       tags:
@@ -539,15 +544,33 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Success -  all found folders within this collection
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SearchResult"
-              example: 
-                {"files":[],"subfolders":[{"name":"Around The World in Eighty Days","modified":1613824559416,"path":"Verne Jules/Around The World in Eighty Days","is_file":false,"finished":false},
-                {"name":"Austene Jane","modified":1613941742570,"path":"Austene Jane","is_file":false,"finished":false}]}
+              example:
+                {
+                  "files": [],
+                  "subfolders":
+                    [
+                      {
+                        "name": "Around The World in Eighty Days",
+                        "modified": 1613824559416,
+                        "path": "Verne Jules/Around The World in Eighty Days",
+                        "is_file": false,
+                        "finished": false,
+                      },
+                      {
+                        "name": "Austene Jane",
+                        "modified": 1613941742570,
+                        "path": "Austene Jane",
+                        "is_file": false,
+                        "finished": false,
+                      },
+                    ],
+                }
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -562,15 +585,33 @@ paths:
         - $ref: "#/components/parameters/CollectionId"
         - $ref: "#/components/parameters/Group"
       responses:
-        '200':
+        "200":
           description: Success -  most recent folders
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SearchResult"
-              example: 
-                {"files":[],"subfolders":[{"name":"Around The World in Eighty Days","modified":1613824559416,"path":"Verne Jules/Around The World in Eighty Days","is_file":false,"finished":false},
-                {"name":"Austene Jane","modified":1613941742570,"path":"Austene Jane","is_file":false,"finished":false}]}
+              example:
+                {
+                  "files": [],
+                  "subfolders":
+                    [
+                      {
+                        "name": "Around The World in Eighty Days",
+                        "modified": 1613824559416,
+                        "path": "Verne Jules/Around The World in Eighty Days",
+                        "is_file": false,
+                        "finished": false,
+                      },
+                      {
+                        "name": "Austene Jane",
+                        "modified": 1613941742570,
+                        "path": "Austene Jane",
+                        "is_file": false,
+                        "finished": false,
+                      },
+                    ],
+                }
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -578,7 +619,7 @@ paths:
     get:
       tags:
         - "Collections"
-      description: | 
+      description: |
         Downloads content of folder as an archive (zip or tar)
         Downloads all files (audio files, cover, description) from this folder as an archive (zip or tar). 
         Default format of the archive is zip, tar archive is also supported - format can be chosen by `fmt` query parameter 
@@ -615,7 +656,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
-  
+
   /positions/{group}:
     get:
       tags:
@@ -648,7 +689,7 @@ paths:
                     "folder": "Wells H G/Invisible Man",
                     "file": "invisibleman_09_wells_64kb.mp3",
                     "folder_finished": false,
-                    "position": 1395.955
+                    "position": 1395.955,
                   },
                   {
                     "timestamp": 1636484689121,
@@ -656,7 +697,7 @@ paths:
                     "folder": "Stevenson Robert Louis/Treasure Island",
                     "file": "treasureisland_04_stevenson_64kb.mp3",
                     "folder_finished": false,
-                    "position": 38.555
+                    "position": 38.555,
                   },
                   {
                     "timestamp": 1636484567281,
@@ -664,8 +705,8 @@ paths:
                     "folder": "Stoker Bram/Dracula",
                     "file": "Dracula.m4b$$004 - Chapter_5$$3452020-4080784$$.m4b",
                     "folder_finished": false,
-                    "position": 195.34
-                  }
+                    "position": 195.34,
+                  },
                 ]
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -688,7 +729,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "400":
           $ref: "#/components/responses/InvalidRequest"
-        "422": 
+        "422":
           description: Post ignored - either there no such folder/file or there is newer position there
           content:
             text/plain:
@@ -702,7 +743,7 @@ paths:
         - Positions
       parameters:
         - $ref: "#/components/parameters/GroupInPath"
-      description: Last recent position for this group 
+      description: Last recent position for this group
       responses:
         "200":
           description: |-
@@ -720,7 +761,7 @@ paths:
                       "folder": "Wells H G/Invisible Man",
                       "file": "invisibleman_09_wells_64kb.mp3",
                       "folder_finished": false,
-                      "position": 130
+                      "position": 130,
                     }
                 No last position:
                   value: null
@@ -740,7 +781,7 @@ paths:
         - $ref: "#/components/parameters/From"
         - $ref: "#/components/parameters/To"
         - name: rec
-          description: |- 
+          description: |-
             Recursively look for all subdirectories
           in: query
           required: false
@@ -774,7 +815,7 @@ paths:
                       "folder": "Wells H G/Invisible Man",
                       "file": "invisibleman_09_wells_64kb.mp3",
                       "folder_finished": false,
-                      "position": 130
+                      "position": 130,
                     }
                 With rec parameter:
                   description: Returns list of positions
@@ -786,9 +827,9 @@ paths:
                         "folder": "Wells H G/Invisible Man",
                         "file": "invisibleman_09_wells_64kb.mp3",
                         "folder_finished": false,
-                        "position": 130
-                      }
-                    ]    
+                        "position": 130,
+                      },
+                    ]
         "401":
           $ref: "#/components/responses/Unauthorized"
         "400":
@@ -870,7 +911,7 @@ components:
           $ref: "#/components/schemas/TypedFile"
         description:
           $ref: "#/components/schemas/TypedFile"
-        tags: 
+        tags:
           type: object
           nullable: true
           description: Metadata tags for this folders - map of name to value
@@ -883,10 +924,10 @@ components:
         - "path"
         - "mime"
       properties:
-        "name": 
+        "name":
           type: string
           example: "000 - Chapter_1"
-        "path": 
+        "path":
           type: string
           example: "Stoker Bram/Dracula/Dracula.m4b$$000 - Chapter_1$$0-1020288$$.m4b"
         "meta":
@@ -897,30 +938,30 @@ components:
               type: integer
               description: Duration of audio file in seconds
               example: 1020,
-            "bitrate": 
+            "bitrate":
               type: integer
-              description: Encoding bitrate of file - original, before transcoding 
+              description: Encoding bitrate of file - original, before transcoding
               example: 54,
             "tags":
               type: object
               description: Metadata tags as map of name to value
               nullable: true
-        "mime": 
+        "mime":
           type: string
           description: Mime type of audio file (before transcoding)
           example: "audio/m4b"
         "section":
           type: object
           nullable: true
-          description: | 
+          description: |
             For chapter chunk out from big chaptered file (like .m4b) 
             this is start and duration (in milliseconds) of chapter with the that file
           properties:
-            "start": 
+            "start":
               type: integer
               description: Start of chapter in ms
               example: 0
-            "duration": 
+            "duration":
               type: integer
               description: Duration of chapter in ms
               example: 1020288
@@ -929,7 +970,7 @@ components:
       properties:
         files:
           type: array
-          items: 
+          items:
             $ref: "#/components/schemas/AudioFile"
           description: Not used now, only subfolders are searched
         subfolders:
@@ -938,7 +979,7 @@ components:
             $ref: "#/components/schemas/Subfolder"
     PositionShort:
       type: object
-      description: |- 
+      description: |-
         Last shared playback position within a folder.
         Only available if group parameter was used and there are some audiofiles in the folder.
       nullable: true
@@ -951,11 +992,11 @@ components:
             Timestamp is generated on server, so if you post new  position 
             it is used to check, if there is not newer position, 
             but actual value then is assigned by server
-        path: 
+        path:
           type: string
           description: Audio file (or chapter)
         position:
-          type: number 
+          type: number
           format: float
           description: Position in audiofile in seconds
       required:
@@ -966,9 +1007,8 @@ components:
         {
           "timestamp": 1636726423847,
           "folder": "Wells H G/Invisible Man/invisibleman_09_wells_64kb.mp3",
-          "position": 1395.955
+          "position": 1395.955,
         }
-      
 
     Position:
       type: object
@@ -987,17 +1027,17 @@ components:
           type: integer
           format: int32
           description: Collection number (index in names from response in /collections endpoint)
-        folder: 
+        folder:
           type: string
           description: Audio folder path
-        file: 
+        file:
           type: string
           description: Audio file (or chapter)
-        folder_finished: 
+        folder_finished:
           type: boolean
           description: Folder was listened to the end
         position:
-          type: number 
+          type: number
           format: float
           description: Position in audiofile in seconds
       required:
@@ -1013,7 +1053,7 @@ components:
           "folder": "Wells H G/Invisible Man",
           "file": "invisibleman_09_wells_64kb.mp3",
           "folder_finished": false,
-          "position": 1395.955
+          "position": 1395.955,
         }
     SharedSecret:
       type: object
@@ -1049,15 +1089,18 @@ components:
         version:
           type: string
           description: Version of audioserve (and thus also version of API)
+        commit:
+          type: string
+          description: Commit hash of audioserve (short 7 characters)
     TranscodingsInfo:
       type: object
       properties:
         high:
-          $ref:  "#/components/schemas/Transcoding"
+          $ref: "#/components/schemas/Transcoding"
         low:
-          $ref:  "#/components/schemas/Transcoding"
+          $ref: "#/components/schemas/Transcoding"
         medium:
-          $ref:  "#/components/schemas/Transcoding"
+          $ref: "#/components/schemas/Transcoding"
         max_transcodings:
           type: integer
           description: Maximum number of parallel transcodings allowed by server
@@ -1077,7 +1120,7 @@ components:
       example: 0
     Path:
       name: path
-      description:  path to the item (as returned in by API, do not forget to urlencode the value)
+      description: path to the item (as returned in by API, do not forget to urlencode the value)
       in: path
       required: true
       schema:
@@ -1151,16 +1194,16 @@ components:
       description: The specified resource was not found
       content:
         text/plain:
-          schema: 
+          schema:
             type: string
           example: Not Found
     Unauthorized:
       description: Not authorized to access this resurce, authentication token invalid or missing
       content:
         text/plain:
-          schema: 
+          schema:
             type: string
-          example:  Access denied
+          example: Access denied
     InvalidRequest:
       description: Invalid request - either invalid parameters or body
       content:
@@ -1168,10 +1211,9 @@ components:
           schema:
             type: string
           example: Bad request
-    
 
   securitySchemes:
-    bearerAuth:            # arbitrary name for the security scheme
+    bearerAuth: # arbitrary name for the security scheme
       type: http
       scheme: bearer
       bearerFormat: custom
