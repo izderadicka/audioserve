@@ -1,7 +1,7 @@
 use anyhow::Result;
 use collection::{audio_meta::is_audio, extract_cover};
 use image::io::Reader as ImageReader;
-use image::ImageOutputFormat;
+use image::ImageFormat;
 use simple_file_cache::FileModTime;
 use std::{
     io::{Cursor, Read},
@@ -71,7 +71,7 @@ pub fn scale_cover(path: impl AsRef<Path> + std::fmt::Debug) -> Result<Vec<u8>> 
     );
     let mut data = Vec::with_capacity(1024);
     let mut buf = Cursor::new(&mut data);
-    scaled.write_to(&mut buf, ImageOutputFormat::Png)?;
+    scaled.write_to(&mut buf, ImageFormat::Png)?;
     Ok(data)
 }
 
