@@ -28,7 +28,7 @@ num_cpus = "1.16"
 ring = "0.17"
 data-encoding = "2.5"
 regex = "1.10"
-tokio = {version="1.36", features=["full"]}
+tokio = {version="1.37", features=["full"]}
 
 dirs = "5.0"
 csv = "1.3"
