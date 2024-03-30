@@ -34,6 +34,7 @@ const UNKNOWN_NAME: &str = "unknown";
 pub fn collections_list(compress: bool) -> ResponseResult {
     let collections = CollectionsInfo {
         version: env!("CARGO_PKG_VERSION"),
+        commit: env!("AUDIOSERVE_COMMIT"),
         folder_download: !get_config().disable_folder_download,
         shared_positions: cfg!(feature = "shared-positions"),
         count: get_config().base_dirs.len() as u32,

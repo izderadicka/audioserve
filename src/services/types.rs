@@ -6,6 +6,7 @@ use serde::Serialize;
 #[derive(Debug, Serialize)]
 pub struct CollectionsInfo {
     pub version: &'static str,
+    pub commit: &'static str,
     pub folder_download: bool,
     pub shared_positions: bool,
     pub count: u32,

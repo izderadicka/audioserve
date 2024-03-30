@@ -1,16 +1,17 @@
 use std::{env, process::Command};
 
 fn main() {
+    let commit = get_commit();
     println!(
         "cargo:rustc-env=AUDIOSERVE_LONG_VERSION={}",
-        get_long_version()
+        get_long_version(&commit)
     );
+    println!("cargo:rustc-env=AUDIOSERVE_COMMIT={}", commit);
     println!("cargo:rustc-env=AUDIOSERVE_FEATURES={}", get_features());
 }
 
-fn get_long_version() -> String {
+fn get_long_version(commit: &str) -> String {
     let ver = env::var("CARGO_PKG_VERSION").expect("cargo version is missing");
-    let commit = get_commit();
     format!("{} #{}", ver, commit)
 }
 
