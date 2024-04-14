@@ -85,9 +85,7 @@ impl Modification {
             EventKind::Create(_) => Some(Self::Created),
             EventKind::Modify(ModifyKind::Name(RenameMode::From)) => Some(Self::Deleted),
             EventKind::Modify(ModifyKind::Name(RenameMode::To)) => Some(Self::Created),
-            EventKind::Modify(ModifyKind::Name(RenameMode::Both)) => {
-                other_path.map(|path| Self::MovedTo(path))
-            }
+            EventKind::Modify(ModifyKind::Name(RenameMode::Both)) => other_path.map(Self::MovedTo),
             EventKind::Modify(_) => Some(Modification::Modified),
             EventKind::Remove(_) => Some(Self::Deleted),
             _ => None,

@@ -231,19 +231,19 @@ pub struct Forwarded {
 impl Forwarded {
     pub fn client(&self) -> Option<&IpAddr> {
         self.nodes
-            .get(0)
+            .first()
             .and_then(|n| n.fwd_for.as_ref())
             .and_then(|i| i.ip())
     }
     pub fn client_port(&self) -> Option<u16> {
         self.nodes
-            .get(0)
+            .first()
             .and_then(|n| n.fwd_for.as_ref())
             .and_then(|i| i.port())
     }
 
     pub fn client_protocol(&self) -> Option<&Protocol> {
-        self.nodes.get(0).and_then(|n| n.fwd_protocol.as_ref())
+        self.nodes.first().and_then(|n| n.fwd_protocol.as_ref())
     }
 }
 
@@ -368,7 +368,7 @@ pub struct XForwardedFor {
 impl XForwardedFor {
     pub fn client(&self) -> &IpAddr {
         self.ips
-            .get(0)
+            .first()
             .expect("at least one record is alway present")
     }
 

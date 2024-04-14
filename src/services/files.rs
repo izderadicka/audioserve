@@ -252,7 +252,7 @@ pub async fn send_cover(
         file_path,
         "image/jpeg",
         cache,
-        |p| extract_cover(p),
+        extract_cover,
         false,
     )
     .await
@@ -347,7 +347,7 @@ pub async fn download_folder(
 
         download_name.push_str(format.extension());
 
-        match blocking(move || {
+        let dir_listing = blocking(move || {
             let allow_symlinks = get_config().allow_symlinks;
             if let Some(folder_re) = include_subfolders {
                 collection::list_dir_files_with_subdirs(
@@ -360,8 +360,8 @@ pub async fn download_folder(
                 collection::list_dir_files_only(base_path, &folder_path, allow_symlinks)
             }
         })
-        .await
-        {
+        .await;
+        match dir_listing {
             Ok(Ok(folder)) => {
                 let total_len: u64 = match format {
                     DownloadFormat::Tar => {

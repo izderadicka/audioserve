@@ -217,24 +217,24 @@ impl FolderLister {
         #[cfg(feature = "tags-encoding")]
         let audio_info = get_audio_properties(&long_path, self.config.tags_encoding.as_ref());
         #[cfg(not(feature = "tags-encoding"))]
-        let audio_info = get_audio_properties(&long_path);
+        let audio_info = get_audio_properties(long_path);
         let meta = audio_info?;
 
         if !self.config.ignore_chapters_meta && meta.has_chapters() {
             // we do have chapters so let present this file as folder
             Ok(AudioInfo::Folder(AudioFolderShort::from_path_complete(
-                &long_path, path, true,
+                long_path, path, true,
             )?))
         } else {
             let meta = meta.get_audio_info(&self.config.tags);
             if self.is_long_file(meta.as_ref())
-                || chapters_file_path(&long_path)
+                || chapters_file_path(long_path)
                     .map(|p| p.is_file())
                     .unwrap_or(false)
             {
                 // file is bigger then limit present as folder
                 Ok(AudioInfo::Folder(AudioFolderShort::from_path_complete(
-                    &long_path, path, true,
+                    long_path, path, true,
                 )?))
             } else {
                 let mime = guess_mime_type(&path);
@@ -368,7 +368,7 @@ impl FolderLister {
                             .into_iter()
                             .map(|f| (f.path.strip_prefix(path_in_folder).unwrap().to_owned(), f))
                             .collect();
-                        let items = playlist.to_items();
+                        let items = playlist.into_items();
                         for item_path in items {
                             if let Some(existing) = old_files.remove(&item_path) {
                                 files.push(existing)
@@ -387,68 +387,66 @@ impl FolderLister {
 
                             sorted = true;
                         }
-                    } else {
-                        if !subfolders.is_empty() {
-                            if let Some(ref re) = self.config.cd_folder_regex {
-                                let can_collapse =
-                                    |f: &AudioFolderShort| !f.is_file && re.is_match(&f.name);
-                                let will_collapse = subfolders.iter().any(can_collapse);
-                                if will_collapse {
-                                    is_collapsed = true;
-                                    sorted = true;
-                                    debug!("Can collapse CD subfolders on path {:?}", full_path);
-                                    let mut folders = mem::take(&mut subfolders);
-                                    files.sort_unstable_by(file_sorter);
-                                    folders.sort_unstable_by(|a, b| {
-                                        if self.config.natural_files_ordering {
-                                            a.collate_natural(b)
-                                        } else {
-                                            a.collate(b)
+                    } else if !subfolders.is_empty() {
+                        if let Some(ref re) = self.config.cd_folder_regex {
+                            let can_collapse =
+                                |f: &AudioFolderShort| !f.is_file && re.is_match(&f.name);
+                            let will_collapse = subfolders.iter().any(can_collapse);
+                            if will_collapse {
+                                is_collapsed = true;
+                                sorted = true;
+                                debug!("Can collapse CD subfolders on path {:?}", full_path);
+                                let mut folders = mem::take(&mut subfolders);
+                                files.sort_unstable_by(file_sorter);
+                                folders.sort_unstable_by(|a, b| {
+                                    if self.config.natural_files_ordering {
+                                        a.collate_natural(b)
+                                    } else {
+                                        a.collate(b)
+                                    }
+                                });
+                                for fld in folders {
+                                    if can_collapse(&fld) {
+                                        let prefix: String = fld.name.into();
+                                        let subdir_path = base_dir.as_ref().join(&fld.path);
+                                        let subdir_name = fld.path.file_name();
+                                        let mut subdir = self.list_dir_dir(
+                                            base_dir.as_ref(),
+                                            subdir_path,
+                                            FoldersOrdering::Alphabetical,
+                                            false,
+                                        )?;
+                                        if !subdir.subfolders.is_empty() {
+                                            warn!("CD folder contains subfolders, these will not be visible");
                                         }
-                                    });
-                                    for fld in folders {
-                                        if can_collapse(&fld) {
-                                            let prefix: String = fld.name.into();
-                                            let subdir_path = base_dir.as_ref().join(&fld.path);
-                                            let subdir_name = fld.path.file_name();
-                                            let mut subdir = self.list_dir_dir(
-                                                base_dir.as_ref(),
-                                                subdir_path,
-                                                FoldersOrdering::Alphabetical,
-                                                false,
-                                            )?;
-                                            if !subdir.subfolders.is_empty() {
-                                                warn!("CD folder contains subfolders, these will not be visible");
+                                        subdir.files.sort_unstable_by(file_sorter);
+                                        for mut f in subdir.files {
+                                            if let (Some(file_name), Some(subdir_name)) =
+                                                (f.path.file_name(), subdir_name)
+                                            {
+                                                f.name = (prefix.clone() + " " + &f.name).into();
+                                                let mut new_file_name = subdir_name.to_owned();
+                                                new_file_name.push("$$");
+                                                new_file_name.push(file_name);
+                                                let mut new_path = fld.path.clone();
+                                                new_path.set_file_name(new_file_name);
+                                                f.path = new_path;
+                                                files.push(f);
+                                            } else {
+                                                warn!(
+                                                    "CD subfolder in wrong position: ${:?}",
+                                                    fld.path
+                                                );
                                             }
-                                            subdir.files.sort_unstable_by(file_sorter);
-                                            for mut f in subdir.files {
-                                                if let (Some(file_name), Some(subdir_name)) =
-                                                    (f.path.file_name(), subdir_name)
-                                                {
-                                                    f.name =
-                                                        (prefix.clone() + " " + &f.name).into();
-                                                    let mut new_file_name = subdir_name.to_owned();
-                                                    new_file_name.push("$$");
-                                                    new_file_name.push(file_name);
-                                                    let mut new_path = fld.path.clone();
-                                                    new_path.set_file_name(new_file_name);
-                                                    f.path = new_path;
-                                                    files.push(f);
-                                                } else {
-                                                    warn!(
-                                                        "CD subfolder in wrong position: ${:?}",
-                                                        fld.path
-                                                    );
-                                                }
-                                            }
-                                        } else {
-                                            subfolders.push(fld);
                                         }
+                                    } else {
+                                        subfolders.push(fld);
                                     }
                                 }
                             }
                         }
                     }
+
                     if !sorted {
                         files.sort_unstable_by(file_sorter);
                     }
@@ -783,7 +781,7 @@ pub fn parse_chapter_path(p: &Path) -> (Cow<Path>, Option<TimeSpan>) {
         let sz = parts.len();
         match sz {
             1 => (Cow::Borrowed(p), None),
-            2 | 3 | 4 => {
+            2..=4 => {
                 let parent = p.parent().unwrap_or_else(|| Path::new(""));
                 if sz == 2 {
                     (Cow::Owned(parent.join(parts[0]).join(parts[1])), None)
@@ -891,7 +889,6 @@ where
             let mut files = vec![];
             let mut cover = None;
             let mut description = None;
-            let allow_symlinks = allow_symlinks;
 
             let get_size_and_name = |p: PathBuf| -> Result<(PathBuf, String, u64), io::Error> {
                 let meta = get_meta(&p)?;

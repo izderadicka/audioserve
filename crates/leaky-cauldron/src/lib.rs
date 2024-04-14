@@ -76,14 +76,14 @@ impl Leaky {
             }
         };
 
-        let res = if new_counter < self.capacity as u64 {
+        let res = if new_counter < self.capacity {
             new_counter += 1;
             Ok(new_counter)
         } else {
             Err(new_counter)
         };
         self.state.counter.store(new_counter, Ordering::Relaxed);
-        return res;
+        res
     }
 
     #[cfg(test)]

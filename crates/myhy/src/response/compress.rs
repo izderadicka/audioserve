@@ -38,7 +38,7 @@ pub fn compressed_response(response_builder: Builder, data: Vec<u8>) -> HttpResp
 
 pub fn compress_buf(data: &[u8]) -> Vec<u8> {
     let mut writer = GzEncoder::new(Vec::with_capacity(data.len() / 10), Compression::default());
-    writer.write_all(&data).expect("Compression error");
+    writer.write_all(data).expect("Compression error");
     writer.finish().unwrap()
 }
 
@@ -57,7 +57,7 @@ fn gzip_header(lvl: Compression) -> [u8; 10] {
     header[1] = 0x8b;
     header[2] = 8;
     header[3] = 0;
-    header[4] = (mtime >> 0) as u8;
+    header[4] = mtime as u8;
     header[5] = (mtime >> 8) as u8;
     header[6] = (mtime >> 16) as u8;
     header[7] = (mtime >> 24) as u8;
@@ -147,17 +147,16 @@ impl<T> CompressStream<T> {
 
     fn crc_footer(&self) -> [u8; 8] {
         let (sum, amt) = (self.crc.sum(), self.crc.amount());
-        let buf = [
-            (sum >> 0) as u8,
+        [
+            sum as u8,
             (sum >> 8) as u8,
             (sum >> 16) as u8,
             (sum >> 24) as u8,
-            (amt >> 0) as u8,
+            amt as u8,
             (amt >> 8) as u8,
             (amt >> 16) as u8,
             (amt >> 24) as u8,
-        ];
-        buf
+        ]
     }
 }
 
@@ -175,10 +174,11 @@ impl<T: AsyncRead + Unpin> Stream for CompressStream<T> {
                 } => {
                     let mut buf = ReadBuf::new(&mut buf_in[..]);
                     buf.set_filled(offset_in);
-                    match {
+                    let poller = {
                         let pinned_stream = Pin::new(&mut src);
                         pinned_stream.poll_read(ctx, &mut buf)
-                    } {
+                    };
+                    match poller {
                         Poll::Ready(Ok(_)) => {
                             let read = buf.filled().len();
                             if read == 0 {
@@ -263,7 +263,7 @@ impl<T: AsyncRead + Unpin> Stream for CompressStream<T> {
                     } else {
                         let space = myself.buf_out.len() - myself.offset_out;
                         let can_write = space.min(left);
-                        (&mut myself.buf_out[myself.offset_out..myself.offset_out + can_write])
+                        myself.buf_out[myself.offset_out..myself.offset_out + can_write]
                             .copy_from_slice(&crc_bytes[bytes_written..bytes_written + can_write]);
                         bytes_written += can_write;
                         myself.offset_out += can_write;
@@ -295,7 +295,7 @@ impl<T: AsyncRead> CompressStream<T> {
         assert!(chunk_size >= 10);
         let header = gzip_header(Compression::default());
         let mut buf_out = create_output_buffer(chunk_size);
-        (&mut buf_out[0..header.len()]).copy_from_slice(&header);
+        buf_out[0..header.len()].copy_from_slice(&header);
         let offset_out = header.len();
 
         let state = State::Reading {

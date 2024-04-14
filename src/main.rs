@@ -193,7 +193,7 @@ fn start_server(
                 get_url_path!(),
                 if is_tls { " with TLS" } else { "" }
             );
-            Box::pin(server.map_err(|e| e.into()))
+            Box::pin(server)
         };
 
         server.await

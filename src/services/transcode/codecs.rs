@@ -112,12 +112,12 @@ impl AudioCodec for Mp3 {
     }
 
     fn bitrate(&self) -> u32 {
-        self.bitrate as u32
+        self.bitrate
     }
 }
 
 // AAC codec
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SampleRate {
     #[serde(rename = "8kHz")]
     _8kHz,
@@ -132,6 +132,7 @@ pub enum SampleRate {
     #[serde(rename = "48kHz")]
     _48kHz,
     #[serde(rename = "unlimited")]
+    #[default]
     Unlimited,
 }
 
@@ -147,12 +148,6 @@ impl SampleRate {
             _48kHz => 48_000,
             SampleRate::Unlimited => 0,
         }
-    }
-}
-
-impl Default for SampleRate {
-    fn default() -> Self {
-        SampleRate::Unlimited
     }
 }
 
@@ -195,6 +190,6 @@ impl AudioCodec for Aac {
     }
 
     fn bitrate(&self) -> u32 {
-        self.bitrate as u32
+        self.bitrate
     }
 }

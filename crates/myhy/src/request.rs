@@ -27,10 +27,7 @@ impl Header for AcceptEncoding {
         Self: Sized,
         I: Iterator<Item = &'i HeaderValue>,
     {
-        let val = values
-            .next()
-            .cloned()
-            .ok_or_else(|| headers::Error::invalid())?;
+        let val = values.next().cloned().ok_or_else(headers::Error::invalid)?;
         Ok(AcceptEncoding(val))
     }
 

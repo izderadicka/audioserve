@@ -139,6 +139,7 @@ struct DirEntry {
 
 // need reverse ordering for heap, oldest will be on top
 use std::cmp::Ordering;
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for DirEntry {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(match self.created.cmp(&other.created) {

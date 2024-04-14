@@ -491,16 +491,11 @@ pub struct CollapseCDFolderConfig {
     pub regex: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub enum Cors {
+    #[default]
     AllowAllOrigins,
     AllowMatchingOrigins(Regex),
-}
-
-impl Default for Cors {
-    fn default() -> Self {
-        Cors::AllowAllOrigins
-    }
 }
 
 impl FromStr for Cors {

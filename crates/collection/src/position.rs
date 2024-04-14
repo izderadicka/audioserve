@@ -77,6 +77,7 @@ impl PositionFilter {
         Self { finished, from, to }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn into_option(self) -> Option<Self> {
         if self.finished.is_none() && self.from.is_none() && self.to.is_none() {
             None
@@ -151,6 +152,7 @@ where
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn with_optional_filter(max_size: usize, filter: Option<F>) -> Self {
         Collector {
             heap: BinaryHeap::new(),
@@ -173,6 +175,7 @@ where
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn into_vec(self) -> Vec<T> {
         let v = self.heap.into_sorted_vec();
         v.into_iter().map(|i| i.0).collect()

@@ -136,11 +136,11 @@ impl Collections {
     ) -> Result<Option<(PathBuf, Metadata)>> {
         let col = self.get_cache(collection)?;
         col.get_folder_cover_path(dir_path).and_then(|p| {
-            p.and_then(|p| {
-                let path = col.base_dir().join(&p);
+            p.map(|p| {
+                let path = col.base_dir().join(p);
                 match path.metadata() {
-                    Ok(meta) => Some(Ok((path, meta))),
-                    Err(e) => Some(Err(e)),
+                    Ok(meta) => Ok((path, meta)),
+                    Err(e) => Err(e),
                 }
             })
             .transpose()

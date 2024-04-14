@@ -204,7 +204,7 @@ dependencies = [
 
 [[package]]
 name = "audioserve"
-version = "0.28.5"
+version = "0.28.6"
 dependencies = [
  "anyhow",
  "async-tar",
@@ -604,7 +604,7 @@ dependencies = [
 
 [[package]]
 name = "collection"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "bincode",

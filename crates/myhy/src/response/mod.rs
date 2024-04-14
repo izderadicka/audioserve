@@ -56,8 +56,7 @@ where
 {
     let (parts, body) = response.into_parts();
     let body = BodyExt::boxed(body.map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "")));
-    let response = Response::from_parts(parts, body);
-    response
+    Response::from_parts(parts, body)
 }
 
 fn short_response(status: StatusCode, msg: &'static str) -> HttpResponse {

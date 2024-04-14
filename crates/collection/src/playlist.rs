@@ -101,7 +101,7 @@ impl<T: Read, B: AsRef<Path>> Iterator for PlaylistIterator<T, B> {
     type Item = PlaylistItem;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(maybe_line) = self.lines.next() {
+        for maybe_line in self.lines.by_ref() {
             match maybe_line {
                 Ok(line) => {
                     let line = line.trim();
@@ -161,7 +161,7 @@ impl Playlist {
         })
     }
 
-    pub fn to_items(self) -> Vec<PathBuf> {
+    pub fn into_items(self) -> Vec<PathBuf> {
         self.items
     }
 
@@ -208,7 +208,7 @@ mod tests {
         let base_path = PathBuf::from("../../test_data");
         let pl = Playlist::new(base_path.join("playlist.m3u"), &base_path).unwrap();
         assert!(pl.is_covering(Path::new("usak")));
-        let items = pl.to_items();
+        let items = pl.into_items();
         assert_eq!(4, items.len());
     }
 }

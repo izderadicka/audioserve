@@ -48,8 +48,6 @@ fn load_private_key(
     let keyfile = fs::File::open(filename.as_ref()).context("open private key file")?;
     let mut reader = io::BufReader::new(keyfile);
 
-    let res = private_key(&mut reader)?
-        .ok_or_else(|| anyhow::anyhow!("no private key found in {:?}", filename));
-
-    res
+    private_key(&mut reader)?
+        .ok_or_else(|| anyhow::anyhow!("no private key found in {:?}", filename))
 }

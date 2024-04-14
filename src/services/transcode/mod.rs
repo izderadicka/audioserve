@@ -214,7 +214,7 @@ impl Transcoder {
         let offset = span.as_ref().map(|s| s.start).unwrap_or(0) as f32;
         let time = span.and_then(|s| s.duration).unwrap_or(0);
         let seek = seek.unwrap_or(0f32);
-        let start = offset as f32 / 1000.0 + seek;
+        let start = offset / 1000.0 + seek;
 
         if start > 0.0 {
             cmd.args(["-accurate_seek", "-ss"]);

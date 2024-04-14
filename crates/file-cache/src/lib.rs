@@ -8,6 +8,7 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use data_encoding::BASE64URL_NOPAD;
 use linked_hash_map::LinkedHashMap;
 use rand::RngCore;
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, Metadata};
 use std::io::{self, Read, Write};
@@ -51,16 +52,13 @@ impl From<Metadata> for FileModTime {
             use std::os::unix::fs::MetadataExt;
             let mtime = meta.mtime();
             let ctime = meta.ctime();
-            let mod_time = if mtime > ctime {
-                mtime * 1000 + meta.mtime_nsec() / 1_000_000
-            } else if mtime < ctime {
-                ctime * 1000 + meta.ctime_nsec() / 1_000_000
-            } else {
-                if meta.mtime_nsec() > meta.ctime_nsec() {
-                    mtime * 1000 + meta.mtime_nsec() / 1_000_000
-                } else {
-                    ctime * 1000 + meta.ctime_nsec() / 1_000_000
-                }
+            let mod_time = match mtime.cmp(&ctime) {
+                Ordering::Greater => mtime * 1000 + meta.mtime_nsec() / 1_000_000,
+                Ordering::Less => ctime * 1000 + meta.ctime_nsec() / 1_000_000,
+                Ordering::Equal => match meta.mtime_nsec().cmp(&meta.ctime_nsec()) {
+                    Ordering::Greater => mtime * 1000 + meta.mtime_nsec() / 1_000_000,
+                    _ => ctime * 1000 + meta.ctime_nsec() / 1_000_000,
+                },
             };
 
             FileModTime::Unix(mod_time.try_into().unwrap_or(0))
@@ -198,7 +196,7 @@ fn cleanup<S: AsRef<str>>(cache: &Arc<RwLock<CacheInner>>, key: S) {
     let file_name = {
         let mut cache = cache.write().expect("Cannot lock cache");
         let file_key = cache.opened.remove(key.as_ref());
-        file_key.map(|k| cache.partial_path(&k))
+        file_key.map(|k| cache.partial_path(k))
     };
 
     debug!("Cleanup for file {:?}", file_name);
@@ -398,13 +396,7 @@ impl CacheInner {
             .map(|file_key| entry_path_helper(root, file_key));
         if is_stalled {
             self.remove(&key)
-                .or_else(|e| {
-                    Err(error!(
-                        "Cannot remove key {} from cache: {}",
-                        key.as_ref(),
-                        e
-                    ))
-                })
+                .map_err(|e| error!("Cannot remove key {} from cache: {}", key.as_ref(), e))
                 .ok();
         }
 
@@ -531,19 +523,14 @@ impl CacheInner {
         if tmp_index.exists() {
             warn!("Found unfinished index, previous save failed, cache might be empty now");
             fs::remove_file(&tmp_index)
-                .or_else(|e| Err(error!("Cannot delete tmp index {:?}:{}", tmp_index, e)))
+                .map_err(|e| error!("Cannot delete tmp index {:?}:{}", tmp_index, e))
                 .ok();
         }
         let old_index_path = self.root.join(INDEX_OLD);
         if old_index_path.exists() {
             warn!("Found previous version of cache, will clean and start empty");
             fs::remove_file(&old_index_path)
-                .or_else(|e| {
-                    Err(error!(
-                        "Cannot delete old index {:?}: {}",
-                        old_index_path, e
-                    ))
-                })
+                .map_err(|e| error!("Cannot delete old index {:?}: {}", old_index_path, e))
                 .ok();
             return Ok(false);
         }
@@ -600,7 +587,7 @@ impl CacheInner {
             {
                 let file_keys_set = index.values().map(|e| &e.key).collect::<HashSet<&String>>();
                 let base_dir = self.root.join(ENTRIES);
-                if let Ok(dir_list) = fs::read_dir(&base_dir) {
+                if let Ok(dir_list) = fs::read_dir(base_dir) {
                     for dir_entry in dir_list.flatten() {
                         if dir_entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
                             if let Ok(file_name) = dir_entry.file_name().into_string() {

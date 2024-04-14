@@ -564,7 +564,9 @@ fn position_params(params: &QueryParams) -> error::Result<collection::PositionFi
 
     fn get_ts_param(params: &QueryParams, name: &str) -> Result<Option<TimeStamp>, anyhow::Error> {
         Ok(if let Some(ts) = params.get(name) {
-            Some(ts.parse::<u64>().map_err(error::Error::new)?).map(TimeStamp::from)
+            Some(TimeStamp::from(
+                ts.parse::<u64>().map_err(error::Error::new)?,
+            ))
         } else {
             None
         })
