@@ -1,6 +1,6 @@
 const FFMPEG_VERSION_4: &str = "ffmpeg-4.3.1";
 const FFMPEG_VERSION_5: &str = "ffmpeg-5.0.1";
-const FFMPEG_VERSION_6: &str = "ffmpeg-6.0";
+const FFMPEG_VERSION_6: &str = "ffmpeg-6.1.1";
 
 macro_rules! warn {
     ($fmt:literal $(, $arg:expr)* ) => {
