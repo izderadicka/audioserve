@@ -25,7 +25,7 @@ mime = "0.3.17"
 serde = "1.0.199"
 serde_json = "1.0.116"
 mime_guess = "2.0"
-flate2 = "1.0.29"
+flate2 = "1.0.30"
 futures-util = "0.3.30"
 
 # for tls
