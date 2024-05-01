@@ -21,7 +21,7 @@ serde_yaml = "0.9"
 clap = {version="4", features=["cargo", "env"]}
 lazy_static = "1.4"
 thiserror = "1.0"
-anyhow = "1.0"
+anyhow = "1.0.82"
 url = "2.5"
 percent-encoding = "2.3"
 num_cpus = "1.16"
