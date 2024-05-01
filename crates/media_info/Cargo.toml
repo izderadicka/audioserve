@@ -13,7 +13,7 @@ encoding = {version="0.2", optional=true}
 clap ={version="4", features=["derive"]}
 
 [build-dependencies]
-pkg-config="0.3"
+pkg-config="0.3.30"
 
 [features]
 static=[]
