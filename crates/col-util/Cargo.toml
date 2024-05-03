@@ -9,5 +9,5 @@ edition = "2021"
 clap={version="4", features=["derive"]}
 collection={path="../collection"}
 env_logger="0.11"
-anyhow="1"
+anyhow="1.0.82"
 libc="0.2"
