@@ -10,7 +10,7 @@ edition = "2021"
 futures = "0.3"
 tokio = {version="1.37", features=["full"]}
 bytes = "1.6"
-chrono = "0.4"
+chrono = "0.4.38"
 thiserror = "1.0"
 crc32fast = "1.4"
 
