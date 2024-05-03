@@ -86,9 +86,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle"
-version = "1.0.4"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7079075b41f533b8c61d2a4d073c4676e1f8b249ff94a393b0595db304e0dd87"
+checksum = "038dfcf04a5feb68e9c60b21c9625a54c2c0616e79b72b0fd87075a056ae1d1b"
 
 [[package]]
 name = "anstyle-parse"
@@ -220,7 +220,7 @@ dependencies = [
  "csv",
  "data-encoding",
  "dirs",
- "env_logger 0.11.0",
+ "env_logger 0.11.3",
  "escargot",
  "futures",
  "http-body-util",
@@ -423,7 +423,7 @@ dependencies = [
  "bit-vec",
  "derive_builder",
  "ego-tree",
- "env_logger 0.11.0",
+ "env_logger 0.11.3",
  "log",
  "notify",
 ]
@@ -601,7 +601,7 @@ dependencies = [
  "anyhow",
  "clap 4.4.3",
  "collection",
- "env_logger 0.11.0",
+ "env_logger 0.11.3",
  "libc",
 ]
 
@@ -614,7 +614,7 @@ dependencies = [
  "crossbeam-channel",
  "csv",
  "enum_dispatch",
- "env_logger 0.11.0",
+ "env_logger 0.11.3",
  "fs_extra",
  "indexmap",
  "lazy_static",
@@ -1022,9 +1022,9 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.11.0"
+version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9eeb342678d785662fd2514be38c459bb925f02b68dd2a3e0f21d7ef82d979dd"
+checksum = "38b35839ba51819680ba087cd351788c9a3c476841207e0b8cee0b04722343b9"
 dependencies = [
  "anstream 0.6.11",
  "anstyle",
@@ -1803,9 +1803,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.20"
+version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
+checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
 
 [[package]]
 name = "loop9"
@@ -2270,7 +2270,7 @@ dependencies = [
 name = "proxy-headers"
 version = "0.1.0"
 dependencies = [
- "env_logger 0.11.0",
+ "env_logger 0.11.3",
  "headers",
  "http",
  "lazy_static",
@@ -2906,7 +2906,7 @@ version = "0.2.2"
 dependencies = [
  "byteorder",
  "data-encoding",
- "env_logger 0.11.0",
+ "env_logger 0.11.3",
  "linked-hash-map",
  "log",
  "rand 0.8.5",
@@ -3545,7 +3545,7 @@ dependencies = [
 name = "websock"
 version = "0.4.0"
 dependencies = [
- "env_logger 0.11.0",
+ "env_logger 0.11.3",
  "futures",
  "headers",
  "http-body-util",
