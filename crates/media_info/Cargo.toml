@@ -7,7 +7,7 @@ build = "build.rs"
 
 [dependencies]
 thiserror = "1.0"
-encoding = {version="0.2", optional=true}
+encoding = {version="0.2.33", optional=true}
 
 [dev-dependencies]
 clap ={version="4", features=["derive"]}
