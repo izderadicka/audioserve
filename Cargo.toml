@@ -13,7 +13,7 @@ members = ["crates/*"]
 bytes = "1.6"
 env_logger = "0.11.3"
 log = {version="0.4", features = ["release_max_level_info", "max_level_trace"]}
-futures = "0.3"
+futures = "0.3.30"
 mime = "0.3"
 serde_json = "1.0.116"
 serde = {version="1.0", features=["derive"]}
