@@ -3786,9 +3786,9 @@ checksum = "525b4ec142c6b68a2d10f01f7bbf6755599ca3f81ea53b8431b7dd348f5fdb2d"
 
 [[package]]
 name = "zip"
-version = "1.2.2"
+version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed14a57c18714abaa03196c0714ed36bab969d7457f72d12fb5c2e1ced4c24ae"
+checksum = "c700ea425e148de30c29c580c1f9508b93ca57ad31c9f4e96b83c194c37a7a8f"
 dependencies = [
  "arbitrary 1.3.2",
  "crc32fast",
