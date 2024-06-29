@@ -52,8 +52,8 @@ fn main() {
     let opts = Opts::parse();
     media_info::init();
 
-    let mf =
-        MediaFile::open(&opts.file_name).unwrap_or_else(|_| panic!("Cannot open file {}", opts.file_name));
+    let mf = MediaFile::open(&opts.file_name)
+        .unwrap_or_else(|_| panic!("Cannot open file {}", opts.file_name));
 
     if !opts.no_basic {
         println!("BASIC INFORMATION:");
@@ -100,7 +100,8 @@ fn main() {
 
     if let Some(path) = opts.cover_file {
         if let Some(pic_data) = mf.cover() {
-            let mut f = File::create(&path).unwrap_or_else(|_| panic!("cannot create file {:?}", path));
+            let mut f =
+                File::create(&path).unwrap_or_else(|_| panic!("cannot create file {:?}", path));
             f.write_all(&pic_data).expect("error writing data");
         }
     }

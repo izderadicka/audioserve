@@ -335,8 +335,7 @@ mod tests {
         let files = &["README.md", "Cargo.toml"];
         let sizes = files.iter().map(|f| Path::new(f).metadata().unwrap().len());
         let expected_archive_len = calc_size(sizes);
-        let tar_stream =
-            TarStream::tar_iter_rel(files.iter(), std::env::current_dir().unwrap());
+        let tar_stream = TarStream::tar_iter_rel(files.iter(), std::env::current_dir().unwrap());
         let tar_file = tokio_fs::File::create(tar_file_name).await?;
         let codec = tokio_util::codec::BytesCodec::new();
         let mut file_sink = codec.framed(tar_file);

@@ -456,8 +456,8 @@ mod test {
         ];
 
         for (n, h) in headers.iter().enumerate() {
-            let v =
-                HeaderValue::from_str(h).unwrap_or_else(|_| panic!("Cannot create header value for #{}", n));
+            let v = HeaderValue::from_str(h)
+                .unwrap_or_else(|_| panic!("Cannot create header value for #{}", n));
             let mut i = iter::once(&v);
             let fwd = Forwarded::decode(&mut i)
                 .unwrap_or_else(|_| panic!("Failed decode header {}: {}", n, headers[n]));
