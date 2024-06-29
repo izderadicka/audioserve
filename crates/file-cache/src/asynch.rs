@@ -169,6 +169,6 @@ mod tests {
         let mut s = String::new();
         f.read_to_string(&mut s).await.unwrap();
         assert_eq!(MSG, s);
-        ()
+        
     }
 }

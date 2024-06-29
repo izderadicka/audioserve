@@ -78,7 +78,7 @@ pub(crate) mod standard {
 
         #[test]
         fn test_natural_order() {
-            let mut terms = vec!["10 - v deset", "2 - dve", "10 - deset", "3 - tri"];
+            let mut terms = ["10 - v deset", "2 - dve", "10 - deset", "3 - tri"];
             terms.sort_by(|a, b| cmp_natural(a, b, |a, b| a.cmp(b)));
             assert_eq!("2 - dve", terms[0]);
             assert_eq!("3 - tri", terms[1]);
@@ -88,7 +88,7 @@ pub(crate) mod standard {
 
         #[test]
         fn test_natural_order_with_prefix() {
-            let mut terms = vec!["Chapter 10", "Chapter 3", "Chapter 20", "Chapter 1"];
+            let mut terms = ["Chapter 10", "Chapter 3", "Chapter 20", "Chapter 1"];
             terms.sort_unstable_by(|a, b| cmp_natural(a, b, |a, b| a.cmp(b)));
             assert_eq!("Chapter 1", terms[0]);
             assert_eq!("Chapter 3", terms[1]);

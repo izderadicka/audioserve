@@ -925,10 +925,10 @@ mod test {
     #[cfg(feature = "shared-positions")]
     fn test_basic_args() {
         init_default_config();
-        let c = parse_args_from(&["audioserve", "--no-authentication", "test_data"]).unwrap();
+        let c = parse_args_from(["audioserve", "--no-authentication", "test_data"]).unwrap();
         assert_eq!(1, c.base_dirs.len());
 
-        let c = parse_args_from(&[
+        let c = parse_args_from([
             "audioserve",
             "--listen",
             "127.0.0.1:4444",
@@ -1014,7 +1014,7 @@ mod test {
     #[cfg(feature = "tls")]
     fn test_tls() {
         init_default_config();
-        let c = parse_args_from(&[
+        let c = parse_args_from([
             "audioserve",
             "--no-authentication",
             "--ssl-key",
@@ -1036,7 +1036,7 @@ mod test {
     fn test_symlinks_in_env() {
         init_default_config();
         env::set_var("AUDIOSERVE_ALLOW_SYMLINKS", "1");
-        let c = parse_args_from(&["audioserve", "--no-authentication", "test_data"]).unwrap();
+        let c = parse_args_from(["audioserve", "--no-authentication", "test_data"]).unwrap();
 
         assert!(c.allow_symlinks);
         env::remove_var("AUDIOSERVE_ALLOW_SYMLINKS");
@@ -1045,7 +1045,7 @@ mod test {
     #[test]
     fn test_alternative_args() {
         init_default_config();
-        let c = parse_args_from(&[
+        let c = parse_args_from([
             "audioserve",
             "--shared-secret-file",
             "test_data/shared-secret",
@@ -1072,7 +1072,7 @@ mod test {
     fn test_from_config() {
         init_default_config();
         let c =
-            parse_args_from(&["audioserve", "--config", "test_data/sample-config.yaml"]).unwrap();
+            parse_args_from(["audioserve", "--config", "test_data/sample-config.yaml"]).unwrap();
 
         assert_eq!(
             Path::new("test_data/desc.txt"),

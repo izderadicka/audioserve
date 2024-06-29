@@ -1016,7 +1016,7 @@ mod tests {
         let media_info = res.unwrap();
         let req_tags = &["title", "album", "artist", "composer"];
         let mut tags = HashSet::new();
-        tags.extend(req_tags.into_iter().map(|s| s.to_string()));
+        tags.extend(req_tags.iter().map(|s| s.to_string()));
         let tags = Some(tags);
         let meta = media_info.get_audio_info(&tags).unwrap();
         assert_eq!(meta.bitrate, 220);
@@ -1088,7 +1088,7 @@ mod tests {
         let (_, pseudo) = name_and_path_for_chapter(&p, &chap, false).unwrap();
         assert_eq!(correct, pseudo.to_str().unwrap());
 
-        let limit_case: String = (0..237).into_iter().map(|_| "X").collect();
+        let limit_case: String = (0..237).map(|_| "X").collect();
         let chap2 = Chapter {
             number: 1,
             title: limit_case,

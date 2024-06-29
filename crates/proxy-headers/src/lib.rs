@@ -455,12 +455,12 @@ mod test {
             r#"For="[2001:db8:cafe::17]:4711", For=192.0.2.43:47011"#,
         ];
 
-        for (n, h) in headers.into_iter().enumerate() {
+        for (n, h) in headers.iter().enumerate() {
             let v =
-                HeaderValue::from_str(h).expect(&format!("Cannot create header value for #{}", n));
+                HeaderValue::from_str(h).unwrap_or_else(|_| panic!("Cannot create header value for #{}", n));
             let mut i = iter::once(&v);
             let fwd = Forwarded::decode(&mut i)
-                .expect(&format!("Failed decode header {}: {}", n, headers[n]));
+                .unwrap_or_else(|_| panic!("Failed decode header {}: {}", n, headers[n]));
             match n {
                 0 => {
                     assert_eq!(fwd.nodes.len(), 1, "first case has just one node");

@@ -12,7 +12,7 @@ fn main() {
         panic!("Parameter must file")
     }
 
-    let mut ar = tar::Archive::new(fs::File::open(&file_path).unwrap());
+    let mut ar = tar::Archive::new(fs::File::open(file_path).unwrap());
     let entries = ar.entries().unwrap();
     for entry in entries {
         let mut entry = entry.unwrap();

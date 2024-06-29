@@ -40,12 +40,12 @@ fn pretty_time(mut time: u64) -> String {
     const HOUR: u64 = 3_600_000;
     const MINUTE: u64 = 60_000;
     let hours = time / HOUR;
-    time = time - hours * HOUR;
+    time -= hours * HOUR;
     let mins = time / MINUTE;
-    time = time - mins * MINUTE;
+    time -= mins * MINUTE;
     let secs = time as f64 / 1_000.0;
 
-    return format!("{:02}:{:02}:{:02.3}", hours, mins, secs);
+    format!("{:02}:{:02}:{:02.3}", hours, mins, secs)
 }
 
 fn main() {
@@ -53,7 +53,7 @@ fn main() {
     media_info::init();
 
     let mf =
-        MediaFile::open(&opts.file_name).expect(&format!("Cannot open file {}", opts.file_name));
+        MediaFile::open(&opts.file_name).unwrap_or_else(|_| panic!("Cannot open file {}", opts.file_name));
 
     if !opts.no_basic {
         println!("BASIC INFORMATION:");
@@ -67,7 +67,7 @@ fn main() {
 
     if !opts.no_tags {
         let meta = mf.all_meta();
-        if meta.len() > 0 {
+        if !meta.is_empty() {
             println!("META TAGS:");
             let mut keys = meta.keys().collect::<Vec<_>>();
             keys.sort();
@@ -100,7 +100,7 @@ fn main() {
 
     if let Some(path) = opts.cover_file {
         if let Some(pic_data) = mf.cover() {
-            let mut f = File::create(&path).expect(&format!("cannot create file {:?}", path));
+            let mut f = File::create(&path).unwrap_or_else(|_| panic!("cannot create file {:?}", path));
             f.write_all(&pic_data).expect("error writing data");
         }
     }
@@ -113,8 +113,8 @@ fn main() {
                     "Chapter {} - {} ({} - {})",
                     chap.number,
                     chap.title,
-                    pretty_time(chap.start as u64),
-                    pretty_time(chap.end as u64)
+                    pretty_time(chap.start),
+                    pretty_time(chap.end)
                 );
             }
         }

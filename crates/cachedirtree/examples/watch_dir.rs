@@ -17,7 +17,7 @@ fn main() -> io::Result<()> {
         //        .include_files(false)
         .build()
         .unwrap();
-    let c = DirCache::new_with_options(&path, opts);
+    let c = DirCache::new_with_options(path, opts);
     let server = TcpListener::bind("127.0.0.1:54321")?;
     info!("Listening on port 54321");
     c.wait_ready();

@@ -640,7 +640,7 @@ mod tests {
         let tmp_dir = TempDir::new("AS_CACHE_TEST")?;
         let test_data_dir_orig = Path::new("../../test_data");
         let test_data_dir = tmp_dir.path().join("test_data");
-        copy(&test_data_dir_orig, tmp_dir.path(), &CopyOptions::default())?;
+        copy(test_data_dir_orig, tmp_dir.path(), &CopyOptions::default())?;
         let info_file = test_data_dir.join("usak/kulisak/desc.txt");
         assert!(info_file.exists());
         let db_path = tmp_dir.path().join("updater_db");
