@@ -283,6 +283,7 @@ pub(crate) trait PositionsTrait {
 
     fn write_json_positions<F: std::io::Write>(&self, file: &mut F) -> Result<()>;
 
+    #[allow(dead_code)] // workaround for more thorough analysis of dead code in new rustc
     fn read_json_positions(&self, data: PositionsData) -> Result<()>;
 }
 

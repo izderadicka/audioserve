@@ -110,6 +110,7 @@ impl TranscodingFormat {
 pub struct ChosenTranscoding {
     pub format: TranscodingFormat,
     pub level: QualityLevel,
+    #[allow(dead_code)]
     pub tag: &'static str,
 }
 

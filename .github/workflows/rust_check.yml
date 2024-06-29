@@ -21,7 +21,7 @@ jobs:
       - name: Check compilation
         run: |
           rustc --version
-          cargo check --verbose
+          cargo check
       - name: Clippy check
         run: cargo clippy --all
       - name: Install build dependencies

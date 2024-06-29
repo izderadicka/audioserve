@@ -28,6 +28,7 @@ use myhy::response::{self, HttpResponse};
 
 pub enum AuthResult<T, B> {
     Authenticated {
+        #[allow(dead_code)]
         credentials: T,
         request: GenericRequestWrapper<B>,
     },
