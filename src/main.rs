@@ -102,7 +102,7 @@ fn create_collections_options() -> anyhow::Result<CollectionOptionsMap> {
 
     #[cfg(feature = "tags-encoding")]
     {
-        fo.tags_encoding = c.tags_encoding.clone();
+        fo.tags_encoding.clone_from(&c.tags_encoding);
     }
 
     let mut co = CollectionOptionsMap::new(fo)?;

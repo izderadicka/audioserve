@@ -21,12 +21,12 @@ jobs:
       - name: Check compilation
         run: |
           rustc --version
-          cargo check
+          cargo check --all --features transcoding-cache,tags-encoding
       - name: Clippy check
-        run: cargo clippy --all
+        run: cargo clippy --all --features transcoding-cache,tags-encoding
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y  openssl libssl-dev pkg-config ffmpeg yasm build-essential wget libbz2-dev zlib1g-dev libavformat-dev
       - name: Run unit tests
-        run: cargo test --all
+        run: cargo test --all --features transcoding-cache,tags-encoding

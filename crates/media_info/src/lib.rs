@@ -360,7 +360,7 @@ impl MediaFile {
                 let start = norm_time(chap.start, chap.time_base);
                 let end = norm_time(chap.end, chap.time_base);
                 c.push(Chapter {
-                    number: num.try_into().unwrap_or(std::u32::MAX),
+                    number: num.try_into().unwrap_or(u32::MAX),
                     title,
                     start,
                     end,

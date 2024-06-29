@@ -215,7 +215,7 @@ impl FolderLister {
         long_path: &Path,
     ) -> crate::error::Result<AudioInfo> {
         #[cfg(feature = "tags-encoding")]
-        let audio_info = get_audio_properties(&long_path, self.config.tags_encoding.as_ref());
+        let audio_info = get_audio_properties(long_path, self.config.tags_encoding.as_ref());
         #[cfg(not(feature = "tags-encoding"))]
         let audio_info = get_audio_properties(long_path);
         let meta = audio_info?;

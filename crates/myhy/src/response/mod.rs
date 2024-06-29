@@ -216,7 +216,7 @@ impl<T: AsyncRead + Unpin> Stream for ChunkStream<T> {
 
 impl<T: AsyncRead> ChunkStream<T> {
     pub fn new(src: T) -> Self {
-        ChunkStream::new_with_limit(src, std::u64::MAX)
+        ChunkStream::new_with_limit(src, u64::MAX)
     }
     pub fn new_with_limit(src: T, remains: u64) -> Self {
         ChunkStream {

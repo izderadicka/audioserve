@@ -97,7 +97,7 @@ impl ToBytes for FileHeader {
         // uncompressed size
         h.put_u32_le(0);
         // file name length
-        if self.file_name.len() > std::u16::MAX as usize {
+        if self.file_name.len() > u16::MAX as usize {
             return Err(Error::FileNameTooBig);
         }
         h.put_u16_le(self.file_name.as_bytes().len() as u16);
@@ -125,7 +125,7 @@ impl ToBytes for Descriptor {
     fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut d = BytesMut::with_capacity(DATA_DESCRIPTOR_SIZE as usize);
 
-        if self.size > std::u32::MAX as u64 {
+        if self.size > u32::MAX as u64 {
             return Err(Error::FileTooBig(self.size));
         }
 
@@ -172,14 +172,14 @@ impl DirectoryEntry {
         // crc-32
         buf.put_u32_le(self.desc.crc);
         // compressed size
-        if self.desc.size > std::u32::MAX as u64 {
+        if self.desc.size > u32::MAX as u64 {
             return Err(Error::FileTooBig(self.desc.size));
         }
         buf.put_u32_le(self.desc.size as u32);
         // uncompressed size
         buf.put_u32_le(self.desc.size as u32);
         // file name length
-        if self.header.file_name.len() > std::u16::MAX as usize {
+        if self.header.file_name.len() > u16::MAX as usize {
             return Err(Error::FileNameTooBig);
         }
         buf.put_u16_le(self.header.file_name.as_bytes().len() as u16);
@@ -194,7 +194,7 @@ impl DirectoryEntry {
         // external file attributes
         buf.put_u32_le(0);
         // relative offset of local header
-        if self.offset > std::u32::MAX as u64 {
+        if self.offset > u32::MAX as u64 {
             return Err(Error::ArchiveTooBig);
         }
         buf.put_u32_le(self.offset as u32);
@@ -229,7 +229,7 @@ impl DirectoryEnd {
         // directory size
         buf.put_u32_le(self.dir_size);
         // directory offset from start
-        if self.dir_offset > std::u32::MAX as u64 {
+        if self.dir_offset > u32::MAX as u64 {
             return Err(Error::ArchiveTooBig);
         }
         buf.put_u32_le(self.dir_offset as u32);
@@ -283,7 +283,7 @@ impl ToBytes for Directory {
         let offset = self
             .offset
             .expect("invalid state - must update offset first");
-        if offset > std::u32::MAX as u64 {
+        if offset > u32::MAX as u64 {
             return Err(Error::ArchiveTooBig);
         }
         let end = DirectoryEnd {

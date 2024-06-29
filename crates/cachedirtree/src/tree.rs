@@ -315,7 +315,7 @@ mod tests {
 
     #[test]
     fn test_search() {
-        fn count_matches(mut s: SearchResult) -> usize {
+        fn count_matches(s: SearchResult) -> usize {
             let mut num = 0;
             for n in s {
                 println!("{:?}", n.path());

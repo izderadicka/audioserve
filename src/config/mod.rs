@@ -621,7 +621,7 @@ impl Config {
             .shared_secret
             .as_ref()
             .map(String::len)
-            .unwrap_or(std::usize::MAX)
+            .unwrap_or(usize::MAX)
             < 3
         {
             return value_error!("shared_secret", "Shared secret must be at least 3 bytes");

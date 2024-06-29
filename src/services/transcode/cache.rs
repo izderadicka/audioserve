@@ -14,7 +14,7 @@ lazy_static! {
         } else {
             let cache_dir = &cfg.transcoding.cache.root_dir;
             if !cache_dir.exists() {
-                fs::create_dir(&cache_dir).expect("Cannot create directory for cache")
+                fs::create_dir(cache_dir).expect("Cannot create directory for cache")
             }
             Some(
                 Cache::new(
