@@ -222,7 +222,7 @@ impl From<FolderByModification> for AudioFolderShort {
     }
 }
 
-#[allow(clippy::non_canonical_partial_ord_impl)]
+// #[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for FolderByModification {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match other.0.modified.partial_cmp(&self.0.modified) {

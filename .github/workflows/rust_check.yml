@@ -6,25 +6,27 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
 
 jobs:
   build:
-
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4
-    - uses: Swatinem/rust-cache@v2
-    - name: Check formatting
-      run: |
-        rustfmt --version
-        cargo fmt --all -- --check
-    - name: Check compilation
-      run: |
-        rustc --version
-        cargo check --verbose
-    - name: Install build dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y  openssl libssl-dev pkg-config ffmpeg yasm build-essential wget libbz2-dev zlib1g-dev libavformat-dev
-    - name: Run unit tests
-      run: cargo test --all
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Check formatting
+        run: |
+          rustfmt --version
+          cargo fmt --all -- --check
+      - name: Check compilation
+        run: |
+          rustc --version
+          cargo check --verbose
+      - name: Clippy check
+        run: cargo clippy --all
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y  openssl libssl-dev pkg-config ffmpeg yasm build-essential wget libbz2-dev zlib1g-dev libavformat-dev
+      - name: Run unit tests
+        run: cargo test --all
