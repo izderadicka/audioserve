@@ -8,3 +8,4 @@ npm-debug.log
 rls/
 _static_build
 /crates/**/Cargo.lock
+lcov.info
