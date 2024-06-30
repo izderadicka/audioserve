@@ -127,7 +127,7 @@ mod tests {
     use futures::StreamExt;
     use std::{
         fs,
-        io::{Cursor, Read, Seek, Write},
+        io::{self, Cursor, Read, Seek, Write},
         path::{Path, PathBuf},
     };
     use tokio::io::AsyncReadExt;
@@ -158,6 +158,28 @@ mod tests {
             assert_eq!(tc, content);
         }
     }
+
+    #[tokio::test]
+    async fn test_io_error() {
+        let res = Zipper::from_directory("_non_existing_").await;
+        assert!(res.is_err());
+        assert!(unsafe { res.unwrap_err_unchecked() }.kind() == io::ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn test_invalid_files() {
+        let invalid = "_non_existing_";
+        let v = vec![(PathBuf::from(invalid), invalid.to_string())];
+        let mut stream = Zipper::from_iter(v.into_iter()).zipped_stream();
+        let mut mum_errors = 0;
+        while let Some(res) = stream.next().await {
+            assert!(res.is_err());
+            assert!(unsafe { res.unwrap_err_unchecked() }.kind() == io::ErrorKind::NotFound);
+            mum_errors += 1;
+        }
+        assert_eq!(mum_errors, 1);
+    }
+
     #[tokio::test]
     async fn test_zip_stream() -> Result<()> {
         let dir = PathBuf::from("src");

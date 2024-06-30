@@ -297,3 +297,25 @@ impl ToBytes for Directory {
         Ok(d.to_vec())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{path::Path, time::SystemTime};
+
+    #[test]
+    fn handles_empty_file_name() {
+        let path = Path::new("/some/valid/path/");
+        let modified = SystemTime::now();
+        let result = FileHeader::new_from_path(path, modified).unwrap();
+        assert_eq!(result.file_name, "path");
+    }
+    #[test]
+    fn handles_special_characters_or_unicode() {
+        let path = Path::new("/some/valid/path/文件.txt");
+        let modified = SystemTime::now();
+        let result = FileHeader::new_from_path(path, modified).unwrap();
+
+        assert_eq!(result.file_name, "文件.txt");
+    }
+}
