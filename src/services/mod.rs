@@ -382,7 +382,7 @@ impl<C: Send + 'static> MainService<C> {
                         #[cfg(not(feature = "folder-download"))]
                         {
                             error!("folder download not ");
-                            response::fut(response::not_found)
+                            Ok(response::not_found())
                         }
                     } else if path == "/search" {
                         if let Some(search_string) = params.get_string("q") {
@@ -468,7 +468,7 @@ impl<C: Send + 'static> MainService<C> {
                 }
 
                 #[cfg(not(feature = "shared-positions"))]
-                response::fut(response::method_not_supported)
+                Ok(response::method_not_supported())
             }
 
             _ => Ok(response::method_not_supported()),
