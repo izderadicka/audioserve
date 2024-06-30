@@ -14,7 +14,7 @@ use tokio::net::TcpListener;
 
 use crate::error::Result;
 
-use self::tls::{tls_acceptor, TlsConfig};
+use self::tls::TlsConfig;
 
 pub mod tls;
 
@@ -50,7 +50,11 @@ impl HttpServer {
         self.addr
     }
 
-    pub async fn serve<S>(self, service_factory: S, tls_config: Option<TlsConfig>) -> Result<()>
+    pub async fn serve<S>(
+        self,
+        service_factory: S,
+        #[allow(unused_variables)] tls_config: Option<TlsConfig>,
+    ) -> Result<()>
     where
         S: ServiceFactory + Send + 'static,
         S::Body: Body + Send + 'static,
@@ -59,12 +63,13 @@ impl HttpServer {
     {
         let mut stop_receiver = service_factory.stop_service_receiver();
         let listener = TcpListener::bind(self.addr).await?;
+
+        #[cfg(feature = "tls")]
         let tls_acceptor = tls_config
-            .map(|tls_config| tls_acceptor(&tls_config))
+            .map(|tls_config| self::tls::tls_acceptor(&tls_config))
             .transpose()?;
         let handle = tokio::task::spawn(async move {
             loop {
-                let tls_acceptor = tls_acceptor.clone();
                 let stream;
                 let remote_addr;
                 tokio::select! {
@@ -85,19 +90,30 @@ impl HttpServer {
                     }
                 };
 
-                if let Some(tls_acceptor) = tls_acceptor {
-                    match tls_acceptor.accept(stream).await {
-                        Ok(stream) => {
-                            let io = TokioIo::new(stream);
-                            let is_ssl = true;
-                            serve_connection(io, &service_factory, remote_addr, is_ssl);
+                #[cfg(feature = "tls")]
+                {
+                    let tls_acceptor = tls_acceptor.clone();
+                    if let Some(tls_acceptor) = tls_acceptor {
+                        match tls_acceptor.accept(stream).await {
+                            Ok(stream) => {
+                                let io = TokioIo::new(stream);
+                                let is_ssl = true;
+                                serve_connection(io, &service_factory, remote_addr, is_ssl);
+                            }
+                            Err(e) => {
+                                error!("Failed TLS handshake: {}", e);
+                                continue;
+                            }
                         }
-                        Err(e) => {
-                            error!("Failed TLS handshake: {}", e);
-                            continue;
-                        }
+                    } else {
+                        let io = TokioIo::new(stream);
+                        let is_ssl = false;
+                        serve_connection(io, &service_factory, remote_addr, is_ssl);
                     }
-                } else {
+                }
+
+                #[cfg(not(feature = "tls"))]
+                {
                     let io = TokioIo::new(stream);
                     let is_ssl = false;
                     serve_connection(io, &service_factory, remote_addr, is_ssl);
