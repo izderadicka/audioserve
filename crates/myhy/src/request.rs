@@ -308,6 +308,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::response::body::empty_body;
+
     use super::*;
 
     #[test]
@@ -316,5 +318,37 @@ mod tests {
         assert!(header.accepts("br"));
         let header = AcceptEncoding(HeaderValue::from_static("gzip, deflate"));
         assert!(!header.accepts("br"));
+    }
+
+    // Returns true when the origin header matches the provided regex
+    #[test]
+    fn returns_true_when_origin_matches_regex() {
+        use http::Request;
+        use regex::Regex;
+
+        let req = Request::builder()
+            .header("origin", "https://example.com")
+            .body(empty_body())
+            .unwrap();
+
+        let regex = Regex::new(r"https://example\.\w{2,5}").unwrap();
+        assert!(is_cors_matching_origin(&req, &regex));
+    }
+
+    #[test]
+    fn test_request_wrapper() {
+        let req = Request::builder()
+            .uri("https://example.com?a=1&b=2")
+            .body(empty_body())
+            .unwrap();
+        let req = GenericRequestWrapper::new(req).unwrap();
+        let req = req.set_is_cors(true).set_is_ssl(true);
+
+        assert!(req.is_cors_enabled());
+        assert!(req.is_https());
+
+        let params = req.params();
+        assert_eq!(params.get("a"), Some(&Cow::Borrowed("1")));
+        assert_eq!(params.get("b"), Some(&Cow::Borrowed("2")));
     }
 }
