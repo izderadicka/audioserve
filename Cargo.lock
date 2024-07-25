@@ -177,7 +177,7 @@ dependencies = [
  "csv",
  "data-encoding",
  "dirs",
- "env_logger 0.11.3",
+ "env_logger 0.11.5",
  "escargot",
  "futures",
  "http-body-util",
@@ -335,7 +335,7 @@ dependencies = [
  "bit-vec",
  "derive_builder",
  "ego-tree",
- "env_logger 0.11.3",
+ "env_logger 0.11.5",
  "log",
  "notify",
 ]
@@ -492,7 +492,7 @@ dependencies = [
  "anyhow",
  "clap 4.5.11",
  "collection",
- "env_logger 0.11.3",
+ "env_logger 0.11.5",
  "libc",
 ]
 
@@ -505,7 +505,7 @@ dependencies = [
  "crossbeam-channel",
  "csv",
  "enum_dispatch",
- "env_logger 0.11.3",
+ "env_logger 0.11.5",
  "fs_extra",
  "indexmap",
  "lazy_static",
@@ -918,9 +918,9 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.11.3"
+version = "0.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38b35839ba51819680ba087cd351788c9a3c476841207e0b8cee0b04722343b9"
+checksum = "e13fa619b91fb2381732789fc5de83b45675e882f66623b7d8cb4f643017018d"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1989,7 +1989,7 @@ dependencies = [
 name = "proxy-headers"
 version = "0.1.0"
 dependencies = [
- "env_logger 0.11.3",
+ "env_logger 0.11.5",
  "headers",
  "http",
  "lazy_static",
@@ -2473,7 +2473,7 @@ version = "0.2.2"
 dependencies = [
  "byteorder",
  "data-encoding",
- "env_logger 0.11.3",
+ "env_logger 0.11.5",
  "linked-hash-map",
  "log",
  "rand 0.8.5",
@@ -3015,7 +3015,7 @@ dependencies = [
 name = "websock"
 version = "0.4.0"
 dependencies = [
- "env_logger 0.11.3",
+ "env_logger 0.11.5",
  "futures",
  "headers",
  "http-body-util",
