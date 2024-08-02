@@ -532,7 +532,7 @@ impl CacheInner {
             .ok();
     }
 
-    pub(crate) fn write_json_positions<F: std::io::Write>(&self, mut file: &mut F) -> Result<()> {
+    pub(crate) fn write_json_positions<F: std::io::Write>(&self, file: &mut F) -> Result<()> {
         write!(file, "{{")?;
         for (idx, res) in self.pos_folder.iter().enumerate() {
             match res {
@@ -540,7 +540,7 @@ impl CacheInner {
                     let folder = std::str::from_utf8(&k)?;
                     let res: PositionRecord = bincode::deserialize(&v)?;
                     write!(file, "\"{}\":", folder)?;
-                    serde_json::to_writer(&mut file, &res)?;
+                    serde_json::to_writer(&mut *file, &res)?;
                     if idx < self.pos_folder.len() - 1 {
                         writeln!(file, ",")?;
                     } else {
