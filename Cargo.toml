@@ -1,6 +1,6 @@
 [package]
 name = "audioserve"
-version = "0.28.7"
+version = "0.28.8"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2021"
 rust-version = "1.70"
@@ -42,7 +42,6 @@ chrono = {version="0.4", optional=true}
 
 # this repo dependencies
 collection = {path="crates/collection", features=["async"]}
-proxy-headers = {path="crates/proxy-headers", optional=true}
 simple-file-cache = {path="crates/file-cache", features=["asynch"]}
 async-tar = {path="crates/async-tar", optional=true}
 async-zip = {path="crates/async-zip", optional=true}
@@ -61,7 +60,7 @@ symlinks=["collection/symlinks"]
 folder-download = ["async-tar", "async-zip"]
 folder-download-default-tar =[]
 shared-positions = ["websock", "cron", "chrono"]
-behind-proxy = ["proxy-headers"]
+behind-proxy = ["myhy/behind-proxy"]
 # non-default
 transcoding-cache=["tokio-util"]
 # for static compilation only

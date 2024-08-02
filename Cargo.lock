@@ -164,7 +164,7 @@ dependencies = [
 
 [[package]]
 name = "audioserve"
-version = "0.28.7"
+version = "0.28.8"
 dependencies = [
  "anyhow",
  "async-tar",
@@ -190,7 +190,6 @@ dependencies = [
  "nix",
  "num_cpus",
  "percent-encoding",
- "proxy-headers",
  "regex",
  "reqwest",
  "ring",
@@ -1727,6 +1726,7 @@ dependencies = [
  "mime",
  "mime_guess",
  "percent-encoding",
+ "proxy-headers",
  "regex",
  "ring",
  "rustls-pemfile",

@@ -249,7 +249,7 @@ where
         }
         #[cfg(feature = "behind-proxy")]
         if self.is_behind_proxy {
-            //try scommon  proxy headers
+            //try common  proxy headers
             let forwarded_https = self
                 .request
                 .headers()

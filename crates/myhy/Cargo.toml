@@ -33,8 +33,11 @@ tokio-rustls = { version="0.26", optional=true, default-features = false, featur
 rustls-pemfile = { version = "2", optional=true}
 rustls-pki-types = {version="1", optional=true}
 
+proxy-headers = {path="../proxy-headers", optional=true}
+
 [features]
 tls=["tokio-rustls", "rustls-pemfile", "rustls-pki-types"]
+behind-proxy=["proxy-headers"]
 
 
 [dev-dependencies]
