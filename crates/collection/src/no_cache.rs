@@ -77,6 +77,19 @@ impl CollectionTrait for CollectionDirect {
 }
 
 impl PositionsTrait for CollectionDirect {
+    fn mark_as_finished<P, S>(
+        &self,
+        _group: S,
+        _path: P,
+        _ts: Option<crate::audio_meta::TimeStamp>,
+    ) -> Result<()>
+    where
+        S: AsRef<str>,
+        P: AsRef<str>,
+    {
+        Ok(())
+    }
+
     fn insert_position<S, P>(
         &self,
         _group: S,

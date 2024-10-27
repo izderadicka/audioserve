@@ -462,6 +462,14 @@ impl Drop for CollectionCache {
 
 // positions
 impl PositionsTrait for CollectionCache {
+    fn mark_as_finished<P, S>(&self, group: S, path: P, ts: Option<TimeStamp>) -> Result<()>
+    where
+        S: AsRef<str>,
+        P: AsRef<str>,
+    {
+        self.inner.mark_as_finished(group, path, ts)
+    }
+
     fn insert_position<S, P>(
         &self,
         group: S,

@@ -224,8 +224,69 @@ impl CacheInner {
     }
 }
 
+fn get_pos_record<K>(k: &K, db: &transaction::TransactionalTree) -> Option<PositionRecord>
+where
+    K: AsRef<[u8]> + ?Sized,
+{
+    db.get(k.as_ref())
+        .map_err(|e| error!("Db get error: {}", e))
+        .ok()
+        .flatten()
+        .and_then(|data| {
+            bincode::deserialize::<PositionRecord>(&data)
+                .map_err(|e| error!("Db item deserialization error: {}", e))
+                .ok()
+        })
+}
+
 // positions
 impl CacheInner {
+    pub(crate) fn mark_as_finished<P, S>(
+        &self,
+        group: S,
+        path: P,
+        ts: Option<TimeStamp>,
+    ) -> Result<()>
+    where
+        S: AsRef<str>,
+        P: AsRef<str>,
+    {
+        self.pos_folder
+            .transaction(|pos_folder| {
+                let mut folder_rec = get_pos_record(path.as_ref(), pos_folder).unwrap_or_default();
+                let ts = ts.unwrap_or_else(|| TimeStamp::now());
+                match folder_rec.get_mut(group.as_ref()) {
+                    Some(p) => {
+                        p.folder_finished = true;
+                        p.timestamp = ts;
+                    }
+                    None => {
+                        if !folder_rec.contains_key(group.as_ref())
+                            && folder_rec.len() >= MAX_GROUPS
+                        {
+                            return transaction::abort(Error::TooManyGroups);
+                        }
+                        folder_rec.insert(
+                            group.as_ref().to_string(),
+                            PositionItem {
+                                file: "__PLACEHOLDER__".into(),
+                                timestamp: ts,
+                                position: 0.0,
+                                folder_finished: true,
+                            },
+                        );
+                    }
+                }
+                match bincode::serialize(&folder_rec).map_err(Error::from) {
+                    Ok(data) => pos_folder.insert(path.as_ref().as_bytes(), data)?,
+                    Err(e) => return transaction::abort(e),
+                };
+
+                Ok(())
+            })
+            .map_err(Error::from)
+    }
+
     pub(crate) fn insert_position<S, P>(
         &self,
         group: S,
@@ -243,16 +304,7 @@ impl CacheInner {
         if let Some((last_file, last_file_duration)) = self.get_last_file(path) {
             (&self.pos_latest, &self.pos_folder)
                 .transaction(move |(pos_latest, pos_folder)| {
-                    let mut folder_rec = pos_folder
-                        .get(path)
-                        .map_err(|e| error!("Db get error: {}", e))
-                        .ok()
-                        .flatten()
-                        .and_then(|data| {
-                            bincode::deserialize::<PositionRecord>(&data)
-                                .map_err(|e| error!("Db item deserialization error: {}", e))
-                                .ok()
-                        })
+                    let mut folder_rec = get_pos_record(path,pos_folder)
                         .unwrap_or_default();
 
                     if let Some(ts) = ts {
@@ -334,16 +386,7 @@ impl CacheInner {
                     None => return Ok(None),
                 };
 
-                Ok(pos_folder
-                    .get(&fld)
-                    .map_err(|e| error!("Error reading position folder record in db: {}", e))
-                    .ok()
-                    .flatten()
-                    .and_then(|r| {
-                        bincode::deserialize::<PositionRecord>(&r)
-                            .map_err(|e| error!("Error deserializing position record {}", e))
-                            .ok()
-                    })
+                Ok(get_pos_record(&fld, pos_folder)
                     .and_then(|m| m.get(group.as_ref()).map(|p| p.to_position(fld, 0))))
             })
             .map_err(|e: TransactionError<Error>| error!("Db transaction error: {}", e))

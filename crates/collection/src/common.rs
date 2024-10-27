@@ -246,6 +246,11 @@ pub(crate) enum Collection {
 
 #[enum_dispatch]
 pub(crate) trait PositionsTrait {
+    fn mark_as_finished<P, S>(&self, group: S, path: P, ts: Option<TimeStamp>) -> Result<()>
+    where
+        S: AsRef<str>,
+        P: AsRef<str>;
+
     fn insert_position<S, P>(
         &self,
         group: S,

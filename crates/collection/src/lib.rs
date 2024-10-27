@@ -25,6 +25,7 @@ use std::{
     path::{Path, PathBuf},
     thread::JoinHandle,
 };
+use tokio::time::error::Elapsed;
 pub use util::guess_mime_type;
 
 use crate::{
@@ -511,19 +512,22 @@ impl Collections {
             collection,
             ..
         } = position;
-        let path = if !folder.is_empty() {
+        let file_is_empty = file.is_empty();
+        let path = if file_is_empty {
+            folder
+        } else if !folder.is_empty() {
             folder + "/" + &file
         } else {
             file
         };
         spawn_blocking!({
-            self.get_cache(collection)?.insert_position(
-                group,
-                path,
-                position,
-                folder_finished,
-                Some(timestamp),
-            )
+            let col = self.get_cache(collection)?;
+            if folder_finished && file_is_empty {
+                debug!("Marked {path} as finished for group {}", group.as_ref());
+                col.mark_as_finished(&group, &path, Some(timestamp))
+            } else {
+                col.insert_position(group, path, position, folder_finished, Some(timestamp))
+            }
         })
         .unwrap_or_else(|e| Err(Error::from(e)))
     }
