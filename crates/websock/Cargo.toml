@@ -10,7 +10,7 @@ hyper = {version="1.4", features=[]}
 tokio = {version="1.37", features=["rt-multi-thread", "time"]}
 futures = "0.3"
 log = "0.4"
-tokio-tungstenite = "0.23.0"
+tokio-tungstenite = "0.24.0"
 thiserror = "1.0"
 headers = "0.4.0"
 http-body-util = "0.1.1"
