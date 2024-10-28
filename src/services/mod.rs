@@ -358,6 +358,14 @@ impl<C: Send + 'static> MainService<C> {
                             req.can_compress(),
                         )
                         .await
+                    } else if path.starts_with("/feed/") {
+                        api::get_feed(
+                            colllection_index,
+                            collections,
+                            get_subpath(path, "/feed/"),
+                            req.can_compress(),
+                        )
+                        .await
                     } else if !get_config().disable_folder_download && path.starts_with("/download")
                     {
                         #[cfg(feature = "folder-download")]

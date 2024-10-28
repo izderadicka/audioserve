@@ -29,6 +29,15 @@ pub async fn get_folder(
         .await
 }
 
+pub async fn get_feed(
+    collection: usize,
+    collections: Arc<collection::Collections>,
+    folder_path: PathBuf,
+    compress: bool,
+) -> ResponseResult {
+    todo!("get_feed")
+}
+
 const UNKNOWN_NAME: &str = "unknown";
 
 pub fn collections_list(compress: bool) -> ResponseResult {
