@@ -25,7 +25,6 @@ use std::{
     path::{Path, PathBuf},
     thread::JoinHandle,
 };
-use tokio::time::error::Elapsed;
 pub use util::guess_mime_type;
 
 use crate::{

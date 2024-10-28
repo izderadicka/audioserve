@@ -1,6 +1,6 @@
 [package]
 name = "audioserve"
-version = "0.28.8"
+version = "0.28.9"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2021"
 rust-version = "1.70"
@@ -12,13 +12,16 @@ members = ["crates/*"]
 
 bytes = "1.6"
 env_logger = "0.11.3"
-log = {version="0.4", features = ["release_max_level_info", "max_level_trace"]}
+log = { version = "0.4", features = [
+    "release_max_level_info",
+    "max_level_trace",
+] }
 futures = "0.3"
 mime = "0.3"
 serde_json = "1.0.116"
-serde = {version="1.0", features=["derive"]}
+serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
-clap = {version="4", features=["cargo", "env"]}
+clap = { version = "4", features = ["cargo", "env"] }
 lazy_static = "1.4"
 thiserror = "1.0"
 anyhow = "1.0.82"
@@ -28,41 +31,47 @@ num_cpus = "1.16"
 ring = "0.17"
 data-encoding = "2.6"
 regex = "1.10"
-tokio = {version="1.37", features=["full"]}
+tokio = { version = "1.37", features = ["full"] }
 
 dirs = "5.0"
 csv = "1.3"
 
-image="0.24"
+image = "0.24"
 
-leaky-cauldron = {path="crates/leaky-cauldron"}
-tokio-util = {version="0.7.10", optional=true, features=["codec"]}
-cron = {version="0.12", optional=true}
-chrono = {version="0.4", optional=true}
+leaky-cauldron = { path = "crates/leaky-cauldron" }
+tokio-util = { version = "0.7.10", optional = true, features = ["codec"] }
+cron = { version = "0.12", optional = true }
+chrono = { version = "0.4", optional = true }
 
 # this repo dependencies
-collection = {path="crates/collection", features=["async"]}
-simple-file-cache = {path="crates/file-cache", features=["asynch"]}
-async-tar = {path="crates/async-tar", optional=true}
-async-zip = {path="crates/async-zip", optional=true}
-websock = {path="crates/websock", optional = true}
-myhy = {path="crates/myhy"}
+collection = { path = "crates/collection", features = ["async"] }
+simple-file-cache = { path = "crates/file-cache", features = ["asynch"] }
+async-tar = { path = "crates/async-tar", optional = true }
+async-zip = { path = "crates/async-zip", optional = true }
+websock = { path = "crates/websock", optional = true }
+myhy = { path = "crates/myhy" }
 
 [target.'cfg(unix)'.dependencies]
-nix = {version="0.29.0", features=["user"]}
+nix = { version = "0.29.0", features = ["user"] }
 
 [features]
-default = ["tls", "symlinks", "folder-download", "shared-positions", "behind-proxy"]
+default = [
+    "tls",
+    "symlinks",
+    "folder-download",
+    "shared-positions",
+    "behind-proxy",
+]
 # default
-tls=["myhy/tls"]
-symlinks=["collection/symlinks"]
+tls = ["myhy/tls"]
+symlinks = ["collection/symlinks"]
 
 folder-download = ["async-tar", "async-zip"]
-folder-download-default-tar =[]
+folder-download-default-tar = []
 shared-positions = ["websock", "cron", "chrono"]
 behind-proxy = ["myhy/behind-proxy"]
 # non-default
-transcoding-cache=["tokio-util"]
+transcoding-cache = ["tokio-util"]
 # for static compilation only
 partially-static = ["collection/partially-static"]
 static = ["collection/static"]
@@ -71,16 +80,18 @@ collation-static = ["collection/collation-static"]
 tags-encoding = ["collection/tags-encoding"]
 
 
-
 [profile.release]
 lto = true
 codegen-units = 1
 
 [dev-dependencies]
-reqwest = {version="0.12.4", features=['blocking', 'json'], default-features = false}
-escargot = "0.5.10" 
+reqwest = { version = "0.12.4", features = [
+    'blocking',
+    'json',
+], default-features = false }
+escargot = "0.5.10"
 tempdir = "0.3.7"
 http-body-util = "0.1.1"
 
 [target.'cfg(unix)'.dev-dependencies]
-nix = {version="0.29.0", features=["process", "signal"]}
+nix = { version = "0.29.0", features = ["process", "signal"] }
