@@ -254,7 +254,7 @@ impl CacheInner {
         self.pos_folder
             .transaction(|pos_folder| {
                 let mut folder_rec = get_pos_record(path.as_ref(), pos_folder).unwrap_or_default();
-                let ts = ts.unwrap_or_else(|| TimeStamp::now());
+                let ts = ts.unwrap_or_else(TimeStamp::now);
                 match folder_rec.get_mut(group.as_ref()) {
                     Some(p) => {
                         p.folder_finished = true;
