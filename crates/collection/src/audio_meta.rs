@@ -20,6 +20,10 @@ impl TimeStamp {
     pub fn now() -> Self {
         SystemTime::now().into()
     }
+
+    pub fn timestamp_millis(&self) -> u64 {
+        self.0
+    }
 }
 
 impl From<SystemTime> for TimeStamp {
@@ -87,6 +91,8 @@ pub struct AudioFile {
     pub meta: Option<AudioMeta>,
     pub mime: String,
     pub section: Option<FileSection>,
+    pub modified: Option<TimeStamp>,
+    pub size: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

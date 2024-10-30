@@ -1,5 +1,6 @@
 use std::convert::Infallible;
 use std::io;
+use std::str::FromStr;
 use std::task::{Context, Poll};
 use std::{future::Future, pin::Pin, time::SystemTime};
 
@@ -166,6 +167,26 @@ pub fn json_response<T: serde::Serialize>(data: &T, compress: bool) -> HttpRespo
         builder
             .typed_header(ContentLength(json.len() as u64))
             .body(full_body(json))
+            .unwrap()
+    }
+}
+
+pub fn xml_response<T: Into<String>>(
+    data: T,
+    compress: bool,
+    specific_mime: Option<&str>,
+) -> HttpResponse {
+    let xml: String = data.into();
+    let mime = specific_mime
+        .and_then(|m| Mime::from_str(m).ok())
+        .unwrap_or(mime::TEXT_XML);
+    let builder = Response::builder().typed_header(ContentType::from(mime));
+    if compress && make_sense_to_compress(xml.len()) {
+        compressed_response(builder, xml.into_bytes())
+    } else {
+        builder
+            .typed_header(ContentLength(xml.len() as u64))
+            .body(full_body(xml))
             .unwrap()
     }
 }

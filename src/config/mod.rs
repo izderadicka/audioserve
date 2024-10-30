@@ -517,6 +517,7 @@ pub struct Config {
     pub base_dirs: Vec<PathBuf>,
     pub base_dirs_options: HashMap<PathBuf, String>,
     pub url_path_prefix: Option<String>,
+    pub url_base: Option<url::Url>,
     pub shared_secret: Option<String>,
     pub limit_rate: Option<f32>,
     #[serde(with = "serde_yaml::with::singleton_map_recursive")]
@@ -711,6 +712,7 @@ impl Default for Config {
             base_dirs: vec![],
             base_dirs_options: HashMap::new(),
             url_path_prefix: None,
+            url_base: None,
             listen: ([0, 0, 0, 0], 3000u16).into(),
             thread_pool: ThreadPoolConfig::default(),
             shared_secret: None,

@@ -25,7 +25,7 @@ clap = { version = "4", features = ["cargo", "env"] }
 lazy_static = "1.4"
 thiserror = "1.0"
 anyhow = "1.0.82"
-url = "2.5"
+url = { version = "2.5", features = ["serde"] }
 percent-encoding = "2.3"
 num_cpus = "1.16"
 ring = "0.17"
@@ -50,6 +50,7 @@ async-tar = { path = "crates/async-tar", optional = true }
 async-zip = { path = "crates/async-zip", optional = true }
 websock = { path = "crates/websock", optional = true }
 myhy = { path = "crates/myhy" }
+rss = { version = "2.0.9", optional = true, features = ["chrono"] }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.29.0", features = ["user"] }
@@ -61,6 +62,7 @@ default = [
     "folder-download",
     "shared-positions",
     "behind-proxy",
+    "rss",
 ]
 # default
 tls = ["myhy/tls"]
@@ -70,6 +72,7 @@ folder-download = ["async-tar", "async-zip"]
 folder-download-default-tar = []
 shared-positions = ["websock", "cron", "chrono"]
 behind-proxy = ["myhy/behind-proxy"]
+rss = ["dep:rss"]
 # non-default
 transcoding-cache = ["tokio-util"]
 # for static compilation only

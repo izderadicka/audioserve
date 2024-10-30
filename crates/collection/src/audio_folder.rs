@@ -2,6 +2,7 @@ use std::borrow::{self, Cow};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::io;
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::{fs, mem};
 
@@ -216,6 +217,9 @@ impl FolderLister {
     ) -> crate::error::Result<AudioInfo> {
         #[cfg(feature = "tags-encoding")]
         let audio_info = get_audio_properties(long_path, self.config.tags_encoding.as_ref());
+        let file_meta = get_meta(long_path)?;
+        let modified = file_meta.modified().ok().map(|t| t.into());
+        let size = Some(file_meta.size());
         #[cfg(not(feature = "tags-encoding"))]
         let audio_info = get_audio_properties(long_path);
         let meta = audio_info?;
@@ -244,6 +248,8 @@ impl FolderLister {
                     path,
                     section: None,
                     mime: mime.to_string(),
+                    modified,
+                    size,
                 };
                 Ok(AudioInfo::File(file))
             }
@@ -524,6 +530,8 @@ impl FolderLister {
                         duration: Some(chap.end - chap.start),
                     }),
                     mime: mime.to_string(),
+                    modified: None,
+                    size: None,
                 })
             })
             .collect::<io::Result<Vec<_>>>()?;

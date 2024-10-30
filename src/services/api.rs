@@ -29,13 +29,26 @@ pub async fn get_folder(
         .await
 }
 
+#[cfg(feature = "rss")]
 pub async fn get_feed(
+    base_dir: &std::path::Path,
     collection: usize,
     collections: Arc<collection::Collections>,
     folder_path: PathBuf,
     compress: bool,
 ) -> ResponseResult {
-    todo!("get_feed")
+    use myhy::response::xml_response;
+
+    use crate::services::rss::folder_to_channel;
+    let base_dir = base_dir.to_path_buf();
+    blocking(move || {
+        let folder =
+            collections.list_dir(collection, &folder_path, FoldersOrdering::RecentFirst, None)?;
+        let channel = folder_to_channel(&base_dir, collection, &folder_path, folder)?;
+        Ok::<_, Error>(xml_response(channel.to_string(), compress, None))
+    })
+    .await
+    .map_err(Error::new)?
 }
 
 const UNKNOWN_NAME: &str = "unknown";

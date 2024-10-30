@@ -1,13 +1,13 @@
 [package]
 name = "collection"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dev-dependencies]
-serde_json ="1.0.116"
+serde_json = "1.0.116"
 env_logger = "0.11.3"
 tempdir = "0.3.7"
 fs_extra = "1.3"
@@ -15,13 +15,13 @@ anyhow = "1.0.82"
 
 [dependencies]
 
-media_info = {path="../media_info"}
-sled = {version="0.34", features=["compression"]}
+media_info = { path = "../media_info" }
+sled = { version = "0.34", features = ["compression"] }
 thiserror = "1.0"
-serde = {version="1.0", features=["derive"]}
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.116"
 lazy_static = "1.4"
-log="0.4"
+log = "0.4"
 regex = "1.10"
 csv = "1.3"
 mime_guess = "2.0"
@@ -33,8 +33,10 @@ notify = "6.1"
 crossbeam-channel = "0.5"
 enum_dispatch = "0.3"
 
-tokio = {version="1", optional=true, features=["rt"]}
-rust_icu_ucol = {version="5.0", default-features=false, features=["renaming"], optional=true}
+tokio = { version = "1", optional = true, features = ["rt"] }
+rust_icu_ucol = { version = "5.0", default-features = false, features = [
+    "renaming",
+], optional = true }
 indexmap = "2.2.6"
 
 [features]
@@ -43,5 +45,8 @@ static = ["media_info/static"]
 async = ["tokio"]
 symlinks = []
 collation = ["rust_icu_ucol/use-bindgen", "rust_icu_ucol/icu_config"]
-collation-static = ["rust_icu_ucol/renaming", "rust_icu_ucol/icu_version_in_env"]
+collation-static = [
+    "rust_icu_ucol/renaming",
+    "rust_icu_ucol/icu_version_in_env",
+]
 tags-encoding = ["media_info/alternate-encoding"]

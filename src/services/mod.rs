@@ -35,6 +35,8 @@ mod files;
 pub mod icon;
 #[cfg(feature = "shared-positions")]
 pub mod position;
+#[cfg(feature = "rss")]
+pub mod rss;
 pub mod search;
 pub mod transcode;
 mod types;
@@ -358,8 +360,12 @@ impl<C: Send + 'static> MainService<C> {
                             req.can_compress(),
                         )
                         .await
-                    } else if path.starts_with("/feed/") {
+                    } else if cfg!(feature = "rss") && path.starts_with("/feed/") {
+                        #[cfg(not(feature = "rss"))]
+                        unimplemented!();
+                        #[cfg(feature = "rss")]
                         api::get_feed(
+                            base_dir,
                             colllection_index,
                             collections,
                             get_subpath(path, "/feed/"),

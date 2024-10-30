@@ -38,6 +38,7 @@ const AUDIOSERVE_CHAPTERS_DURATION: &str = "chapters-duration";
 const AUDIOSERVE_NO_DIR_COLLAPS: &str = "no-dir-collaps";
 const AUDIOSERVE_IGNORE_CHAPTERS_META: &str = "ignore-chapters-meta";
 const AUDIOSERVE_URL_PATH_PREFIX: &str = "url-path-prefix";
+const AUDIOSERVE_URL_BASE: &str = "url-base";
 const AUDIOSERVE_FORCE_CACHE_UPDATE: &str = "force-cache-update";
 const AUDIOSERVE_STATIC_RESOURCE_CACHE_AGE: &str = "static-resource-cache-age";
 const AUDIOSERVE_FOLDER_FILE_CACHE_AGE: &str = "folder-file-cache-age";
@@ -239,7 +240,12 @@ fn create_parser() -> Command {
         .arg(long_arg!(AUDIOSERVE_URL_PATH_PREFIX)
             .num_args(1)
             .value_parser(is_valid_url_path_prefix)
-            .help("Base URL is a fixed path that is before audioserve path part, must start with / and not end with /  [default: none]")
+            .help("Base fixed path that is before audioserve path part, must start with / and not end with /. To be used with path mapping on rev. proxy.  [default: none]")
+            )
+        .arg(long_arg!(AUDIOSERVE_URL_BASE)
+            .num_args(1)
+            .value_parser(parse_url)
+            .help("Base URL, where audioserve is  visible - full absolute URL with scheme and host, port. (Now used for RSS only)  [default: none]")
             )
         .arg(long_arg_flag!(AUDIOSERVE_FORCE_CACHE_UPDATE)
             .help("Forces full reload of metadata cache on start")
@@ -699,6 +705,8 @@ where
         config.url_path_prefix,
         Some(AUDIOSERVE_URL_PATH_PREFIX)
     );
+
+    set_config!(args, config.url_base, Some(AUDIOSERVE_URL_BASE));
 
     set_config!(
         args,

@@ -40,6 +40,14 @@ pub fn is_valid_url_path_prefix(s: &str) -> Result<String, anyhow::Error> {
     }
 }
 
+pub fn parse_url(s: &str) -> Result<url::Url, anyhow::Error> {
+    let url = url::Url::parse(s).context("Invalid URL")?;
+    if url.scheme() != "http" && url.scheme() != "https" {
+        bail!("Only http and https are supported");
+    }
+    Ok(url)
+}
+
 pub fn duration_secs(s: &str) -> Result<Duration, anyhow::Error> {
     let secs: u64 = s.parse().context("Invalid Duration")?;
     Ok(Duration::from_secs(secs))
