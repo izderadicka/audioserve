@@ -28,6 +28,7 @@ Like audioserve and want to start quickly and easily and securely? Try [this sim
     - [Audio files metadata tags](#audio-files-metadata-tags)
     - [Collation](#collation)
     - [Playlists](#playlists)
+    - [Podcasts](#podcasts)
   - [Sharing playback positions between clients](#sharing-playback-positions-between-clients)
   - [Security](#security)
     - [TLS/SSL](#tlsssl)
@@ -148,7 +149,12 @@ With program argument `read-playlist` audioserve will search for file with exten
 - maximum relative path length is 4 segments
 - file must exist and be and audio file to be used
 - subdirectories that are used in playlist are not displayed, it's assumed they are fully managed by playlist
-- thoroughly tested are only playlists with items in same folder -  if playlist is spanning subfolder it may have problems in some special cases like watching for directory changes, tracking playback position. 
+- thoroughly tested are only playlists with items in same folder -  if playlist is spanning subfolder it may have problems in some special cases like watching for directory changes, tracking playback position.
+
+### Podcasts
+You can use folder (with audiofiles) as a podcast. On URL path `/<collection_id>/feed/<folder_path>` is RSS feed definition, that contains metadata about folder and audio files as items (episodes in Podcast terminology). Items are sorted from newest based on file modification time.
+
+Right now it's new and not tested functionality - feedback is welcomed thought issues on Github.
 
 ## Sharing playback positions between clients
 

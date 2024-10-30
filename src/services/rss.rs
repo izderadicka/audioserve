@@ -4,7 +4,10 @@ use crate::{config::get_config, Error};
 use anyhow::bail;
 use chrono::DateTime;
 use collection::audio_meta::AudioFolder;
-use rss::{Channel, ChannelBuilder, EnclosureBuilder, ImageBuilder, ItemBuilder};
+use rss::{
+    extension::itunes::ITunesItemExtensionBuilder, Channel, ChannelBuilder, EnclosureBuilder,
+    ImageBuilder, ItemBuilder,
+};
 
 pub fn folder_to_channel(
     base_path: &Path,
@@ -83,20 +86,41 @@ pub fn folder_to_channel(
                 )
                 .mime_type(f.mime)
                 .build();
+
+            let meta = f.meta.as_ref();
+            let itunes_ext = meta.map(|m| {
+                let duration = fmt_time(m.duration);
+                let ext = ITunesItemExtensionBuilder::default()
+                    .duration(Some(duration))
+                    .build();
+                ext
+            });
             let publication_date = f
                 .modified
                 .and_then(|t| DateTime::from_timestamp_millis(t.timestamp_millis() as i64))
                 .map(|dt| dt.to_rfc2822());
+            let title = meta
+                .and_then(|m| m.tags.as_ref().and_then(|m| m.get("title").cloned()))
+                .unwrap_or_else(|| f.name.into());
             Ok(ItemBuilder::default()
-                .title(Some(f.name.into()))
+                .title(Some(title))
                 .pub_date(publication_date)
                 .link(None)
                 .enclosure(Some(enclosure))
+                .itunes_ext(itunes_ext)
                 .build())
         })
         .collect::<Result<Vec<_>, anyhow::Error>>()?;
     channel.set_items(items);
     Ok(channel)
+}
+
+fn fmt_time(mut secs: u32) -> String {
+    let hours = secs / 3600;
+    secs = secs % 3600;
+    let minutes = secs / 60;
+    secs = secs % 60;
+    format!("{:02}:{:02}:{:02}", hours, minutes, secs)
 }
 
 fn read_file_with_limit(path: &Path) -> Result<String, anyhow::Error> {
@@ -119,5 +143,12 @@ mod tests {
         let url = base.join("audio/")?.join("cesta/z/mesta")?;
         assert_eq!("http://localhost:3000/audio/cesta/z/mesta", url.to_string());
         Ok(())
+    }
+
+    #[test]
+    fn test_fmt_time() {
+        assert_eq!("00:01:00", fmt_time(60));
+        assert_eq!("01:00:00", fmt_time(3600));
+        assert_eq!("01:01:00", fmt_time(3660));
     }
 }
