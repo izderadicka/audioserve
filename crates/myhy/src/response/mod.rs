@@ -3,13 +3,14 @@ use std::io;
 use std::task::{Context, Poll};
 use std::{future::Future, pin::Pin, time::SystemTime};
 
+use body::empty_body;
 use bytes::Bytes;
 use futures::prelude::*;
 use headers::{
     CacheControl, ContentEncoding, ContentLength, ContentType, Header, HeaderMapExt, LastModified,
 };
 use http::response::Builder;
-use http::{Response, StatusCode};
+use http::{header, Response, StatusCode};
 use http_body_util::BodyExt;
 use hyper::body::Body;
 use mime::Mime;
@@ -109,6 +110,14 @@ def_resp!(
     internal_error(StatusCode::INTERNAL_SERVER_ERROR, INTERNAL_SERVER_ERROR);
     ignored(StatusCode::UNPROCESSABLE_ENTITY, UNPROCESSABLE_ENTITY)
 );
+
+pub fn redirect_permanent(url: &str) -> HttpResponse {
+    Response::builder()
+        .status(StatusCode::MOVED_PERMANENTLY)
+        .header(header::LOCATION, url)
+        .body(empty_body())
+        .unwrap()
+}
 
 pub fn add_cache_headers(
     mut resp: Builder,
