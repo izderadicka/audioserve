@@ -3,9 +3,10 @@
 use anyhow::{Error, Result};
 use escargot::CargoBuild;
 use headers::HeaderValue;
+use myhy::headers;
 use reqwest::{blocking::Client, header::HeaderMap, StatusCode};
 use serde_json::Value;
-use std::io;
+use std::{fs::File, io::Write as _, net::TcpStream};
 
 fn make_url(path: &str, port: u16) -> String {
     format!("http://localhost:{}", port) + path
@@ -87,30 +88,59 @@ macro_rules! assert_header {
     };
 }
 
+fn is_port_free(port: u16) -> bool {
+    match TcpStream::connect(format!("localhost:{}", port)) {
+        Ok(_) => false,
+        Err(_) => true,
+    }
+}
+
 #[test]
 #[ignore]
 fn test_binary() -> Result<()> {
+    let min_html = "<html><head><title>AudioServe</title></head><body></body></html>";
     let tmp_dir = tempdir::TempDir::new("audioserve_bin_test")?;
+    {
+        let mut f = File::create(tmp_dir.path().join("index.html"))?;
+        f.write_all(min_html.as_bytes())?;
+    }
     let bin = CargoBuild::new()
         .bin("audioserve")
-        .features("transcoding-cache partially-static")
+        .features("transcoding-cache,tags-encoding")
         .run()?;
 
     eprintln!("Binary is at {:?}", bin.path());
 
-    let port: u16 = 3333;
-    let listen_on = format!("127.0.0.1:{}", port);
+    let port_range = 3333u16..=4444;
 
+    let mut retries = 5;
+    let mut port: u16;
+    let gen = ring::rand::SystemRandom::new();
+    loop {
+        let rand = ring::rand::generate::<[u8; 2]>(&gen).unwrap().expose();
+        let rand = u16::from_be_bytes(rand);
+        port = port_range.start() + rand % (port_range.end() - port_range.start());
+
+        if is_port_free(port) {
+            break;
+        }
+        retries -= 1;
+        if retries == 0 {
+            panic!("Could not find free port");
+        }
+    }
+
+    let listen_on = format!("127.0.0.1:{}", port);
+    let tmp_dir_path = tmp_dir.path().to_str().unwrap();
     let mut cmd = bin.command();
     cmd.args(&[
         "--no-authentication",
         "--listen",
         listen_on.as_str(),
         "--data-dir",
-        tmp_dir
-            .path()
-            .to_str()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Invalid temp path"))?,
+        tmp_dir_path,
+        "--client-dir",
+        tmp_dir_path,
         "test_data",
     ])
     .env("RUST_LOG", "audioserve=debug");
@@ -142,21 +172,21 @@ fn test_binary() -> Result<()> {
     assert_eq!(StatusCode::OK, resp.status());
     assert_header!(resp, "Content-Type", "text/html");
 
-    let jg = |path| -> Result<Value> {
+    let jq = |path| -> Result<Value> {
         client
             .get(&make_url(path, port))
             .send()?
             .json::<Value>()
             .map_err(Error::new)
     };
-    let collections = jg("/collections")?;
+    let collections = jq("/collections")?;
     assert_eq!(1, extract_value(&collections, "names").and_then(array_len)?);
     assert_eq!(
         "test_data",
         extract_value(&collections, "names[0]").and_then(string_value)?
     );
 
-    let transcodings = jg("/transcodings")?;
+    let transcodings = jq("/transcodings")?;
     assert_eq!(
         64,
         extract_value(&transcodings, "high.bitrate").and_then(int_value)?
@@ -166,7 +196,7 @@ fn test_binary() -> Result<()> {
         extract_value(&transcodings, "high.name").and_then(string_value)?
     );
 
-    let root_folder = jg("/folder/")?;
+    let root_folder = jq("/folder/")?;
     assert_eq!(2, extract_value(&root_folder, "files").and_then(array_len)?);
     assert_eq!(
         2,
@@ -203,15 +233,17 @@ fn test_binary() -> Result<()> {
     assert_header!(res, "x-transcode", "codec=opus-in-ogg; bitrate=32");
 
     let mut range_headers = HeaderMap::new();
-    range_headers.insert("Range", HeaderValue::from_str("bytes=0-100")?);
+    range_headers.insert("Range", HeaderValue::from_str("bytes=0-1000")?);
     let res = client
         .get(&make_url("/audio/02-file.opus?trans=0", port))
         .headers(range_headers)
         .send()?;
     assert_header!(res, "Content-Type", "audio/ogg");
     assert_eq!(StatusCode::PARTIAL_CONTENT, res.status());
-    assert_header!(res, "content-range", "bytes 0-100/12480");
-    assert_header!(res, "content-length", "101");
+    assert_header!(res, "content-range", "bytes 0-1000/12480");
+    assert_header!(res, "content-length", "1001");
+    let data = res.bytes().unwrap();
+    assert_eq!(1001, data.len());
 
     #[cfg(not(unix))]
     proc.kill();
@@ -219,10 +251,11 @@ fn test_binary() -> Result<()> {
     #[cfg(unix)]
     {
         use nix::{sys::signal, unistd::Pid};
-        signal::kill(Pid::from_raw(proc.id() as i32), signal::SIGINT)
+        signal::kill(Pid::from_raw(proc.id() as i32), signal::SIGTERM)
             .unwrap_or_else(|e| eprintln!("Cannot kill process {}, error {}", proc.id(), e));
     }
     let status = proc.wait().unwrap();
     eprintln!("Exit status is {:?}", status.code());
+    assert_eq!(Some(0), status.code());
     Ok(())
 }
