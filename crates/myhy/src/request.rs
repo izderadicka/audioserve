@@ -137,22 +137,14 @@ impl<T> GenericRequestWrapper<T> {
 
     pub fn set_path_prefix(mut self, path_prefix: Option<&str>) -> error::Result<Self> {
         self.path = match path_prefix {
-            Some(p) => match self.path.strip_prefix(p) {
-                Some(s) => {
-                    if s.is_empty() {
-                        "/".to_string()
-                    } else {
-                        s.to_string()
-                    }
-                }
-                None => {
+            Some(p) => self
+                .path
+                .strip_prefix(p)
+                .map(|p| p.to_string())
+                .ok_or_else(|| {
                     error!("URL path is missing prefix {}", p);
-                    return Err(error::Error::msg(format!(
-                        "URL path is missing prefix {}",
-                        p
-                    )));
-                }
-            },
+                    error::Error::msg(format!("URL path is missing prefix {}", p))
+                })?,
             None => self.path,
         };
         Ok(self)

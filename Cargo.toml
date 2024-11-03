@@ -1,6 +1,6 @@
 [package]
 name = "audioserve"
-version = "0.28.9"
+version = "0.28.10"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2021"
 rust-version = "1.70"
