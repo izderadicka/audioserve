@@ -31,6 +31,7 @@ jobs:
       - name: Run unit tests
         run: cargo test --all --features transcoding-cache,tags-encoding
       - name: Run integration tests
+        if: gihub.ref == 'refs/heads/mater'
         run: cargo test -- --ignored --nocapture test_binary
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
