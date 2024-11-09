@@ -1,3 +1,5 @@
+# check=error=true
+
 ARG CARGO_ARGS
 ARG CARGO_RELEASE="release"
 
@@ -20,7 +22,7 @@ RUN if [[ -n "$CARGO_RELEASE" ]]; then CARGO_RELEASE="--$CARGO_RELEASE"; fi && \
     cargo build ${CARGO_RELEASE} ${CARGO_ARGS} &&\
     cargo test ${CARGO_RELEASE} --all ${CARGO_ARGS}
 
-FROM node:20-alpine as client
+FROM node:20-alpine AS client
 
 RUN apk add git &&\
     git clone https://github.com/izderadicka/audioserve-web.git /audioserve_client &&\
