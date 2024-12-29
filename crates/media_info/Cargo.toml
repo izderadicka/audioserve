@@ -6,7 +6,7 @@ edition = "2021"
 build = "build.rs"
 
 [dependencies]
-thiserror = "1.0"
+thiserror = "2.0"
 encoding = {version="0.2", optional=true}
 
 [dev-dependencies]

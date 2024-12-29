@@ -11,7 +11,7 @@ futures = "0.3"
 tokio = {version="1.37", features=["full"]}
 bytes = "1.6"
 chrono = "0.4"
-thiserror = "1.0"
+thiserror = "2.0"
 crc32fast = "1.4"
 
 [dev-dependencies]
