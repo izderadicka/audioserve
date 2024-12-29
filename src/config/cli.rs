@@ -116,10 +116,11 @@ fn create_parser() -> Command {
             .value_parser(parent_dir_exists)
             .help("Base directory for data created by audioserve (caches, state, ...) [default is $HOME/.audioserve]")
             )
+        // TODO:  delete in future
         .arg(long_arg_no_env!(AUDIOSERVE_DEBUG)
             .short('d')
             .action(ArgAction::SetTrue)
-            .help("Enable debug logging (detailed logging config can be done via RUST_LOG env. variable). Program must be compiled in debug configuration")
+            .help("Deprecated use RUST_LOG env. variable instead. Program must be compiled in debug configuration")
             )
         .arg(long_arg!(AUDIOSERVE_LISTEN)
             .short('l')
@@ -505,7 +506,6 @@ where
 
     if let Some(dir) = args.get_one::<PathBuf>(AUDIOSERVE_DATA_DIR) {
         unsafe {
-            BASE_DATA_DIR.take();
             BASE_DATA_DIR = Some(dir.into());
         }
     }
