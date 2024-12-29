@@ -54,7 +54,7 @@ pub struct QueryParams<'a> {
     params: Option<HashMap<Cow<'a, str>, Cow<'a, str>>>,
 }
 
-impl<'a> QueryParams<'a> {
+impl QueryParams<'_> {
     pub fn get<S: AsRef<str>>(&self, name: S) -> Option<&Cow<'_, str>> {
         self.params.as_ref().and_then(|m| m.get(name.as_ref()))
     }

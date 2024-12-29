@@ -65,7 +65,7 @@ pub type DirRef<'a> = NodeRef<'a, DirEntry>;
 
 pub struct SearchItem<'a>(DirRef<'a>);
 
-impl<'a> SearchItem<'a> {
+impl SearchItem<'_> {
     #[allow(clippy::needless_collect)]
     pub fn path(&self) -> PathBuf {
         let segments: Vec<_> = self
@@ -156,7 +156,7 @@ impl<'a> Iterator for SearchResult<'a> {
     }
 }
 
-impl<'a> SearchResult<'a> {
+impl SearchResult<'_> {
     fn has_match(&mut self) -> bool {
         let mut matched_terms = self.matched_terms_stack.last().unwrap().clone();
         let res = self

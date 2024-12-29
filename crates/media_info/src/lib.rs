@@ -384,7 +384,7 @@ pub struct Stream<'a> {
     _parent: PhantomData<&'a MediaFile>,
 }
 
-impl<'a> Stream<'a> {
+impl Stream<'_> {
     pub fn kind(&self) -> StreamKind {
         let codec_type = unsafe { (*(*self.ctx).codecpar).codec_type };
         use StreamKind::*;
