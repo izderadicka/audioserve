@@ -40,7 +40,7 @@ image = "0.24"
 
 leaky-cauldron = { path = "crates/leaky-cauldron" }
 tokio-util = { version = "0.7.10", optional = true, features = ["codec"] }
-cron = { version = "0.12", optional = true }
+cron = { version = "0.14", optional = true }
 chrono = { version = "0.4", optional = true }
 
 # this repo dependencies
