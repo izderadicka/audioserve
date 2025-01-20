@@ -6,17 +6,17 @@ edition = "2018"
 
 [dependencies]
 
-hyper = {version="1.4", features=[]}
-tokio = {version="1.37", features=["rt-multi-thread", "time"]}
+hyper = { version = "1.4", features = [] }
+tokio = { version = "1.37", features = ["rt-multi-thread", "time"] }
 futures = "0.3"
 log = "0.4"
 tokio-tungstenite = "0.24.0"
-thiserror = "1.0"
+thiserror.workspace = true
 headers = "0.4.0"
 http-body-util = "0.1.1"
 hyper-util = { version = "0.1.3", features = ["tokio"] }
 
 [dev-dependencies]
 env_logger = "0.11.3"
-hyper = {version="1.4", features=["server", "http1", "http2", "server"]}
-tokio = {version="1.37", features=["macros", "io-util", "fs", "net"]}
+hyper = { version = "1.4", features = ["server", "http1", "http2", "server"] }
+tokio = { version = "1.37", features = ["macros", "io-util", "fs", "net"] }

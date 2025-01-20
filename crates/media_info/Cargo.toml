@@ -6,17 +6,16 @@ edition = "2021"
 build = "build.rs"
 
 [dependencies]
-thiserror = "1.0"
-encoding = {version="0.2", optional=true}
+thiserror.workspace = true
+encoding = { version = "0.2", optional = true }
 
 [dev-dependencies]
-clap ={version="4", features=["derive"]}
+clap = { version = "4", features = ["derive"] }
 
 [build-dependencies]
-pkg-config="0.3.30"
+pkg-config = "0.3.30"
 
 [features]
-static=[]
-partially-static=[]
-alternate-encoding=["encoding"]
-
+static = []
+partially-static = []
+alternate-encoding = ["encoding"]
