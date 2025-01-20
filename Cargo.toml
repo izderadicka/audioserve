@@ -1,9 +1,9 @@
 [package]
 name = "audioserve"
-version = "0.28.13"
+version = "0.28.14"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2021"
-rust-version = "1.72"
+rust-version = "1.79"
 
 [workspace]
 members = ["crates/*"]

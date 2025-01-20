@@ -3,7 +3,7 @@
 ARG CARGO_ARGS
 ARG CARGO_RELEASE="release"
 
-FROM alpine:3.19 AS build
+FROM alpine:3.21 AS build
 LABEL maintainer="Ivan <ivan@zderadicka.eu>"
 
 ARG CARGO_ARGS
@@ -22,7 +22,7 @@ RUN if [[ -n "$CARGO_RELEASE" ]]; then CARGO_RELEASE="--$CARGO_RELEASE"; fi && \
     cargo build ${CARGO_RELEASE} ${CARGO_ARGS} &&\
     cargo test ${CARGO_RELEASE} --all ${CARGO_ARGS}
 
-FROM node:20-alpine AS client
+FROM node:22-alpine AS client
 
 RUN apk add git &&\
     git clone https://github.com/izderadicka/audioserve-web.git /audioserve_client &&\
@@ -32,7 +32,7 @@ RUN apk add git &&\
     npm run build &&\
     ./compress_dist.sh
 
-FROM alpine:3.19
+FROM alpine:3.21
 
 ARG CARGO_ARGS
 ARG CARGO_RELEASE
