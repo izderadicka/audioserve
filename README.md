@@ -166,6 +166,8 @@ Proper functioning is (indeed) dependent on good connectivity - as position is s
 
 Position tracking is tightly connected with collection cache, so it'll not work for collection, which do not use caching (specified with `:no-cache` option). You can also backup positions to JSON file (highly recommended) for restoration in case of disk problems or for migration of audioserve - check `--positions-backup-file` and `--positions-backup-schedule` arguments of the program. Also if former argument is present you can force immediate backup by sending signal `sigusr2` to the program.
 
+To restore from positions backup run audioserve once with `--positions-restore=v1` and `--positions-backup-file` arguments and collections paths (ensure before that collections are scanned fully), it will finish immediately after restoring positions, then run it again with your usual arguments.
+
 Shared playback positions are behind default program feature `shared-positions`, so you can compile program without it.
 
 Shared positions also serve for marking finished / listened folders - if last file in the folder is listened till some offset from it's end (configurable via option `time-to-folder-end`, defaults to 10 seconds), folder if then marked as finished.  If you start listening the folder again it is unmarked - folder finished flag is derived directly of last listening position in this folder.

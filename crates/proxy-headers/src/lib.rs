@@ -25,19 +25,19 @@ pub enum AddrError<'a> {
     SocketInsteadIp,
 }
 
-impl<'a> From<AddrError<'a>> for headers::Error {
+impl From<AddrError<'_>> for headers::Error {
     fn from(_: AddrError) -> Self {
         headers::Error::invalid()
     }
 }
 
-impl<'a> From<AddrParseError> for AddrError<'a> {
+impl From<AddrParseError> for AddrError<'_> {
     fn from(_: AddrParseError) -> Self {
         AddrError::InvalidAddress
     }
 }
 
-impl<'a> From<Utf8Error> for AddrError<'a> {
+impl From<Utf8Error> for AddrError<'_> {
     fn from(e: Utf8Error) -> Self {
         AddrError::InvalidString(e)
     }

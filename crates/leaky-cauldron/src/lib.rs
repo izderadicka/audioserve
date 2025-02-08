@@ -49,7 +49,6 @@ impl Leaky {
     }
 
     /// Indicates that new unit has arrived and returns Result, if this one is still with rate/capacity
-
     /// Return results - Ok(x) if still within capacity (x is capacity now taken), Err otherwise.
     pub fn start_one(&self) -> Result<u64, u64> {
         let mut last_tick = self.state.last_tick.load(Ordering::Relaxed);

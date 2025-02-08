@@ -29,12 +29,18 @@ const CD_FOLDER_RE: &str = r"^CD[ -_]?\s*\d+\s*$";
 
 // CONFIG is assured to be inited only once from main thread
 pub fn get_config() -> &'static Config {
-    unsafe { CONFIG.as_ref().expect("Config is not initialized") }
+    // It's safe as CONFIG is initialized only once in main thread before any other
+    #[allow(static_mut_refs)]
+    unsafe {
+        CONFIG.as_ref().expect("Config is not initialized")
+    }
 }
 
 static mut BASE_DATA_DIR: Option<PathBuf> = None;
 
 fn base_data_dir() -> &'static PathBuf {
+    // It's safe - same as
+    #[allow(static_mut_refs)]
     unsafe {
         BASE_DATA_DIR
             .as_ref()
@@ -755,6 +761,8 @@ impl Default for Config {
 
 pub fn init_config() -> Result<()> {
     unsafe {
+        // It's safe as CONFIG is initialized only once in main thread
+        #[allow(static_mut_refs)]
         if CONFIG.is_some() {
             panic!("Config is already initialied")
         }

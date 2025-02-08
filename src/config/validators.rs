@@ -6,6 +6,8 @@ use std::{
     time::Duration,
 };
 
+use super::PositionsBackupFormat;
+
 pub fn is_existing_dir(p: &str) -> Result<PathBuf, anyhow::Error> {
     let p = Path::new(p);
     if !p.is_dir() {
@@ -51,4 +53,10 @@ pub fn parse_url(s: &str) -> Result<url::Url, anyhow::Error> {
 pub fn duration_secs(s: &str) -> Result<Duration, anyhow::Error> {
     let secs: u64 = s.parse().context("Invalid Duration")?;
     Ok(Duration::from_secs(secs))
+}
+
+pub fn positions_restore_format(s: &str) -> Result<PositionsBackupFormat, anyhow::Error> {
+    let format: PositionsBackupFormat =
+        s.parse().context(format!("Invalid format string {}", s))?;
+    Ok(format)
 }

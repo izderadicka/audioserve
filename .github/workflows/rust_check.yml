@@ -32,12 +32,15 @@ jobs:
           sudo apt-get install -y  openssl libssl-dev pkg-config ffmpeg yasm build-essential wget libbz2-dev zlib1g-dev libavformat-dev
       - name: Run unit tests
         run: cargo test --all --features transcoding-cache,tags-encoding
+      - name: Run integration tests
+        if: github.ref == 'refs/heads/mater'
+        run: cargo test -- --ignored --nocapture test_binary
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate code coverage
         run: cargo llvm-cov --all --lcov --output-path lcov.info
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
           files: lcov.info

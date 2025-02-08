@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-/**
- ffmpeg suported tags:
+/*
+ ffmpeg supported tags:
 
 album        -- name of the set this work belongs to
 album_artist -- main creator of the set/album, if different from artist.

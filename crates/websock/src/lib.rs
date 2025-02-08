@@ -75,7 +75,6 @@ fn header_matches<S: AsHeaderName>(headers: &HeaderMap<HeaderValue>, name: S, va
 /// 101 Protocol upgrade, if websocket handshake is OK, or of status 400, if
 /// handshake was no successful.
 ///
-
 pub fn spawn_websocket<T, P>(
     req: Request<Incoming>,
     mut f: P,
@@ -168,6 +167,7 @@ where
 ///
 /// Websocket can have context of type T, which is then shared with all
 /// messages in this websocket.
+#[allow(clippy::type_complexity)]
 pub fn upgrade_connection<T: Send>(
     mut req: Request<Incoming>,
     ctx: T,
@@ -278,9 +278,8 @@ impl<T> fmt::Debug for WebSocket<T> {
 
 /// A WebSocket message.
 ///
-/// Only repesents Text and Binary messages.
+/// Only represents Text and Binary messages.
 ///
-
 pub struct Message {
     inner: protocol::Message,
 }

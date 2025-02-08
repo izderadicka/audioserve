@@ -188,8 +188,9 @@ impl<C: Send + 'static> Service<HttpRequest> for MainService<C> {
             return response::fut(|| preflight_cors_response(&req));
         }
 
+        let path_prefix: Option<&str> = get_config().url_path_prefix.as_deref();
         let req = match RequestWrapper::new(req)
-            .and_then(|req| req.set_path_prefix(get_config().url_path_prefix.as_deref()))
+            .and_then(|req| req.set_path_prefix(path_prefix))
             .map(|req| {
                 req.set_remote_addr(Some(self.remote_addr.ip()))
                     .set_is_ssl(self.is_ssl)
@@ -203,6 +204,12 @@ impl<C: Send + 'static> Service<HttpRequest> for MainService<C> {
                 return response::fut(response::bad_request);
             }
         };
+
+        if req.path().is_empty() {
+            if let Some(prefix) = path_prefix {
+                return response::fut(|| response::redirect_permanent(&(prefix.to_string() + "/")));
+            }
+        }
 
         Box::pin(
             MainService::<C>::process_request(state, self.authenticator.clone(), req).or_else(

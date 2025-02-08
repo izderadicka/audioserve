@@ -280,7 +280,7 @@ pub fn is_description<P: AsRef<Path>>(path: P) -> bool {
 pub use media_info::Chapter;
 /// trait to generalize access to media metadata
 /// (so that underlying library can be easily changed)
-pub trait MediaInfo<'a>: Sized {
+pub trait MediaInfo: Sized {
     fn get_audio_info(&self, required_tags: &Option<HashSet<String>>) -> Option<AudioMeta>;
     fn get_chapters(&self) -> Option<Vec<Chapter>>;
     fn has_chapters(&self) -> bool;
@@ -319,7 +319,7 @@ mod libavformat {
     pub struct Info {
         media_file: media_info::MediaFile,
     }
-    impl<'a> MediaInfo<'a> for Info {
+    impl MediaInfo for Info {
         fn get_audio_info(&self, required_tags: &Option<HashSet<String>>) -> Option<AudioMeta> {
             Some(AudioMeta {
                 duration: (self.media_file.duration() as f32 / 1000.0).round() as u32,
