@@ -152,9 +152,9 @@ With program argument `read-playlist` audioserve will search for file with exten
 - thoroughly tested are only playlists with items in same folder -  if playlist is spanning subfolder it may have problems in some special cases like watching for directory changes, tracking playback position.
 
 ### Podcasts
-You can use folder (with audiofiles) as a podcast. On URL path `/<collection_id>/feed/<folder_path>` is RSS feed definition, that contains metadata about folder and audio files as items (episodes in Podcast terminology). Items are sorted from newest based on file modification time.
+You can use folder (with audiofiles) as a podcast. On URL path `/<collection_id>/feed/<folder_path>` is RSS feed definition, that contains metadata about folder and audio files as items (episodes in Podcast terminology). Items are sorted from newest based on file modification time. 
 
-Right now it's new and not tested functionality - feedback is welcomed thought issues on Github.
+Right now it's a new and not tested functionality - feedback is welcomed thought issues on Github. Right now works only with --no-authentication argument, as podcast clients cannot authenticate with audioserve. Also structure of cache db has changed, expect errors in log on first start - which are automatically fixed. Podcast support is behind feature `rss` (now default), so can be compiled with out it.
 
 ## Sharing playback positions between clients
 
@@ -521,7 +521,8 @@ To add non-default features (like `transcoding-cache`) compile with this option 
 | symlinks                      | Enables to use symbolic links in media folders                                                                                     |   Yes   | Use --allow-symlinks to follow symbolic links                                                                    |
 | folder-download               | Enables API endpoint to download content of a folder in tar archive                                                                |   Yes   | Can be disabled with argument --disable-folder-download                                                          |
 | shared-positions              | Clients can share recent playback positions via simple websocket API                                                               |   Yes   |
-| behind-proxy                  | Enable logging of client address from proxy headers                                                                                |   yes   | Enables argument --behind-proxy which should be use to log client address from headers provided by reverse proxy |
+| behind-proxy                  | Enable logging of client address from proxy headers                                                                                |   Yes   | Enables argument --behind-proxy which should be use to log client address from headers provided by reverse proxy |
+| rss                           | Enable RSS/Podcast feed URL for folders                                                                                            |   Yes   | --url-base is needed for feeds to work                                                                           |
 | transcoding-cache             | Cache to save transcoded files for fast next use                                                                                   |   No    | Can be disabled by --t-cache-disable and modified by --t-cache-dir --t-cache-size --t-cache-max-files            |
 | static                        | Enables fully static build of audioserve. Check above notes for static build                                                       |   No    |
 | partially-static              | Statically links libavformat (and related).Enables to run audioserve on systems, which do not have required version of libavformat |   No    |

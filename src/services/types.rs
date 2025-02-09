@@ -9,6 +9,7 @@ pub struct CollectionsInfo {
     pub commit: &'static str,
     pub folder_download: bool,
     pub shared_positions: bool,
+    pub rss_feed: bool,
     pub count: u32,
     pub names: Vec<&'static str>,
 }

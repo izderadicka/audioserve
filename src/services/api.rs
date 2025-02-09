@@ -59,6 +59,7 @@ pub fn collections_list(compress: bool) -> ResponseResult {
         commit: env!("AUDIOSERVE_COMMIT"),
         folder_download: !get_config().disable_folder_download,
         shared_positions: cfg!(feature = "shared-positions"),
+        rss_feed: cfg!(feature = "rss"),
         count: get_config().base_dirs.len() as u32,
         names: get_config()
             .base_dirs

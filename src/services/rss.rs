@@ -41,9 +41,10 @@ pub fn folder_to_channel(
         Some(ref url) => url,
         None => base_url,
     };
+    let mut link = base_url.clone();
+    link.set_fragment(Some(format!("{}/{}", collection, path).as_str()));
     let base_url = base_url.join(&format!("{}/", collection))?;
 
-    let link = base_url.join("feed/")?.join(path)?;
     let mut cb = ChannelBuilder::default();
     let channel = cb.title(title).link(link);
 
