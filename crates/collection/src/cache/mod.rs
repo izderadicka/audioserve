@@ -608,14 +608,14 @@ mod tests {
 
     use fs_extra::dir::{copy, CopyOptions};
     use serde_json::Value;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     use crate::position::PositionItem;
 
     use super::*;
 
     fn create_tmp_collection() -> (CollectionCache, TempDir) {
-        let tmp_dir = TempDir::new("AS_CACHE_TEST").expect("Cannot create temp dir");
+        let tmp_dir = TempDir::with_prefix("AS_CACHE_TEST").expect("Cannot create temp dir");
         let test_data_dir = Path::new("../../test_data");
         let db_path = tmp_dir.path().join("updater_db");
         fs::create_dir(&db_path).ok();
@@ -645,7 +645,7 @@ mod tests {
     #[test]
     fn test_cache_manipulation() -> anyhow::Result<()> {
         env_logger::try_init().ok();
-        let tmp_dir = TempDir::new("AS_CACHE_TEST")?;
+        let tmp_dir = TempDir::with_prefix("AS_CACHE_TEST")?;
         let test_data_dir_orig = Path::new("../../test_data");
         let test_data_dir = tmp_dir.path().join("test_data");
         copy(test_data_dir_orig, tmp_dir.path(), &CopyOptions::default())?;

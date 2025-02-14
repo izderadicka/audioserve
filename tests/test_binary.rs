@@ -99,7 +99,7 @@ fn is_port_free(port: u16) -> bool {
 #[ignore]
 fn test_binary() -> Result<()> {
     let min_html = "<html><head><title>AudioServe</title></head><body></body></html>";
-    let tmp_dir = tempdir::TempDir::new("audioserve_bin_test")?;
+    let tmp_dir = tempfile::TempDir::with_prefix("audioserve_bin_test")?;
     {
         let mut f = File::create(tmp_dir.path().join("index.html"))?;
         f.write_all(min_html.as_bytes())?;
