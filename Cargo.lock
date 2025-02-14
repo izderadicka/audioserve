@@ -169,7 +169,7 @@ dependencies = [
  "chrono",
  "crc32fast",
  "futures",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "zip",
 ]
@@ -227,7 +227,7 @@ dependencies = [
  "serde_yaml",
  "simple-file-cache",
  "tempdir",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tokio-util",
  "url",
@@ -599,7 +599,7 @@ dependencies = [
  "serde_json",
  "sled",
  "tempdir",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "unicase",
  "unicase_serde",
@@ -1936,7 +1936,7 @@ dependencies = [
  "clap 4.5.26",
  "encoding",
  "pkg-config",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -2911,7 +2911,7 @@ dependencies = [
  "log",
  "rand 0.8.5",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
 ]
 
@@ -3103,11 +3103,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.3"
+version = "2.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c006c85c7651b3cf2ada4584faa36773bd07bac24acfb39f3c431b36d7e667aa"
+checksum = "d452f284b73e6d76dd36758a0c8684b1d5be31f92b89d07fd5822175732206fc"
 dependencies = [
- "thiserror-impl 2.0.3",
+ "thiserror-impl 2.0.11",
 ]
 
 [[package]]
@@ -3123,9 +3123,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.3"
+version = "2.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f077553d607adc1caf65430528a576c757a71ed73944b66ebb58ef2bbd243568"
+checksum = "26afc1baea8a989337eeb52b6e72a039780ce45c3edfcc9c5b9d112feeb173c2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3553,7 +3553,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "log",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tokio-tungstenite",
 ]
@@ -3911,7 +3911,7 @@ dependencies = [
  "displaydoc",
  "indexmap",
  "memchr",
- "thiserror 2.0.3",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
