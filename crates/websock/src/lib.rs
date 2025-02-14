@@ -14,6 +14,7 @@ use hyper_util::rt::TokioIo;
 use std::io;
 use std::{fmt, time::Duration};
 use thiserror::Error;
+use tokio_tungstenite::tungstenite::Utf8Bytes;
 use tokio_tungstenite::{
     tungstenite::{self, protocol},
     WebSocketStream,
@@ -286,14 +287,14 @@ pub struct Message {
 
 impl Message {
     /// Constructs a new Text `Message`.
-    pub fn text<S: Into<String>>(s: S) -> Self {
+    pub fn text<S: Into<Utf8Bytes>>(s: S) -> Self {
         Message {
             inner: protocol::Message::text(s),
         }
     }
 
     /// Constructs a new Binary `Message`.
-    pub fn binary<V: Into<Vec<u8>>>(v: V) -> Self {
+    pub fn binary<V: Into<hyper::body::Bytes>>(v: V) -> Self {
         Message {
             inner: protocol::Message::binary(v),
         }
