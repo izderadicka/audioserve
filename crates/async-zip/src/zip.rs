@@ -100,7 +100,7 @@ impl ToBytes for FileHeader {
         if self.file_name.len() > u16::MAX as usize {
             return Err(Error::FileNameTooBig);
         }
-        h.put_u16_le(self.file_name.as_bytes().len() as u16);
+        h.put_u16_le(self.file_name.len() as u16);
         // extra field length
         h.put_u16_le(0);
         // file name
@@ -182,7 +182,7 @@ impl DirectoryEntry {
         if self.header.file_name.len() > u16::MAX as usize {
             return Err(Error::FileNameTooBig);
         }
-        buf.put_u16_le(self.header.file_name.as_bytes().len() as u16);
+        buf.put_u16_le(self.header.file_name.len() as u16);
         // extra field length
         buf.put_u16_le(0);
         // file comment length
