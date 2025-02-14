@@ -289,7 +289,7 @@ where
                 .ok()
         })
         .map(|s| {
-            if s.to_ascii_lowercase() == "null" {
+            if s.eq_ignore_ascii_case("null") {
                 false
             } else {
                 matching_regex.is_match(s)
