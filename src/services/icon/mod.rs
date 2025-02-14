@@ -1,7 +1,7 @@
 use anyhow::Result;
 use collection::{audio_meta::is_audio, extract_cover};
-use image::io::Reader as ImageReader;
 use image::ImageFormat;
+use image::ImageReader;
 use simple_file_cache::FileModTime;
 use std::{
     io::{Cursor, Read},

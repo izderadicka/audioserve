@@ -379,7 +379,7 @@ fn create_parser() -> Command {
         .arg(
             long_arg!(AUDIOSERVE_POSITIONS_RESTORE)
             .num_args(1)
-            .value_parser(["legacy", "v1"])
+            .value_parser(positions_restore_format)
             .requires(AUDIOSERVE_POSITIONS_BACKUP_FILE)
             .help("Restores positions from backup JSON file, value is version of file legacy is before audioserve v0.16,  v1 is current")
         )
