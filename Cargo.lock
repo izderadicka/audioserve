@@ -200,7 +200,7 @@ dependencies = [
  "async-zip",
  "bytes",
  "chrono",
- "clap 4.5.30",
+ "clap 4.5.31",
  "collection",
  "cron",
  "csv",
@@ -526,9 +526,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.30"
+version = "4.5.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92b7b18d71fad5313a1e320fa9897994228ce274b60faa4d694fe0ea89cd9e6d"
+checksum = "027bb0d98429ae334a8698531da7077bdf906419543a35a55c2cb1b66437d767"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -536,9 +536,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.30"
+version = "4.5.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a35db2071778a7344791a4fb4f95308b5673d219dee3ae348b86642574ecc90c"
+checksum = "5589e0cba072e0f3d23791efac0fd8627b49c829c196a492e88168e6a669d863"
 dependencies = [
  "anstream",
  "anstyle",
@@ -569,7 +569,7 @@ name = "col-util"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 4.5.30",
+ "clap 4.5.31",
  "collection",
  "env_logger 0.11.6",
  "libc",
@@ -650,7 +650,7 @@ dependencies = [
  "anes",
  "cast",
  "ciborium",
- "clap 4.5.30",
+ "clap 4.5.31",
  "criterion-plot",
  "is-terminal",
  "itertools 0.10.5",
@@ -1939,7 +1939,7 @@ dependencies = [
 name = "media_info"
 version = "0.3.1"
 dependencies = [
- "clap 4.5.30",
+ "clap 4.5.31",
  "encoding",
  "pkg-config",
  "thiserror 2.0.11",
