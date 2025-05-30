@@ -1,6 +1,6 @@
 # check=error=true
 
-FROM alpine:3.19 AS build
+FROM alpine:3.22 AS build
 LABEL maintainer="Ivan <ivan@zderadicka.eu>"
 ENV CARGO_ARGS=""
 ENV FEATURES=""
