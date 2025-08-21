@@ -14,6 +14,7 @@ use thiserror::Error;
 #[allow(non_snake_case)]
 #[allow(deref_nullptr)]
 #[allow(clippy::type_complexity)]
+#[allow(unnecessary_transmutes)] // TBD - generate new FFIs later
 mod ffi;
 pub mod tags;
 
