@@ -1,5 +1,5 @@
-const FFMPEG_VERSION_4: &str = "ffmpeg-4.3.1";
-const FFMPEG_VERSION_5: &str = "ffmpeg-5.0.1";
+const FFMPEG_VERSION_4: &str = "ffmpeg-4.4.6";
+const FFMPEG_VERSION_5: &str = "ffmpeg-5.1.7";
 const FFMPEG_VERSION_6: &str = "ffmpeg-6.1.1";
 
 macro_rules! warn {
@@ -44,6 +44,7 @@ fn main() {
         }
     };
     let ffi_src = format!("src/ffi_{}.rs", ffmpeg_version);
+    eprintln!("ffmpeg version: {}", ffmpeg_version);
     let ffi_target =
         std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("current_ffi.rs");
     std::fs::copy(ffi_src, ffi_target).unwrap();

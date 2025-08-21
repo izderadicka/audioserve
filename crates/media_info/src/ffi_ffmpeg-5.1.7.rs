@@ -11,6 +11,15 @@ pub const AVMediaType_AVMEDIA_TYPE_SUBTITLE: AVMediaType = 3;
 pub const AVMediaType_AVMEDIA_TYPE_ATTACHMENT: AVMediaType = 4;
 pub const AVMediaType_AVMEDIA_TYPE_NB: AVMediaType = 5;
 pub type AVMediaType = ::std::os::raw::c_int;
+pub const AVPictureType_AV_PICTURE_TYPE_NONE: AVPictureType = 0;
+pub const AVPictureType_AV_PICTURE_TYPE_I: AVPictureType = 1;
+pub const AVPictureType_AV_PICTURE_TYPE_P: AVPictureType = 2;
+pub const AVPictureType_AV_PICTURE_TYPE_B: AVPictureType = 3;
+pub const AVPictureType_AV_PICTURE_TYPE_S: AVPictureType = 4;
+pub const AVPictureType_AV_PICTURE_TYPE_SI: AVPictureType = 5;
+pub const AVPictureType_AV_PICTURE_TYPE_SP: AVPictureType = 6;
+pub const AVPictureType_AV_PICTURE_TYPE_BI: AVPictureType = 7;
+pub type AVPictureType = ::std::os::raw::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct AVRational {
@@ -315,29 +324,7 @@ pub const AVPixelFormat_AV_PIX_FMT_P216BE: AVPixelFormat = 202;
 pub const AVPixelFormat_AV_PIX_FMT_P216LE: AVPixelFormat = 203;
 pub const AVPixelFormat_AV_PIX_FMT_P416BE: AVPixelFormat = 204;
 pub const AVPixelFormat_AV_PIX_FMT_P416LE: AVPixelFormat = 205;
-pub const AVPixelFormat_AV_PIX_FMT_VUYA: AVPixelFormat = 206;
-pub const AVPixelFormat_AV_PIX_FMT_RGBAF16BE: AVPixelFormat = 207;
-pub const AVPixelFormat_AV_PIX_FMT_RGBAF16LE: AVPixelFormat = 208;
-pub const AVPixelFormat_AV_PIX_FMT_VUYX: AVPixelFormat = 209;
-pub const AVPixelFormat_AV_PIX_FMT_P012LE: AVPixelFormat = 210;
-pub const AVPixelFormat_AV_PIX_FMT_P012BE: AVPixelFormat = 211;
-pub const AVPixelFormat_AV_PIX_FMT_Y212BE: AVPixelFormat = 212;
-pub const AVPixelFormat_AV_PIX_FMT_Y212LE: AVPixelFormat = 213;
-pub const AVPixelFormat_AV_PIX_FMT_XV30BE: AVPixelFormat = 214;
-pub const AVPixelFormat_AV_PIX_FMT_XV30LE: AVPixelFormat = 215;
-pub const AVPixelFormat_AV_PIX_FMT_XV36BE: AVPixelFormat = 216;
-pub const AVPixelFormat_AV_PIX_FMT_XV36LE: AVPixelFormat = 217;
-pub const AVPixelFormat_AV_PIX_FMT_RGBF32BE: AVPixelFormat = 218;
-pub const AVPixelFormat_AV_PIX_FMT_RGBF32LE: AVPixelFormat = 219;
-pub const AVPixelFormat_AV_PIX_FMT_RGBAF32BE: AVPixelFormat = 220;
-pub const AVPixelFormat_AV_PIX_FMT_RGBAF32LE: AVPixelFormat = 221;
-pub const AVPixelFormat_AV_PIX_FMT_P212BE: AVPixelFormat = 222;
-pub const AVPixelFormat_AV_PIX_FMT_P212LE: AVPixelFormat = 223;
-pub const AVPixelFormat_AV_PIX_FMT_P412BE: AVPixelFormat = 224;
-pub const AVPixelFormat_AV_PIX_FMT_P412LE: AVPixelFormat = 225;
-pub const AVPixelFormat_AV_PIX_FMT_GBRAP14BE: AVPixelFormat = 226;
-pub const AVPixelFormat_AV_PIX_FMT_GBRAP14LE: AVPixelFormat = 227;
-pub const AVPixelFormat_AV_PIX_FMT_NB: AVPixelFormat = 228;
+pub const AVPixelFormat_AV_PIX_FMT_NB: AVPixelFormat = 206;
 pub type AVPixelFormat = ::std::os::raw::c_int;
 pub const AVColorPrimaries_AVCOL_PRI_RESERVED0: AVColorPrimaries = 0;
 pub const AVColorPrimaries_AVCOL_PRI_BT709: AVColorPrimaries = 1;
@@ -412,6 +399,26 @@ pub const AVChromaLocation_AVCHROMA_LOC_BOTTOMLEFT: AVChromaLocation = 5;
 pub const AVChromaLocation_AVCHROMA_LOC_BOTTOM: AVChromaLocation = 6;
 pub const AVChromaLocation_AVCHROMA_LOC_NB: AVChromaLocation = 7;
 pub type AVChromaLocation = ::std::os::raw::c_uint;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct AVBuffer {
+    _unused: [u8; 0],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct AVBufferRef {
+    pub buffer: *mut AVBuffer,
+    pub data: *mut u8,
+    pub size: usize,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of AVBufferRef"][::std::mem::size_of::<AVBufferRef>() - 24usize];
+    ["Alignment of AVBufferRef"][::std::mem::align_of::<AVBufferRef>() - 8usize];
+    ["Offset of field: AVBufferRef::buffer"][::std::mem::offset_of!(AVBufferRef, buffer) - 0usize];
+    ["Offset of field: AVBufferRef::data"][::std::mem::offset_of!(AVBufferRef, data) - 8usize];
+    ["Offset of field: AVBufferRef::size"][::std::mem::offset_of!(AVBufferRef, size) - 16usize];
+};
 pub const AVChannel_AV_CHAN_NONE: AVChannel = -1;
 pub const AVChannel_AV_CHAN_FRONT_LEFT: AVChannel = 0;
 pub const AVChannel_AV_CHAN_FRONT_RIGHT: AVChannel = 1;
@@ -507,6 +514,37 @@ const _: () = {
     ["Offset of field: AVChannelLayout::opaque"]
         [::std::mem::offset_of!(AVChannelLayout, opaque) - 16usize];
 };
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct AVDictionaryEntry {
+    pub key: *mut ::std::os::raw::c_char,
+    pub value: *mut ::std::os::raw::c_char,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of AVDictionaryEntry"][::std::mem::size_of::<AVDictionaryEntry>() - 16usize];
+    ["Alignment of AVDictionaryEntry"][::std::mem::align_of::<AVDictionaryEntry>() - 8usize];
+    ["Offset of field: AVDictionaryEntry::key"]
+        [::std::mem::offset_of!(AVDictionaryEntry, key) - 0usize];
+    ["Offset of field: AVDictionaryEntry::value"]
+        [::std::mem::offset_of!(AVDictionaryEntry, value) - 8usize];
+};
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct AVDictionary {
+    _unused: [u8; 0],
+}
+unsafe extern "C" {
+    pub fn av_dict_get(
+        m: *const AVDictionary,
+        key: *const ::std::os::raw::c_char,
+        prev: *const AVDictionaryEntry,
+        flags: ::std::os::raw::c_int,
+    ) -> *mut AVDictionaryEntry;
+}
+unsafe extern "C" {
+    pub fn av_dict_count(m: *const AVDictionary) -> ::std::os::raw::c_int;
+}
 pub const AVSampleFormat_AV_SAMPLE_FMT_NONE: AVSampleFormat = -1;
 pub const AVSampleFormat_AV_SAMPLE_FMT_U8: AVSampleFormat = 0;
 pub const AVSampleFormat_AV_SAMPLE_FMT_S16: AVSampleFormat = 1;
@@ -522,6 +560,193 @@ pub const AVSampleFormat_AV_SAMPLE_FMT_S64: AVSampleFormat = 10;
 pub const AVSampleFormat_AV_SAMPLE_FMT_S64P: AVSampleFormat = 11;
 pub const AVSampleFormat_AV_SAMPLE_FMT_NB: AVSampleFormat = 12;
 pub type AVSampleFormat = ::std::os::raw::c_int;
+pub const AVFrameSideDataType_AV_FRAME_DATA_PANSCAN: AVFrameSideDataType = 0;
+pub const AVFrameSideDataType_AV_FRAME_DATA_A53_CC: AVFrameSideDataType = 1;
+pub const AVFrameSideDataType_AV_FRAME_DATA_STEREO3D: AVFrameSideDataType = 2;
+pub const AVFrameSideDataType_AV_FRAME_DATA_MATRIXENCODING: AVFrameSideDataType = 3;
+pub const AVFrameSideDataType_AV_FRAME_DATA_DOWNMIX_INFO: AVFrameSideDataType = 4;
+pub const AVFrameSideDataType_AV_FRAME_DATA_REPLAYGAIN: AVFrameSideDataType = 5;
+pub const AVFrameSideDataType_AV_FRAME_DATA_DISPLAYMATRIX: AVFrameSideDataType = 6;
+pub const AVFrameSideDataType_AV_FRAME_DATA_AFD: AVFrameSideDataType = 7;
+pub const AVFrameSideDataType_AV_FRAME_DATA_MOTION_VECTORS: AVFrameSideDataType = 8;
+pub const AVFrameSideDataType_AV_FRAME_DATA_SKIP_SAMPLES: AVFrameSideDataType = 9;
+pub const AVFrameSideDataType_AV_FRAME_DATA_AUDIO_SERVICE_TYPE: AVFrameSideDataType = 10;
+pub const AVFrameSideDataType_AV_FRAME_DATA_MASTERING_DISPLAY_METADATA: AVFrameSideDataType = 11;
+pub const AVFrameSideDataType_AV_FRAME_DATA_GOP_TIMECODE: AVFrameSideDataType = 12;
+pub const AVFrameSideDataType_AV_FRAME_DATA_SPHERICAL: AVFrameSideDataType = 13;
+pub const AVFrameSideDataType_AV_FRAME_DATA_CONTENT_LIGHT_LEVEL: AVFrameSideDataType = 14;
+pub const AVFrameSideDataType_AV_FRAME_DATA_ICC_PROFILE: AVFrameSideDataType = 15;
+pub const AVFrameSideDataType_AV_FRAME_DATA_S12M_TIMECODE: AVFrameSideDataType = 16;
+pub const AVFrameSideDataType_AV_FRAME_DATA_DYNAMIC_HDR_PLUS: AVFrameSideDataType = 17;
+pub const AVFrameSideDataType_AV_FRAME_DATA_REGIONS_OF_INTEREST: AVFrameSideDataType = 18;
+pub const AVFrameSideDataType_AV_FRAME_DATA_VIDEO_ENC_PARAMS: AVFrameSideDataType = 19;
+pub const AVFrameSideDataType_AV_FRAME_DATA_SEI_UNREGISTERED: AVFrameSideDataType = 20;
+pub const AVFrameSideDataType_AV_FRAME_DATA_FILM_GRAIN_PARAMS: AVFrameSideDataType = 21;
+pub const AVFrameSideDataType_AV_FRAME_DATA_DETECTION_BBOXES: AVFrameSideDataType = 22;
+pub const AVFrameSideDataType_AV_FRAME_DATA_DOVI_RPU_BUFFER: AVFrameSideDataType = 23;
+pub const AVFrameSideDataType_AV_FRAME_DATA_DOVI_METADATA: AVFrameSideDataType = 24;
+pub const AVFrameSideDataType_AV_FRAME_DATA_DYNAMIC_HDR_VIVID: AVFrameSideDataType = 25;
+pub type AVFrameSideDataType = ::std::os::raw::c_uint;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct AVFrameSideData {
+    pub type_: AVFrameSideDataType,
+    pub data: *mut u8,
+    pub size: usize,
+    pub metadata: *mut AVDictionary,
+    pub buf: *mut AVBufferRef,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of AVFrameSideData"][::std::mem::size_of::<AVFrameSideData>() - 40usize];
+    ["Alignment of AVFrameSideData"][::std::mem::align_of::<AVFrameSideData>() - 8usize];
+    ["Offset of field: AVFrameSideData::type_"]
+        [::std::mem::offset_of!(AVFrameSideData, type_) - 0usize];
+    ["Offset of field: AVFrameSideData::data"]
+        [::std::mem::offset_of!(AVFrameSideData, data) - 8usize];
+    ["Offset of field: AVFrameSideData::size"]
+        [::std::mem::offset_of!(AVFrameSideData, size) - 16usize];
+    ["Offset of field: AVFrameSideData::metadata"]
+        [::std::mem::offset_of!(AVFrameSideData, metadata) - 24usize];
+    ["Offset of field: AVFrameSideData::buf"]
+        [::std::mem::offset_of!(AVFrameSideData, buf) - 32usize];
+};
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct AVFrame {
+    pub data: [*mut u8; 8usize],
+    pub linesize: [::std::os::raw::c_int; 8usize],
+    pub extended_data: *mut *mut u8,
+    pub width: ::std::os::raw::c_int,
+    pub height: ::std::os::raw::c_int,
+    pub nb_samples: ::std::os::raw::c_int,
+    pub format: ::std::os::raw::c_int,
+    pub key_frame: ::std::os::raw::c_int,
+    pub pict_type: AVPictureType,
+    pub sample_aspect_ratio: AVRational,
+    pub pts: i64,
+    pub pkt_dts: i64,
+    pub time_base: AVRational,
+    pub coded_picture_number: ::std::os::raw::c_int,
+    pub display_picture_number: ::std::os::raw::c_int,
+    pub quality: ::std::os::raw::c_int,
+    pub opaque: *mut ::std::os::raw::c_void,
+    pub repeat_pict: ::std::os::raw::c_int,
+    pub interlaced_frame: ::std::os::raw::c_int,
+    pub top_field_first: ::std::os::raw::c_int,
+    pub palette_has_changed: ::std::os::raw::c_int,
+    pub reordered_opaque: i64,
+    pub sample_rate: ::std::os::raw::c_int,
+    pub channel_layout: u64,
+    pub buf: [*mut AVBufferRef; 8usize],
+    pub extended_buf: *mut *mut AVBufferRef,
+    pub nb_extended_buf: ::std::os::raw::c_int,
+    pub side_data: *mut *mut AVFrameSideData,
+    pub nb_side_data: ::std::os::raw::c_int,
+    pub flags: ::std::os::raw::c_int,
+    pub color_range: AVColorRange,
+    pub color_primaries: AVColorPrimaries,
+    pub color_trc: AVColorTransferCharacteristic,
+    pub colorspace: AVColorSpace,
+    pub chroma_location: AVChromaLocation,
+    pub best_effort_timestamp: i64,
+    pub pkt_pos: i64,
+    pub pkt_duration: i64,
+    pub metadata: *mut AVDictionary,
+    pub decode_error_flags: ::std::os::raw::c_int,
+    pub channels: ::std::os::raw::c_int,
+    pub pkt_size: ::std::os::raw::c_int,
+    pub hw_frames_ctx: *mut AVBufferRef,
+    pub opaque_ref: *mut AVBufferRef,
+    pub crop_top: usize,
+    pub crop_bottom: usize,
+    pub crop_left: usize,
+    pub crop_right: usize,
+    pub private_ref: *mut AVBufferRef,
+    pub ch_layout: AVChannelLayout,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of AVFrame"][::std::mem::size_of::<AVFrame>() - 472usize];
+    ["Alignment of AVFrame"][::std::mem::align_of::<AVFrame>() - 8usize];
+    ["Offset of field: AVFrame::data"][::std::mem::offset_of!(AVFrame, data) - 0usize];
+    ["Offset of field: AVFrame::linesize"][::std::mem::offset_of!(AVFrame, linesize) - 64usize];
+    ["Offset of field: AVFrame::extended_data"]
+        [::std::mem::offset_of!(AVFrame, extended_data) - 96usize];
+    ["Offset of field: AVFrame::width"][::std::mem::offset_of!(AVFrame, width) - 104usize];
+    ["Offset of field: AVFrame::height"][::std::mem::offset_of!(AVFrame, height) - 108usize];
+    ["Offset of field: AVFrame::nb_samples"]
+        [::std::mem::offset_of!(AVFrame, nb_samples) - 112usize];
+    ["Offset of field: AVFrame::format"][::std::mem::offset_of!(AVFrame, format) - 116usize];
+    ["Offset of field: AVFrame::key_frame"][::std::mem::offset_of!(AVFrame, key_frame) - 120usize];
+    ["Offset of field: AVFrame::pict_type"][::std::mem::offset_of!(AVFrame, pict_type) - 124usize];
+    ["Offset of field: AVFrame::sample_aspect_ratio"]
+        [::std::mem::offset_of!(AVFrame, sample_aspect_ratio) - 128usize];
+    ["Offset of field: AVFrame::pts"][::std::mem::offset_of!(AVFrame, pts) - 136usize];
+    ["Offset of field: AVFrame::pkt_dts"][::std::mem::offset_of!(AVFrame, pkt_dts) - 144usize];
+    ["Offset of field: AVFrame::time_base"][::std::mem::offset_of!(AVFrame, time_base) - 152usize];
+    ["Offset of field: AVFrame::coded_picture_number"]
+        [::std::mem::offset_of!(AVFrame, coded_picture_number) - 160usize];
+    ["Offset of field: AVFrame::display_picture_number"]
+        [::std::mem::offset_of!(AVFrame, display_picture_number) - 164usize];
+    ["Offset of field: AVFrame::quality"][::std::mem::offset_of!(AVFrame, quality) - 168usize];
+    ["Offset of field: AVFrame::opaque"][::std::mem::offset_of!(AVFrame, opaque) - 176usize];
+    ["Offset of field: AVFrame::repeat_pict"]
+        [::std::mem::offset_of!(AVFrame, repeat_pict) - 184usize];
+    ["Offset of field: AVFrame::interlaced_frame"]
+        [::std::mem::offset_of!(AVFrame, interlaced_frame) - 188usize];
+    ["Offset of field: AVFrame::top_field_first"]
+        [::std::mem::offset_of!(AVFrame, top_field_first) - 192usize];
+    ["Offset of field: AVFrame::palette_has_changed"]
+        [::std::mem::offset_of!(AVFrame, palette_has_changed) - 196usize];
+    ["Offset of field: AVFrame::reordered_opaque"]
+        [::std::mem::offset_of!(AVFrame, reordered_opaque) - 200usize];
+    ["Offset of field: AVFrame::sample_rate"]
+        [::std::mem::offset_of!(AVFrame, sample_rate) - 208usize];
+    ["Offset of field: AVFrame::channel_layout"]
+        [::std::mem::offset_of!(AVFrame, channel_layout) - 216usize];
+    ["Offset of field: AVFrame::buf"][::std::mem::offset_of!(AVFrame, buf) - 224usize];
+    ["Offset of field: AVFrame::extended_buf"]
+        [::std::mem::offset_of!(AVFrame, extended_buf) - 288usize];
+    ["Offset of field: AVFrame::nb_extended_buf"]
+        [::std::mem::offset_of!(AVFrame, nb_extended_buf) - 296usize];
+    ["Offset of field: AVFrame::side_data"][::std::mem::offset_of!(AVFrame, side_data) - 304usize];
+    ["Offset of field: AVFrame::nb_side_data"]
+        [::std::mem::offset_of!(AVFrame, nb_side_data) - 312usize];
+    ["Offset of field: AVFrame::flags"][::std::mem::offset_of!(AVFrame, flags) - 316usize];
+    ["Offset of field: AVFrame::color_range"]
+        [::std::mem::offset_of!(AVFrame, color_range) - 320usize];
+    ["Offset of field: AVFrame::color_primaries"]
+        [::std::mem::offset_of!(AVFrame, color_primaries) - 324usize];
+    ["Offset of field: AVFrame::color_trc"][::std::mem::offset_of!(AVFrame, color_trc) - 328usize];
+    ["Offset of field: AVFrame::colorspace"]
+        [::std::mem::offset_of!(AVFrame, colorspace) - 332usize];
+    ["Offset of field: AVFrame::chroma_location"]
+        [::std::mem::offset_of!(AVFrame, chroma_location) - 336usize];
+    ["Offset of field: AVFrame::best_effort_timestamp"]
+        [::std::mem::offset_of!(AVFrame, best_effort_timestamp) - 344usize];
+    ["Offset of field: AVFrame::pkt_pos"][::std::mem::offset_of!(AVFrame, pkt_pos) - 352usize];
+    ["Offset of field: AVFrame::pkt_duration"]
+        [::std::mem::offset_of!(AVFrame, pkt_duration) - 360usize];
+    ["Offset of field: AVFrame::metadata"][::std::mem::offset_of!(AVFrame, metadata) - 368usize];
+    ["Offset of field: AVFrame::decode_error_flags"]
+        [::std::mem::offset_of!(AVFrame, decode_error_flags) - 376usize];
+    ["Offset of field: AVFrame::channels"][::std::mem::offset_of!(AVFrame, channels) - 380usize];
+    ["Offset of field: AVFrame::pkt_size"][::std::mem::offset_of!(AVFrame, pkt_size) - 384usize];
+    ["Offset of field: AVFrame::hw_frames_ctx"]
+        [::std::mem::offset_of!(AVFrame, hw_frames_ctx) - 392usize];
+    ["Offset of field: AVFrame::opaque_ref"]
+        [::std::mem::offset_of!(AVFrame, opaque_ref) - 400usize];
+    ["Offset of field: AVFrame::crop_top"][::std::mem::offset_of!(AVFrame, crop_top) - 408usize];
+    ["Offset of field: AVFrame::crop_bottom"]
+        [::std::mem::offset_of!(AVFrame, crop_bottom) - 416usize];
+    ["Offset of field: AVFrame::crop_left"][::std::mem::offset_of!(AVFrame, crop_left) - 424usize];
+    ["Offset of field: AVFrame::crop_right"]
+        [::std::mem::offset_of!(AVFrame, crop_right) - 432usize];
+    ["Offset of field: AVFrame::private_ref"]
+        [::std::mem::offset_of!(AVFrame, private_ref) - 440usize];
+    ["Offset of field: AVFrame::ch_layout"][::std::mem::offset_of!(AVFrame, ch_layout) - 448usize];
+};
 pub const AVCodecID_AV_CODEC_ID_NONE: AVCodecID = 0;
 pub const AVCodecID_AV_CODEC_ID_MPEG1VIDEO: AVCodecID = 1;
 pub const AVCodecID_AV_CODEC_ID_MPEG2VIDEO: AVCodecID = 2;
@@ -784,14 +1009,6 @@ pub const AVCodecID_AV_CODEC_ID_VBN: AVCodecID = 258;
 pub const AVCodecID_AV_CODEC_ID_JPEGXL: AVCodecID = 259;
 pub const AVCodecID_AV_CODEC_ID_QOI: AVCodecID = 260;
 pub const AVCodecID_AV_CODEC_ID_PHM: AVCodecID = 261;
-pub const AVCodecID_AV_CODEC_ID_RADIANCE_HDR: AVCodecID = 262;
-pub const AVCodecID_AV_CODEC_ID_WBMP: AVCodecID = 263;
-pub const AVCodecID_AV_CODEC_ID_MEDIA100: AVCodecID = 264;
-pub const AVCodecID_AV_CODEC_ID_VQC: AVCodecID = 265;
-pub const AVCodecID_AV_CODEC_ID_PDV: AVCodecID = 266;
-pub const AVCodecID_AV_CODEC_ID_EVC: AVCodecID = 267;
-pub const AVCodecID_AV_CODEC_ID_RTV1: AVCodecID = 268;
-pub const AVCodecID_AV_CODEC_ID_VMIX: AVCodecID = 269;
 pub const AVCodecID_AV_CODEC_ID_FIRST_AUDIO: AVCodecID = 65536;
 pub const AVCodecID_AV_CODEC_ID_PCM_S16LE: AVCodecID = 65536;
 pub const AVCodecID_AV_CODEC_ID_PCM_S16BE: AVCodecID = 65537;
@@ -881,7 +1098,6 @@ pub const AVCodecID_AV_CODEC_ID_ADPCM_IMA_MTF: AVCodecID = 69679;
 pub const AVCodecID_AV_CODEC_ID_ADPCM_IMA_CUNNING: AVCodecID = 69680;
 pub const AVCodecID_AV_CODEC_ID_ADPCM_IMA_MOFLEX: AVCodecID = 69681;
 pub const AVCodecID_AV_CODEC_ID_ADPCM_IMA_ACORN: AVCodecID = 69682;
-pub const AVCodecID_AV_CODEC_ID_ADPCM_XMD: AVCodecID = 69683;
 pub const AVCodecID_AV_CODEC_ID_AMR_NB: AVCodecID = 73728;
 pub const AVCodecID_AV_CODEC_ID_AMR_WB: AVCodecID = 73729;
 pub const AVCodecID_AV_CODEC_ID_RA_144: AVCodecID = 77824;
@@ -893,8 +1109,6 @@ pub const AVCodecID_AV_CODEC_ID_SOL_DPCM: AVCodecID = 81923;
 pub const AVCodecID_AV_CODEC_ID_SDX2_DPCM: AVCodecID = 81924;
 pub const AVCodecID_AV_CODEC_ID_GREMLIN_DPCM: AVCodecID = 81925;
 pub const AVCodecID_AV_CODEC_ID_DERF_DPCM: AVCodecID = 81926;
-pub const AVCodecID_AV_CODEC_ID_WADY_DPCM: AVCodecID = 81927;
-pub const AVCodecID_AV_CODEC_ID_CBD2_DPCM: AVCodecID = 81928;
 pub const AVCodecID_AV_CODEC_ID_MP2: AVCodecID = 86016;
 pub const AVCodecID_AV_CODEC_ID_MP3: AVCodecID = 86017;
 pub const AVCodecID_AV_CODEC_ID_AAC: AVCodecID = 86018;
@@ -992,14 +1206,6 @@ pub const AVCodecID_AV_CODEC_ID_HCA: AVCodecID = 86109;
 pub const AVCodecID_AV_CODEC_ID_FASTAUDIO: AVCodecID = 86110;
 pub const AVCodecID_AV_CODEC_ID_MSNSIREN: AVCodecID = 86111;
 pub const AVCodecID_AV_CODEC_ID_DFPWM: AVCodecID = 86112;
-pub const AVCodecID_AV_CODEC_ID_BONK: AVCodecID = 86113;
-pub const AVCodecID_AV_CODEC_ID_MISC4: AVCodecID = 86114;
-pub const AVCodecID_AV_CODEC_ID_APAC: AVCodecID = 86115;
-pub const AVCodecID_AV_CODEC_ID_FTR: AVCodecID = 86116;
-pub const AVCodecID_AV_CODEC_ID_WAVARC: AVCodecID = 86117;
-pub const AVCodecID_AV_CODEC_ID_RKA: AVCodecID = 86118;
-pub const AVCodecID_AV_CODEC_ID_AC4: AVCodecID = 86119;
-pub const AVCodecID_AV_CODEC_ID_OSQ: AVCodecID = 86120;
 pub const AVCodecID_AV_CODEC_ID_FIRST_SUBTITLE: AVCodecID = 94208;
 pub const AVCodecID_AV_CODEC_ID_DVD_SUBTITLE: AVCodecID = 94208;
 pub const AVCodecID_AV_CODEC_ID_DVB_SUBTITLE: AVCodecID = 94209;
@@ -1039,15 +1245,70 @@ pub const AVCodecID_AV_CODEC_ID_SMPTE_KLV: AVCodecID = 98311;
 pub const AVCodecID_AV_CODEC_ID_DVD_NAV: AVCodecID = 98312;
 pub const AVCodecID_AV_CODEC_ID_TIMED_ID3: AVCodecID = 98313;
 pub const AVCodecID_AV_CODEC_ID_BIN_DATA: AVCodecID = 98314;
-pub const AVCodecID_AV_CODEC_ID_SMPTE_2038: AVCodecID = 98315;
 pub const AVCodecID_AV_CODEC_ID_PROBE: AVCodecID = 102400;
 pub const AVCodecID_AV_CODEC_ID_MPEG2TS: AVCodecID = 131072;
 pub const AVCodecID_AV_CODEC_ID_MPEG4SYSTEMS: AVCodecID = 131073;
 pub const AVCodecID_AV_CODEC_ID_FFMETADATA: AVCodecID = 135168;
 pub const AVCodecID_AV_CODEC_ID_WRAPPED_AVFRAME: AVCodecID = 135169;
-pub const AVCodecID_AV_CODEC_ID_VNULL: AVCodecID = 135170;
-pub const AVCodecID_AV_CODEC_ID_ANULL: AVCodecID = 135171;
 pub type AVCodecID = ::std::os::raw::c_uint;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct AVProfile {
+    pub profile: ::std::os::raw::c_int,
+    pub name: *const ::std::os::raw::c_char,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of AVProfile"][::std::mem::size_of::<AVProfile>() - 16usize];
+    ["Alignment of AVProfile"][::std::mem::align_of::<AVProfile>() - 8usize];
+    ["Offset of field: AVProfile::profile"][::std::mem::offset_of!(AVProfile, profile) - 0usize];
+    ["Offset of field: AVProfile::name"][::std::mem::offset_of!(AVProfile, name) - 8usize];
+};
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct AVCodec {
+    pub name: *const ::std::os::raw::c_char,
+    pub long_name: *const ::std::os::raw::c_char,
+    pub type_: AVMediaType,
+    pub id: AVCodecID,
+    pub capabilities: ::std::os::raw::c_int,
+    pub max_lowres: u8,
+    pub supported_framerates: *const AVRational,
+    pub pix_fmts: *const AVPixelFormat,
+    pub supported_samplerates: *const ::std::os::raw::c_int,
+    pub sample_fmts: *const AVSampleFormat,
+    pub channel_layouts: *const u64,
+    pub priv_class: *const AVClass,
+    pub profiles: *const AVProfile,
+    pub wrapper_name: *const ::std::os::raw::c_char,
+    pub ch_layouts: *const AVChannelLayout,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of AVCodec"][::std::mem::size_of::<AVCodec>() - 104usize];
+    ["Alignment of AVCodec"][::std::mem::align_of::<AVCodec>() - 8usize];
+    ["Offset of field: AVCodec::name"][::std::mem::offset_of!(AVCodec, name) - 0usize];
+    ["Offset of field: AVCodec::long_name"][::std::mem::offset_of!(AVCodec, long_name) - 8usize];
+    ["Offset of field: AVCodec::type_"][::std::mem::offset_of!(AVCodec, type_) - 16usize];
+    ["Offset of field: AVCodec::id"][::std::mem::offset_of!(AVCodec, id) - 20usize];
+    ["Offset of field: AVCodec::capabilities"]
+        [::std::mem::offset_of!(AVCodec, capabilities) - 24usize];
+    ["Offset of field: AVCodec::max_lowres"][::std::mem::offset_of!(AVCodec, max_lowres) - 28usize];
+    ["Offset of field: AVCodec::supported_framerates"]
+        [::std::mem::offset_of!(AVCodec, supported_framerates) - 32usize];
+    ["Offset of field: AVCodec::pix_fmts"][::std::mem::offset_of!(AVCodec, pix_fmts) - 40usize];
+    ["Offset of field: AVCodec::supported_samplerates"]
+        [::std::mem::offset_of!(AVCodec, supported_samplerates) - 48usize];
+    ["Offset of field: AVCodec::sample_fmts"]
+        [::std::mem::offset_of!(AVCodec, sample_fmts) - 56usize];
+    ["Offset of field: AVCodec::channel_layouts"]
+        [::std::mem::offset_of!(AVCodec, channel_layouts) - 64usize];
+    ["Offset of field: AVCodec::priv_class"][::std::mem::offset_of!(AVCodec, priv_class) - 72usize];
+    ["Offset of field: AVCodec::profiles"][::std::mem::offset_of!(AVCodec, profiles) - 80usize];
+    ["Offset of field: AVCodec::wrapper_name"]
+        [::std::mem::offset_of!(AVCodec, wrapper_name) - 88usize];
+    ["Offset of field: AVCodec::ch_layouts"][::std::mem::offset_of!(AVCodec, ch_layouts) - 96usize];
+};
 pub const AVFieldOrder_AV_FIELD_UNKNOWN: AVFieldOrder = 0;
 pub const AVFieldOrder_AV_FIELD_PROGRESSIVE: AVFieldOrder = 1;
 pub const AVFieldOrder_AV_FIELD_TT: AVFieldOrder = 2;
@@ -1055,6 +1316,105 @@ pub const AVFieldOrder_AV_FIELD_BB: AVFieldOrder = 3;
 pub const AVFieldOrder_AV_FIELD_TB: AVFieldOrder = 4;
 pub const AVFieldOrder_AV_FIELD_BT: AVFieldOrder = 5;
 pub type AVFieldOrder = ::std::os::raw::c_uint;
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct AVCodecParameters {
+    pub codec_type: AVMediaType,
+    pub codec_id: AVCodecID,
+    pub codec_tag: u32,
+    pub extradata: *mut u8,
+    pub extradata_size: ::std::os::raw::c_int,
+    pub format: ::std::os::raw::c_int,
+    pub bit_rate: i64,
+    pub bits_per_coded_sample: ::std::os::raw::c_int,
+    pub bits_per_raw_sample: ::std::os::raw::c_int,
+    pub profile: ::std::os::raw::c_int,
+    pub level: ::std::os::raw::c_int,
+    pub width: ::std::os::raw::c_int,
+    pub height: ::std::os::raw::c_int,
+    pub sample_aspect_ratio: AVRational,
+    pub field_order: AVFieldOrder,
+    pub color_range: AVColorRange,
+    pub color_primaries: AVColorPrimaries,
+    pub color_trc: AVColorTransferCharacteristic,
+    pub color_space: AVColorSpace,
+    pub chroma_location: AVChromaLocation,
+    pub video_delay: ::std::os::raw::c_int,
+    pub channel_layout: u64,
+    pub channels: ::std::os::raw::c_int,
+    pub sample_rate: ::std::os::raw::c_int,
+    pub block_align: ::std::os::raw::c_int,
+    pub frame_size: ::std::os::raw::c_int,
+    pub initial_padding: ::std::os::raw::c_int,
+    pub trailing_padding: ::std::os::raw::c_int,
+    pub seek_preroll: ::std::os::raw::c_int,
+    pub ch_layout: AVChannelLayout,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of AVCodecParameters"][::std::mem::size_of::<AVCodecParameters>() - 168usize];
+    ["Alignment of AVCodecParameters"][::std::mem::align_of::<AVCodecParameters>() - 8usize];
+    ["Offset of field: AVCodecParameters::codec_type"]
+        [::std::mem::offset_of!(AVCodecParameters, codec_type) - 0usize];
+    ["Offset of field: AVCodecParameters::codec_id"]
+        [::std::mem::offset_of!(AVCodecParameters, codec_id) - 4usize];
+    ["Offset of field: AVCodecParameters::codec_tag"]
+        [::std::mem::offset_of!(AVCodecParameters, codec_tag) - 8usize];
+    ["Offset of field: AVCodecParameters::extradata"]
+        [::std::mem::offset_of!(AVCodecParameters, extradata) - 16usize];
+    ["Offset of field: AVCodecParameters::extradata_size"]
+        [::std::mem::offset_of!(AVCodecParameters, extradata_size) - 24usize];
+    ["Offset of field: AVCodecParameters::format"]
+        [::std::mem::offset_of!(AVCodecParameters, format) - 28usize];
+    ["Offset of field: AVCodecParameters::bit_rate"]
+        [::std::mem::offset_of!(AVCodecParameters, bit_rate) - 32usize];
+    ["Offset of field: AVCodecParameters::bits_per_coded_sample"]
+        [::std::mem::offset_of!(AVCodecParameters, bits_per_coded_sample) - 40usize];
+    ["Offset of field: AVCodecParameters::bits_per_raw_sample"]
+        [::std::mem::offset_of!(AVCodecParameters, bits_per_raw_sample) - 44usize];
+    ["Offset of field: AVCodecParameters::profile"]
+        [::std::mem::offset_of!(AVCodecParameters, profile) - 48usize];
+    ["Offset of field: AVCodecParameters::level"]
+        [::std::mem::offset_of!(AVCodecParameters, level) - 52usize];
+    ["Offset of field: AVCodecParameters::width"]
+        [::std::mem::offset_of!(AVCodecParameters, width) - 56usize];
+    ["Offset of field: AVCodecParameters::height"]
+        [::std::mem::offset_of!(AVCodecParameters, height) - 60usize];
+    ["Offset of field: AVCodecParameters::sample_aspect_ratio"]
+        [::std::mem::offset_of!(AVCodecParameters, sample_aspect_ratio) - 64usize];
+    ["Offset of field: AVCodecParameters::field_order"]
+        [::std::mem::offset_of!(AVCodecParameters, field_order) - 72usize];
+    ["Offset of field: AVCodecParameters::color_range"]
+        [::std::mem::offset_of!(AVCodecParameters, color_range) - 76usize];
+    ["Offset of field: AVCodecParameters::color_primaries"]
+        [::std::mem::offset_of!(AVCodecParameters, color_primaries) - 80usize];
+    ["Offset of field: AVCodecParameters::color_trc"]
+        [::std::mem::offset_of!(AVCodecParameters, color_trc) - 84usize];
+    ["Offset of field: AVCodecParameters::color_space"]
+        [::std::mem::offset_of!(AVCodecParameters, color_space) - 88usize];
+    ["Offset of field: AVCodecParameters::chroma_location"]
+        [::std::mem::offset_of!(AVCodecParameters, chroma_location) - 92usize];
+    ["Offset of field: AVCodecParameters::video_delay"]
+        [::std::mem::offset_of!(AVCodecParameters, video_delay) - 96usize];
+    ["Offset of field: AVCodecParameters::channel_layout"]
+        [::std::mem::offset_of!(AVCodecParameters, channel_layout) - 104usize];
+    ["Offset of field: AVCodecParameters::channels"]
+        [::std::mem::offset_of!(AVCodecParameters, channels) - 112usize];
+    ["Offset of field: AVCodecParameters::sample_rate"]
+        [::std::mem::offset_of!(AVCodecParameters, sample_rate) - 116usize];
+    ["Offset of field: AVCodecParameters::block_align"]
+        [::std::mem::offset_of!(AVCodecParameters, block_align) - 120usize];
+    ["Offset of field: AVCodecParameters::frame_size"]
+        [::std::mem::offset_of!(AVCodecParameters, frame_size) - 124usize];
+    ["Offset of field: AVCodecParameters::initial_padding"]
+        [::std::mem::offset_of!(AVCodecParameters, initial_padding) - 128usize];
+    ["Offset of field: AVCodecParameters::trailing_padding"]
+        [::std::mem::offset_of!(AVCodecParameters, trailing_padding) - 132usize];
+    ["Offset of field: AVCodecParameters::seek_preroll"]
+        [::std::mem::offset_of!(AVCodecParameters, seek_preroll) - 136usize];
+    ["Offset of field: AVCodecParameters::ch_layout"]
+        [::std::mem::offset_of!(AVCodecParameters, ch_layout) - 144usize];
+};
 pub const AVDiscard_AVDISCARD_NONE: AVDiscard = -16;
 pub const AVDiscard_AVDISCARD_DEFAULT: AVDiscard = 0;
 pub const AVDiscard_AVDISCARD_NONREF: AVDiscard = 8;
@@ -1063,57 +1423,6 @@ pub const AVDiscard_AVDISCARD_NONINTRA: AVDiscard = 24;
 pub const AVDiscard_AVDISCARD_NONKEY: AVDiscard = 32;
 pub const AVDiscard_AVDISCARD_ALL: AVDiscard = 48;
 pub type AVDiscard = ::std::os::raw::c_int;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct AVBuffer {
-    _unused: [u8; 0],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct AVBufferRef {
-    pub buffer: *mut AVBuffer,
-    pub data: *mut u8,
-    pub size: usize,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of AVBufferRef"][::std::mem::size_of::<AVBufferRef>() - 24usize];
-    ["Alignment of AVBufferRef"][::std::mem::align_of::<AVBufferRef>() - 8usize];
-    ["Offset of field: AVBufferRef::buffer"][::std::mem::offset_of!(AVBufferRef, buffer) - 0usize];
-    ["Offset of field: AVBufferRef::data"][::std::mem::offset_of!(AVBufferRef, data) - 8usize];
-    ["Offset of field: AVBufferRef::size"][::std::mem::offset_of!(AVBufferRef, size) - 16usize];
-};
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct AVDictionaryEntry {
-    pub key: *mut ::std::os::raw::c_char,
-    pub value: *mut ::std::os::raw::c_char,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of AVDictionaryEntry"][::std::mem::size_of::<AVDictionaryEntry>() - 16usize];
-    ["Alignment of AVDictionaryEntry"][::std::mem::align_of::<AVDictionaryEntry>() - 8usize];
-    ["Offset of field: AVDictionaryEntry::key"]
-        [::std::mem::offset_of!(AVDictionaryEntry, key) - 0usize];
-    ["Offset of field: AVDictionaryEntry::value"]
-        [::std::mem::offset_of!(AVDictionaryEntry, value) - 8usize];
-};
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct AVDictionary {
-    _unused: [u8; 0],
-}
-unsafe extern "C" {
-    pub fn av_dict_get(
-        m: *const AVDictionary,
-        key: *const ::std::os::raw::c_char,
-        prev: *const AVDictionaryEntry,
-        flags: ::std::os::raw::c_int,
-    ) -> *mut AVDictionaryEntry;
-}
-unsafe extern "C" {
-    pub fn av_dict_count(m: *const AVDictionary) -> ::std::os::raw::c_int;
-}
 pub const AVPacketSideDataType_AV_PKT_DATA_PALETTE: AVPacketSideDataType = 0;
 pub const AVPacketSideDataType_AV_PKT_DATA_NEW_EXTRADATA: AVPacketSideDataType = 1;
 pub const AVPacketSideDataType_AV_PKT_DATA_PARAM_CHANGE: AVPacketSideDataType = 2;
@@ -1205,114 +1514,6 @@ const _: () = {
     ["Offset of field: AVPacket::opaque_ref"]
         [::std::mem::offset_of!(AVPacket, opaque_ref) - 88usize];
     ["Offset of field: AVPacket::time_base"][::std::mem::offset_of!(AVPacket, time_base) - 96usize];
-};
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct AVCodecParameters {
-    pub codec_type: AVMediaType,
-    pub codec_id: AVCodecID,
-    pub codec_tag: u32,
-    pub extradata: *mut u8,
-    pub extradata_size: ::std::os::raw::c_int,
-    pub format: ::std::os::raw::c_int,
-    pub bit_rate: i64,
-    pub bits_per_coded_sample: ::std::os::raw::c_int,
-    pub bits_per_raw_sample: ::std::os::raw::c_int,
-    pub profile: ::std::os::raw::c_int,
-    pub level: ::std::os::raw::c_int,
-    pub width: ::std::os::raw::c_int,
-    pub height: ::std::os::raw::c_int,
-    pub sample_aspect_ratio: AVRational,
-    pub field_order: AVFieldOrder,
-    pub color_range: AVColorRange,
-    pub color_primaries: AVColorPrimaries,
-    pub color_trc: AVColorTransferCharacteristic,
-    pub color_space: AVColorSpace,
-    pub chroma_location: AVChromaLocation,
-    pub video_delay: ::std::os::raw::c_int,
-    pub channel_layout: u64,
-    pub channels: ::std::os::raw::c_int,
-    pub sample_rate: ::std::os::raw::c_int,
-    pub block_align: ::std::os::raw::c_int,
-    pub frame_size: ::std::os::raw::c_int,
-    pub initial_padding: ::std::os::raw::c_int,
-    pub trailing_padding: ::std::os::raw::c_int,
-    pub seek_preroll: ::std::os::raw::c_int,
-    pub ch_layout: AVChannelLayout,
-    pub framerate: AVRational,
-    pub coded_side_data: *mut AVPacketSideData,
-    pub nb_coded_side_data: ::std::os::raw::c_int,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of AVCodecParameters"][::std::mem::size_of::<AVCodecParameters>() - 192usize];
-    ["Alignment of AVCodecParameters"][::std::mem::align_of::<AVCodecParameters>() - 8usize];
-    ["Offset of field: AVCodecParameters::codec_type"]
-        [::std::mem::offset_of!(AVCodecParameters, codec_type) - 0usize];
-    ["Offset of field: AVCodecParameters::codec_id"]
-        [::std::mem::offset_of!(AVCodecParameters, codec_id) - 4usize];
-    ["Offset of field: AVCodecParameters::codec_tag"]
-        [::std::mem::offset_of!(AVCodecParameters, codec_tag) - 8usize];
-    ["Offset of field: AVCodecParameters::extradata"]
-        [::std::mem::offset_of!(AVCodecParameters, extradata) - 16usize];
-    ["Offset of field: AVCodecParameters::extradata_size"]
-        [::std::mem::offset_of!(AVCodecParameters, extradata_size) - 24usize];
-    ["Offset of field: AVCodecParameters::format"]
-        [::std::mem::offset_of!(AVCodecParameters, format) - 28usize];
-    ["Offset of field: AVCodecParameters::bit_rate"]
-        [::std::mem::offset_of!(AVCodecParameters, bit_rate) - 32usize];
-    ["Offset of field: AVCodecParameters::bits_per_coded_sample"]
-        [::std::mem::offset_of!(AVCodecParameters, bits_per_coded_sample) - 40usize];
-    ["Offset of field: AVCodecParameters::bits_per_raw_sample"]
-        [::std::mem::offset_of!(AVCodecParameters, bits_per_raw_sample) - 44usize];
-    ["Offset of field: AVCodecParameters::profile"]
-        [::std::mem::offset_of!(AVCodecParameters, profile) - 48usize];
-    ["Offset of field: AVCodecParameters::level"]
-        [::std::mem::offset_of!(AVCodecParameters, level) - 52usize];
-    ["Offset of field: AVCodecParameters::width"]
-        [::std::mem::offset_of!(AVCodecParameters, width) - 56usize];
-    ["Offset of field: AVCodecParameters::height"]
-        [::std::mem::offset_of!(AVCodecParameters, height) - 60usize];
-    ["Offset of field: AVCodecParameters::sample_aspect_ratio"]
-        [::std::mem::offset_of!(AVCodecParameters, sample_aspect_ratio) - 64usize];
-    ["Offset of field: AVCodecParameters::field_order"]
-        [::std::mem::offset_of!(AVCodecParameters, field_order) - 72usize];
-    ["Offset of field: AVCodecParameters::color_range"]
-        [::std::mem::offset_of!(AVCodecParameters, color_range) - 76usize];
-    ["Offset of field: AVCodecParameters::color_primaries"]
-        [::std::mem::offset_of!(AVCodecParameters, color_primaries) - 80usize];
-    ["Offset of field: AVCodecParameters::color_trc"]
-        [::std::mem::offset_of!(AVCodecParameters, color_trc) - 84usize];
-    ["Offset of field: AVCodecParameters::color_space"]
-        [::std::mem::offset_of!(AVCodecParameters, color_space) - 88usize];
-    ["Offset of field: AVCodecParameters::chroma_location"]
-        [::std::mem::offset_of!(AVCodecParameters, chroma_location) - 92usize];
-    ["Offset of field: AVCodecParameters::video_delay"]
-        [::std::mem::offset_of!(AVCodecParameters, video_delay) - 96usize];
-    ["Offset of field: AVCodecParameters::channel_layout"]
-        [::std::mem::offset_of!(AVCodecParameters, channel_layout) - 104usize];
-    ["Offset of field: AVCodecParameters::channels"]
-        [::std::mem::offset_of!(AVCodecParameters, channels) - 112usize];
-    ["Offset of field: AVCodecParameters::sample_rate"]
-        [::std::mem::offset_of!(AVCodecParameters, sample_rate) - 116usize];
-    ["Offset of field: AVCodecParameters::block_align"]
-        [::std::mem::offset_of!(AVCodecParameters, block_align) - 120usize];
-    ["Offset of field: AVCodecParameters::frame_size"]
-        [::std::mem::offset_of!(AVCodecParameters, frame_size) - 124usize];
-    ["Offset of field: AVCodecParameters::initial_padding"]
-        [::std::mem::offset_of!(AVCodecParameters, initial_padding) - 128usize];
-    ["Offset of field: AVCodecParameters::trailing_padding"]
-        [::std::mem::offset_of!(AVCodecParameters, trailing_padding) - 132usize];
-    ["Offset of field: AVCodecParameters::seek_preroll"]
-        [::std::mem::offset_of!(AVCodecParameters, seek_preroll) - 136usize];
-    ["Offset of field: AVCodecParameters::ch_layout"]
-        [::std::mem::offset_of!(AVCodecParameters, ch_layout) - 144usize];
-    ["Offset of field: AVCodecParameters::framerate"]
-        [::std::mem::offset_of!(AVCodecParameters, framerate) - 168usize];
-    ["Offset of field: AVCodecParameters::coded_side_data"]
-        [::std::mem::offset_of!(AVCodecParameters, coded_side_data) - 176usize];
-    ["Offset of field: AVCodecParameters::nb_coded_side_data"]
-        [::std::mem::offset_of!(AVCodecParameters, nb_coded_side_data) - 184usize];
 };
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -1411,13 +1612,14 @@ pub struct AVIOContext {
         ) -> ::std::os::raw::c_int,
     >,
     pub ignore_boundary_point: ::std::os::raw::c_int,
+    pub written: i64,
     pub buf_ptr_max: *mut ::std::os::raw::c_uchar,
     pub bytes_read: i64,
     pub bytes_written: i64,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of AVIOContext"][::std::mem::size_of::<AVIOContext>() - 208usize];
+    ["Size of AVIOContext"][::std::mem::size_of::<AVIOContext>() - 216usize];
     ["Alignment of AVIOContext"][::std::mem::align_of::<AVIOContext>() - 8usize];
     ["Offset of field: AVIOContext::av_class"]
         [::std::mem::offset_of!(AVIOContext, av_class) - 0usize];
@@ -1466,70 +1668,14 @@ const _: () = {
         [::std::mem::offset_of!(AVIOContext, write_data_type) - 168usize];
     ["Offset of field: AVIOContext::ignore_boundary_point"]
         [::std::mem::offset_of!(AVIOContext, ignore_boundary_point) - 176usize];
+    ["Offset of field: AVIOContext::written"]
+        [::std::mem::offset_of!(AVIOContext, written) - 184usize];
     ["Offset of field: AVIOContext::buf_ptr_max"]
-        [::std::mem::offset_of!(AVIOContext, buf_ptr_max) - 184usize];
+        [::std::mem::offset_of!(AVIOContext, buf_ptr_max) - 192usize];
     ["Offset of field: AVIOContext::bytes_read"]
-        [::std::mem::offset_of!(AVIOContext, bytes_read) - 192usize];
+        [::std::mem::offset_of!(AVIOContext, bytes_read) - 200usize];
     ["Offset of field: AVIOContext::bytes_written"]
-        [::std::mem::offset_of!(AVIOContext, bytes_written) - 200usize];
-};
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct AVProfile {
-    pub profile: ::std::os::raw::c_int,
-    pub name: *const ::std::os::raw::c_char,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of AVProfile"][::std::mem::size_of::<AVProfile>() - 16usize];
-    ["Alignment of AVProfile"][::std::mem::align_of::<AVProfile>() - 8usize];
-    ["Offset of field: AVProfile::profile"][::std::mem::offset_of!(AVProfile, profile) - 0usize];
-    ["Offset of field: AVProfile::name"][::std::mem::offset_of!(AVProfile, name) - 8usize];
-};
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct AVCodec {
-    pub name: *const ::std::os::raw::c_char,
-    pub long_name: *const ::std::os::raw::c_char,
-    pub type_: AVMediaType,
-    pub id: AVCodecID,
-    pub capabilities: ::std::os::raw::c_int,
-    pub max_lowres: u8,
-    pub supported_framerates: *const AVRational,
-    pub pix_fmts: *const AVPixelFormat,
-    pub supported_samplerates: *const ::std::os::raw::c_int,
-    pub sample_fmts: *const AVSampleFormat,
-    pub channel_layouts: *const u64,
-    pub priv_class: *const AVClass,
-    pub profiles: *const AVProfile,
-    pub wrapper_name: *const ::std::os::raw::c_char,
-    pub ch_layouts: *const AVChannelLayout,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of AVCodec"][::std::mem::size_of::<AVCodec>() - 104usize];
-    ["Alignment of AVCodec"][::std::mem::align_of::<AVCodec>() - 8usize];
-    ["Offset of field: AVCodec::name"][::std::mem::offset_of!(AVCodec, name) - 0usize];
-    ["Offset of field: AVCodec::long_name"][::std::mem::offset_of!(AVCodec, long_name) - 8usize];
-    ["Offset of field: AVCodec::type_"][::std::mem::offset_of!(AVCodec, type_) - 16usize];
-    ["Offset of field: AVCodec::id"][::std::mem::offset_of!(AVCodec, id) - 20usize];
-    ["Offset of field: AVCodec::capabilities"]
-        [::std::mem::offset_of!(AVCodec, capabilities) - 24usize];
-    ["Offset of field: AVCodec::max_lowres"][::std::mem::offset_of!(AVCodec, max_lowres) - 28usize];
-    ["Offset of field: AVCodec::supported_framerates"]
-        [::std::mem::offset_of!(AVCodec, supported_framerates) - 32usize];
-    ["Offset of field: AVCodec::pix_fmts"][::std::mem::offset_of!(AVCodec, pix_fmts) - 40usize];
-    ["Offset of field: AVCodec::supported_samplerates"]
-        [::std::mem::offset_of!(AVCodec, supported_samplerates) - 48usize];
-    ["Offset of field: AVCodec::sample_fmts"]
-        [::std::mem::offset_of!(AVCodec, sample_fmts) - 56usize];
-    ["Offset of field: AVCodec::channel_layouts"]
-        [::std::mem::offset_of!(AVCodec, channel_layouts) - 64usize];
-    ["Offset of field: AVCodec::priv_class"][::std::mem::offset_of!(AVCodec, priv_class) - 72usize];
-    ["Offset of field: AVCodec::profiles"][::std::mem::offset_of!(AVCodec, profiles) - 80usize];
-    ["Offset of field: AVCodec::wrapper_name"]
-        [::std::mem::offset_of!(AVCodec, wrapper_name) - 88usize];
-    ["Offset of field: AVCodec::ch_layouts"][::std::mem::offset_of!(AVCodec, ch_layouts) - 96usize];
+        [::std::mem::offset_of!(AVIOContext, bytes_written) - 208usize];
 };
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -1574,10 +1720,80 @@ pub struct AVOutputFormat {
     pub flags: ::std::os::raw::c_int,
     pub codec_tag: *const *const AVCodecTag,
     pub priv_class: *const AVClass,
+    pub priv_data_size: ::std::os::raw::c_int,
+    pub flags_internal: ::std::os::raw::c_int,
+    pub write_header: ::std::option::Option<
+        unsafe extern "C" fn(arg1: *mut AVFormatContext) -> ::std::os::raw::c_int,
+    >,
+    pub write_packet: ::std::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut AVFormatContext,
+            pkt: *mut AVPacket,
+        ) -> ::std::os::raw::c_int,
+    >,
+    pub write_trailer: ::std::option::Option<
+        unsafe extern "C" fn(arg1: *mut AVFormatContext) -> ::std::os::raw::c_int,
+    >,
+    pub interleave_packet: ::std::option::Option<
+        unsafe extern "C" fn(
+            s: *mut AVFormatContext,
+            pkt: *mut AVPacket,
+            flush: ::std::os::raw::c_int,
+            has_packet: ::std::os::raw::c_int,
+        ) -> ::std::os::raw::c_int,
+    >,
+    pub query_codec: ::std::option::Option<
+        unsafe extern "C" fn(
+            id: AVCodecID,
+            std_compliance: ::std::os::raw::c_int,
+        ) -> ::std::os::raw::c_int,
+    >,
+    pub get_output_timestamp: ::std::option::Option<
+        unsafe extern "C" fn(
+            s: *mut AVFormatContext,
+            stream: ::std::os::raw::c_int,
+            dts: *mut i64,
+            wall: *mut i64,
+        ),
+    >,
+    pub control_message: ::std::option::Option<
+        unsafe extern "C" fn(
+            s: *mut AVFormatContext,
+            type_: ::std::os::raw::c_int,
+            data: *mut ::std::os::raw::c_void,
+            data_size: usize,
+        ) -> ::std::os::raw::c_int,
+    >,
+    pub write_uncoded_frame: ::std::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut AVFormatContext,
+            stream_index: ::std::os::raw::c_int,
+            frame: *mut *mut AVFrame,
+            flags: ::std::os::raw::c_uint,
+        ) -> ::std::os::raw::c_int,
+    >,
+    pub get_device_list: ::std::option::Option<
+        unsafe extern "C" fn(
+            s: *mut AVFormatContext,
+            device_list: *mut AVDeviceInfoList,
+        ) -> ::std::os::raw::c_int,
+    >,
+    pub data_codec: AVCodecID,
+    pub init: ::std::option::Option<
+        unsafe extern "C" fn(arg1: *mut AVFormatContext) -> ::std::os::raw::c_int,
+    >,
+    pub deinit: ::std::option::Option<unsafe extern "C" fn(arg1: *mut AVFormatContext)>,
+    pub check_bitstream: ::std::option::Option<
+        unsafe extern "C" fn(
+            s: *mut AVFormatContext,
+            st: *mut AVStream,
+            pkt: *const AVPacket,
+        ) -> ::std::os::raw::c_int,
+    >,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of AVOutputFormat"][::std::mem::size_of::<AVOutputFormat>() - 64usize];
+    ["Size of AVOutputFormat"][::std::mem::size_of::<AVOutputFormat>() - 176usize];
     ["Alignment of AVOutputFormat"][::std::mem::align_of::<AVOutputFormat>() - 8usize];
     ["Offset of field: AVOutputFormat::name"]
         [::std::mem::offset_of!(AVOutputFormat, name) - 0usize];
@@ -1599,6 +1815,36 @@ const _: () = {
         [::std::mem::offset_of!(AVOutputFormat, codec_tag) - 48usize];
     ["Offset of field: AVOutputFormat::priv_class"]
         [::std::mem::offset_of!(AVOutputFormat, priv_class) - 56usize];
+    ["Offset of field: AVOutputFormat::priv_data_size"]
+        [::std::mem::offset_of!(AVOutputFormat, priv_data_size) - 64usize];
+    ["Offset of field: AVOutputFormat::flags_internal"]
+        [::std::mem::offset_of!(AVOutputFormat, flags_internal) - 68usize];
+    ["Offset of field: AVOutputFormat::write_header"]
+        [::std::mem::offset_of!(AVOutputFormat, write_header) - 72usize];
+    ["Offset of field: AVOutputFormat::write_packet"]
+        [::std::mem::offset_of!(AVOutputFormat, write_packet) - 80usize];
+    ["Offset of field: AVOutputFormat::write_trailer"]
+        [::std::mem::offset_of!(AVOutputFormat, write_trailer) - 88usize];
+    ["Offset of field: AVOutputFormat::interleave_packet"]
+        [::std::mem::offset_of!(AVOutputFormat, interleave_packet) - 96usize];
+    ["Offset of field: AVOutputFormat::query_codec"]
+        [::std::mem::offset_of!(AVOutputFormat, query_codec) - 104usize];
+    ["Offset of field: AVOutputFormat::get_output_timestamp"]
+        [::std::mem::offset_of!(AVOutputFormat, get_output_timestamp) - 112usize];
+    ["Offset of field: AVOutputFormat::control_message"]
+        [::std::mem::offset_of!(AVOutputFormat, control_message) - 120usize];
+    ["Offset of field: AVOutputFormat::write_uncoded_frame"]
+        [::std::mem::offset_of!(AVOutputFormat, write_uncoded_frame) - 128usize];
+    ["Offset of field: AVOutputFormat::get_device_list"]
+        [::std::mem::offset_of!(AVOutputFormat, get_device_list) - 136usize];
+    ["Offset of field: AVOutputFormat::data_codec"]
+        [::std::mem::offset_of!(AVOutputFormat, data_codec) - 144usize];
+    ["Offset of field: AVOutputFormat::init"]
+        [::std::mem::offset_of!(AVOutputFormat, init) - 152usize];
+    ["Offset of field: AVOutputFormat::deinit"]
+        [::std::mem::offset_of!(AVOutputFormat, deinit) - 160usize];
+    ["Offset of field: AVOutputFormat::check_bitstream"]
+        [::std::mem::offset_of!(AVOutputFormat, check_bitstream) - 168usize];
 };
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -1714,10 +1960,8 @@ const _: () = {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct AVStream {
-    pub av_class: *const AVClass,
     pub index: ::std::os::raw::c_int,
     pub id: ::std::os::raw::c_int,
-    pub codecpar: *mut AVCodecParameters,
     pub priv_data: *mut ::std::os::raw::c_void,
     pub time_base: AVRational,
     pub start_time: i64,
@@ -1733,42 +1977,42 @@ pub struct AVStream {
     pub nb_side_data: ::std::os::raw::c_int,
     pub event_flags: ::std::os::raw::c_int,
     pub r_frame_rate: AVRational,
+    pub codecpar: *mut AVCodecParameters,
     pub pts_wrap_bits: ::std::os::raw::c_int,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of AVStream"][::std::mem::size_of::<AVStream>() - 232usize];
+    ["Size of AVStream"][::std::mem::size_of::<AVStream>() - 224usize];
     ["Alignment of AVStream"][::std::mem::align_of::<AVStream>() - 8usize];
-    ["Offset of field: AVStream::av_class"][::std::mem::offset_of!(AVStream, av_class) - 0usize];
-    ["Offset of field: AVStream::index"][::std::mem::offset_of!(AVStream, index) - 8usize];
-    ["Offset of field: AVStream::id"][::std::mem::offset_of!(AVStream, id) - 12usize];
-    ["Offset of field: AVStream::codecpar"][::std::mem::offset_of!(AVStream, codecpar) - 16usize];
-    ["Offset of field: AVStream::priv_data"][::std::mem::offset_of!(AVStream, priv_data) - 24usize];
-    ["Offset of field: AVStream::time_base"][::std::mem::offset_of!(AVStream, time_base) - 32usize];
+    ["Offset of field: AVStream::index"][::std::mem::offset_of!(AVStream, index) - 0usize];
+    ["Offset of field: AVStream::id"][::std::mem::offset_of!(AVStream, id) - 4usize];
+    ["Offset of field: AVStream::priv_data"][::std::mem::offset_of!(AVStream, priv_data) - 8usize];
+    ["Offset of field: AVStream::time_base"][::std::mem::offset_of!(AVStream, time_base) - 16usize];
     ["Offset of field: AVStream::start_time"]
-        [::std::mem::offset_of!(AVStream, start_time) - 40usize];
-    ["Offset of field: AVStream::duration"][::std::mem::offset_of!(AVStream, duration) - 48usize];
-    ["Offset of field: AVStream::nb_frames"][::std::mem::offset_of!(AVStream, nb_frames) - 56usize];
+        [::std::mem::offset_of!(AVStream, start_time) - 24usize];
+    ["Offset of field: AVStream::duration"][::std::mem::offset_of!(AVStream, duration) - 32usize];
+    ["Offset of field: AVStream::nb_frames"][::std::mem::offset_of!(AVStream, nb_frames) - 40usize];
     ["Offset of field: AVStream::disposition"]
-        [::std::mem::offset_of!(AVStream, disposition) - 64usize];
-    ["Offset of field: AVStream::discard"][::std::mem::offset_of!(AVStream, discard) - 68usize];
+        [::std::mem::offset_of!(AVStream, disposition) - 48usize];
+    ["Offset of field: AVStream::discard"][::std::mem::offset_of!(AVStream, discard) - 52usize];
     ["Offset of field: AVStream::sample_aspect_ratio"]
-        [::std::mem::offset_of!(AVStream, sample_aspect_ratio) - 72usize];
-    ["Offset of field: AVStream::metadata"][::std::mem::offset_of!(AVStream, metadata) - 80usize];
+        [::std::mem::offset_of!(AVStream, sample_aspect_ratio) - 56usize];
+    ["Offset of field: AVStream::metadata"][::std::mem::offset_of!(AVStream, metadata) - 64usize];
     ["Offset of field: AVStream::avg_frame_rate"]
-        [::std::mem::offset_of!(AVStream, avg_frame_rate) - 88usize];
+        [::std::mem::offset_of!(AVStream, avg_frame_rate) - 72usize];
     ["Offset of field: AVStream::attached_pic"]
-        [::std::mem::offset_of!(AVStream, attached_pic) - 96usize];
+        [::std::mem::offset_of!(AVStream, attached_pic) - 80usize];
     ["Offset of field: AVStream::side_data"]
-        [::std::mem::offset_of!(AVStream, side_data) - 200usize];
+        [::std::mem::offset_of!(AVStream, side_data) - 184usize];
     ["Offset of field: AVStream::nb_side_data"]
-        [::std::mem::offset_of!(AVStream, nb_side_data) - 208usize];
+        [::std::mem::offset_of!(AVStream, nb_side_data) - 192usize];
     ["Offset of field: AVStream::event_flags"]
-        [::std::mem::offset_of!(AVStream, event_flags) - 212usize];
+        [::std::mem::offset_of!(AVStream, event_flags) - 196usize];
     ["Offset of field: AVStream::r_frame_rate"]
-        [::std::mem::offset_of!(AVStream, r_frame_rate) - 216usize];
+        [::std::mem::offset_of!(AVStream, r_frame_rate) - 200usize];
+    ["Offset of field: AVStream::codecpar"][::std::mem::offset_of!(AVStream, codecpar) - 208usize];
     ["Offset of field: AVStream::pts_wrap_bits"]
-        [::std::mem::offset_of!(AVStream, pts_wrap_bits) - 224usize];
+        [::std::mem::offset_of!(AVStream, pts_wrap_bits) - 216usize];
 };
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
