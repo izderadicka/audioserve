@@ -14,6 +14,7 @@ use thiserror::Error;
 #[allow(non_snake_case)]
 #[allow(deref_nullptr)]
 #[allow(clippy::type_complexity)]
+#[allow(unnecessary_transmutes)] // TBD - generate new FFIs later
 mod ffi;
 pub mod tags;
 
@@ -255,7 +256,7 @@ impl MediaFile {
         unsafe { (*self.ctx).nb_streams.try_into().unwrap_or_default() }
     }
 
-    pub fn stream(&self, idx: usize) -> Stream {
+    pub fn stream(&self, idx: usize) -> Stream<'_> {
         let streams = unsafe { slice::from_raw_parts((*self.ctx).streams, self.streams_count()) };
         Stream {
             ctx: streams[idx],
@@ -263,7 +264,7 @@ impl MediaFile {
         }
     }
 
-    fn attached_stream(&self) -> Option<Stream> {
+    fn attached_stream(&self) -> Option<Stream<'_>> {
         for idx in 0..self.streams_count() {
             let s = self.stream(idx);
             if matches!(s.kind(), StreamKind::VIDEO) && s.codec_id() == CODEC_ID_MJPEG {
