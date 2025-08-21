@@ -109,23 +109,23 @@ fn is_escapable(c: u8) -> bool {
     c == b'\t' || (0x20..=0x7e).contains(&c) || c >= 0x80
 }
 
-pub fn value(input: &[u8]) -> IResult<&[u8], Cow<[u8]>> {
+pub fn value(input: &[u8]) -> IResult<&[u8], Cow<'_, [u8]>> {
     alt((map(token, Cow::Borrowed), map(quoted_string, Cow::Owned)))(input)
 }
 
-pub fn values_list(input: &[u8]) -> IResult<&[u8], Vec<Cow<[u8]>>> {
+pub fn values_list(input: &[u8]) -> IResult<&[u8], Vec<Cow<'_, [u8]>>> {
     terminated(separated_list1(tuple((tag(b","), space0)), value), space0)(input)
 }
 
-pub fn pair(input: &[u8]) -> IResult<&[u8], (&[u8], Cow<[u8]>)> {
+pub fn pair(input: &[u8]) -> IResult<&[u8], (&[u8], Cow<'_, [u8]>)> {
     separated_pair(token, tag(b"="), value)(input)
 }
 
-pub fn element(input: &[u8]) -> IResult<&[u8], Vec<(&[u8], Cow<[u8]>)>> {
+pub fn element(input: &[u8]) -> IResult<&[u8], Vec<(&[u8], Cow<'_, [u8]>)>> {
     separated_list1(tag(b";"), pair)(input)
 }
 
-pub fn elements(input: &[u8]) -> IResult<&[u8], Vec<Vec<(&[u8], Cow<[u8]>)>>> {
+pub fn elements(input: &[u8]) -> IResult<&[u8], Vec<Vec<(&[u8], Cow<'_, [u8]>)>>> {
     separated_list1(tuple((tag(b","), space0)), element)(input)
 }
 

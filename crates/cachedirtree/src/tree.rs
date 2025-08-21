@@ -273,11 +273,11 @@ impl DirTree {
         })
     }
 
-    pub fn iter(&self) -> Skip<Descendants<DirEntry>> {
+    pub fn iter(&self) -> Skip<Descendants<'_, DirEntry>> {
         self.tree.root().descendants().skip(1)
     }
 
-    pub fn search<S: AsRef<str>>(&self, query: S) -> SearchResult {
+    pub fn search<S: AsRef<str>>(&self, query: S) -> SearchResult<'_> {
         let search_terms = query
             .as_ref()
             .split(' ')

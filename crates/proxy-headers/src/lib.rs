@@ -99,7 +99,7 @@ impl IpOrSocket {
         }
     }
 }
-fn parse_ip(s: &str) -> Result<IpOrSocket, AddrError> {
+fn parse_ip(s: &str) -> Result<IpOrSocket, AddrError<'_>> {
     if s.starts_with('[') {
         if s.ends_with(']') {
             // this should be IPv6 address

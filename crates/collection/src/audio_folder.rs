@@ -774,7 +774,7 @@ fn parse_span(s: &str) -> Option<TimeSpan> {
     }
 }
 
-pub fn parse_chapter_path(p: &Path) -> (Cow<Path>, Option<TimeSpan>) {
+pub fn parse_chapter_path(p: &Path) -> (Cow<'_, Path>, Option<TimeSpan>) {
     let fname = p.file_name().and_then(OsStr::to_str);
     if let Some(fname) = fname {
         let parts: Vec<_> = fname.split("$$").collect();
