@@ -71,7 +71,7 @@ enum TarState {
 pub fn calc_size<S: IntoIterator<Item = u64>>(sizes: S) -> u64 {
     sizes
         .into_iter()
-        .fold(1024, |total, sz| total + 512 + 512 * ((sz + 511) / 512))
+        .fold(1024, |total, sz| total + 512 + 512 * sz.div_ceil(512))
 }
 
 ///

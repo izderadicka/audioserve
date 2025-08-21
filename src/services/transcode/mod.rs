@@ -388,8 +388,7 @@ impl Transcoder {
                             self::vec_codec::VecEncoder,
                         );
                         let (tx, rx) = mpsc::channel(64);
-                        let mut tx = cache_sink
-                            .fanout(tx.sink_map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
+                        let mut tx = cache_sink.fanout(tx.sink_map_err(io::Error::other));
                         let f = async move {
                             let done = tx.send_all(&mut stream).await;
                             if let Err(e) = done {

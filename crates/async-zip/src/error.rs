@@ -22,7 +22,7 @@ impl From<Error> for io::Error {
     fn from(e: Error) -> Self {
         match e {
             Error::Io(e) => e,
-            other => io::Error::new(io::ErrorKind::Other, other),
+            other => io::Error::other(other),
         }
     }
 }

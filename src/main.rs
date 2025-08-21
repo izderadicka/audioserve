@@ -50,7 +50,7 @@ fn generate_server_secret<P: AsRef<Path>>(file: P) -> Result<Vec<u8>, Error> {
         let mut random = [0u8; 32];
         let rng = SystemRandom::new();
         rng.fill(&mut random)
-            .map_err(|_e| io::Error::new(io::ErrorKind::Other, "Error when generating secret"))?;
+            .map_err(|_e| io::Error::other("Error when generating secret"))?;
         let mut f;
         #[cfg(unix)]
         {

@@ -87,21 +87,15 @@ impl FolderLister {
         match self.get_dir_type(&full_path)? {
             DirType::Dir => {
                 if self.is_collapsable_folder(&full_path) {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!(
-                            "Directory {:?} is collapsed, should not be scanned directly",
-                            full_path
-                        ),
-                    ));
+                    return Err(io::Error::other(format!(
+                        "Directory {:?} is collapsed, should not be scanned directly",
+                        full_path
+                    )));
                 }
                 self.list_dir_dir(base_dir, full_path, ordering, true)
             }
             DirType::File(full_meta) => self.list_dir_file(base_dir, full_path, full_meta, false),
-            DirType::Other => Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Not folder or chapterised audio file",
-            )),
+            DirType::Other => Err(io::Error::other("Not folder or chapterised audio file")),
         }
     }
 
@@ -156,7 +150,7 @@ impl FolderLister {
             let audio_info = get_audio_properties(path, self.config.tags_encoding.as_ref());
             #[cfg(not(feature = "tags-encoding"))]
             let audio_info = get_audio_properties(path);
-            let meta = audio_info.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            let meta = audio_info.map_err(io::Error::other)?;
             let has_cover = meta.has_cover();
             let has_description = meta.has_description();
             match (meta.get_chapters(), meta.get_audio_info(&self.config.tags)) {
@@ -338,10 +332,10 @@ impl FolderLister {
                             //is_collapsed = true;
                         }
                         _ => {
-                            return Err(io::Error::new(
-                                io::ErrorKind::Other,
-                                format!("Expecting chapterized file on {:?}", full_path),
-                            ))
+                            return Err(io::Error::other(format!(
+                                "Expecting chapterized file on {:?}",
+                                full_path
+                            )))
                         }
                     }
                 } else {
@@ -652,8 +646,7 @@ fn chapters_file_path(path: &Path) -> Option<PathBuf> {
 fn chapters_from_csv(path: &Path) -> Result<Option<Vec<Chapter>>, io::Error> {
     if let Some(chapters_file) = chapters_file_path(path) {
         if chapters_file.is_file() {
-            let mut reader = csv::Reader::from_path(&chapters_file)
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            let mut reader = csv::Reader::from_path(&chapters_file).map_err(io::Error::other)?;
 
             let records = reader.records()
                 .filter_map(|r| {
@@ -729,22 +722,19 @@ fn name_and_path_for_chapter(
     let pseudo_file = pseudo_name.clone() + &name_suffix;
     let (base, file_name) = if collapse {
         let base = p.parent().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("Cannot create path for chapter (no parent) in {:?}", p),
-            )
+            io::Error::other(format!(
+                "Cannot create path for chapter (no parent) in {:?}",
+                p
+            ))
         })?;
         let mut f = p
             .file_name()
             .and_then(OsStr::to_str)
             .ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!(
-                        "Cannot create path for chapter (invalid file name) in {:?}",
-                        p
-                    ),
-                )
+                io::Error::other(format!(
+                    "Cannot create path for chapter (invalid file name) in {:?}",
+                    p
+                ))
             })?
             .to_string();
         f.push_str("$$");
@@ -827,7 +817,7 @@ pub fn list_dir_files_only(
             p.file_name()
                 .and_then(|n| n.to_str())
                 .map(|s| s.to_string())
-                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Invalid file name"))
+                .ok_or_else(|| io::Error::other("Invalid file name"))
         },
     )
 }
@@ -847,12 +837,13 @@ pub fn list_dir_files_with_subdirs(
         |p| {
             let subdir = p
                 .strip_prefix(&full_path)
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Invalid path {}", e)))?
+                .map_err(|e| io::Error::other(format!("Invalid path {}", e)))?
                 .parent();
 
-            let name = p.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
-                io::Error::new(io::ErrorKind::Other, "Invalid file name - not UTF8")
-            })?;
+            let name = p
+                .file_name()
+                .and_then(|n| n.to_str())
+                .ok_or_else(|| io::Error::other("Invalid file name - not UTF8"))?;
             if !subdir
                 .and_then(|p| p.file_name().map(|n| n.is_empty()))
                 .unwrap_or(true)
@@ -861,9 +852,7 @@ pub fn list_dir_files_with_subdirs(
                     .parent()
                     .and_then(|p| p.file_name())
                     .and_then(|f| f.to_str())
-                    .ok_or_else(|| {
-                        io::Error::new(io::ErrorKind::Other, "Invalid folder name - not UTF8")
-                    })?;
+                    .ok_or_else(|| io::Error::other("Invalid folder name - not UTF8"))?;
 
                 Ok(folder.to_string() + " " + name)
             } else {
@@ -912,9 +901,9 @@ where
                             } else if ft.is_dir() {
                                 if let Some(ref re) = include_subdirs {
                                     let name = f.file_name();
-                                    let name = name.to_str().ok_or_else(|| {
-                                        io::Error::new(io::ErrorKind::Other, "Non UTF-8 name")
-                                    })?;
+                                    let name = name
+                                        .to_str()
+                                        .ok_or_else(|| io::Error::other("Non UTF-8 name"))?;
                                     if re.is_match(name) {
                                         let subdir = f.path();
                                         let di = fs::read_dir(&subdir)?;

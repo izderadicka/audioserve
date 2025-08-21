@@ -66,8 +66,7 @@ impl CollectionCache {
                 Err(e) => error!("Cannot create {:?} : {}", options_file, e),
             };
             match File::open(&options_file).and_then(|f| {
-                serde_json::from_reader::<_, CollectionOptions>(f)
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+                serde_json::from_reader::<_, CollectionOptions>(f).map_err(io::Error::other)
             }) {
                 Ok(prev_options) => {
                     if prev_options != opt {

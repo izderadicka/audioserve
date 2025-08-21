@@ -316,6 +316,7 @@ impl Message {
     }
 
     /// Tries to get a reference to the string text, if this is a Text message.
+    #[allow(clippy::result_large_err)]
     pub fn to_str(&self) -> Result<&str, Error> {
         match self.inner {
             protocol::Message::Text(ref s) => Ok(s),

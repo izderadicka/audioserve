@@ -206,7 +206,7 @@ impl DirTree {
         let p: &Path = root_dir.as_ref();
         let root_name = p
             .to_str()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "root directory is not utf8"))?;
+            .ok_or_else(|| io::Error::other("root directory is not utf8"))?;
         if !p.is_dir() {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,

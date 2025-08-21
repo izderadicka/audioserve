@@ -203,7 +203,7 @@ impl DirCacheInner {
     fn search<S: AsRef<str>>(&self, query: S) -> Result<Vec<PathBuf>, io::Error> {
         let cache = self.cache.read().unwrap();
         if cache.is_none() {
-            return Err(io::Error::new(io::ErrorKind::Other, "cache not ready"));
+            return Err(io::Error::other("cache not ready"));
         }
         Ok(cache
             .as_ref()
@@ -220,7 +220,7 @@ impl DirCacheInner {
     {
         let cache = self.cache.read().unwrap();
         if cache.is_none() {
-            return Err(io::Error::new(io::ErrorKind::Other, "cache not ready"));
+            return Err(io::Error::other("cache not ready"));
         }
         Ok(collector(cache.as_ref().unwrap().search(query)))
     }
@@ -228,12 +228,12 @@ impl DirCacheInner {
     fn recent(&self) -> Result<Vec<PathBuf>, io::Error> {
         let cache = self.cache.read().unwrap();
         if cache.is_none() {
-            return Err(io::Error::new(io::ErrorKind::Other, "cache not ready"));
+            return Err(io::Error::other("cache not ready"));
         }
         let recent = cache.as_ref().unwrap().recent();
         match recent {
             Some(iter) => Ok(iter.map(borrow::ToOwned::to_owned).collect()),
-            None => Err(io::Error::new(io::ErrorKind::Other, "recent not supported")),
+            None => Err(io::Error::other("recent not supported")),
         }
     }
 }
