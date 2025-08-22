@@ -55,7 +55,7 @@ websock = { path = "crates/websock", optional = true }
 myhy = { path = "crates/myhy" }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.29.0", features = ["user"] }
+nix = { version = "0.30.0", features = ["user"] }
 
 [features]
 default = [
@@ -97,4 +97,4 @@ tempfile = "3.16.0"
 http-body-util = "0.1.1"
 
 [target.'cfg(unix)'.dev-dependencies]
-nix = { version = "0.29.0", features = ["process", "signal"] }
+nix = { version = "0.30.0", features = ["process", "signal"] }
