@@ -1,6 +1,7 @@
 const FFMPEG_VERSION_4: &str = "ffmpeg-4.4.6";
 const FFMPEG_VERSION_5: &str = "ffmpeg-5.1.7";
 const FFMPEG_VERSION_6: &str = "ffmpeg-6.1.1";
+const FFMPEG_VERSION_7: &str = "ffmpeg-7.1.1";
 
 macro_rules! warn {
     ($fmt:literal $(, $arg:expr)* ) => {
@@ -15,15 +16,23 @@ fn parse_main_version(version: &str) -> Option<u32> {
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    #[cfg(windows)]
+    {
+        println!("cargo:rustc-link-search=C:/ffmpeg/lib");
+        std::env::set_var("PKG_CONFIG_PATH",  "C:\\ffmpeg\\lib\\pkgconfig");
+    }
+
     let ffmpeg_version = if cfg!(feature = "static") || cfg!(feature = "partially-static") {
         FFMPEG_VERSION_6
     } else {
         match pkg_config::probe_library("libavformat") {
             Ok(lib) => {
                 if let Some(version) = parse_main_version(&lib.version) {
-                    if version > 60 {
-                        warn!("libavformat is too new - will try latest ffi, but may not work");
-                        FFMPEG_VERSION_6
+                    if version > 62 {
+                        warn!("libavformat {} is too new - will try latest ffi, but may not work", version);
+                        FFMPEG_VERSION_7
+                    } else if version == 62 {
+                        FFMPEG_VERSION_7
                     } else if version == 60 {
                         FFMPEG_VERSION_6
                     } else if version == 59 {
