@@ -383,6 +383,9 @@ fn main() -> anyhow::Result<()> {
         runtime.spawn(watch_for_positions_backup_signal(collections.clone()));
     }
 
+    #[cfg(not(unix))]
+    runtime.block_on(terminate_server());
+    #[cfg(unix)]
     runtime.block_on(terminate_server(term_receiver, stop_service_sender));
 
     //graceful shutdown of server will wait till immediate tasks ends, so rather shut it down hard

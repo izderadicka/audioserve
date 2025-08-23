@@ -25,4 +25,5 @@ bindgen \
 --allowlist-var AV_DICT_IGNORE_SUFFIX \
 --allowlist-var AV_TIME_BASE \
 wrapper.h -- -I $FFMPEG_VERSION \
+-I"C:\ffmpeg\include" \
 > src/ffi_$FFMPEG_VERSION.rs
