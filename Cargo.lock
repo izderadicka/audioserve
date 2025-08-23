@@ -2923,7 +2923,7 @@ dependencies = [
  "env_logger 0.11.6",
  "linked-hash-map",
  "log",
- "rand 0.8.5",
+ "rand 0.9.0",
  "tempfile",
  "thiserror 2.0.12",
  "tokio",
