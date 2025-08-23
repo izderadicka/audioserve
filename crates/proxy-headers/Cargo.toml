@@ -7,7 +7,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nom = "7"
+nom = "8"
 headers = "0.4.0"
 http = "1.1.0"
 lazy_static = "1.4"
