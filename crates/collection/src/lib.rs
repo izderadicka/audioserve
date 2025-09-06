@@ -48,6 +48,22 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const MAX_POSITIONS: usize = 1_000;
 pub use common::MINIMUM_CHAPTER_DURATION;
 
+fn serialize<T>(data: &T) -> Result<Vec<u8>>
+where
+    T: serde::Serialize,
+{
+    let res = bincode::serde::encode_to_vec(data, bincode::config::legacy())?;
+    Ok(res)
+}
+
+fn deserialize<T>(data: &[u8]) -> Result<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let res = bincode::serde::decode_from_slice(data, bincode::config::legacy())?;
+    Ok(res.0)
+}
+
 fn check_version<P: AsRef<Path>>(db_dir: P) -> Result<()> {
     let db_dir = db_dir.as_ref();
     let version_file = db_dir.join(".version");

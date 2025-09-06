@@ -16,7 +16,7 @@ pub fn update_path(
 }
 
 pub fn deser_audiofolder<T: AsRef<[u8]>>(data: T) -> Option<AudioFolder> {
-    bincode::deserialize(data.as_ref())
+    crate::deserialize(data.as_ref())
         .map_err(|e| error!("Error deserializing data from db {}", e))
         .ok()
 }

@@ -163,7 +163,7 @@ impl CacheInner {
 
     pub(crate) fn update<P: AsRef<Path>>(&self, dir: P, af: AudioFolder) -> Result<()> {
         let dir = dir.as_ref().to_str().ok_or(Error::InvalidCollectionPath)?;
-        bincode::serialize(&af)
+        crate::serialize(&af)
             .map_err(Error::from)
             .and_then(|data| self.db.insert(dir, data).map_err(Error::from))
             .map(|_| debug!("Cache updated for {:?}", dir))
@@ -233,7 +233,7 @@ where
         .ok()
         .flatten()
         .and_then(|data| {
-            bincode::deserialize::<PositionRecord>(&data)
+            crate::deserialize::<PositionRecord>(&data)
                 .map_err(|e| error!("Db item deserialization error: {}", e))
                 .ok()
         })
@@ -277,7 +277,7 @@ impl CacheInner {
                         );
                     }
                 }
-                match bincode::serialize(&folder_rec).map_err(Error::from) {
+                match crate::serialize(&folder_rec).map_err(Error::from) {
                     Ok(data) => pos_folder.insert(path.as_ref().as_bytes(), data)?,
                     Err(e) => return transaction::abort(e),
                 };
@@ -346,7 +346,7 @@ impl CacheInner {
                     }
 
                     folder_rec.insert(group.as_ref().into(), this_pos);
-                    let rec = match bincode::serialize(&folder_rec) {
+                    let rec = match crate::serialize(&folder_rec) {
                         Err(e) => return transaction::abort(Error::from(e)),
                         Ok(res) => res,
                     };
@@ -423,7 +423,7 @@ impl CacheInner {
             .ok()
             .flatten()
             .and_then(|r| {
-                bincode::deserialize::<PositionRecord>(&r)
+                crate::deserialize::<PositionRecord>(&r)
                     .map_err(|e| error!("Error deserializing position record {}", e))
                     .ok()
             })
@@ -462,7 +462,7 @@ impl CacheInner {
             res.map_err(|e| error!("Error reading from positions db: {}", e))
                 .ok()
                 .and_then(|(folder, rec)| {
-                    let rec: PositionRecord = bincode::deserialize(&rec)
+                    let rec: PositionRecord = crate::deserialize(&rec)
                         .map_err(|e| error!("Position deserialization error: {}", e))
                         .ok()?;
                     let folder = String::from_utf8(folder.as_ref().into()).unwrap(); // known to be valid UTF8
@@ -581,7 +581,7 @@ impl CacheInner {
             match res {
                 Ok((k, v)) => {
                     let folder = std::str::from_utf8(&k)?;
-                    let res: PositionRecord = bincode::deserialize(&v)?;
+                    let res: PositionRecord = crate::deserialize(&v)?;
                     write!(file, "\"{}\":", folder)?;
                     serde_json::to_writer(&mut *file, &res)?;
                     if idx < self.pos_folder.len() - 1 {
@@ -666,7 +666,7 @@ impl CacheInner {
         for item in self.db.scan_prefix(from.to_str().unwrap()) {
             // safe to unwrap as we insert only valid strings
             let (k, v) = item?;
-            let mut folder_rec: AudioFolder = bincode::deserialize(&v)?;
+            let mut folder_rec: AudioFolder = crate::deserialize(&v)?;
             let p: &Path = Path::new(unsafe { std::str::from_utf8_unchecked(&k) }); // we insert only valid strings as keys
             let new_key = update_path(from, to, p)?;
             let new_key = new_key.to_str().ok_or(Error::InvalidPath)?;
@@ -706,7 +706,7 @@ impl CacheInner {
                 folder_rec.cover = Some(c);
             }
 
-            insert_batch.insert(new_key, bincode::serialize(&folder_rec)?);
+            insert_batch.insert(new_key, crate::serialize(&folder_rec)?);
         }
 
         self.db
