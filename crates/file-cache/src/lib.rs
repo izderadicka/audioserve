@@ -226,7 +226,7 @@ impl FileGuard {
 
 fn gen_cache_key() -> String {
     let mut random = [0; FILE_KEY_LEN];
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     rng.fill_bytes(&mut random);
     BASE64URL_NOPAD.encode(&random)
 }
@@ -795,7 +795,7 @@ mod tests {
         let tmp_folder = tempdir().unwrap();
 
         let mut data = [0_u8; 1024];
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let t = FileModTime::now();
         rng.fill_bytes(&mut data);
 
@@ -828,11 +828,11 @@ mod tests {
                 let c = c.clone();
                 threads.push(thread::spawn(move || {
                     let mut f = c.add(format!("Key {}", i), t).unwrap();
-                    let mut rng = rand::thread_rng();
+                    let mut rng = rand::rng();
                     for j in 0..8 {
                         f.write_all(&data[128 * j..128 * (j + 1)]).unwrap();
                         thread::sleep(std::time::Duration::from_millis(
-                            rng.gen_range(Range { start: 1, end: 100 }),
+                            rng.random_range(Range { start: 1, end: 100 }),
                         ))
                     }
                     f.finish().unwrap();
