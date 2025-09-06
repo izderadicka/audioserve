@@ -8,7 +8,6 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use data_encoding::BASE64URL_NOPAD;
 use linked_hash_map::LinkedHashMap;
 use rand::RngCore;
-use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, Metadata};
 use std::io::{self, Read, Write};
