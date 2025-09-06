@@ -4,11 +4,11 @@ use std::{borrow::Cow, str::Utf8Error, string::FromUtf8Error};
 use nom::{
     branch::alt,
     bytes::complete::{escaped_transform, tag, take_while1, take_while_m_n},
-    character::{complete::space0, is_alphanumeric},
+    character::complete::space0,
     combinator::{cut, map, rest},
     multi::separated_list1,
-    sequence::{preceded, separated_pair, terminated, tuple},
-    IResult,
+    sequence::{preceded, separated_pair, terminated},
+    AsChar, IResult, Parser,
 };
 
 pub type Error<'a> = nom::error::Error<&'a [u8]>;
@@ -23,8 +23,8 @@ macro_rules! def_set {
     ($($name:ident = $chars: expr),*) => {
         $(
             pub fn $name(input: &[u8]) -> IResult<&[u8], &[u8]> {
-                let is_char = |c| is_alphanumeric(c) || $chars.contains(&c);
-                take_while1(is_char)(input)
+                let is_char = |c: u8| c.is_alphanum() || $chars.contains(&c);
+                take_while1(is_char).parse(input)
             }
 
         )*
@@ -87,7 +87,7 @@ pub fn quoted_string(input: &[u8]) -> IResult<&[u8], Vec<u8>> {
         '\\',
         take_while_m_n(1, 1, is_escapable),
     );
-    preceded(tag(QUOTE), cut(terminated(escaped, tag(QUOTE))))(input)
+    preceded(tag(QUOTE), cut(terminated(escaped, tag(QUOTE)))).parse(input)
 }
 
 fn is_quoted_text(c: u8) -> bool {
@@ -110,23 +110,23 @@ fn is_escapable(c: u8) -> bool {
 }
 
 pub fn value(input: &[u8]) -> IResult<&[u8], Cow<'_, [u8]>> {
-    alt((map(token, Cow::Borrowed), map(quoted_string, Cow::Owned)))(input)
+    alt((map(token, Cow::Borrowed), map(quoted_string, Cow::Owned))).parse(input)
 }
 
 pub fn values_list(input: &[u8]) -> IResult<&[u8], Vec<Cow<'_, [u8]>>> {
-    terminated(separated_list1(tuple((tag(b","), space0)), value), space0)(input)
+    terminated(separated_list1((tag(","), space0), value), space0).parse(input)
 }
 
 pub fn pair(input: &[u8]) -> IResult<&[u8], (&[u8], Cow<'_, [u8]>)> {
-    separated_pair(token, tag(b"="), value)(input)
+    separated_pair(token, tag("="), value).parse(input)
 }
 
 pub fn element(input: &[u8]) -> IResult<&[u8], Vec<(&[u8], Cow<'_, [u8]>)>> {
-    separated_list1(tag(b";"), pair)(input)
+    separated_list1(tag(";"), pair).parse(input)
 }
 
 pub fn elements(input: &[u8]) -> IResult<&[u8], Vec<Vec<(&[u8], Cow<'_, [u8]>)>>> {
-    separated_list1(tuple((tag(b","), space0)), element)(input)
+    separated_list1((tag(","), space0), element).parse(input)
 }
 
 #[cfg(test)]
