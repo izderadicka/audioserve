@@ -1,6 +1,7 @@
 const FFMPEG_VERSION_4: &str = "ffmpeg-4.4.6";
 const FFMPEG_VERSION_5: &str = "ffmpeg-5.1.7";
 const FFMPEG_VERSION_6: &str = "ffmpeg-6.1.1";
+const FFMPEG_VERSION_7: &str = "ffmpeg-7.1.1";
 
 macro_rules! warn {
     ($fmt:literal $(, $arg:expr)* ) => {
@@ -21,9 +22,10 @@ fn main() {
         match pkg_config::probe_library("libavformat") {
             Ok(lib) => {
                 if let Some(version) = parse_main_version(&lib.version) {
-                    if version > 60 {
-                        warn!("libavformat is too new - will try latest ffi, but may not work");
-                        FFMPEG_VERSION_6
+                    if version > 61 {
+                        panic!("libavformat is too new - need to update source with new ffi");
+                    } else if version == 61 {
+                        FFMPEG_VERSION_7
                     } else if version == 60 {
                         FFMPEG_VERSION_6
                     } else if version == 59 {
