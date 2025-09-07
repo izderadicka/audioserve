@@ -28,7 +28,10 @@ mime_guess = "2.0"
 unicase = "2.7"
 unicase_serde = "0.1"
 ring = "0.17"
-bincode = "1.3.3"
+bincode = { version = "2.0.1", features = [
+    "serde",
+    "std",
+], default-features = false }
 notify = "8.0"
 crossbeam-channel = "0.5"
 enum_dispatch = "0.3"

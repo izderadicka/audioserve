@@ -27,7 +27,10 @@ pub enum Error {
     IOError(#[from] std::io::Error),
 
     #[error("Bincode serialization error: {0}")]
-    BincodeError(#[from] Box<bincode::ErrorKind>),
+    BincodeEncodeError(#[from] bincode::error::EncodeError),
+
+    #[error("Bincode deserialization error: {0}")]
+    BincodeDecodeError(#[from] bincode::error::DecodeError),
 
     #[error("Missing Collection Cache: {0}")]
     MissingCollectionCache(usize),
