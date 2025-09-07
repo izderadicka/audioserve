@@ -164,7 +164,6 @@ impl CacheInner {
     pub(crate) fn update<P: AsRef<Path>>(&self, dir: P, af: AudioFolder) -> Result<()> {
         let dir = dir.as_ref().to_str().ok_or(Error::InvalidCollectionPath)?;
         crate::serialize(&af)
-            .map_err(Error::from)
             .and_then(|data| self.db.insert(dir, data).map_err(Error::from))
             .map(|_| debug!("Cache updated for {:?}", dir))
     }
@@ -277,7 +276,7 @@ impl CacheInner {
                         );
                     }
                 }
-                match crate::serialize(&folder_rec).map_err(Error::from) {
+                match crate::serialize(&folder_rec) {
                     Ok(data) => pos_folder.insert(path.as_ref().as_bytes(), data)?,
                     Err(e) => return transaction::abort(e),
                 };
@@ -347,7 +346,7 @@ impl CacheInner {
 
                     folder_rec.insert(group.as_ref().into(), this_pos);
                     let rec = match crate::serialize(&folder_rec) {
-                        Err(e) => return transaction::abort(Error::from(e)),
+                        Err(e) => return transaction::abort(e),
                         Ok(res) => res,
                     };
 
