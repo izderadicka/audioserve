@@ -8,7 +8,7 @@ on:
 
 jobs:
   audioserve-build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
     - name: Build image
@@ -18,7 +18,7 @@ jobs:
         docker login -u ${{secrets.DOCKERHUB_USER}} -p ${{secrets.DOCKERHUB_PASSWORD}}
         docker push izderadicka/audioserve
   build-static:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: audioserve-build
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
