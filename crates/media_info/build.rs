@@ -3,11 +3,11 @@ const FFMPEG_VERSION_5: &str = "ffmpeg-5.1.7";
 const FFMPEG_VERSION_6: &str = "ffmpeg-6.1.1";
 const FFMPEG_VERSION_7: &str = "ffmpeg-7.1.1";
 
-macro_rules! warn {
-    ($fmt:literal $(, $arg:expr)* ) => {
-        println!(concat!("cargo:warning=", $fmt), $($arg)*)
-    };
-}
+// macro_rules! warn {
+//     ($fmt:literal $(, $arg:expr)* ) => {
+//         println!(concat!("cargo:warning=", $fmt), $($arg)*)
+//     };
+// }
 
 fn parse_main_version(version: &str) -> Option<u32> {
     let mut parts = version.split('.');
@@ -19,7 +19,11 @@ fn main() {
     let ffmpeg_version = if cfg!(feature = "static") || cfg!(feature = "partially-static") {
         FFMPEG_VERSION_6
     } else {
-        match pkg_config::probe_library("libavformat") {
+        let pkg = pkg_config::Config::new()
+            .print_system_cflags(true)
+            .print_system_libs(true)
+            .probe("libavformat");
+        match pkg {
             Ok(lib) => {
                 if let Some(version) = parse_main_version(&lib.version) {
                     if version > 61 {
@@ -40,8 +44,7 @@ fn main() {
                 }
             }
             Err(e) => {
-                warn!("Cannot find libavformat: {}", e);
-                FFMPEG_VERSION_4
+                panic!("Cannot find libavformat: {}", e);
             }
         }
     };

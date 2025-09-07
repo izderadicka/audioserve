@@ -1,0 +1,21 @@
+# check=error=true
+
+FROM ubuntu:24.04 AS build
+LABEL maintainer="Ivan <ivan@zderadicka.eu>"
+
+
+RUN apt update &&\
+    apt install -y  curl \ 
+    openssl libssl-dev pkg-config ffmpeg yasm build-essential wget libbz2-dev zlib1g-dev libavformat-dev
+
+USER 1000:1000
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=stable --profile=minimal
+
+WORKDIR /home/ubuntu/audioserve
+
+ENV PATH=$PATH:/home/ubuntu/.cargo/bin
+
+
+#RUN  cargo test --all --features transcoding-cache,tags-encoding
+
