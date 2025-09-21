@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use crate::{AudioFile, AudioFolderShort};
 
 lazy_static! {
-    static ref NUMBER_RE: Regex = Regex::new(r"\d+").unwrap();
+    static ref NUMBER_RE: Regex = Regex::new(r"\d{1,10}").unwrap();
 }
 
 pub(crate) trait Collate<T = Self> {
@@ -23,7 +23,7 @@ fn split_name(name: &str) -> Option<(&str, u32, &str)> {
             let pos: u32 = num
                 .as_str()
                 .parse()
-                .map_err(|_e| warn!("Cannot parse number {} in name {}", num.as_str(), name))
+                .map_err(|_e| debug!("Cannot parse number {} in name {}", num.as_str(), name))
                 .ok()?;
             let rest = &name[num.end()..];
             let prefix = &name[..num.start()];
