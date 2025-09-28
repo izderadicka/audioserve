@@ -14,6 +14,7 @@ clap = { version = "4", features = ["derive"] }
 
 [build-dependencies]
 pkg-config = "0.3.30"
+bindgen = "0.72.1"
 
 [features]
 static = []
