@@ -215,7 +215,7 @@ impl CollectionOptionsMap {
                 RegexBuilder::new(re)
                     .case_insensitive(true)
                     .build()
-                    .map_err(|e| (Error::InvalidCDFolderRegex(re.into(), e)))?,
+                    .map_err(|e| Error::InvalidCDFolderRegex(re.into(), e))?,
             );
         }
         Ok(CollectionOptionsMap {
