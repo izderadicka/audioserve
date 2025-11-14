@@ -15,4 +15,4 @@ thiserror.workspace = true
 crc32fast = "1.4"
 
 [dev-dependencies]
-zip = { version = "5.0.0", default-features = false }
+zip = { version = "6.0.0", default-features = false }
