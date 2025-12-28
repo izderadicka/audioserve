@@ -373,7 +373,7 @@ fn main() -> anyhow::Result<()> {
 
     let collections = create_collections()?;
     let runtime = build_runtime();
-    let (term_receiver, stop_service_sender) =
+    let (_term_receiver, _stop_service_sender) =
         start_server(&runtime, server_secret, collections.clone());
 
     #[cfg(unix)]
@@ -383,7 +383,10 @@ fn main() -> anyhow::Result<()> {
         runtime.spawn(watch_for_positions_backup_signal(collections.clone()));
     }
 
-    runtime.block_on(terminate_server(term_receiver, stop_service_sender));
+    #[cfg(not(unix))]
+    runtime.block_on(terminate_server());
+    #[cfg(unix)]
+    runtime.block_on(terminate_server(_term_receiver, _stop_service_sender));
 
     //graceful shutdown of server will wait till immediate tasks ends, so rather shut it down hard
     runtime.shutdown_timeout(std::time::Duration::from_millis(300));
