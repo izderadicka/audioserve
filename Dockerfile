@@ -3,7 +3,7 @@
 ARG CARGO_ARGS
 ARG CARGO_RELEASE="release"
 
-FROM alpine:3.22 AS build
+FROM alpine:3.23 AS build
 LABEL maintainer="Ivan <ivan@zderadicka.eu>"
 
 ARG CARGO_ARGS
@@ -32,7 +32,7 @@ RUN apk add git &&\
     npm run build &&\
     ./compress_dist.sh
 
-FROM alpine:3.22
+FROM alpine:3.23
 
 ARG CARGO_ARGS
 ARG CARGO_RELEASE
