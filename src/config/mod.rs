@@ -656,8 +656,8 @@ impl Config {
             );
         };
 
-        if self.ssl.is_some() {
-            self.ssl.as_ref().unwrap().check()?
+        if let Some(ref ssl) = self.ssl {
+            ssl.check()?
         }
 
         self.transcoding.check()?;
