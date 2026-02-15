@@ -30,6 +30,7 @@ impl PositionItem {
     }
 }
 
+#[allow(clippy::derive_ord_xor_partial_ord)] // Just WA for float ordering, which is not important here
 #[derive(Clone, Serialize, Deserialize, PartialEq, PartialOrd, Debug)]
 pub struct Position {
     pub timestamp: TimeStamp,
@@ -43,7 +44,6 @@ pub struct Position {
 
 impl Eq for Position {}
 // TODO: Should I really need custom implementation of PartialOrd??
-#[allow(clippy::derive_ord_xor_partial_ord)] // Just WA for float ordering, which is not important here
 impl Ord for Position {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match self.partial_cmp(other) {
