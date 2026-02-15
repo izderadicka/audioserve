@@ -43,6 +43,7 @@ Like audioserve and want to start quickly and easily and securely? Try [this sim
     - [Alternative transcodings and transcoding configuration for Apple users](#alternative-transcodings-and-transcoding-configuration-for-apple-users)
   - [Command line](#command-line)
   - [Web client](#web-client)
+    - [On Android](#on-android)
   - [Android client](#android-client)
   - [API](#api)
   - [Installation](#installation)
@@ -364,6 +365,10 @@ Web client resides in it's [own project](https://github.com/izderadicka/audioser
 
 I'm testing web client on recent Firefox and Chrome/Chromium (on Linux and Android platforms, occasionally on Win and Edge, assuming that Edge is now basically Chrome, so it should work). For Apple platforms, new client should work for Safari after some additional configuration - check [this chapter](#alternative-transcodings-and-transcoding-configuration-for-apple-users).
 
+### On Android
+
+Web PWA is now preferred  for mobile too, I'm using with Chrome, you can there install app on desktop easily and was working bit more better then FF.
+The background JS throttling might be an issue recently - try set `Delay before caching next files` to 0 it may help (but not much tested yet).
 
 ## Android client
 
