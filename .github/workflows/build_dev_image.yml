@@ -10,7 +10,7 @@ jobs:
     outputs:
       should_run: ${{ steps.should_run.outputs.should_run }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: print latest_commit
         run: echo ${{ github.sha }}
 
@@ -28,7 +28,7 @@ jobs:
       run: |
         echo "Starting build"
         docker --version
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Build image
       run: docker build --tag izderadicka/audioserve:unstable --build-arg CARGO_ARGS="--features=transcoding-cache,tags-encoding" .
     - name: Publish image
