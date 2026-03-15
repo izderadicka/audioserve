@@ -242,6 +242,22 @@ impl<C: Send + 'static> MainService<C> {
                     get_config().static_resource_cache_age,
                 )
                 .await;
+            } else if req.path().starts_with("/pub-icon/") {
+                let collections = subservices.collections.clone();
+                let (path, colllection_index) = match extract_collection_number(req.path()) {
+                    Ok(r) => r,
+                    Err(_) => {
+                        error!("Invalid collection number");
+                        return Ok(response::not_found());
+                    }
+                };
+
+                return files::send_folder_icon(
+                    colllection_index,
+                    get_subpath(path, "/pub-icon/"),
+                    collections,
+                )
+                .await;
             }
         }
         // from here everything must be authenticated
