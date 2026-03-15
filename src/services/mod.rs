@@ -187,6 +187,7 @@ impl<C: Send + 'static> Service<HttpRequest> for MainService<C> {
         }
 
         let path_prefix: Option<&str> = get_config().url_path_prefix.as_deref();
+        let original_uri = req.uri().clone();
         let req = match RequestWrapper::new(req)
             .and_then(|req| req.set_path_prefix(path_prefix))
             .map(|req| {
@@ -198,7 +199,7 @@ impl<C: Send + 'static> Service<HttpRequest> for MainService<C> {
             }) {
             Ok(r) => r,
             Err(e) => {
-                error!("Request URL error: {}", e);
+                error!("Request URL {} error: {}", original_uri, e);
                 return response::fut(response::bad_request);
             }
         };
