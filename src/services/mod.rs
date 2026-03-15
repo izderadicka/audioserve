@@ -244,20 +244,21 @@ impl<C: Send + 'static> MainService<C> {
                 .await;
             } else if req.path().starts_with("/pub-icon/") {
                 let collections = subservices.collections.clone();
-                let (path, colllection_index) = match extract_collection_number(req.path()) {
+                let path = req.path().strip_prefix("/pub-icon").unwrap();
+                let (path, colllection_index) = match extract_collection_number(&path) {
                     Ok(r) => r,
                     Err(_) => {
                         error!("Invalid collection number");
                         return Ok(response::not_found());
                     }
                 };
-
-                return files::send_folder_icon(
+                let path = PathBuf::from(path.strip_prefix('/').unwrap());
+                debug!(
+                    "Sending icon for collection {} path {}",
                     colllection_index,
-                    get_subpath(path, "/pub-icon/"),
-                    collections,
-                )
-                .await;
+                    path.display()
+                );
+                return files::send_folder_icon(colllection_index, path, collections).await;
             }
         }
         // from here everything must be authenticated
