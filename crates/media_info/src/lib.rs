@@ -32,6 +32,10 @@ pub enum Error {
     InvalidEncoding(String),
 }
 
+#[cfg(windows)]
+const CODEC_ID_MJPEG: i32 = 7;
+
+#[cfg(unix)]
 const CODEC_ID_MJPEG: u32 = 7;
 
 // fn string_from_ptr(ptr: *const c_char) -> Result<Option<String>> {
@@ -421,6 +425,12 @@ impl Stream<'_> {
         unsafe { *self.ctx }.id
     }
 
+    #[cfg(windows)]
+    pub fn codec_id(&self) -> i32 {
+        unsafe { *(*self.ctx).codecpar }.codec_id
+    }
+
+    #[cfg(unix)]
     pub fn codec_id(&self) -> u32 {
         unsafe { *(*self.ctx).codecpar }.codec_id
     }
