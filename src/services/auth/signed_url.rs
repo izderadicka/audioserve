@@ -1,82 +1,84 @@
 use std::sync::Arc;
 
 use data_encoding::BASE64URL_NOPAD;
-use ring::{
-    hmac,
-    rand::{SecureRandom as _, SystemRandom},
-};
+use ring::hmac;
+
+use anyhow::{anyhow, bail, Context};
 
 use crate::services::auth::now;
 
+/// Signs and verifies URLs of the form:
+///
+///   /some/path?exp=<unix_ms>&sig=<base64url_hmac>
+///
+/// Signature input is:
+///
+///   [path_len: u16 big endian] || [path bytes] || [exp: u64 big endian]
+///
+/// Using the length prefix avoids ambiguity in the signed payload.
 struct SignedUrlServiceInner {
-    secret: Vec<u8>,
+    key: hmac::Key,
     token_validity_seconds: u32,
 }
 
 impl SignedUrlServiceInner {
     pub fn new(secret: Vec<u8>, token_validity_seconds: u32) -> Self {
-        SignedUrlServiceInner {
-            secret,
+        assert!(!secret.is_empty(), "secret must not be empty");
+
+        Self {
+            key: hmac::Key::new(hmac::HMAC_SHA256, &secret),
             token_validity_seconds,
         }
     }
 
-    fn prepare_data(&self, nonce: &[u8; 32], path: &str, validity: [u8; 8]) -> Vec<u8> {
-        assert!(path.len() <= u16::MAX as usize);
-        let mut data = Vec::with_capacity(32 + 2 + path.len() + 8);
-        data.extend_from_slice(nonce);
+    fn prepare_data(path: &str, exp_ms: u64) -> Vec<u8> {
+        assert!(path.len() <= u16::MAX as usize, "path too long");
+
+        let mut data = Vec::with_capacity(2 + path.len() + 8);
         let path_len = (path.len() as u16).to_be_bytes();
         data.extend_from_slice(&path_len);
         data.extend_from_slice(path.as_bytes());
-        data.extend_from_slice(&validity);
+        data.extend_from_slice(&exp_ms.to_be_bytes());
         data
     }
 
-    pub fn create_token(&self, path: String) -> String {
-        let mut nonce = [0u8; 32];
-        let rng = SystemRandom::new();
-        rng.fill(&mut nonce).expect("Cannot generate random number");
-        let validity: u64 = now() + u64::from(self.token_validity_seconds) * 1000;
-        let validity: [u8; 8] = validity.to_be_bytes();
-        let mut token = self.prepare_data(&nonce, &path, validity);
-        let key = hmac::Key::new(hmac::HMAC_SHA256, &self.secret);
-        let sig = hmac::sign(&key, &token);
-        token.extend_from_slice(sig.as_ref());
-        BASE64URL_NOPAD.encode(&token)
+    fn sign_path_and_exp(&self, path: &str, exp_ms: u64) -> String {
+        let data = Self::prepare_data(path, exp_ms);
+        let sig = hmac::sign(&self.key, &data);
+        BASE64URL_NOPAD.encode(sig.as_ref())
     }
 
-    pub fn verify_token(&self, token: &str) -> anyhow::Result<String> {
-        let token = BASE64URL_NOPAD.decode(token.as_bytes())?;
+    /// Creates signed query parameters for a given path.
+    ///
+    /// Returns:
+    ///   (exp_ms, sig)
+    pub fn create_path_signature(&self, path: &str) -> (u64, String) {
+        let exp_ms = now() + u64::from(self.token_validity_seconds) * 1000;
+        let sig = self.sign_path_and_exp(path, exp_ms);
+        (exp_ms, sig)
+    }
 
-        // 32 nonce + 2 path len + 8 validity + 32 hmac = 74 minimum
-        const MIN_LEN: usize = 32 + 2 + 8 + 32;
-        if token.len() < MIN_LEN {
-            anyhow::bail!("Token too short");
+    /// Verifies that `sig` is valid for the exact `path` and `exp_ms`.
+    pub fn verify_path_signature(&self, path: &str, exp_ms: u64, sig: &str) -> anyhow::Result<()> {
+        if exp_ms < now() {
+            bail!("Token expired");
         }
 
-        let data_end = token.len() - 32;
-        let (data, sig) = token.split_at(data_end);
+        let sig_bytes = BASE64URL_NOPAD
+            .decode(sig.as_bytes())
+            .context("Invalid signature encoding")?;
 
-        let key = hmac::Key::new(hmac::HMAC_SHA256, &self.secret);
-        hmac::verify(&key, data, sig).map_err(|_| anyhow::anyhow!("Invalid signature"))?;
-
-        let string_len = u16::from_be_bytes([data[32], data[33]]) as usize;
-        let path_start = 34;
-        let path_end = path_start + string_len;
-        let validity_end = path_end + 8;
-
-        if validity_end != data.len() {
-            anyhow::bail!("Malformed token");
+        // HMAC-SHA256 output length is 32 bytes.
+        if sig_bytes.len() != 32 {
+            bail!("Invalid signature length");
         }
 
-        let path = std::str::from_utf8(&data[path_start..path_end])?;
-        let validity = u64::from_be_bytes(data[path_end..validity_end].try_into()?);
+        let data = Self::prepare_data(path, exp_ms);
 
-        if validity < now() {
-            anyhow::bail!("Token expired");
-        }
+        hmac::verify(&self.key, &data, &sig_bytes)
+            .map_err(|e| anyhow!("Invalid signature: {e}"))?;
 
-        Ok(path.to_owned())
+        Ok(())
     }
 }
 
@@ -87,17 +89,18 @@ pub struct SignedUrlService {
 
 impl SignedUrlService {
     pub fn new(secret: Vec<u8>, token_validity_seconds: u32) -> Self {
-        SignedUrlService {
+        Self {
             inner: Arc::new(SignedUrlServiceInner::new(secret, token_validity_seconds)),
         }
     }
 
-    pub fn create_token(&self, path: String) -> String {
-        self.inner.create_token(path)
+    /// Returns `(exp_ms, sig)`.
+    pub fn create_signature(&self, path: &str) -> (u64, String) {
+        self.inner.create_path_signature(path)
     }
 
-    pub fn verify_token(&self, token: &str) -> anyhow::Result<String> {
-        self.inner.verify_token(token)
+    pub fn verify_signature(&self, path: &str, exp_ms: u64, sig: &str) -> anyhow::Result<()> {
+        self.inner.verify_path_signature(path, exp_ms, sig)
     }
 }
 
@@ -106,9 +109,43 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_signed_url_service() {
-        let service = SignedUrlService::new(vec![0u8; 32], 10);
-        let token = service.create_token("icon/test".to_string());
-        assert_eq!(service.verify_token(&token).unwrap(), "icon/test");
+    fn test_signed_url_service_ok() {
+        let service = SignedUrlService::new(vec![7u8; 32], 10);
+        let path = "/icon/test";
+
+        let (exp, sig) = service.create_signature(path);
+        service.verify_signature(path, exp, &sig).unwrap();
+    }
+
+    #[test]
+    fn test_signed_url_service_wrong_path() {
+        let service = SignedUrlService::new(vec![7u8; 32], 10);
+        let (exp, sig) = service.create_signature("/icon/test");
+
+        let err = service.verify_signature("/icon/other", exp, &sig);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_signed_url_service_bad_sig() {
+        let service = SignedUrlService::new(vec![7u8; 32], 10);
+        let (exp, mut sig) = service.create_signature("/icon/test");
+
+        sig.push('x');
+
+        let err = service.verify_signature("/icon/test", exp, &sig);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_signed_url_service_expired() {
+        let service = SignedUrlService::new(vec![7u8; 32], 0);
+        let path = "/icon/test";
+
+        let (exp, sig) = service.create_signature(path);
+
+        // Depending on how `now()` is implemented, immediate expiry may already be expired.
+        let err = service.verify_signature(path, exp.saturating_sub(1), &sig);
+        assert!(err.is_err());
     }
 }

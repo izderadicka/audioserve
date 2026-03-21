@@ -1,14 +1,18 @@
 use std::ffi::OsStr;
 use std::{path::PathBuf, sync::Arc};
 
+use bytes::Bytes;
 use collection::FoldersOrdering;
 use futures::prelude::*;
+use myhy::request::RequestWrapper;
+use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking as blocking;
 
 use super::search::{Search, SearchTrait};
 use super::types::CollectionsInfo;
 use super::types::Transcodings;
 use crate::config::get_config;
+use crate::services::auth::signed_url::SignedUrlService;
 use crate::Error;
 use myhy::response::{self, json_response, ResponseResult};
 
@@ -153,4 +157,44 @@ pub async fn recent(
     })
     .await
     .map_err(Error::new)
+}
+
+#[derive(Deserialize)]
+struct SignPathRequest {
+    path: String,
+}
+
+#[derive(Serialize)]
+struct SignPathResponse {
+    exp: u64,
+    sig: String,
+}
+
+pub fn sign_path(body: Bytes, path_signer: &SignedUrlService) -> ResponseResult {
+    let SignPathRequest { path } = serde_json::from_slice(&body)?;
+
+    let (exp, sig) = path_signer.create_signature(&path);
+    Ok(json_response(&SignPathResponse { exp, sig }, false))
+}
+
+pub async fn json_body(req: &mut RequestWrapper) -> Result<Bytes, Error> {
+    let is_json = req
+        .headers()
+        .get("Content-Type")
+        .and_then(|v| {
+            v.to_str()
+                .ok()
+                .map(|s| s.to_lowercase().eq("application/json"))
+        })
+        .unwrap_or(false);
+    if is_json {
+        let bytes = req
+            .body_bytes()
+            .await
+            .inspect_err(|e| error!("Error reading POST body: {}", e))?;
+        Ok(bytes)
+    } else {
+        error!("Not JSON content type");
+        anyhow::bail!("Not JSON content type")
+    }
 }

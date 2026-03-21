@@ -9,6 +9,7 @@ use myhy::response::body::full_body;
 use myhy::response::ResponseBuilderExt;
 use myhy::Body;
 use myhy::{Method, Response};
+use ring::hmac::HMAC_SHA256;
 use ring::rand::{SecureRandom, SystemRandom};
 use ring::{
     digest::{digest, SHA256},
@@ -47,7 +48,7 @@ pub trait Authenticator<B>: Send + Sync {
 #[derive(Clone, Debug)]
 struct Secrets {
     shared_secret: String,
-    server_secret: Vec<u8>,
+    server_key: hmac::Key,
     token_validity_hours: u32,
 }
 
@@ -57,11 +58,11 @@ pub struct SharedSecretAuthenticator {
 }
 
 impl SharedSecretAuthenticator {
-    pub fn new(shared_secret: String, server_secret: Vec<u8>, token_validity_hours: u32) -> Self {
+    pub fn new(shared_secret: String, server_secret: &[u8], token_validity_hours: u32) -> Self {
         SharedSecretAuthenticator {
             secrets: Arc::new(Secrets {
                 shared_secret,
-                server_secret,
+                server_key: hmac::Key::new(HMAC_SHA256, server_secret),
                 token_validity_hours,
             }),
         }
@@ -265,12 +266,12 @@ impl Secrets {
         false
     }
     fn new_auth_token(&self) -> String {
-        Token::new(self.token_validity_hours, &self.server_secret).into()
+        Token::new(self.token_validity_hours, &self.server_key).into()
     }
 
     fn token_ok(&self, token: &str) -> bool {
         match token.parse::<Token>() {
-            Ok(token) => token.is_valid(&self.server_secret),
+            Ok(token) => token.is_valid(&self.server_key),
             Err(e) => {
                 warn!("Invalid token: {}", e);
                 false
@@ -301,7 +302,7 @@ fn now() -> u64 {
 }
 
 impl Token {
-    fn new(token_validity_hours: u32, secret: &[u8]) -> Self {
+    fn new(token_validity_hours: u32, key: &hmac::Key) -> Self {
         let mut random = [0u8; 32];
         let rng = SystemRandom::new();
         rng.fill(&mut random)
@@ -309,7 +310,6 @@ impl Token {
         let validity: u64 = now() + u64::from(token_validity_hours) * 3600;
         let validity: [u8; 8] = validity.to_be_bytes();
         let to_sign = prepare_data(&random, validity);
-        let key = hmac::Key::new(hmac::HMAC_SHA256, secret);
         let sig = hmac::sign(&key, &to_sign);
         let slice = sig.as_ref();
         assert!(slice.len() == 32);
@@ -323,8 +323,7 @@ impl Token {
         }
     }
 
-    fn is_valid(&self, secret: &[u8]) -> bool {
-        let key = hmac::Key::new(hmac::HMAC_SHA256, secret);
+    fn is_valid(&self, key: &hmac::Key) -> bool {
         let data = prepare_data(&self.random, self.validity);
         if hmac::verify(&key, &data, &self.signature).is_err() {
             return false;
@@ -391,15 +390,17 @@ mod tests {
 
     #[test]
     fn test_token() {
-        let token = Token::new(24, b"my big secret");
-        assert!(token.is_valid(b"my big secret"));
+        let key = hmac::Key::new(hmac::HMAC_SHA256, b"my big secret");
+        let token = Token::new(24, &key);
+        assert!(token.is_valid(&key));
         let orig_token = token.clone();
         let serialized_token: String = token.into();
         assert!(serialized_token.len() >= 72);
         let new_token: Token = serialized_token.parse().unwrap();
         assert_eq!(orig_token, new_token);
-        assert!(new_token.is_valid(b"my big secret"));
-        assert!(!new_token.is_valid(b"wrong secret"));
+        assert!(new_token.is_valid(&key));
+        let wrong_key = hmac::Key::new(hmac::HMAC_SHA256, b"wrong secret");
+        assert!(!new_token.is_valid(&wrong_key));
         assert!(new_token.validity() - now() <= 24 * 3600);
     }
 
