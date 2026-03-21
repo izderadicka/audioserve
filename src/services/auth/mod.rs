@@ -310,7 +310,7 @@ impl Token {
         let validity: u64 = now() + u64::from(token_validity_hours) * 3600;
         let validity: [u8; 8] = validity.to_be_bytes();
         let to_sign = prepare_data(&random, validity);
-        let sig = hmac::sign(&key, &to_sign);
+        let sig = hmac::sign(key, &to_sign);
         let slice = sig.as_ref();
         assert!(slice.len() == 32);
         let mut signature = [0u8; 32];
@@ -325,7 +325,7 @@ impl Token {
 
     fn is_valid(&self, key: &hmac::Key) -> bool {
         let data = prepare_data(&self.random, self.validity);
-        if hmac::verify(&key, &data, &self.signature).is_err() {
+        if hmac::verify(key, &data, &self.signature).is_err() {
             return false;
         };
 

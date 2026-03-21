@@ -269,7 +269,7 @@ impl<C: Send + 'static> MainService<C> {
                     }
                     let collections = subservices.collections.clone();
                     let path = req.path().strip_prefix("/pub-icon").unwrap();
-                    let (path, colllection_index) = match extract_collection_number(&path) {
+                    let (path, colllection_index) = match extract_collection_number(path) {
                         Ok(r) => r,
                         Err(_) => {
                             error!("Invalid collection number");
