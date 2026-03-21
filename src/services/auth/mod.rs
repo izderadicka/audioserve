@@ -26,6 +26,8 @@ use url::form_urlencoded;
 use myhy::request::GenericRequestWrapper;
 use myhy::response::{self, HttpResponse};
 
+pub mod signed_url;
+
 pub enum AuthResult<T, B> {
     Authenticated {
         #[allow(dead_code)]
