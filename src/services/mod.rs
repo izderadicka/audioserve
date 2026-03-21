@@ -3,6 +3,8 @@ use self::search::Search;
 use self::transcode::QualityLevel;
 use crate::config::{get_config, Cors};
 use crate::error;
+use crate::services::api::{json_body, sign_path};
+use crate::services::auth::signed_url::SignedUrlService;
 use crate::services::transcode::ChosenTranscoding;
 use myhy::request::{is_cors_matching_origin, HttpRequest, QueryParams, RequestWrapper};
 use myhy::response::body::HttpBody;
@@ -52,6 +54,7 @@ pub struct ServiceFactory<T> {
     rate_limitter: Option<Arc<Leaky>>,
     search: Search<String>,
     transcoding: TranscodingDetails,
+    path_signing: SignedUrlService,
     collections: Arc<Collections>,
     stop_service_receiver: watch::Receiver<()>,
 }
@@ -62,6 +65,7 @@ impl<T> ServiceFactory<T> {
         search: Search<String>,
         transcoding: TranscodingDetails,
         collections: Arc<Collections>,
+        path_signing: SignedUrlService,
         rate_limit: Option<f32>,
         stop_service_receiver: watch::Receiver<()>,
     ) -> Self
@@ -75,6 +79,7 @@ impl<T> ServiceFactory<T> {
             search,
             transcoding,
             collections,
+            path_signing,
             stop_service_receiver,
         }
     }
@@ -95,6 +100,7 @@ where
                 search: self.search.clone(),
                 transcoding: self.transcoding.clone(),
                 collections: self.collections.clone(),
+                path_signing: self.path_signing.clone(),
             },
             authenticator: self.authenticator.clone(),
             rate_limitter: self.rate_limitter.clone(),
@@ -113,6 +119,7 @@ pub struct ServiceComponents {
     pub search: Search<String>,
     pub transcoding: TranscodingDetails,
     pub collections: Arc<Collections>,
+    pub path_signing: SignedUrlService,
 }
 
 type OptionalAuthenticatorType<T> = Option<Arc<dyn Authenticator<Incoming, Credentials = T>>>;
@@ -243,6 +250,43 @@ impl<C: Send + 'static> MainService<C> {
                     get_config().static_resource_cache_age,
                 )
                 .await;
+            } else if req.path().starts_with("/pub-icon/") {
+                let params = req.params();
+                let signature = params.get("sig");
+                let expiration: Option<u64> = params.get("exp").and_then(|s| s.parse().ok());
+                if let (Some(sig), Some(exp)) = (signature, expiration) {
+                    if let Err(e) =
+                        subservices
+                            .path_signing
+                            .verify_signature(req.path(), exp, sig.as_ref())
+                    {
+                        error!(
+                            "Invalid pub-icon request signature on path{}: {}",
+                            req.path(),
+                            e
+                        );
+                        return Ok(response::bad_request());
+                    }
+                    let collections = subservices.collections.clone();
+                    let path = req.path().strip_prefix("/pub-icon").unwrap();
+                    let (path, colllection_index) = match extract_collection_number(&path) {
+                        Ok(r) => r,
+                        Err(_) => {
+                            error!("Invalid collection number");
+                            return Ok(response::not_found());
+                        }
+                    };
+                    let path = PathBuf::from(path.strip_prefix('/').unwrap());
+                    debug!(
+                        "Sending icon for collection {} path {}",
+                        colllection_index,
+                        path.display()
+                    );
+                    return files::send_folder_icon(colllection_index, path, collections).await;
+                } else {
+                    error!("Invalid pub-icon request: missing signature or expiration");
+                    return Ok(response::bad_request());
+                }
             }
         }
         // from here everything must be authenticated
@@ -276,6 +320,7 @@ impl<C: Send + 'static> MainService<C> {
             search,
             transcoding,
             collections,
+            path_signing,
         } = subservices;
         match *req.method() {
             Method::GET => {
@@ -441,42 +486,38 @@ impl<C: Send + 'static> MainService<C> {
             }
 
             Method::POST => {
-                #[cfg(feature = "shared-positions")]
                 if path.starts_with("/positions") {
+                    #[cfg(feature = "shared-positions")]
                     match extract_group(path) {
                         PositionGroup::Group(group) => {
-                            let is_json = req
-                                .headers()
-                                .get("Content-Type")
-                                .and_then(|v| {
-                                    v.to_str()
-                                        .ok()
-                                        .map(|s| s.to_lowercase().eq("application/json"))
-                                })
-                                .unwrap_or(false);
-                            if is_json {
-                                match req.body_bytes().await {
-                                    Ok(bytes) => {
-                                        api::insert_position(collections, group, bytes).await
-                                    }
-                                    Err(e) => {
-                                        error!("Error reading POST body: {}", e);
-                                        Ok(response::bad_request())
-                                    }
+                            use crate::services::api::json_body;
+
+                            match json_body(&mut req).await {
+                                Ok(bytes) => api::insert_position(collections, group, bytes).await,
+                                Err(e) => {
+                                    error!("Error reading POST body: {}", e);
+                                    Ok(response::bad_request())
                                 }
-                            } else {
-                                error!("Not JSON content type");
-                                Ok(response::bad_request())
                             }
                         }
                         _ => Ok(response::bad_request()),
                     }
+                    #[cfg(not(feature = "shared-positions"))]
+                    Ok(response::not_found())
+                } else if path == "/sign-path" {
+                    match json_body(&mut req)
+                        .await
+                        .and_then(|body| sign_path(body, &path_signing))
+                    {
+                        Ok(resp) => Ok(resp),
+                        Err(e) => {
+                            error!("Error reading request body: {}", e);
+                            Ok(response::bad_request())
+                        }
+                    }
                 } else {
                     Ok(response::not_found())
                 }
-
-                #[cfg(not(feature = "shared-positions"))]
-                Ok(response::method_not_supported())
             }
 
             _ => Ok(response::method_not_supported()),

@@ -27,6 +27,8 @@ use tokio::sync::{oneshot, watch};
 
 use myhy::server::HttpServer;
 
+use crate::services::auth::signed_url::SignedUrlService;
+
 mod config;
 mod error;
 mod services;
@@ -161,8 +163,9 @@ fn start_server(
     let (stop_service_sender, stop_service_receiver) = watch::channel(());
     let start_server = async move {
         let authenticator = get_config().shared_secret.as_ref().map(|secret| {
-            SharedSecretAuthenticator::new(secret.clone(), server_secret, cfg.token_validity_hours)
+            SharedSecretAuthenticator::new(secret.clone(), &server_secret, cfg.token_validity_hours)
         });
+        let path_signing = SignedUrlService::new(server_secret, 5 * 60);
         let transcoding = TranscodingDetails {
             transcodings: Arc::new(AtomicUsize::new(0)),
             max_transcodings: cfg.transcoding.max_parallel_processes,
@@ -172,6 +175,7 @@ fn start_server(
             Search::new(Some(collections.clone())),
             transcoding,
             collections,
+            path_signing,
             cfg.limit_rate,
             stop_service_receiver,
         );
