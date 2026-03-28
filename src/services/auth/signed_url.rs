@@ -53,14 +53,19 @@ impl SignedUrlServiceInner {
     /// Returns:
     ///   (exp_ms, sig)
     pub fn create_path_signature(&self, path: &str) -> (u64, String) {
-        let exp_ms = now() + u64::from(self.token_validity_seconds) * 1000;
-        let sig = self.sign_path_and_exp(path, exp_ms);
-        (exp_ms, sig)
+        let exp_secs = now() + u64::from(self.token_validity_seconds);
+        let sig = self.sign_path_and_exp(path, exp_secs);
+        (exp_secs, sig)
     }
 
     /// Verifies that `sig` is valid for the exact `path` and `exp_ms`.
-    pub fn verify_path_signature(&self, path: &str, exp_ms: u64, sig: &str) -> anyhow::Result<()> {
-        if exp_ms < now() {
+    pub fn verify_path_signature(
+        &self,
+        path: &str,
+        exp_secs: u64,
+        sig: &str,
+    ) -> anyhow::Result<()> {
+        if exp_secs < now() {
             bail!("Token expired");
         }
 
@@ -73,7 +78,7 @@ impl SignedUrlServiceInner {
             bail!("Invalid signature length");
         }
 
-        let data = Self::prepare_data(path, exp_ms);
+        let data = Self::prepare_data(path, exp_secs);
 
         hmac::verify(&self.key, &data, &sig_bytes)
             .map_err(|e| anyhow!("Invalid signature: {e}"))?;
@@ -99,8 +104,8 @@ impl SignedUrlService {
         self.inner.create_path_signature(path)
     }
 
-    pub fn verify_signature(&self, path: &str, exp_ms: u64, sig: &str) -> anyhow::Result<()> {
-        self.inner.verify_path_signature(path, exp_ms, sig)
+    pub fn verify_signature(&self, path: &str, exp_secs: u64, sig: &str) -> anyhow::Result<()> {
+        self.inner.verify_path_signature(path, exp_secs, sig)
     }
 }
 
@@ -146,6 +151,7 @@ mod tests {
 
         // Depending on how `now()` is implemented, immediate expiry may already be expired.
         let err = service.verify_signature(path, exp.saturating_sub(1), &sig);
-        assert!(err.is_err());
+        let error_message = err.unwrap_err().to_string();
+        assert!(error_message.contains("Token expired"));
     }
 }
