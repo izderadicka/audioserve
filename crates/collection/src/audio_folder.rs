@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 use std::{fs, mem};
 
 use super::audio_meta::*;
@@ -10,7 +11,6 @@ use crate::collator::Collate;
 use crate::common::CollectionOptions;
 use crate::playlist::{is_playlist, Playlist};
 use crate::util::{get_file_name, get_meta, get_modified, get_real_file_type, guess_mime_type};
-use lazy_static::lazy_static;
 use regex::Regex;
 
 #[derive(Debug)]
@@ -747,9 +747,7 @@ fn name_and_path_for_chapter(
     Ok((pseudo_name, base.join(file_name)))
 }
 
-lazy_static! {
-    static ref CHAPTER_SPAN_RE: Regex = Regex::new(r"(\d+)-(\d+)").unwrap();
-}
+static CHAPTER_SPAN_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\d+)-(\d+)").unwrap());
 
 fn parse_span(s: &str) -> Option<TimeSpan> {
     if let Some(cap) = CHAPTER_SPAN_RE.captures(s) {

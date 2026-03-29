@@ -1,12 +1,9 @@
-use lazy_static::lazy_static;
 use regex::Regex;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, sync::LazyLock};
 
 use crate::{AudioFile, AudioFolderShort};
 
-lazy_static! {
-    static ref NUMBER_RE: Regex = Regex::new(r"\d{1,10}").unwrap();
-}
+static NUMBER_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\d{1,10}").unwrap());
 
 pub(crate) trait Collate<T = Self> {
     fn collate(&self, other: &T) -> Ordering;
@@ -48,7 +45,7 @@ fn cmp_natural(me: &str, other: &str, compare: impl Fn(&str, &str) -> Ordering) 
     compare(me, other)
 }
 
-#[cfg(not(any(feature = "collation", feature = "collation-static")))]
+#[cfg(not(feature = "collation"))]
 pub(crate) mod standard {
     use super::*;
 
@@ -98,23 +95,32 @@ pub(crate) mod standard {
     }
 }
 
-#[cfg(any(feature = "collation", feature = "collation-static"))]
+#[cfg(feature = "collation")]
 pub(crate) mod locale {
-    use super::*;
-    use lazy_static::lazy_static;
-    use rust_icu_ucol::UCollator;
-    use std::convert::TryFrom;
+    use std::sync::LazyLock;
 
-    lazy_static! {
-        static ref LOCALE_COLLATOR: Collator = Collator::new();
+    use super::*;
+    use icu::collator::{
+        options::{CollatorOptions, Strength},
+        CollatorBorrowed as UCollator,
+    };
+    use icu::locale::Locale;
+
+    static LOCALE_COLLATOR: LazyLock<Collator> = LazyLock::new(|| Collator::new());
+
+    fn normalize_posix_locale(input: &str) -> String {
+        let base = input
+            .split('.')
+            .next()
+            .unwrap_or(input)
+            .split('@')
+            .next()
+            .unwrap_or(input);
+
+        base.replace('_', "-")
     }
 
-    struct Collator(UCollator);
-
-    // According to ICU documentation C implementation should be thread safe for ucol_strcoll methods
-    // See https://unicode-org.github.io/icu/userguide/icu/design.html#thread-safe-const-apis
-    // Use of recent ICU library is assumed
-    unsafe impl Sync for Collator {}
+    struct Collator(UCollator<'static>);
 
     impl Collator {
         pub(crate) fn collate<A, B>(&self, a: A, b: B) -> Ordering
@@ -122,12 +128,18 @@ pub(crate) mod locale {
             A: AsRef<str>,
             B: AsRef<str>,
         {
-            self.0
-                .strcoll_utf8(a.as_ref(), b.as_ref())
-                .unwrap_or_else(|e| {
-                    error!("Collation error {}", e);
-                    Ordering::Greater
-                })
+            self.0.compare(a.as_ref(), b.as_ref())
+        }
+
+        pub(crate) fn new_from_locale(locale: &str) -> Result<Self, crate::error::Error> {
+            let locale = normalize_posix_locale(locale);
+            let locale: Locale = locale.parse()?;
+            let mut options = CollatorOptions::default();
+            options.strength = Some(Strength::Secondary);
+            let collator = UCollator::try_new(locale.into(), options)
+                .map_err(|e| crate::error::Error::InvalidCollationData(e.to_string()))?;
+
+            Ok(Collator(collator))
         }
 
         #[cfg(not(test))]
@@ -141,14 +153,12 @@ pub(crate) mod locale {
 
             info!("Using locale {} for Collator", locale);
 
-            let col = UCollator::try_from(locale.as_str()).expect("Cannot create UCollator");
-            Collator(col)
+            Collator::new_from_locale(&locale).expect("Cannot create Collator")
         }
 
         #[cfg(test)]
         pub(crate) fn new() -> Self {
-            let col = UCollator::try_from("cs_CZ").expect("Cannot create UCollator");
-            Collator(col)
+            Collator::new_from_locale("cs").expect("Cannot create UCollator")
         }
     }
 
@@ -182,11 +192,14 @@ pub(crate) mod locale {
 
         #[test]
         fn we_have_czech_language() {
-            let locales = rust_icu_ucol::get_available_locales().expect("cannot get locales");
-            assert!(locales
-                .map(|i| i.expect("invalid string"))
-                .find(|loc| loc == "cs")
-                .is_some());
+            use icu::locale::locale;
+            let _locale: icu::locale::Locale = "cs".parse().expect("Should have cs");
+            let _locale: icu::locale::Locale = "cs-CZ".parse().expect("Should have cs_CZ");
+            let locale: icu::locale::Locale = normalize_posix_locale("cs_CZ.UTF-8")
+                .parse()
+                .expect("Should have cs_CZ.UTF-8");
+
+            assert_eq!(locale!("cs-CZ"), locale);
         }
 
         #[test]
@@ -195,7 +208,7 @@ pub(crate) mod locale {
             let mut letters = phrase.chars().map(|c| c.to_string()).collect::<Vec<_>>();
             letters.sort_unstable_by(|a, b| LOCALE_COLLATOR.collate(a, b));
             let sorted = letters.join("");
-            assert_eq!("ábčdďeéěííkkkllllňoópPřšťuuúůyýž", sorted);
+            assert_eq!("ábčdďeéěííkkkllllňoóPpřšťuuúůyýž", sorted);
         }
 
         #[test]
