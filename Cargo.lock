@@ -1004,7 +1004,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "778e2ac28f6c47af28e4907f13ffd1e1ddbd400980a9abd7c8df189bf578a5ad"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2641,9 +2641,9 @@ dependencies = [
 
 [[package]]
 name = "rust_icu_common"
-version = "5.1.0"
+version = "5.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cbb62287eca447eef9b2296b5f3dad3712ddd0890572db3b7a3207423e34b80"
+checksum = "dc35239580d427f5447568f553a294f6f0c8fdd67146e1130067e5b484540f39"
 dependencies = [
  "anyhow",
  "rust_icu_sys",
@@ -2651,23 +2651,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust_icu_sys"
-version = "5.1.0"
+name = "rust_icu_release"
+version = "5.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74d2ba58bacec8f1346df26eba033cf1eadfe5a4fec804823b1e84122556ade9"
+checksum = "98af0ceffe04981029314055da9b2a00c68d037117742698a20ec50a46558038"
+dependencies = [
+ "anyhow",
+]
+
+[[package]]
+name = "rust_icu_sys"
+version = "5.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea315f466b24d9a13c8fac9ee01f44a42518c2adeda3527d6d7e2ee8a1db9179"
 dependencies = [
  "anyhow",
  "bindgen",
  "lazy_static",
  "libc",
  "paste",
+ "rust_icu_release",
 ]
 
 [[package]]
 name = "rust_icu_ucol"
-version = "5.1.0"
+version = "5.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3c67f9c23448d29a9bb33b1783f4181e5d881de04bf6bd4fb4d78a606bc3718"
+checksum = "87dd303ff05453c6debc2292433d8fdaf52d12dc9370dc5ebb4ea7f0cc6aa293"
 dependencies = [
  "anyhow",
  "log",
@@ -2680,9 +2690,9 @@ dependencies = [
 
 [[package]]
 name = "rust_icu_uenum"
-version = "5.1.0"
+version = "5.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "261f1db6a2f7d0ae272695251a812a697ef5c278717290168400531003a95074"
+checksum = "a66ff6af667bbd503f1bcc6cec34a1dabaddd051e1666af2ae0737e9a7e66e25"
 dependencies = [
  "paste",
  "rust_icu_common",
@@ -2691,9 +2701,9 @@ dependencies = [
 
 [[package]]
 name = "rust_icu_ustring"
-version = "5.1.0"
+version = "5.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "149dd205018f54f943c34db4a39634d52ebd91e5f8d48979e1d0872e9b7fae27"
+checksum = "4cf42586d82f0e05e7a772e82aa549294c1ed4d85ceb0a896e7f86725c820a4c"
 dependencies = [
  "log",
  "paste",
@@ -2717,7 +2727,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2730,7 +2740,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.9.4",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3517,7 +3527,7 @@ version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0978bf7171b3d90bac376700cb56d606feb40f251a475a5d6634613564460b22"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
