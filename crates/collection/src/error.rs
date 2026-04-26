@@ -62,6 +62,14 @@ pub enum Error {
 
     #[error("Invalid regex for CD folder: {0} {1}")]
     InvalidCDFolderRegex(String, regex::Error),
+
+    #[cfg(feature = "collation")]
+    #[error("Invalid locale string: {0}")]
+    InvalidLocale(#[from] icu::locale::ParseError),
+
+    #[cfg(feature = "collation")]
+    #[error("Invalid Collation Data: {0}")]
+    InvalidCollationData(String),
 }
 
 macro_rules! invalid_option_err {

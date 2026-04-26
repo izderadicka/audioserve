@@ -1,6 +1,6 @@
 [package]
 name = "collection"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 edition = "2021"
 
@@ -20,7 +20,6 @@ sled = { version = "0.34", features = ["compression"] }
 thiserror.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.116"
-lazy_static = "1.4"
 log = "0.4"
 regex = "1.10"
 csv = "1.3"
@@ -37,9 +36,7 @@ crossbeam-channel = "0.5"
 enum_dispatch = "0.3"
 
 tokio = { version = "1", optional = true, features = ["rt"] }
-rust_icu_ucol = { version = "5.0", default-features = false, features = [
-    "renaming",
-], optional = true }
+icu = { version = "2.1", optional = true }
 indexmap = "2.2.6"
 
 [features]
@@ -47,9 +44,5 @@ partially-static = ["media_info/partially-static"]
 static = ["media_info/static"]
 async = ["tokio"]
 symlinks = []
-collation = ["rust_icu_ucol/use-bindgen", "rust_icu_ucol/icu_config"]
-collation-static = [
-    "rust_icu_ucol/renaming",
-    "rust_icu_ucol/icu_version_in_env",
-]
+collation = ["icu"]
 tags-encoding = ["media_info/alternate-encoding"]

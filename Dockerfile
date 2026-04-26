@@ -11,8 +11,7 @@ ARG CARGO_RELEASE
 
 RUN apk update &&\
     apk add git bash curl yasm build-base pkgconfig \
-    wget libbz2 bzip2-dev zlib zlib-dev rust cargo ffmpeg-dev ffmpeg \
-    clang clang-dev gawk ctags llvm-dev icu icu-libs icu-dev
+    wget libbz2 bzip2-dev zlib zlib-dev rust cargo ffmpeg-dev ffmpeg
 
 COPY . /audioserve 
 WORKDIR /audioserve
@@ -42,8 +41,7 @@ COPY --from=client /audioserve_client/dist /audioserve/client/dist
 
 RUN adduser -D -u 1000 audioserve &&\
     chown -R audioserve:audioserve /audioserve &&\
-    apk --no-cache add libbz2 zlib ffmpeg && \
-    if [[ "$CARGO_ARGS" =~ "collation" ]]; then apk --no-cache add icu-libs; fi
+    apk --no-cache add libbz2 zlib ffmpeg
 
 WORKDIR /audioserve
 USER audioserve
