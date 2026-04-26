@@ -1006,7 +1006,7 @@ mod tests {
         tags.extend(req_tags.iter().map(|s| s.to_string()));
         let tags = Some(tags);
         let meta = media_info.get_audio_info(&tags).unwrap();
-        assert_eq!(meta.bitrate, 220);
+        assert!(meta.bitrate>= 220 && meta.bitrate <= 225); // bitrate can be different on different versions of ffmpeg
         assert_eq!(meta.duration, 2);
         assert!(meta.tags.is_some());
         let tags = meta.tags.unwrap();

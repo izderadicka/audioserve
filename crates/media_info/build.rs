@@ -2,6 +2,7 @@ const FFMPEG_VERSION_4: &str = "ffmpeg-4.4.6";
 const FFMPEG_VERSION_5: &str = "ffmpeg-5.1.7";
 const FFMPEG_VERSION_6: &str = "ffmpeg-6.1.1";
 const FFMPEG_VERSION_7: &str = "ffmpeg-7.1.1";
+const FFMPEG_VERSION_8: &str = "ffmpeg-8.1";
 
 // macro_rules! warn {
 //     ($fmt:literal $(, $arg:expr)* ) => {
@@ -26,18 +27,18 @@ fn main() {
         match pkg {
             Ok(lib) => {
                 if let Some(version) = parse_main_version(&lib.version) {
-                    if version > 61 {
-                        panic!("libavformat is too new - need to update source with new ffi");
-                    } else if version == 61 {
-                        FFMPEG_VERSION_7
-                    } else if version == 60 {
-                        FFMPEG_VERSION_6
-                    } else if version == 59 {
-                        FFMPEG_VERSION_5
-                    } else if version == 58 {
-                        FFMPEG_VERSION_4
-                    } else {
-                        panic!("libavformat version is too old {}", lib.version);
+                    match version {
+                        62 => FFMPEG_VERSION_8,
+                        61 => FFMPEG_VERSION_7,
+                        60 => FFMPEG_VERSION_6,
+                        59 => FFMPEG_VERSION_5,
+                        58 => FFMPEG_VERSION_4,
+                        _ if version > 62 => {
+                            panic!("libavformat is too new - need to update source with new ffi");
+                        }
+                        _ => {
+                            panic!("libavformat version is too old {}, need at version 58, from ffmpeg 4.4", lib.version);
+                        }
                     }
                 } else {
                     panic!("Invalid version of libavformat: {}", lib.version);
