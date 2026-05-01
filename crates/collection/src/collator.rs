@@ -106,7 +106,7 @@ pub(crate) mod locale {
     };
     use icu::locale::Locale;
 
-    static LOCALE_COLLATOR: LazyLock<Collator> = LazyLock::new(|| Collator::new());
+    static LOCALE_COLLATOR: LazyLock<Collator> = LazyLock::new(Collator::new);
 
     fn normalize_posix_locale(input: &str) -> String {
         let base = input
