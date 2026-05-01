@@ -719,8 +719,8 @@ mod tests {
         // To update: run `cargo test -p collection test_position_record_golden_bytes -- --nocapture`,
         // copy the printed bytes, then verify backward-compatibility before committing.
         let expected: &[u8] = &[
-            1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 102, 1, 0, 0, 0, 0, 0, 0, 0, 97, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 102, 1, 0, 0, 0, 0, 0, 0, 0, 97, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ];
         assert_eq!(
             bytes, expected,
