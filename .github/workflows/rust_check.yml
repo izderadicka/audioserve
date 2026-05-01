@@ -9,7 +9,7 @@ env:
   RUSTFLAGS: "-Dwarnings"
 
 jobs:
-  build:
+  check:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -31,13 +31,14 @@ jobs:
         run: |
           rustc --version
           cargo check --all --features transcoding-cache,tags-encoding
+      - name: Check compilation (no-default-features)
+        run: cargo check --package audioserve --no-default-features
+      - name: Check compilation (all-features)
+        run: cargo check --all --all-features
       - name: Clippy check
         run: cargo clippy --all --features transcoding-cache,tags-encoding
       - name: Run unit tests
         run: cargo test --all --features transcoding-cache,tags-encoding
-      - name: Run integration tests
-        if: github.ref == 'refs/heads/mater'
-        run: cargo test -- --ignored --nocapture test_binary
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate code coverage
@@ -49,3 +50,14 @@ jobs:
           files: lcov.info
           fail_ci_if_error: true
 
+  integration-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: Swatinem/rust-cache@v2
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y  openssl libssl-dev pkg-config ffmpeg yasm build-essential wget libbz2-dev zlib1g-dev libavformat-dev
+      - name: Run integration tests
+        run: cargo test --features transcoding-cache,tags-encoding -- --ignored --nocapture test_binary

@@ -667,3 +667,64 @@ impl Collections {
             .unwrap_or_else(|e| Err(Error::from(e)))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::audio_meta::TimeStamp;
+    use crate::position::{PositionItem, PositionRecord};
+
+    fn make_test_record() -> PositionRecord {
+        let mut rec = PositionRecord::new();
+        rec.insert(
+            "folder/track.mp3".into(),
+            PositionItem {
+                file: "track.mp3".into(),
+                timestamp: TimeStamp::from(1_700_000_000_000u64),
+                position: 42.5_f32,
+                folder_finished: false,
+            },
+        );
+        rec
+    }
+
+    #[test]
+    fn test_position_record_roundtrip() {
+        let original = make_test_record();
+        let bytes = serialize(&original).expect("serialize failed");
+        let decoded: PositionRecord = deserialize(&bytes).expect("deserialize failed");
+        let item = decoded.get("folder/track.mp3").unwrap();
+        assert_eq!(item.file, "track.mp3");
+        assert!((item.position - 42.5_f32).abs() < 1e-4);
+        assert!(!item.folder_finished);
+    }
+
+    #[test]
+    fn test_position_record_golden_bytes() {
+        // Pins the exact bincode encoding (legacy config).
+        // If bincode is updated and this test fails, verify the new encoding
+        // is backward-compatible with existing on-disk sled data before updating.
+        let mut rec = PositionRecord::new();
+        rec.insert(
+            "f".into(),
+            PositionItem {
+                file: "a".into(),
+                timestamp: TimeStamp::from(0u64),
+                position: 0.0_f32,
+                folder_finished: false,
+            },
+        );
+        let bytes = serialize(&rec).expect("serialize failed");
+        // Generated with bincode 2.0.1 / legacy config.
+        // To update: run `cargo test -p collection test_position_record_golden_bytes -- --nocapture`,
+        // copy the printed bytes, then verify backward-compatibility before committing.
+        let expected: &[u8] = &[
+            1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 102, 1, 0, 0, 0, 0, 0, 0, 0, 97, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
+        assert_eq!(
+            bytes, expected,
+            "bincode encoding changed — verify backward-compatibility before updating golden bytes"
+        );
+    }
+}
