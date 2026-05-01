@@ -1,6 +1,6 @@
 # check=error=true
 
-FROM ubuntu:24.04 AS build
+FROM ubuntu:26.04 AS build
 LABEL maintainer="Ivan <ivan@zderadicka.eu>"
 
 
