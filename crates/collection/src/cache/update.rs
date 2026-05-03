@@ -60,7 +60,7 @@ impl UpdateAction {
                 UpdateActionKind::RemoveFolder => true,
                 UpdateActionKind::RenameFolder { .. } => false,
             },
-            UpdateActionKind::RenameFolder { .. } => false,
+            UpdateActionKind::RenameFolder { .. } => matches!(other, UpdateActionKind::RemoveFolder),
         }
     }
 }
@@ -498,7 +498,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rename_folder_never_covered() {
+    fn test_rename_folder_not_covered_by_refresh() {
         let a = action(
             "music/rock",
             UpdateActionKind::RenameFolder {
@@ -507,13 +507,26 @@ mod tests {
         );
         assert!(!a.is_covered_by(&UpdateActionKind::RefreshFolder, false));
         assert!(!a.is_covered_by(&UpdateActionKind::RefreshFolderRecursive, false));
-        assert!(!a.is_covered_by(&UpdateActionKind::RemoveFolder, false));
         assert!(!a.is_covered_by(
             &UpdateActionKind::RenameFolder {
                 to: PathBuf::from("music/other")
             },
             false
         ));
+    }
+
+    #[test]
+    fn test_rename_folder_covered_by_remove() {
+        // If RemoveFolder is already queued for a path, a RenameFolder on the same
+        // path must be suppressed — otherwise the insert would silently replace the
+        // remove and the cache entry would never be deleted.
+        let a = action(
+            "music/rock",
+            UpdateActionKind::RenameFolder {
+                to: PathBuf::from("music/punk"),
+            },
+        );
+        assert!(a.is_covered_by(&UpdateActionKind::RemoveFolder, false));
     }
 }
 
