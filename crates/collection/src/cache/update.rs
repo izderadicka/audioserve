@@ -434,6 +434,89 @@ impl<'a> RecursiveUpdater<'a> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{UpdateAction, UpdateActionKind};
+    use std::path::PathBuf;
+
+    fn action(path: &str, kind: UpdateActionKind) -> UpdateAction {
+        UpdateAction::new(PathBuf::from(path), kind)
+    }
+
+    #[test]
+    fn test_refresh_folder_covered_by_same_refresh() {
+        let a = action("music/rock", UpdateActionKind::RefreshFolder);
+        // Same path (other_is_parent=false) → covered
+        assert!(a.is_covered_by(&UpdateActionKind::RefreshFolder, false));
+        // Parent path (other_is_parent=true) → not covered
+        assert!(!a.is_covered_by(&UpdateActionKind::RefreshFolder, true));
+    }
+
+    #[test]
+    fn test_refresh_folder_covered_by_recursive_and_remove() {
+        let a = action("music/rock", UpdateActionKind::RefreshFolder);
+        assert!(a.is_covered_by(&UpdateActionKind::RefreshFolderRecursive, false));
+        assert!(a.is_covered_by(&UpdateActionKind::RefreshFolderRecursive, true));
+        assert!(a.is_covered_by(&UpdateActionKind::RemoveFolder, false));
+        assert!(a.is_covered_by(&UpdateActionKind::RemoveFolder, true));
+    }
+
+    #[test]
+    fn test_refresh_folder_not_covered_by_rename() {
+        let a = action("music/rock", UpdateActionKind::RefreshFolder);
+        assert!(!a.is_covered_by(
+            &UpdateActionKind::RenameFolder {
+                to: PathBuf::from("music/punk")
+            },
+            false
+        ));
+    }
+
+    #[test]
+    fn test_refresh_recursive_coverage() {
+        let a = action("music/rock", UpdateActionKind::RefreshFolderRecursive);
+        assert!(a.is_covered_by(&UpdateActionKind::RefreshFolderRecursive, false));
+        assert!(a.is_covered_by(&UpdateActionKind::RefreshFolderRecursive, true));
+        assert!(a.is_covered_by(&UpdateActionKind::RemoveFolder, false));
+        // Plain RefreshFolder never covers RefreshFolderRecursive
+        assert!(!a.is_covered_by(&UpdateActionKind::RefreshFolder, false));
+        assert!(!a.is_covered_by(&UpdateActionKind::RefreshFolder, true));
+    }
+
+    #[test]
+    fn test_remove_folder_coverage() {
+        let a = action("music/rock", UpdateActionKind::RemoveFolder);
+        assert!(a.is_covered_by(&UpdateActionKind::RemoveFolder, false));
+        assert!(!a.is_covered_by(&UpdateActionKind::RefreshFolder, false));
+        assert!(!a.is_covered_by(&UpdateActionKind::RefreshFolderRecursive, false));
+        assert!(!a.is_covered_by(
+            &UpdateActionKind::RenameFolder {
+                to: PathBuf::from("music/punk")
+            },
+            false
+        ));
+    }
+
+    #[test]
+    fn test_rename_folder_never_covered() {
+        let a = action(
+            "music/rock",
+            UpdateActionKind::RenameFolder {
+                to: PathBuf::from("music/punk"),
+            },
+        );
+        assert!(!a.is_covered_by(&UpdateActionKind::RefreshFolder, false));
+        assert!(!a.is_covered_by(&UpdateActionKind::RefreshFolderRecursive, false));
+        assert!(!a.is_covered_by(&UpdateActionKind::RemoveFolder, false));
+        assert!(!a.is_covered_by(
+            &UpdateActionKind::RenameFolder {
+                to: PathBuf::from("music/other")
+            },
+            false
+        ));
+    }
+}
+
 pub(crate) enum FilteredEvent {
     Pass(Event),
     Error(notify::Error, Option<PathBuf>),

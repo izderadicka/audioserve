@@ -52,3 +52,33 @@ pub fn positions_restore_format(s: &str) -> Result<PositionsBackupFormat, anyhow
         s.parse().context(format!("Invalid format string {}", s))?;
     Ok(format)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::is_valid_url_path_prefix;
+
+    #[test]
+    fn test_valid_prefix() {
+        assert!(is_valid_url_path_prefix("/api").is_ok());
+        assert!(is_valid_url_path_prefix("/api/v1").is_ok());
+        assert_eq!("/myapp", is_valid_url_path_prefix("/myapp").unwrap());
+    }
+
+    #[test]
+    fn test_invalid_prefix_root_only() {
+        // "/" both starts and ends with '/' → rejected
+        assert!(is_valid_url_path_prefix("/").is_err());
+    }
+
+    #[test]
+    fn test_invalid_prefix_no_leading_slash() {
+        assert!(is_valid_url_path_prefix("api").is_err());
+        assert!(is_valid_url_path_prefix("api/v1").is_err());
+    }
+
+    #[test]
+    fn test_invalid_prefix_trailing_slash() {
+        assert!(is_valid_url_path_prefix("/api/").is_err());
+        assert!(is_valid_url_path_prefix("/api/v1/").is_err());
+    }
+}
