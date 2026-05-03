@@ -68,18 +68,18 @@ pub(crate) type PositionsCollector = Collector<Position, PositionFilter>;
 
 pub struct PositionFilter {
     finished: Option<bool>,
-    from: Option<TimeStamp>,
-    to: Option<TimeStamp>,
+    before: Option<TimeStamp>,
+    after: Option<TimeStamp>,
 }
 
 impl PositionFilter {
-    pub fn new(finished: Option<bool>, from: Option<TimeStamp>, to: Option<TimeStamp>) -> Self {
-        Self { finished, from, to }
+    pub fn new(finished: Option<bool>, before: Option<TimeStamp>, after: Option<TimeStamp>) -> Self {
+        Self { finished, before, after }
     }
 
     #[allow(dead_code)]
     pub(crate) fn into_option(self) -> Option<Self> {
-        if self.finished.is_none() && self.from.is_none() && self.to.is_none() {
+        if self.finished.is_none() && self.before.is_none() && self.after.is_none() {
             None
         } else {
             Some(self)
@@ -95,19 +95,19 @@ impl CollectorFilter<Position> for PositionFilter {
             .map(|finished| *finished == item.folder_finished)
             .unwrap_or(true);
 
-        let before = self
-            .to
+        let passes_after = self
+            .after
             .as_ref()
-            .map(|before| item.timestamp >= *before)
+            .map(|after| item.timestamp >= *after)
             .unwrap_or(true);
 
-        let after = self
-            .from
+        let passes_before = self
+            .before
             .as_ref()
-            .map(|after| item.timestamp < *after)
+            .map(|before| item.timestamp < *before)
             .unwrap_or(true);
 
-        finished && before && after
+        finished && passes_after && passes_before
     }
 }
 
@@ -228,20 +228,19 @@ mod tests {
 
     #[test]
     fn test_position_filter_timestamp_window() {
-        // PositionFilter::new(finished, from, to)
-        // filter passes when: item.timestamp >= to AND item.timestamp < from
-        // i.e., the window [to, from) — here to=100, from=500
+        // PositionFilter::new(finished, before, after)
+        // passes when: after <= timestamp < before
         let filter = PositionFilter::new(
             None,
-            Some(TimeStamp::from(500)),
-            Some(TimeStamp::from(100)),
+            Some(TimeStamp::from(500)), // before: upper bound (exclusive)
+            Some(TimeStamp::from(100)), // after:  lower bound (inclusive)
         );
-        assert!(!filter.filter(&make_position(99, false)));  // below to
-        assert!(filter.filter(&make_position(100, false)));  // at to → accepted
+        assert!(!filter.filter(&make_position(99, false)));  // below after
+        assert!(filter.filter(&make_position(100, false)));  // at after → accepted
         assert!(filter.filter(&make_position(250, false)));  // in range
-        assert!(filter.filter(&make_position(499, false)));  // one below from
-        assert!(!filter.filter(&make_position(500, false))); // at from → rejected
-        assert!(!filter.filter(&make_position(600, false))); // above from
+        assert!(filter.filter(&make_position(499, false)));  // one below before
+        assert!(!filter.filter(&make_position(500, false))); // at before → rejected
+        assert!(!filter.filter(&make_position(600, false))); // above before
     }
 
     #[test]

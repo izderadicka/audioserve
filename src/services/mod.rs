@@ -629,10 +629,10 @@ fn position_params(params: &QueryParams) -> error::Result<collection::PositionFi
         _ => None,
     };
 
-    let from = get_ts_param(params, "from")?;
-    let to = get_ts_param(params, "to")?;
+    let before = get_ts_param(params, "before")?;
+    let after = get_ts_param(params, "after")?;
 
-    Ok(PositionFilter::new(finished, from, to))
+    Ok(PositionFilter::new(finished, before, after))
 }
 
 #[cfg(feature = "shared-positions")]
