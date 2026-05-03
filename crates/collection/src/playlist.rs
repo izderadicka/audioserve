@@ -25,7 +25,7 @@ fn validate_path(p: PathBuf) -> PlaylistItem {
 
     let segments: Vec<_> = p.components().collect();
     let sz = segments.len();
-    if sz > 4 {
+    if sz > 10 {
         debug!("Too deep item in playlist");
         return PlaylistItem::Illegal(p);
     } else if sz < 1 {
@@ -230,13 +230,13 @@ mod tests {
             PlaylistItem::Illegal(_)
         ));
 
-        // 5 segments (> 4) → Illegal; exactly 4 → accepted
+        // 11 segments (> 10) → Illegal; exactly 10 → accepted
         assert!(matches!(
-            validate_path(PathBuf::from("a/b/c/d/e.mp3")),
+            validate_path(PathBuf::from("a/b/c/d/e/f/g/h/i/j/k.mp3")),
             PlaylistItem::Illegal(_)
         ));
         assert!(!matches!(
-            validate_path(PathBuf::from("a/b/c/d.mp3")),
+            validate_path(PathBuf::from("a/b/c/d/e/f/g/h/i/j.mp3")),
             PlaylistItem::Illegal(_)
         ));
 
