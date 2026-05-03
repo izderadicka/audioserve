@@ -231,15 +231,12 @@ mod tests {
         // PositionFilter::new(finished, from, to)
         // filter passes when: item.timestamp >= to AND item.timestamp < from
         // i.e., the window [to, from) — here to=100, from=500
-        let filter = PositionFilter::new(
-            None,
-            Some(TimeStamp::from(500)),
-            Some(TimeStamp::from(100)),
-        );
-        assert!(!filter.filter(&make_position(99, false)));  // below to
-        assert!(filter.filter(&make_position(100, false)));  // at to → accepted
-        assert!(filter.filter(&make_position(250, false)));  // in range
-        assert!(filter.filter(&make_position(499, false)));  // one below from
+        let filter =
+            PositionFilter::new(None, Some(TimeStamp::from(500)), Some(TimeStamp::from(100)));
+        assert!(!filter.filter(&make_position(99, false))); // below to
+        assert!(filter.filter(&make_position(100, false))); // at to → accepted
+        assert!(filter.filter(&make_position(250, false))); // in range
+        assert!(filter.filter(&make_position(499, false))); // one below from
         assert!(!filter.filter(&make_position(500, false))); // at from → rejected
         assert!(!filter.filter(&make_position(600, false))); // above from
     }

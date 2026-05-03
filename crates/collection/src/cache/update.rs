@@ -60,7 +60,9 @@ impl UpdateAction {
                 UpdateActionKind::RemoveFolder => true,
                 UpdateActionKind::RenameFolder { .. } => false,
             },
-            UpdateActionKind::RenameFolder { .. } => matches!(other, UpdateActionKind::RemoveFolder),
+            UpdateActionKind::RenameFolder { .. } => {
+                matches!(other, UpdateActionKind::RemoveFolder)
+            }
         }
     }
 }
