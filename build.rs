@@ -8,7 +8,10 @@ fn main() {
         get_long_version(&commit, &commit_date)
     );
     println!("cargo:rustc-env=AUDIOSERVE_COMMIT={}", commit);
-    println!("cargo:rustc-env=AUDIOSERVE_COMMIT_WITH_DATE={} ({})", commit, commit_date);
+    println!(
+        "cargo:rustc-env=AUDIOSERVE_COMMIT_WITH_DATE={} ({})",
+        commit, commit_date
+    );
     println!("cargo:rustc-env=AUDIOSERVE_FEATURES={}", get_features());
 }
 
@@ -43,7 +46,13 @@ fn get_commit() -> String {
 
 fn get_commit_date() -> String {
     Command::new("git")
-        .args(["log", "-1", "--format=%cd", "--date=format:%d.%m.%Y %H:%M:%S", "HEAD"])
+        .args([
+            "log",
+            "-1",
+            "--format=%cd",
+            "--date=format:%d.%m.%Y %H:%M:%S",
+            "HEAD",
+        ])
         .output()
         .map(|mut o| {
             // trim trailing newline
