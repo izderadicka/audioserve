@@ -792,7 +792,9 @@ pub mod init {
             unsafe {
                 BASE_DATA_DIR = Some(base_dir);
             }
-            let config = Config::default();
+            let mut config = Config::default();
+            // provide two real directories so collection-number routing can be tested
+            config.base_dirs = vec![std::env::temp_dir(), std::env::temp_dir()];
             unsafe {
                 CONFIG = Some(config);
             }
@@ -833,5 +835,108 @@ mod tests {
         );
         let c3 = load_file("./test_data/transcodings.2.yaml");
         assert_eq!(c3.transcoding.get(QualityLevel::High).bitrate(), 96);
+    }
+
+    #[test]
+    fn test_thread_pool_config_check() {
+        let mut cfg = ThreadPoolConfig::default();
+
+        cfg.num_threads = 0;
+        assert!(cfg.check().is_err(), "num_threads=0 should fail");
+        cfg.num_threads = 1;
+        assert!(cfg.check().is_ok(), "num_threads=1 should pass");
+        cfg.num_threads = 32_768;
+        assert!(cfg.check().is_ok(), "num_threads=32768 should pass");
+        cfg.num_threads = 32_769;
+        assert!(cfg.check().is_err(), "num_threads=32769 should fail");
+
+        cfg.num_threads = 8;
+        cfg.queue_size = 9;
+        assert!(cfg.check().is_err(), "queue_size=9 should fail");
+        cfg.queue_size = 10;
+        assert!(cfg.check().is_ok(), "queue_size=10 should pass");
+        cfg.queue_size = 32_768;
+        assert!(cfg.check().is_ok(), "queue_size=32768 should pass");
+        cfg.queue_size = 32_769;
+        assert!(cfg.check().is_err(), "queue_size=32769 should fail");
+    }
+
+    #[test]
+    fn test_transcoding_config_check() {
+        let mut cfg = TranscodingConfig::default();
+
+        cfg.max_parallel_processes = 3;
+        assert!(cfg.check().is_err(), "max_parallel_processes=3 should fail");
+        cfg.max_parallel_processes = 4;
+        assert!(cfg.check().is_ok(), "max_parallel_processes=4 should pass");
+        cfg.max_parallel_processes = 200;
+        assert!(
+            cfg.check().is_ok(),
+            "max_parallel_processes=200 should pass"
+        );
+        cfg.max_parallel_processes = 201;
+        assert!(
+            cfg.check().is_err(),
+            "max_parallel_processes=201 should fail"
+        );
+
+        cfg.max_parallel_processes = 8;
+        cfg.max_runtime_hours = 0;
+        assert!(cfg.check().is_err(), "max_runtime_hours=0 should fail");
+        cfg.max_runtime_hours = 1;
+        assert!(cfg.check().is_ok(), "max_runtime_hours=1 should pass");
+    }
+
+    #[test]
+    fn test_collection_config_check() {
+        let mut cfg = CollectionConfig::default();
+
+        cfg.changes_debounce_interval = 0;
+        assert!(
+            cfg.check().is_err(),
+            "changes_debounce_interval=0 should fail"
+        );
+        cfg.changes_debounce_interval = 1;
+        assert!(
+            cfg.check().is_ok(),
+            "changes_debounce_interval=1 should pass"
+        );
+        cfg.changes_debounce_interval = 1800;
+        assert!(
+            cfg.check().is_ok(),
+            "changes_debounce_interval=1800 should pass"
+        );
+        cfg.changes_debounce_interval = 1801;
+        assert!(
+            cfg.check().is_err(),
+            "changes_debounce_interval=1801 should fail"
+        );
+    }
+
+    #[test]
+    fn test_config_get_tags() {
+        let mut cfg = Config::default();
+        assert!(cfg.get_tags().is_none(), "empty tags should return None");
+
+        cfg.tags.insert("artist".into());
+        cfg.tags.insert("album".into());
+        let tags = cfg.get_tags().expect("non-empty tags should return Some");
+        assert!(tags.contains("artist"));
+        assert!(tags.contains("album"));
+    }
+
+    #[test]
+    fn test_generate_tag() {
+        let t1 = generate_tag("pattern_one");
+        let t2 = generate_tag("pattern_one");
+        assert_eq!(t1, t2, "same input must produce same tag");
+        assert_eq!(t1.len(), 16, "tag must be 16 hex chars");
+
+        let t3 = generate_tag("pattern_two");
+        assert_ne!(t1, t3, "different inputs must produce different tags");
+
+        let t4 = generate_tag("yet_another_pattern");
+        assert_ne!(t1, t4);
+        assert_ne!(t3, t4);
     }
 }

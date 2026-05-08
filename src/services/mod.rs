@@ -662,10 +662,47 @@ fn extract_group(path: &str) -> PositionGroup {
 }
 
 #[cfg(test)]
-#[cfg(feature = "shared-positions")]
 mod tests {
     use super::*;
+    use crate::config::init::init_default_config;
 
+    #[test]
+    fn test_is_static_file() {
+        assert!(is_static_file("/bundle.js"));
+        assert!(is_static_file("/bundle.css"));
+        assert!(is_static_file("/global.css"));
+        assert!(is_static_file("/favicon.png"));
+        assert!(is_static_file("/app.webmanifest"));
+        assert!(is_static_file("/service-worker.js"));
+        assert!(is_static_file("/static/image.png"));
+        assert!(is_static_file("/static/sub/dir/file.js"));
+
+        assert!(!is_static_file("/api/folder"));
+        assert!(!is_static_file("/collections"));
+        assert!(!is_static_file("/1/path"));
+        assert!(!is_static_file("/bundle.jsx"));
+    }
+
+    #[test]
+    fn test_extract_collection_number() {
+        // init gives 2 collections (both pointing to temp_dir)
+        init_default_config();
+        let (path, cnum) = extract_collection_number("/0/some/path").unwrap();
+        assert_eq!(path, "/some/path");
+        assert_eq!(cnum, 0);
+        let (path, cnum) = extract_collection_number("/1/other/nested").unwrap();
+        assert_eq!(path, "/other/nested");
+        assert_eq!(cnum, 1);
+        // index 2 is out of range (only 0 and 1 exist)
+        assert!(extract_collection_number("/2/path").is_err());
+        assert!(extract_collection_number("/99/path").is_err());
+        // paths without a leading digit segment default to collection 0
+        let (path, cnum) = extract_collection_number("/no/collection/prefix").unwrap();
+        assert_eq!(path, "/no/collection/prefix");
+        assert_eq!(cnum, 0);
+    }
+
+    #[cfg(feature = "shared-positions")]
     #[test]
     fn test_extract_group() {
         if let PositionGroup::Group(x) = extract_group("/positions/usak") {
@@ -697,5 +734,32 @@ mod tests {
         } else {
             panic!("should be invalid")
         }
+    }
+
+    #[cfg(feature = "shared-positions")]
+    #[test]
+    fn test_position_params() {
+        use bytes::Bytes;
+        use http_body_util::Full;
+        use myhy::request::GenericRequestWrapper;
+        use myhy::Request;
+
+        macro_rules! params_for {
+            ($query:expr) => {{
+                let req = Request::builder()
+                    .uri(concat!("/test?", $query))
+                    .body(Full::new(Bytes::new()))
+                    .unwrap();
+                let wrapper = GenericRequestWrapper::new(req).unwrap();
+                let params = wrapper.params();
+                position_params(&params)
+            }};
+        }
+
+        assert!(params_for!("finished=true").is_ok());
+        assert!(params_for!("unfinished=true").is_ok());
+        assert!(params_for!("from=1000&to=5000").is_ok());
+        assert!(params_for!("").is_ok());
+        assert!(params_for!("from=notanumber").is_err());
     }
 }

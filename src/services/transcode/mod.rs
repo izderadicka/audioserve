@@ -646,4 +646,41 @@ mod tests {
         )
         .await;
     }
+
+    #[test]
+    fn test_quality_level_roundtrip() {
+        assert_eq!(QualityLevel::from_letter(&"l"), Some(QualityLevel::Low));
+        assert_eq!(QualityLevel::from_letter(&"m"), Some(QualityLevel::Medium));
+        assert_eq!(QualityLevel::from_letter(&"h"), Some(QualityLevel::High));
+        assert_eq!(QualityLevel::from_letter(&"x"), None);
+        assert_eq!(QualityLevel::from_letter(&""), None);
+
+        assert_eq!(QualityLevel::Low.to_letter(), "l");
+        assert_eq!(QualityLevel::Medium.to_letter(), "m");
+        assert_eq!(QualityLevel::High.to_letter(), "h");
+        assert_eq!(QualityLevel::Passthrough.to_letter(), "p");
+    }
+
+    #[test]
+    fn test_transcoding_params_format() {
+        let t = Transcoder::new(ChosenTranscoding {
+            format: TranscodingFormat::OpusInOgg(Opus::new(48, 8, Bandwidth::SuperWideBand, false)),
+            level: QualityLevel::Medium,
+            tag: "test",
+        });
+        let params = t.transcoding_params();
+        assert!(params.contains("codec="), "params must contain 'codec='");
+        assert!(
+            params.contains("bitrate="),
+            "params must contain 'bitrate='"
+        );
+        assert!(
+            params.contains("48"),
+            "params must contain the bitrate value 48"
+        );
+        assert!(
+            params.contains("opus-in-ogg"),
+            "params must name the format"
+        );
+    }
 }

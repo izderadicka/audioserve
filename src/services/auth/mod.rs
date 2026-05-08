@@ -534,4 +534,50 @@ mod tests {
             panic!("Authentication should fail");
         }
     }
+
+    #[test]
+    fn test_token_expired() {
+        const KEY_BYTES: &[u8] = b"test key for expiry";
+        let key = hmac::Key::new(hmac::HMAC_SHA256, KEY_BYTES);
+        // 0-hour validity: expires at the moment of creation because is_valid checks validity() > now()
+        let token = Token::new(0, &key);
+        assert!(!token.is_valid(&key));
+        let secrets = Secrets {
+            shared_secret: "secret".into(),
+            server_key: hmac::Key::new(hmac::HMAC_SHA256, KEY_BYTES),
+            token_validity_hours: 24,
+        };
+        let serialized: String = token.into();
+        assert!(!secrets.token_ok(&serialized));
+    }
+
+    #[test]
+    fn test_tokens_are_unique() {
+        let key = hmac::Key::new(hmac::HMAC_SHA256, b"uniqueness test key");
+        let token1: String = Token::new(24, &key).into();
+        let token2: String = Token::new(24, &key).into();
+        assert_ne!(token1, token2);
+    }
+
+    #[test]
+    fn test_cookie_params() {
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri("/test")
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+        let req = GenericRequestWrapper::new(req).unwrap();
+        assert_eq!(cookie_params(&req), "SameSite=Lax");
+
+        let req2 = Request::builder()
+            .method(Method::GET)
+            .uri("/test")
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+        let req2 = GenericRequestWrapper::new(req2)
+            .unwrap()
+            .set_is_ssl(true)
+            .set_is_cors(true);
+        assert_eq!(cookie_params(&req2), "SameSite=None; Secure");
+    }
 }

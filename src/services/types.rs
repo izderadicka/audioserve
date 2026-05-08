@@ -131,4 +131,24 @@ mod download_format {
             }
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_download_format() {
+            assert_eq!(DownloadFormat::Tar.extension(), ".tar");
+            assert_eq!(DownloadFormat::Zip.extension(), ".zip");
+
+            let tar: DownloadFormat = "tar".parse().unwrap();
+            assert_eq!(tar, DownloadFormat::Tar);
+
+            let zip: DownloadFormat = "zip".parse().unwrap();
+            assert_eq!(zip, DownloadFormat::Zip);
+
+            assert!("xml".parse::<DownloadFormat>().is_err());
+            assert!("".parse::<DownloadFormat>().is_err());
+        }
+    }
 }

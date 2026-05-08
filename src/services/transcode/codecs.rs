@@ -193,3 +193,58 @@ impl AudioCodec for Aac {
         self.bitrate
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bandwidth_to_hz() {
+        assert_eq!(Bandwidth::NarrowBand.to_hz(), 4000);
+        assert_eq!(Bandwidth::MediumBand.to_hz(), 6000);
+        assert_eq!(Bandwidth::WideBand.to_hz(), 8000);
+        assert_eq!(Bandwidth::SuperWideBand.to_hz(), 12000);
+        assert_eq!(Bandwidth::FullBand.to_hz(), 20000);
+        assert_eq!(Bandwidth::Unlimited.to_hz(), 0);
+    }
+
+    #[test]
+    fn test_sample_rate_to_sr() {
+        assert_eq!(SampleRate::_8kHz.to_sr(), 8_000);
+        assert_eq!(SampleRate::_12kHz.to_sr(), 12_000);
+        assert_eq!(SampleRate::_16kHz.to_sr(), 16_000);
+        assert_eq!(SampleRate::_24kHz.to_sr(), 24_000);
+        assert_eq!(SampleRate::_32kHz.to_sr(), 32_000);
+        assert_eq!(SampleRate::_48kHz.to_sr(), 48_000);
+        assert_eq!(SampleRate::Unlimited.to_sr(), 0);
+    }
+
+    #[test]
+    fn test_opus_codec_args() {
+        let opus = Opus::new(48, 8, Bandwidth::FullBand, false);
+        assert!(opus.codec_args().contains(&"libopus"));
+        let quality = opus.quality_args();
+        assert!(!quality.is_empty());
+        let joined: Vec<&str> = quality.iter().map(|s| s.as_ref()).collect();
+        assert!(joined.contains(&"-b:a"));
+        assert!(joined.contains(&"48k"));
+        assert!(joined.contains(&"-compression_level"));
+        assert!(joined.contains(&"-cutoff"));
+    }
+
+    #[test]
+    fn test_mp3_codec_args() {
+        let mp3 = Mp3 {
+            bitrate: 128,
+            compression_level: 5,
+            abr: false,
+            mono: false,
+        };
+        assert!(mp3.codec_args().contains(&"libmp3lame"));
+        let quality = mp3.quality_args();
+        assert!(!quality.is_empty());
+        let joined: Vec<&str> = quality.iter().map(|s| s.as_ref()).collect();
+        assert!(joined.contains(&"-b:a"));
+        assert!(joined.contains(&"128k"));
+    }
+}
