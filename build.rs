@@ -2,17 +2,18 @@ use std::{env, process::Command};
 
 fn main() {
     let commit = get_commit();
+    let commit_date = get_commit_date();
     println!(
         "cargo:rustc-env=AUDIOSERVE_LONG_VERSION={}",
-        get_long_version(&commit)
+        get_long_version(&commit, &commit_date)
     );
     println!("cargo:rustc-env=AUDIOSERVE_COMMIT={}", commit);
     println!("cargo:rustc-env=AUDIOSERVE_FEATURES={}", get_features());
 }
 
-fn get_long_version(commit: &str) -> String {
+fn get_long_version(commit: &str, commit_date: &str) -> String {
     let ver = env::var("CARGO_PKG_VERSION").expect("cargo version is missing");
-    format!("{} #{}", ver, commit)
+    format!("{} #{} ({})", ver, commit, commit_date)
 }
 
 const FEATURE_PREFIX: &str = "CARGO_FEATURE_";
@@ -31,6 +32,23 @@ fn get_commit() -> String {
         .output()
         .map(|mut o| {
             o.stdout.truncate(7);
+            String::from_utf8(o.stdout).expect("git output must be utf-8")
+        })
+        .unwrap_or_else(|e| {
+            eprintln!("Error running git: {}", e);
+            "?".to_string()
+        })
+}
+
+fn get_commit_date() -> String {
+    Command::new("git")
+        .args(["log", "-1", "--format=%cd", "--date=format:%d.%m.%Y %H:%M:%S", "HEAD"])
+        .output()
+        .map(|mut o| {
+            // trim trailing newline
+            while o.stdout.last() == Some(&b'\n') || o.stdout.last() == Some(&b'\r') {
+                o.stdout.pop();
+            }
             String::from_utf8(o.stdout).expect("git output must be utf-8")
         })
         .unwrap_or_else(|e| {
