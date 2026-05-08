@@ -8,6 +8,7 @@ fn main() {
         get_long_version(&commit, &commit_date)
     );
     println!("cargo:rustc-env=AUDIOSERVE_COMMIT={}", commit);
+    println!("cargo:rustc-env=AUDIOSERVE_COMMIT_WITH_DATE={} ({})", commit, commit_date);
     println!("cargo:rustc-env=AUDIOSERVE_FEATURES={}", get_features());
 }
 
