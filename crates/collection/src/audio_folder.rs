@@ -1158,4 +1158,57 @@ mod tests {
             "Follet Ken/Srsen leta v noci/CD1/01 Srsen leta v noci.opus"
         );
     }
+
+    fn lister_with_chapter_duration(minutes: u32) -> FolderLister {
+        let mut opts: FolderOptions = CollectionOptions::default().into();
+        opts.chapters_duration = minutes;
+        FolderLister::new_with_options(opts)
+    }
+
+    #[test]
+    fn test_split_chapters_exact_division() {
+        // 60 min / 20 min chapters → exactly 3 chapters, no remainder
+        let lister = lister_with_chapter_duration(20);
+        let chaps = lister.split_chapters(60 * 60);
+        assert_eq!(3, chaps.len());
+        assert_eq!(0, chaps[0].start);
+        assert_eq!(20 * 60 * 1000, chaps[0].end);
+        assert_eq!(20 * 60 * 1000, chaps[1].start);
+        assert_eq!(40 * 60 * 1000, chaps[1].end);
+        assert_eq!(40 * 60 * 1000, chaps[2].start);
+        assert_eq!(60 * 60 * 1000, chaps[2].end);
+        assert_eq!("Part 0", chaps[0].title);
+        assert_eq!(0, chaps[0].number);
+    }
+
+    #[test]
+    fn test_split_chapters_small_remainder_merged() {
+        // 65 min / 30 min chapters: remainder 5 min < 30/3=10 min → merged into chapter 2
+        let lister = lister_with_chapter_duration(30);
+        let chaps = lister.split_chapters(65 * 60);
+        assert_eq!(2, chaps.len());
+        assert_eq!(30 * 60 * 1000, chaps[1].start);
+        assert_eq!(65 * 60 * 1000, chaps[1].end);
+    }
+
+    #[test]
+    fn test_split_chapters_large_remainder_not_merged() {
+        // 80 min / 30 min chapters: remainder 20 min > 10 min → stays as its own chapter
+        let lister = lister_with_chapter_duration(30);
+        let chaps = lister.split_chapters(80 * 60);
+        assert_eq!(3, chaps.len());
+        assert_eq!(60 * 60 * 1000, chaps[2].start);
+        assert_eq!(80 * 60 * 1000, chaps[2].end);
+        assert_eq!(2, chaps[2].number);
+    }
+
+    #[test]
+    fn test_split_chapters_single_chapter() {
+        // Audio shorter than one chapter duration → single chapter spanning full duration
+        let lister = lister_with_chapter_duration(30);
+        let chaps = lister.split_chapters(10 * 60);
+        assert_eq!(1, chaps.len());
+        assert_eq!(0, chaps[0].start);
+        assert_eq!(10 * 60 * 1000, chaps[0].end);
+    }
 }

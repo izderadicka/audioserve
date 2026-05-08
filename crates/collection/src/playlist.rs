@@ -25,7 +25,7 @@ fn validate_path(p: PathBuf) -> PlaylistItem {
 
     let segments: Vec<_> = p.components().collect();
     let sz = segments.len();
-    if sz > 4 {
+    if sz > 10 {
         debug!("Too deep item in playlist");
         return PlaylistItem::Illegal(p);
     } else if sz < 1 {
@@ -210,5 +210,55 @@ mod tests {
         assert!(pl.is_covering(Path::new("usak")));
         let items = pl.into_items();
         assert_eq!(4, items.len());
+    }
+
+    #[test]
+    fn test_validate_path_security() {
+        // Absolute path → Illegal
+        assert!(matches!(
+            validate_path(PathBuf::from("/etc/passwd")),
+            PlaylistItem::Illegal(_)
+        ));
+
+        // Parent traversal → Illegal
+        assert!(matches!(
+            validate_path(PathBuf::from("../secret/file.mp3")),
+            PlaylistItem::Illegal(_)
+        ));
+        assert!(matches!(
+            validate_path(PathBuf::from("subdir/../other.mp3")),
+            PlaylistItem::Illegal(_)
+        ));
+
+        // 11 segments (> 10) → Illegal; exactly 10 → accepted
+        assert!(matches!(
+            validate_path(PathBuf::from("a/b/c/d/e/f/g/h/i/j/k.mp3")),
+            PlaylistItem::Illegal(_)
+        ));
+        assert!(!matches!(
+            validate_path(PathBuf::from("a/b/c/d/e/f/g/h/i/j.mp3")),
+            PlaylistItem::Illegal(_)
+        ));
+
+        // Empty path → Illegal
+        assert!(matches!(
+            validate_path(PathBuf::from("")),
+            PlaylistItem::Illegal(_)
+        ));
+
+        // Single segment → CurrentDir
+        assert!(matches!(
+            validate_path(PathBuf::from("track.mp3")),
+            PlaylistItem::CurrentDir(_)
+        ));
+
+        // Two segments → Subdir with correct paths
+        match validate_path(PathBuf::from("subdir/track.mp3")) {
+            PlaylistItem::Subdir(full, dir) => {
+                assert_eq!(full, PathBuf::from("subdir/track.mp3"));
+                assert_eq!(dir, PathBuf::from("subdir"));
+            }
+            _ => panic!("Expected Subdir"),
+        }
     }
 }

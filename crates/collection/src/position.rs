@@ -194,4 +194,65 @@ mod tests {
         let res = c.into_vec();
         assert_eq!(vec![9, 8, 6, 5], res);
     }
+
+    use crate::audio_meta::TimeStamp;
+
+    fn make_position(ts: u64, finished: bool) -> Position {
+        Position {
+            timestamp: TimeStamp::from(ts),
+            collection: 0,
+            folder: "test/folder".into(),
+            file: "test.mp3".into(),
+            folder_finished: finished,
+            position: 0.5,
+        }
+    }
+
+    #[test]
+    fn test_position_filter_no_criteria() {
+        let filter = PositionFilter::new(None, None, None);
+        assert!(filter.filter(&make_position(1000, false)));
+        assert!(filter.filter(&make_position(9999, true)));
+    }
+
+    #[test]
+    fn test_position_filter_finished_flag() {
+        let f_true = PositionFilter::new(Some(true), None, None);
+        assert!(!f_true.filter(&make_position(100, false)));
+        assert!(f_true.filter(&make_position(100, true)));
+
+        let f_false = PositionFilter::new(Some(false), None, None);
+        assert!(f_false.filter(&make_position(100, false)));
+        assert!(!f_false.filter(&make_position(100, true)));
+    }
+
+    #[test]
+    fn test_position_filter_timestamp_window() {
+        // PositionFilter::new(finished, from, to)
+        // filter passes when: item.timestamp >= to AND item.timestamp < from
+        // i.e., the window [to, from) — here to=100, from=500
+        let filter =
+            PositionFilter::new(None, Some(TimeStamp::from(500)), Some(TimeStamp::from(100)));
+        assert!(!filter.filter(&make_position(99, false))); // below to
+        assert!(filter.filter(&make_position(100, false))); // at to → accepted
+        assert!(filter.filter(&make_position(250, false))); // in range
+        assert!(filter.filter(&make_position(499, false))); // one below from
+        assert!(!filter.filter(&make_position(500, false))); // at from → rejected
+        assert!(!filter.filter(&make_position(600, false))); // above from
+    }
+
+    #[test]
+    fn test_position_filter_combined_finished_and_timestamp() {
+        let filter = PositionFilter::new(
+            Some(true),
+            Some(TimeStamp::from(500)),
+            Some(TimeStamp::from(100)),
+        );
+        // In range but wrong finished flag → fails
+        assert!(!filter.filter(&make_position(250, false)));
+        // Right finished but out of range → fails
+        assert!(!filter.filter(&make_position(50, true)));
+        // Both conditions met → passes
+        assert!(filter.filter(&make_position(250, true)));
+    }
 }
