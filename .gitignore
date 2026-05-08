@@ -10,3 +10,4 @@ _static_build
 /crates/**/Cargo.lock
 lcov.info
 /target-test
+mutants.out
