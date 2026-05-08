@@ -7,7 +7,7 @@ extern crate byteorder;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use data_encoding::BASE64URL_NOPAD;
 use linked_hash_map::LinkedHashMap;
-use rand::RngCore;
+use rand::Rng;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, Metadata};
@@ -788,7 +788,7 @@ mod tests {
 
     #[test]
     fn test_size() {
-        use rand::Rng;
+        use rand::{Rng, RngExt};
         use std::thread;
 
         env_logger::try_init().ok();
