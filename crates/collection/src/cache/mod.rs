@@ -248,12 +248,33 @@ impl CollectionCache {
 
         let watcher = recommended_watcher(event_passing_fn)
             .map_err(|e| error!("Failed to create fs watcher: {}", e));
-        if let Ok(mut watcher) = watcher {
-            watcher
-                .watch(self.inner.base_dir(), notify::RecursiveMode::Recursive)
-                .map_err(|e| error!("failed to start watching: {}", e))
-                .ok();
-            *self.notify_watcher.lock().unwrap() = Some(watcher);
+        match watcher {
+            Ok(mut watcher) => {
+                // Recursive watch setup walks the entire tree (readdir + inotify_add_watch
+                // per directory), which can take many seconds to minutes on large or
+                // cold-cache filesystems (notably ZFS). Run it in a background thread so
+                // collection init returns immediately and the server can start listening.
+                // Until the watch is armed, fs changes won't be observed; the initial
+                // recursive scan that runs in parallel covers any state up to that point.
+                let base_dir = self.inner.base_dir().to_owned();
+                let notify_watcher = self.notify_watcher.clone();
+                spawn_named_thread("collection-watch-setup", move || {
+                    let t0 = std::time::Instant::now();
+                    if let Err(e) = watcher.watch(&base_dir, notify::RecursiveMode::Recursive) {
+                        error!("failed to start watching {:?}: {}", base_dir, e);
+                        return;
+                    }
+                    debug!(
+                        "Recursive watch armed for {:?} after {:?}",
+                        base_dir,
+                        t0.elapsed()
+                    );
+                    *notify_watcher.lock().unwrap() = Some(watcher);
+                });
+            }
+            Err(_) => {
+                error!("Failed to create fs watcher, collection changes won't be observed",);
+            }
         }
         event_receiver
     }

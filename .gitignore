@@ -11,3 +11,4 @@ _static_build
 lcov.info
 /target-test
 mutants.out
+.claude
