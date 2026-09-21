@@ -743,7 +743,7 @@ impl CacheInner {
                 }
                 let from = folder;
                 if let Err(e) = self.update_recursive_after_rename(&from, &to) {
-                    error!("Failed to do recursive rename, error: {}, we will have to do rescan of {:?}", e, &to);
+                    error!("Failed to do recursive rename, error: {}, we will have to do rescan of {:?}", e, to);
                     self.remove_tree(&from)
                         .map_err(|e| warn!("Error removing folder from cache: {}", e))
                         .ok();

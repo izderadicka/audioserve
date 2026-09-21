@@ -94,7 +94,7 @@ async fn serve_file_cached_or_transcoded(
                 )
                 .await
             } else {
-                debug!("Sending file {:?} from transcoded cache", &full_path);
+                debug!("Sending file {:?} from transcoded cache", full_path);
                 let mime = transcoding_quality.format.mime();
                 serve_opened_file(f, range, None, mime).await.map_err(|e| {
                     error!("Error sending cached file: {}", e);
@@ -136,7 +136,7 @@ async fn serve_file_transcoded_checked(
 
     debug!(
         "Sendig file {:?} transcoded - remaining slots {}/{}",
-        &full_path,
+        full_path,
         transcoding.max_transcodings - running_transcodings - 1,
         transcoding.max_transcodings
     );

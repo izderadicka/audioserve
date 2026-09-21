@@ -170,7 +170,7 @@ impl FolderLister {
                                 has_description,
                             }))
                         } else {
-                            error!("Chapter file for {:?} has less then two chapters!", &path);
+                            error!("Chapter file for {:?} has less then two chapters!", path);
                             Ok(DirType::Other)
                         }
                     }
@@ -652,7 +652,7 @@ fn chapters_from_csv(path: &Path) -> Result<Option<Vec<Chapter>>, io::Error> {
                 .filter_map(|r| {
                     match r {
                         Err(e) => {
-                            error!("Invalid line in chapters file {:?} -  {}", &chapters_file, e);
+                            error!("Invalid line in chapters file {:?} -  {}", chapters_file, e);
                             None
                         }
                         Ok(r) => Some(r)
@@ -665,7 +665,7 @@ fn chapters_from_csv(path: &Path) -> Result<Option<Vec<Chapter>>, io::Error> {
                             Some((title,start, end))
                         }
                         _ => {
-                            error!("Invalid line {:?} in chapters file {:?} - missing or invalid fields", r.position(), &chapters_file);
+                            error!("Invalid line {:?} in chapters file {:?} - missing or invalid fields", r.position(), chapters_file);
                             None
                         }
                     }

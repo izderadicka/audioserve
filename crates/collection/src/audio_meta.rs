@@ -346,7 +346,7 @@ mod libavformat {
                         .collect::<Vec<_>>()
                 })
                 // ignore files with only one chapter
-                .and_then(|c| if c.len() < 2 { None } else { Some(c) })
+                .filter(|c| c.len() >= 2)
         }
 
         fn has_cover(&self) -> bool {
