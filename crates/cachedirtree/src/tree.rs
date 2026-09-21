@@ -126,14 +126,10 @@ impl<'a> Iterator for SearchResult<'a> {
                 self.matched_terms_stack.pop().unwrap();
                 trace!("Pop {:?}", self.matched_terms_stack.last().unwrap());
                 while parent.next_sibling().is_none() {
-                    parent = match parent.parent() {
-                        Some(p) => {
-                            self.matched_terms_stack.pop().unwrap();
-                            trace!("Pop {:?}", self.matched_terms_stack.last().unwrap());
-                            p
-                        }
-                        None => return None,
-                    };
+                    let p = parent.parent()?;
+                    self.matched_terms_stack.pop().unwrap();
+                    trace!("Pop {:?}", self.matched_terms_stack.last().unwrap());
+                    parent = p;
                 }
                 // is safe to unwrap, as previous loop will either find parent with next sibling or return
                 self.current_node = parent.next_sibling().unwrap();
