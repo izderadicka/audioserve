@@ -170,6 +170,7 @@ async fn serve_file_transcoded(
             "Requesting non existent file for transcoding {:?}",
             full_path
         );
+        counter.fetch_sub(1, Ordering::Release);
         return Ok(response::not_found());
     }
 
