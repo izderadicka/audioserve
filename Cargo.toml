@@ -91,7 +91,7 @@ reqwest = { version = "0.13.0", features = [
     'blocking',
     'json',
 ], default-features = false }
-escargot = "0.5.10"
+escargot = "1.0.0"
 tempfile = "3.16.0"
 http-body-util = "0.1.1"
 

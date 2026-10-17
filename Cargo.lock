@@ -1051,9 +1051,9 @@ dependencies = [
 
 [[package]]
 name = "escargot"
-version = "0.5.15"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11c3aea32bc97b500c9ca6a72b768a26e558264303d101d3409cf6d57a9ed0cf"
+checksum = "7cee4ebc7aa179936de3e98031b4c30b0f594309cc18e0e8fa41e0c13c303a2d"
 dependencies = [
  "log",
  "serde",
