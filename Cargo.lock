@@ -1051,9 +1051,9 @@ dependencies = [
 
 [[package]]
 name = "escargot"
-version = "0.5.15"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11c3aea32bc97b500c9ca6a72b768a26e558264303d101d3409cf6d57a9ed0cf"
+checksum = "189159de09e965c688ce1bfae3d974b8fc6826e2eaefcb6e0d40f337ec98492b"
 dependencies = [
  "log",
  "serde",
@@ -3513,7 +3513,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
