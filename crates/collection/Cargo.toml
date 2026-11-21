@@ -31,7 +31,7 @@ bincode = { version = "2.0.1", features = [
     "serde",
     "std",
 ], default-features = false }
-notify = "8.0"
+notify = "9.0"
 crossbeam-channel = "0.5"
 enum_dispatch = "0.3"
 
